@@ -1,0 +1,9 @@
+node_modules/
+.env
+study_bot.db
+study_bot.db.bak
+userStates.json
+backups/
+*.db
+*.bak
+fix*.js
