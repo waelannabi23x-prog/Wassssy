@@ -108,6 +108,8 @@ async function initSchema() {
   exec(`CREATE TABLE IF NOT EXISTS messages (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, type TEXT, content TEXT, file_id TEXT, target TEXT DEFAULT 'all', specialty_id INTEGER DEFAULT 0, sent INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')))`);
   exec(`CREATE TABLE IF NOT EXISTS user_states (user_id INTEGER PRIMARY KEY, state TEXT NOT NULL, updated_at TEXT DEFAULT (datetime('now')))`);
   exec(`CREATE TABLE IF NOT EXISTS group_chats (chat_id INTEGER PRIMARY KEY, title TEXT, joined_at TEXT DEFAULT (datetime('now')))`);
+  exec(`CREATE TABLE IF NOT EXISTS message_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, type TEXT DEFAULT 'text', content TEXT DEFAULT '', file_id TEXT DEFAULT '', created_at TEXT DEFAULT (datetime('now')))`);
+  exec(`CREATE TABLE IF NOT EXISTS scheduled_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, template_id INTEGER, target TEXT DEFAULT 'all', specialty_id INTEGER DEFAULT 0, send_at TEXT, sent INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')))`);
   exec('CREATE INDEX IF NOT EXISTS idx_files_category ON files(category_id)');
   exec('CREATE INDEX IF NOT EXISTS idx_history_user ON history(user_id)');
   exec('CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id)');
