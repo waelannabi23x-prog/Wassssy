@@ -190,6 +190,7 @@ async function initSchema() {
     "ALTER TABLE subjects ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
     "ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned INTEGER DEFAULT 0",
+    "ALTER TABLE bundles ADD COLUMN IF NOT EXISTS uploaded_by BIGINT DEFAULT 0",
   ];
   for(const sql of alterCols){
     try {
