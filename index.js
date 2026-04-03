@@ -15,6 +15,15 @@ const fs = require('fs');
 const TOKEN = process.env.BOT_TOKEN;
 global.userStates = {};
 global.maintenanceMode = false;
+// Load maintenance mode from DB
+async function loadMaintenance() {
+  try {
+    const { getSetting } = require('./database/db');
+    const val = await getSetting('maintenance');
+    global.maintenanceMode = val === 'true';
+    console.log('🔧 Maintenance mode:', global.maintenanceMode);
+  } catch(e) {}
+}
 
 // Load states from DB
 async function loadStates() {
@@ -297,6 +306,7 @@ bot.on('text', async ctx => {
 async function launch() {
   try {
     await initSchema();
+    await loadMaintenance();
     await loadStates();
     const m = await getSetting('maintenance');
     if (m === 'true') global.maintenanceMode = true;

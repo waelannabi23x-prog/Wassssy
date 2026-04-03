@@ -142,10 +142,10 @@ async function sendBundle(ctx,bundleId,spId,yrId,smId,sbId,catId){
   if(!files.length) return ctx.reply('الحزمة فارغة');
   bundlesDb.incBundleDownloads(bundleId);
   await ctx.reply('📦 *'+b.title+'* — جاري الإرسال...',{parse_mode:'Markdown'});
-  const mediaGroup=files.filter(f=>f.file_type!=='link').map(f=>({type:f.file_type==='photo'?'photo':'document',media:f.file_id,caption:f.title||''}));
+  const mediaGroup=files.filter(f=>f.real_type!=='link').map(f=>({type:f.real_type==='photo'?'photo':'document',media:f.file_id,caption:f.file_title||f.title||''}));
   if(mediaGroup.length) await ctx.replyWithMediaGroup(mediaGroup).catch(()=>{});
-  const links=files.filter(f=>f.file_type==='link');
-  if(links.length) await ctx.reply(links.map(f=>f.title+': '+f.file_id).join('\n'));
+  const links=files.filter(f=>f.real_type==='link');
+  if(links.length) await ctx.reply(links.map(f=>(f.file_title||f.title)+': '+f.file_id).join('\n'));
   const backCb=catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
   await ctx.reply('✅ اكتمل الإرسال!',{...build([[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]])});
 }
