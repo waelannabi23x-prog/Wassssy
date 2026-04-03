@@ -12,7 +12,7 @@ const deleteTemplate = id => run('DELETE FROM message_templates WHERE id=?',[id]
 
 // Scheduled
 const getScheduled = () => all('SELECT sm.*,mt.name,mt.type,mt.content,mt.file_id FROM scheduled_messages sm LEFT JOIN message_templates mt ON sm.template_id=mt.id WHERE sm.sent=0 ORDER BY sm.send_at ASC');
-const getPending = () => all("SELECT sm.*,mt.name,mt.type,mt.content,mt.file_id FROM scheduled_messages sm LEFT JOIN message_templates mt ON sm.template_id=mt.id WHERE sm.sent=0 AND sm.send_at::timestamp <= NOW() AT TIME ZONE 'Africa/Algiers'");
+const getPending = () => all("SELECT sm.*,mt.name,mt.type,mt.content,mt.file_id FROM scheduled_messages sm LEFT JOIN message_templates mt ON sm.template_id=mt.id WHERE sm.sent=0 AND sm.send_at <= NOW() + INTERVAL '1 hour'");
 const normalizeDate = (input) => {
   input = input.trim();
   // H:MM DD-MM-YYYY or HH:MM DD-MM-YYYY
