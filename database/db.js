@@ -56,6 +56,7 @@ function getSqlite() {
 
 // ── Convert SQLite query to PostgreSQL ──
 function toPg(sql) {
+  if(!sql || typeof sql !== "string") return sql || "";
   // Replace ? with $1, $2, ... but not inside ON CONFLICT(...)
   let i = 0;
   sql = sql
@@ -65,8 +66,7 @@ function toPg(sql) {
       if(m) return `NOW() + INTERVAL '${m[1]} ${m[2]}'`;
       return 'NOW()';
     })
-    .replace(/INSERT OR REPLACE/g, 'INSERT')
-    .replace(/INSERT OR IGNORE/g, 'INSERT')
+    .replace(/INSERT OR REPLACE INTO (\w+)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/gi, (_, table, cols, vals) => { const colList = cols.split(',').map(c => c.trim()); const pk = colList[0]; const updates = colList.slice(1).map(c => c+'=EXCLUDED.'+c).join(','); return 'INSERT INTO '+table+'('+cols+') VALUES('+vals+') ON CONFLICT('+pk+') DO UPDATE SET '+updates; })
     .replace(/LIKE \?/gi, 'ILIKE ?');
   // Now replace ? with $N
   sql = sql.replace(/\?/g, () => '$' + (++i));
@@ -222,7 +222,7 @@ async function getSetting(key) {
 }
 
 async function setSetting(key, value) {
-  await run('INSERT OR REPLACE INTO settings(key,value) VALUES(?,?)', [key, value]);
+  await run('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value', [key, value]);
 }
 
 module.exports = { all, get, run, initSchema, getSetting, setSetting, saveDB, DB_PATH };

@@ -33,7 +33,7 @@ global.setState = async function(uid, state) {
   global.userStates[uid] = state;
   try {
     const { run } = require('./database/db');
-    await run('INSERT OR REPLACE INTO user_states(user_id,state,updated_at) VALUES(?,?,datetime(\'now\'))', [uid, JSON.stringify(state)]);
+    await run('INSERT INTO user_states(user_id,state,updated_at) VALUES(?,?,NOW()) ON CONFLICT(user_id) DO UPDATE SET state=EXCLUDED.state,updated_at=NOW()', [uid, JSON.stringify(state)]);
   } catch(e) {}
 };
 
@@ -50,7 +50,7 @@ global.delState = async function(uid) {
 setInterval(async () => {
   try {
     const { run } = require('./database/db');
-    await run(`DELETE FROM user_states WHERE updated_at < datetime('now', '-1 hour')`);
+    await run(`DELETE FROM user_states WHERE updated_at < NOW() - INTERVAL '1 hour'`);
     const now = Date.now();
     for(const uid in global.userStates){
       if(global.userStates[uid]?._ts && now - global.userStates[uid]._ts > 3600000) global.delState(uid);
