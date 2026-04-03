@@ -20,8 +20,8 @@ async function authMiddleware(ctx,next){
   await users.upsert(uid,ctx.from.first_name,ctx.from.last_name,ctx.from.username);
   if(checkRateLimit(uid)&&!isOwner(uid)) return ctx.answerCbQuery?.('⏳ Too many requests!').catch(()=>{});
   if(await users.isBanned(uid)&&!isOwner(uid)) return ctx.reply('🚫 You are banned.');
-  const maintenance = await getSetting('maintenance');
-  if(maintenance==='true'&&!await isAdmin(uid)) return ctx.reply('🔧 *'+(global.maintenanceMsg||'Bot under maintenance')+'*\n\nPlease wait! 🙏',{parse_mode:'Markdown'});
+  
+  if(global.maintenanceMode===true&&!await isAdmin(uid)) return ctx.reply('🔧 *'+(global.maintenanceMsg||'Bot under maintenance')+'*\n\nPlease wait! 🙏',{parse_mode:'Markdown'});
   ctx.isOwner=isOwner(uid); ctx.isAdmin=await isAdmin(uid); ctx.uid=uid;
   return next();
 }
