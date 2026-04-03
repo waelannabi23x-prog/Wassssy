@@ -15,6 +15,9 @@ function getDb() {
     db.pragma('synchronous = NORMAL');
     db.pragma('temp_store = MEMORY');
     useBetterSqlite = true;
+    // Create tables immediately
+    db.exec(`CREATE TABLE IF NOT EXISTS scheduled_messages (id INTEGER PRIMARY KEY AUTOINCREMENT, template_id INTEGER, target TEXT DEFAULT 'all', specialty_id INTEGER DEFAULT 0, send_at TEXT, sent INTEGER DEFAULT 0, created_at TEXT DEFAULT (datetime('now')))`);
+    db.exec(`CREATE TABLE IF NOT EXISTS message_templates (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL UNIQUE, type TEXT DEFAULT 'text', content TEXT DEFAULT '', file_id TEXT DEFAULT '', created_at TEXT DEFAULT (datetime('now')))`);
     console.log('✅ Using better-sqlite3');
     return db;
   } catch(e) {
