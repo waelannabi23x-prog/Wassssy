@@ -78,8 +78,7 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
       rows.splice(1,0,[btn('📦 '+b.title+' ('+b.downloads+' تحميل)','bundle_'+b.id+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)]);
     });
   }
-  if(ctx.isAdmin) rows.push([btn('➕ رفع ملف','mg_upl_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)]);
-  if(ctx.isOwner) rows.push([btn('📦 حزمة جديدة','mg_add_bundle_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)]);
+  if(ctx.isAdmin) rows.push([btn('➕ رفع ملف','mg_upl_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId),btn('📦 حزمة','mg_add_bundle_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)]);
   rows.push(backMenu('sbs_'+spId+'_'+yrId+'_'+smId+'_'+sbId));
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
