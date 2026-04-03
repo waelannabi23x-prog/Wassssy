@@ -3,7 +3,7 @@ const upsert = (id,fn,ln,un) => run(`INSERT INTO users(id,first_name,last_name,u
 const getAll = (page=0,limit=20) => all('SELECT * FROM users ORDER BY last_active DESC LIMIT ? OFFSET ?',[limit,page*limit]);
 const count = async () => (await get('SELECT COUNT(*) as c FROM users'))?.c || 0;
 const activeToday = async () => (await get(`SELECT COUNT(*) as c FROM users WHERE last_active::timestamp >= NOW() - INTERVAL '1 day'`))?.c || 0;
-const allIds = async () => (await all('SELECT id FROM users WHERE is_banned=FALSE')).map(r=>r.id);
+const allIds = async () => (await all('SELECT id FROM users WHERE is_banned=0')).map(r=>r.id);
 const ban = id => run('UPDATE users SET is_banned=1 WHERE id=?',[id]);
 const unban = id => run('UPDATE users SET is_banned=0 WHERE id=?',[id]);
 const isBanned = async id => !!(await get('SELECT is_banned FROM users WHERE id=?',[id]))?.is_banned;

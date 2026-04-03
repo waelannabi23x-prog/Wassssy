@@ -180,6 +180,23 @@ async function initSchema() {
   }
 
   if(!pg) saveDB();
+  // Add missing columns if not exist
+  const alterCols = [
+    "ALTER TABLE files ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
+    "ALTER TABLE files ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''",
+    "ALTER TABLE specialties ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
+    "ALTER TABLE years ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
+    "ALTER TABLE semesters ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
+    "ALTER TABLE subjects ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
+    "ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
+    "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned INTEGER DEFAULT 0",
+  ];
+  for(const sql of alterCols){
+    try {
+      if(pg) await pg.query(sql);
+      else if(getSqlite()) getSqlite().exec(sql.replace(/IF NOT EXISTS/g,''));
+    } catch(e) {}
+  }
   console.log('✅ DB schema ready');
 }
 
