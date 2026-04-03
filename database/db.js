@@ -200,9 +200,18 @@ async function initSchema() {
   ];
   for(const sql of alterCols){
     try {
-      if(pg) await pg.query(sql);
-      else if(getSqlite()) getSqlite().exec(sql.replace(/IF NOT EXISTS/g,''));
-    } catch(e) {}
+      if(pg) {
+        // PostgreSQL safe column add
+        const match = sql.match(/ALTER TABLE (\w+) ADD COLUMN IF NOT EXISTS (\w+) (.+)/);
+        if(match) {
+          const [,table,col,type] = match;
+          const exists = await pg.query(`SELECT 1 FROM information_schema.columns WHERE table_name=$1 AND column_name=$2`,[table,col]);
+          if(!exists.rows.length) await pg.query(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
+        } else {
+          await pg.query(sql);
+        }
+      } else if(getSqlite()) getSqlite().exec(sql.replace(/IF NOT EXISTS/g,''));
+    } catch(e) { console.error('Alter error:', e.message.substring(0,60)); }
   }
   console.log('✅ DB schema ready');
 }
