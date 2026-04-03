@@ -184,6 +184,10 @@ async function initSchema() {
   const alterCols = [
     "ALTER TABLE files ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
     "ALTER TABLE files ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''",
+    "ALTER TABLE files ADD COLUMN IF NOT EXISTS file_type TEXT DEFAULT 'document'",
+    "ALTER TABLE files ADD COLUMN IF NOT EXISTS downloads INTEGER DEFAULT 0",
+    "ALTER TABLE files ADD COLUMN IF NOT EXISTS uploaded_by BIGINT DEFAULT 0",
+    "ALTER TABLE files ADD COLUMN IF NOT EXISTS uploaded_at TEXT DEFAULT (CURRENT_TIMESTAMP)",
     "ALTER TABLE specialties ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
     "ALTER TABLE years ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
     "ALTER TABLE semesters ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
@@ -191,6 +195,8 @@ async function initSchema() {
     "ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned INTEGER DEFAULT 0",
     "ALTER TABLE bundles ADD COLUMN IF NOT EXISTS uploaded_by BIGINT DEFAULT 0",
+    "ALTER TABLE bundles ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''",
+    "ALTER TABLE bundles ADD COLUMN IF NOT EXISTS downloads INTEGER DEFAULT 0",
   ];
   for(const sql of alterCols){
     try {
