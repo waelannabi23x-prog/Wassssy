@@ -33,7 +33,7 @@ async function showMainMenu(ctx, name) {
   const rows = [
     [btn('📚 تصفح المحتوى', 'browse')],
     [btn('🔍 بحث', 'search_prompt'), btn('🆕 الأحدث', 'latest')],
-    [btn('🔥 الأشهر', 'popular'), btn('🎯 موصى به', 'recommended')],
+    [btn('🆕 جديد في تخصصي', 'new_in_sp'), btn('🎯 موصى به', 'recommended')],
     [btn('⭐ المفضلة', 'favorites'), btn('📂 السجل', 'history')],
     [btn('👤 ملفي', 'profile'), btn('📊 إحصائيات', 'stats')],
   ];

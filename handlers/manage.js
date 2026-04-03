@@ -86,7 +86,9 @@ async function showMgFiles(ctx,spId,yrId,smId,sbId,catId,page=0){
     rows.push([btn('✏️','mg_rn_fl_'+[spId,yrId,smId,sbId,catId,f.id].join('_')),btn('📝','mg_desc_fl_'+[spId,yrId,smId,sbId,catId,f.id].join('_')),btn('🗑','mg_dl_fl_'+[spId,yrId,smId,sbId,catId,f.id].join('_'))]);
   });
   if(total>PS){const nav=[];if(page>0)nav.push(btn('⬅️','mg_fls_pg_'+[spId,yrId,smId,sbId,catId,page-1].join('_')));nav.push(btn((page+1)+'/'+Math.ceil(total/PS),'noop'));if((page+1)*PS<total)nav.push(btn('➡️','mg_fls_pg_'+[spId,yrId,smId,sbId,catId,page+1].join('_')));rows.push(nav);}
-  rows.push([btn('➕ رفع ملف','mg_upl_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId),btn('📦 حزمة','mg_add_bundle_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)]);
+  const uploadRow=[btn('➕ رفع ملف','mg_upl_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)];
+  if(ctx.isOwner) uploadRow.push(btn('📦 حزمة','mg_add_bundle_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId));
+  rows.push(uploadRow);
   rows.push(back('mg_cats_'+spId+'_'+yrId+'_'+smId+'_'+sbId));
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
@@ -245,11 +247,11 @@ async function handleText(ctx,state){
       case 'mg_desc_fl': await filesDb.updateDesc(state.id,text); done('✅ تم تحديث الوصف!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_')); break;
       case 'mg_admin_search':
         clearState(uid);
-        const fr=filesDb.search(text); const ur=usersDb.searchUsers(text);
-        let resp='🔍 *بحث الإدارة: "'+text+'"*\n\n';
-        if(fr.length){resp+='📄 *ملفات ('+fr.length+'):*\n';fr.slice(0,5).forEach(f=>{resp+='• '+f.title+' ('+f.sub_name+')\n';});}
-        if(ur.length){resp+='\n👥 *مستخدمون ('+ur.length+'):*\n';ur.slice(0,5).forEach(u=>{resp+='• '+(u.first_name||'ID:'+u.id)+(u.username?' @'+u.username:'')+'\n';});}
-        if(!fr.length&&!ur.length) resp+='_لا نتائج._';
+        const [fr,ur]=await Promise.all([filesDb.search(text),usersDb.searchUsers(text)]);
+        let resp='🔍 *بحث: "'+escMd(text)+'"*\n\n';
+        if(fr.length){resp+='📄 *ملفات ('+fr.length+'):*\n';fr.slice(0,5).forEach(f=>{resp+='• '+escMd(f.title)+' \('+escMd(f.sub_name)+'\)\n';});}
+        if(ur.length){resp+='\n👥 *مستخدمون ('+ur.length+'):*\n';ur.slice(0,5).forEach(u=>{resp+='• '+escMd(u.first_name||'ID:'+u.id)+(u.username?' @'+escMd(u.username):'')+'\n';});}
+        if(!fr.length&&!ur.length) resp+='_لا نتائج\._';
         ctx.reply(resp,{parse_mode:'Markdown',...build([back('mg_menu')])}); break;
       case 'mg_broadcast':
         clearState(uid);
@@ -448,6 +450,7 @@ async function handleCallback(ctx,data){
     return ctx.reply('✏️ الاسم الجديد للحزمة:');
   }
   if(data.startsWith('mg_add_bundle_')){
+    if(!ctx.isOwner) return ctx.answerCbQuery('🚫 هذه الميزة للمالك فقط.',{show_alert:true});
     const p=data.replace('mg_add_bundle_','').split('_');
     setState(uid,{type:'mg_bundle_title',spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});
     return ctx.reply('📦 اسم الحزمة:');

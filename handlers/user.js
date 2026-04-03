@@ -23,6 +23,26 @@ async function showPopular(ctx){
   return eos(ctx,'🔥 *الأكثر تحميلاً*',{parse_mode:'Markdown',...build(rows)});
 }
 
+async function showNewInSpecialty(ctx){
+  const uid=ctx.uid;
+  const spRow=await require('../database/users').getSpecialty(uid);
+  const spId=spRow?.specialty_id;
+  if(!spId||spId==0) return showLatest(ctx);
+  const {all}=require('../database/db');
+  const list=await all(
+    `SELECT f.*,c.name as cat_name,s.name as sub_name FROM files f
+     JOIN categories c ON f.category_id=c.id
+     JOIN subjects s ON c.subject_id=s.id
+     JOIN semesters sm ON s.semester_id=sm.id
+     JOIN years y ON sm.year_id=y.id
+     WHERE y.specialty_id=? AND f.is_deleted=0
+     ORDER BY f.uploaded_at DESC LIMIT 15`,[spId]);
+  if(!list.length) return showLatest(ctx);
+  const rows=list.map(f=>[btn('📄 '+f.title+' · '+escMd(f.sub_name),'preview_'+f.id+'_0_0_0_0_0')]);
+  rows.push(back('main_menu'));
+  return eos(ctx,'🆕 *الجديد في تخصصك ('+list.length+')*',{parse_mode:'Markdown',...build(rows)});
+}
+
 async function showRecommended(ctx){
   const uid=ctx.uid; const list=await interactions.getRecommended(uid,10);
   if(!list.length) return showPopular(ctx);
@@ -94,4 +114,4 @@ async function handleSearch(ctx,query){
   ctx.reply('نتائج "'+query+'" ('+results.length+')',{...build(rows)});
 }
 
-module.exports={showLatest,showPopular,showRecommended,showFavorites,toggleFav,showHistory,showProfile,showStats,handleSearch};
+module.exports={showLatest,showPopular,showNewInSpecialty,showRecommended,showFavorites,toggleFav,showHistory,showProfile,showStats,handleSearch};

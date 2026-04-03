@@ -39,7 +39,7 @@ global.setState = async function(uid, state) {
 
 // Delete state from DB
 global.delState = async function(uid) {
-  global.delState(uid);
+  delete global.userStates[uid];
   try {
     const { run } = require('./database/db');
     await run('DELETE FROM user_states WHERE user_id=?', [uid]);
@@ -89,6 +89,17 @@ bot.command('done', async ctx => {
   }
 });
 
+bot.command('leaveall', async ctx => {
+  if(!ctx.isOwner) return ctx.reply('🚫 ليس لديك صلاحية.');
+  const { all } = require('./database/db');
+  const chats = await all('SELECT chat_id FROM group_chats');
+  let left = 0;
+  for(const ch of chats){
+    try { await ctx.telegram.leaveChat(ch.chat_id); left++; } catch(e) {}
+  }
+  ctx.reply('✅ خرجت من '+left+' قروب.');
+});
+
 bot.command('cancel', ctx => {
   if (global.userStates?.[ctx.uid]) { global.delState(ctx.uid); ctx.reply('❌ تم الإلغاء.'); }
 });
@@ -129,7 +140,7 @@ bot.on('callback_query', async ctx => {
       return ctx.reply('🎓 اختر تخصصك:', {parse_mode:'Markdown', ...require('./utils/keyboard').build(rows)});
     }
     if (data === 'latest') return userH.showLatest(ctx);
-    if (data === 'popular') return userH.showPopular(ctx);
+    if (data === 'new_in_sp') return userH.showNewInSpecialty(ctx);
     if (data === 'recommended') return userH.showRecommended(ctx);
     if (data === 'favorites') return userH.showFavorites(ctx);
     if (data === 'history') return userH.showHistory(ctx);
@@ -301,6 +312,26 @@ async function launch() {
 }
 
 launch();
+// Auto-leave any group/channel
+bot.on('my_chat_member', async ctx => {
+  const chat = ctx.myChatMember.chat;
+  if(chat.type !== 'private') {
+    try {
+      const { run } = require('./database/db');
+      await run('INSERT OR IGNORE INTO group_chats(chat_id,title) VALUES(?,?)', [chat.id, chat.title||'']);
+      await ctx.telegram.leaveChat(chat.id);
+      console.log('Left chat:', chat.id, chat.title||'');
+    } catch(e) {}
+  }
+});
+
+bot.on('message', async ctx => {
+  if(ctx.chat?.type !== 'private') {
+    try { await ctx.telegram.leaveChat(ctx.chat.id); } catch(e) {}
+    return;
+  }
+});
+
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
 
