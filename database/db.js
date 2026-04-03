@@ -91,7 +91,7 @@ async function initSchema() {
     sqlDb.run('PRAGMA synchronous=NORMAL');
     sqlDb.run('PRAGMA temp_store=MEMORY');
   }
-  const exec = (sql) => { try { bsq ? bsq.exec(sql) : sqlDb.run(sql); } catch(e) {} };
+  const exec = (sql) => { try { bsq ? bsq.exec(sql) : sqlDb.run(sql); } catch(e) { console.error('exec error:', e.message, sql.substring(0,50)); } };
   exec(`CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY, first_name TEXT, last_name TEXT, username TEXT, is_banned INTEGER DEFAULT 0, joined_at TEXT DEFAULT (datetime('now')), last_active TEXT DEFAULT (datetime('now')))`);
   exec(`CREATE TABLE IF NOT EXISTS admins (user_id INTEGER PRIMARY KEY, added_by INTEGER, permissions TEXT DEFAULT 'upload,add_content', specialty_id INTEGER DEFAULT 0, added_at TEXT DEFAULT (datetime('now')))`);
   try{ bsq ? bsq.exec('ALTER TABLE admins ADD COLUMN specialty_id INTEGER DEFAULT 0') : sqlDb.run('ALTER TABLE admins ADD COLUMN specialty_id INTEGER DEFAULT 0'); }catch(e){}
