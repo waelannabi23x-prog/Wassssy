@@ -3,8 +3,10 @@ const fs = require('fs');
 const path = require('path');
 const DB_PATH = path.join(__dirname, '..', 'study_bot.db');
 
+let useBetterSqlite = null;
 function getDb() {
   if(db) return db;
+  if(useBetterSqlite === false) return null;
   try {
     const Database = require('better-sqlite3');
     db = new Database(DB_PATH);
@@ -12,10 +14,12 @@ function getDb() {
     db.pragma('cache_size = 10000');
     db.pragma('synchronous = NORMAL');
     db.pragma('temp_store = MEMORY');
+    useBetterSqlite = true;
+    console.log('✅ Using better-sqlite3');
     return db;
   } catch(e) {
-    // Fallback to sql.js if better-sqlite3 not available (Termux)
-    console.log('better-sqlite3 not available, using sql.js');
+    useBetterSqlite = false;
+    console.log('⚠️ Using sql.js fallback');
     return null;
   }
 }
