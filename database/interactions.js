@@ -2,7 +2,7 @@ const { all, get, run } = require('./db');
 const J = `SELECT f.*,c.name as cat_name,s.name as sub_name FROM files f JOIN categories c ON f.category_id=c.id JOIN subjects s ON c.subject_id=s.id`;
 const getFavs = uid => all(J+' JOIN favorites fv ON fv.file_id=f.id WHERE fv.user_id=? AND f.is_deleted=0 ORDER BY fv.file_id DESC',[uid]);
 const isFav = async (uid,fid) => !!(await get('SELECT 1 FROM favorites WHERE user_id=? AND file_id=?',[uid,fid]));
-const addFav = (uid,fid) => run('INSERT OR IGNORE INTO favorites(user_id,file_id) VALUES(?,?)',[uid,fid]);
+const addFav = (uid,fid) => run('INSERT INTO favorites(user_id,file_id) VALUES(?,?) ON CONFLICT(user_id,file_id) DO NOTHING',[uid,fid]);
 const removeFav = (uid,fid) => run('DELETE FROM favorites WHERE user_id=? AND file_id=?',[uid,fid]);
 const favCount = async fid => (await get('SELECT COUNT(*) as c FROM favorites WHERE file_id=?',[fid]))?.c || 0;
 const addHistory = (uid,fid) => run('INSERT INTO history(user_id,file_id) VALUES(?,?)',[uid,fid]);
@@ -35,8 +35,8 @@ async function getSimilar(fileId,limit=4){
 }
 const addLog = (uid,action,details) => run('INSERT INTO logs(user_id,action,details) VALUES(?,?,?)',[uid,action,details||'']);
 const getLogs = (n=20) => all('SELECT l.*,u.first_name FROM logs l LEFT JOIN users u ON l.user_id=u.id ORDER BY l.created_at DESC LIMIT ?',[n]);
-const clearOldLogs = () => run(`DELETE FROM logs WHERE created_at < datetime('now', '-30 days')`);
-const getActiveUsers = async (days=7) => (await all(`SELECT id FROM users WHERE is_banned=0 AND last_active >= datetime('now', '-' || ? || ' days')`)).map(r=>r.id);
+const clearOldLogs = () => run(`DELETE FROM logs WHERE created_at < NOW() - INTERVAL '30 days'`);
+const getActiveUsers = async (days=7) => (await all(`SELECT id FROM users WHERE is_banned=0 AND last_active::timestamp >= NOW() - (? || ' days')::INTERVAL`)).map(r=>r.id);
 
 const addRating = (uid,fid,rating) => run('INSERT INTO ratings(user_id,file_id,rating) VALUES(?,?,?) ON CONFLICT(user_id,file_id) DO UPDATE SET rating=excluded.rating',[uid,fid,rating]);
 const getUserRating = async (uid,fid) => (await get('SELECT rating FROM ratings WHERE user_id=? AND file_id=?',[uid,fid]))?.rating || 0;
