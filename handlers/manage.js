@@ -345,7 +345,7 @@ async function handleCallback(ctx,data){
     const t=await messagesDb.getTemplate(id);
     if(!t) return ctx.reply('غير موجود');
     const rows=[[btn('📅 جدولة','mg_sched_'+id)],[btn('🗑 حذف','mg_del_tpl_'+id)],[back('mg_templates')[0]]];
-    const escMd2=s=>(s||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\return eos(ctx,'القالب: '+t.name+' | النوع: '+t.type+'\n\n'+t.content,{parse_mode:'Markdown',...build(rows)});'); return eos(ctx,'📋 *'+escMd2(t.name)+'*\nالنوع: '+t.type+'\n\n'+escMd2(t.content),{parse_mode:'Markdown',...build(rows)});
+        return eos(ctx,'القالب: '+t.name+' | النوع: '+t.type+'\n\n'+(t.content||''),{parse_mode:'Markdown',...build(rows)});
   }
   if(data.startsWith('mg_del_tpl_')){
     const messagesDb=require('../database/messages');
