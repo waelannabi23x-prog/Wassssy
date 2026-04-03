@@ -33,7 +33,7 @@ function startScheduler(bot, ownerIds) {
 
   // Check scheduled messages every minute
   setInterval(() => checkScheduledMessages(bot), 60000);
-  checkScheduledMessages(bot);
+  setTimeout(() => checkScheduledMessages(bot), 5000);
 
   scheduleDaily(async () => {
     try {
