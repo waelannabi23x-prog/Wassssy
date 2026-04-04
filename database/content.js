@@ -6,7 +6,7 @@ const getSpecs = async () => {
   const cached = cacheGet(key);
   if (cached) return cached;
   const result = await all('SELECT * FROM specialties WHERE is_deleted=0 ORDER BY name');
-  cacheSet(key, result);
+  cacheSet(key, result, 21600000);
   return result;
 };
 
@@ -15,7 +15,7 @@ const getSpec = async id => {
   const cached = cacheGet(key);
   if (cached) return cached;
   const result = await get('SELECT * FROM specialties WHERE id=?', [id]);
-  cacheSet(key, result);
+  cacheSet(key, result, 21600000);
   return result;
 };
 
@@ -24,7 +24,7 @@ const getYears = async spId => {
   const cached = cacheGet(key);
   if (cached) return cached;
   const result = await all('SELECT * FROM years WHERE specialty_id=? AND is_deleted=0 ORDER BY name', [spId]);
-  cacheSet(key, result);
+  cacheSet(key, result, 21600000);
   return result;
 };
 
@@ -33,7 +33,7 @@ const getYear = async id => {
   const cached = cacheGet(key);
   if (cached) return cached;
   const result = await get('SELECT * FROM years WHERE id=?', [id]);
-  cacheSet(key, result);
+  cacheSet(key, result, 21600000);
   return result;
 };
 
@@ -42,7 +42,7 @@ const getSemesters = async yrId => {
   const cached = cacheGet(key);
   if (cached) return cached;
   const result = await all('SELECT * FROM semesters WHERE year_id=? AND is_deleted=0 ORDER BY name', [yrId]);
-  cacheSet(key, result);
+  cacheSet(key, result, 21600000);
   return result;
 };
 
@@ -51,7 +51,7 @@ const getSemester = async id => {
   const cached = cacheGet(key);
   if (cached) return cached;
   const result = await get('SELECT * FROM semesters WHERE id=?', [id]);
-  cacheSet(key, result);
+  cacheSet(key, result, 21600000);
   return result;
 };
 
@@ -60,7 +60,7 @@ const getSubjects = async smId => {
   const cached = cacheGet(key);
   if (cached) return cached;
   const result = await all('SELECT * FROM subjects WHERE semester_id=? AND is_deleted=0 ORDER BY name', [smId]);
-  cacheSet(key, result);
+  cacheSet(key, result, 21600000);
   return result;
 };
 
@@ -69,7 +69,7 @@ const getSubject = async id => {
   const cached = cacheGet(key);
   if (cached) return cached;
   const result = await get('SELECT * FROM subjects WHERE id=?', [id]);
-  cacheSet(key, result);
+  cacheSet(key, result, 21600000);
   return result;
 };
 
@@ -78,7 +78,7 @@ const getCategories = async sbId => {
   const cached = cacheGet(key);
   if (cached) return cached;
   const result = await all('SELECT * FROM categories WHERE subject_id=? AND is_deleted=0 ORDER BY name', [sbId]);
-  cacheSet(key, result);
+  cacheSet(key, result, 21600000);
   return result;
 };
 
@@ -87,7 +87,7 @@ const getCategory = async id => {
   const cached = cacheGet(key);
   if (cached) return cached;
   const result = await get('SELECT * FROM categories WHERE id=?', [id]);
-  cacheSet(key, result);
+  cacheSet(key, result, 21600000);
   return result;
 };
 

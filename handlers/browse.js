@@ -34,7 +34,8 @@ async function showYears(ctx,spId,page=0) {
 }
 
 async function showSemesters(ctx,spId,yrId) {
-  const uid=ctx.uid; const sp=await content.getSpec(spId); const yr=await content.getYear(yrId);
+  const uid=ctx.uid;
+  const [sp, yr] = await Promise.all([content.getSpec(spId), content.getYear(yrId)]);
   const sems=await content.getSemesters(yrId);
   if(!sems.length) return eos(ctx,buildPath([sp?.name,yr?.name])+'\n\n📭 لا توجد فصول.',build([backMenu('yr_'+spId+'_'+yrId)]));
   const rows=sems.map(s=>[btn('📆 '+s.name,'sm_'+spId+'_'+yrId+'_'+s.id)]);
@@ -43,7 +44,8 @@ async function showSemesters(ctx,spId,yrId) {
 }
 
 async function showSubjects(ctx,spId,yrId,smId,page=0) {
-  const uid=ctx.uid; const sp=await content.getSpec(spId); const yr=await content.getYear(yrId); const sm=await content.getSemester(smId);
+  const uid=ctx.uid;
+  const [sp, yr, sm] = await Promise.all([content.getSpec(spId), content.getYear(yrId), content.getSemester(smId)]);
   const all=await content.getSubjects(smId); const total=all.length; const subs=all.slice(page*PS,(page+1)*PS);
   if(!subs.length) return eos(ctx,buildPath([sp?.name,yr?.name,sm?.name])+'\n\n📭 لا توجد مواد.',build([backMenu('sm_'+spId+'_'+yrId+'_'+smId)]));
   const rows=subs.map(s=>[btn('📖 '+s.name,'sb_'+spId+'_'+yrId+'_'+smId+'_'+s.id)]);
@@ -53,7 +55,8 @@ async function showSubjects(ctx,spId,yrId,smId,page=0) {
 }
 
 async function showCategories(ctx,spId,yrId,smId,sbId) {
-  const uid=ctx.uid; const sp=await content.getSpec(spId); const yr=await content.getYear(yrId); const sm=await content.getSemester(smId); const sb=await content.getSubject(sbId);
+  const uid=ctx.uid;
+  const [sp, yr, sm, sb] = await Promise.all([content.getSpec(spId), content.getYear(yrId), content.getSemester(smId), content.getSubject(sbId)]);
   const cats=await content.getCategories(sbId);
   if(!cats.length) return eos(ctx,buildPath([sp?.name,yr?.name,sm?.name,sb?.name])+'\n\n📭 لا توجد فئات.',build([backMenu('sb_'+spId+'_'+yrId+'_'+smId+'_'+sbId)]));
   const rows=cats.map(c=>[btn('📁 '+c.name,'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+c.id)]);
@@ -62,8 +65,14 @@ async function showCategories(ctx,spId,yrId,smId,sbId) {
 }
 
 async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
-  const uid=ctx.uid; const cat=await content.getCategory(catId); const sb=await content.getSubject(sbId);
-  const sp=await content.getSpec(spId); const yr=await content.getYear(yrId); const sm=await content.getSemester(smId);
+  const uid=ctx.uid;
+  const [cat, sb, sp, yr, sm] = await Promise.all([
+    content.getCategory(catId),
+    content.getSubject(sbId),
+    content.getSpec(spId),
+    content.getYear(yrId),
+    content.getSemester(smId)
+  ]);
   const all=await filesDb.getFiles(catId); const total=all.length; const list=all.slice(page*PS,(page+1)*PS);
   const pathStr=buildPath([sp?.name,yr?.name,sm?.name,sb?.name,cat?.name]);
   let text=pathStr+'\n━━━━━━━━━━━━\n'+(total?'📄 *'+total+' ملف*':t(uid,'no_files'));
