@@ -316,9 +316,25 @@ async function handleText(ctx,state){
       case 'mg_broadcast':
         clearState(uid);
         const ids=await usersDb.allIds(); let sent=0,failed=0;
-        const sm=await ctx.reply('📢 جاري الإرسال لـ '+ids.length+' مستخدم...');
-        for(const id of ids){try{await ctx.telegram.sendMessage(id,'📢 *إعلان*\n\n'+text,{parse_mode:'Markdown'});sent++;}catch{failed++;}await new Promise(r=>setTimeout(r,50));}
-        ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ اكتمل البث!\n✅ أُرسل: '+sent+' | ❌ فشل: '+failed,build([back('mg_menu')])); break;
+        const total_bc=ids.length;
+        const sm=await ctx.reply('📢 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total_bc,{parse_mode:'Markdown'});
+        for(let i=0;i<ids.length;i++){
+          try{await ctx.telegram.sendMessage(ids[i],'📢 *إعلان*\n\n'+text,{parse_mode:'Markdown'});sent++;}catch{failed++;}
+          await new Promise(r=>setTimeout(r,50));
+          if(i%10===0||i===ids.length-1){
+            const pct=Math.round((i+1)/total_bc*100);
+            const filled=Math.round(pct/10);
+            const bar='█'.repeat(filled)+'░'.repeat(10-filled);
+            ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,
+              '📢 *جاري الإرسال...*\n`['+bar+'] '+pct+'%`\n✅ '+sent+' | ❌ '+failed+' | ⏳ '+(total_bc-i-1),
+              {parse_mode:'Markdown'}
+            ).catch(()=>{});
+          }
+        }
+        ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,
+          '✅ *اكتمل البث!*\n`[██████████] 100%`\n✅ '+sent+' | ❌ '+failed+' | 📊 '+Math.round(sent/total_bc*100)+'%',
+          {...build([back('mg_menu')]),parse_mode:'Markdown'}
+        ); break;
       case 'mg_notify_sp_msg':
         clearState(uid);
         const spUsers = await usersDb.getUsersBySpecialty(state.spId);
