@@ -151,7 +151,7 @@ async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
   const backCb=catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
   const kb=build([[btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid)],[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]]);
   try{
-    if(f.file_type==='link'){await ctx.reply(caption+' '+f.url,{...kb});}
+    if(f.file_type==='link'){await ctx.reply(caption+'\n\n🔗 '+f.file_id,{parse_mode:'Markdown',...kb});}
     else if(f.file_type==='photo') await ctx.replyWithPhoto(f.file_id,{caption,parse_mode:'Markdown',...kb});
     else await ctx.replyWithDocument(f.file_id,{caption,parse_mode:'Markdown',...kb});
     try{await ctx.deleteMessage();}catch(e){}

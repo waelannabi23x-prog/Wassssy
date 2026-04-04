@@ -254,7 +254,7 @@ async function handleFileUpload(ctx){
   else if(msg.video){fid=msg.video.file_id;ftype='document';}
   else if(msg.audio){fid=msg.audio.file_id;ftype='document';}
   else if(msg.voice){fid=msg.voice.file_id;ftype='document';}
-  else if(isLink){fid='lnk_'+Date.now();ftype='link';}
+  else if(isLink){fid=msgText;ftype='link';}
   else return ctx.reply('ارسل ملف او رابط. او /cancel');
   try{
     await filesDb.addFile(state.catId,state.title,state.desc||'',fid,ftype,uid,ftype==='link'?msgText:'');
