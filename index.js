@@ -5,6 +5,7 @@ const { authMiddleware, isOwner, OWNER_ID } = require('./middlewares/auth');
 const interactions = require('./database/interactions');
 const startHandler = require('./handlers/start');
 const browse = require('./handlers/browse');
+const commentsDb = require('./database/comments');
 const userH = require('./handlers/user');
 const manage = require('./handlers/manage');
 const { startScheduler } = require('./utils/scheduler');
@@ -205,6 +206,27 @@ bot.on('callback_query', async ctx => {
       return userH.handleSearch(ctx, query);
     }
     if (data.startsWith('fav_')) return userH.toggleFav(ctx, data.replace('fav_',''));
+
+    // ── COMMENTS ──
+    if (data.startsWith('cmt_') && !data.startsWith('cmt_pg_')) {
+      const p=data.replace('cmt_','').split('_');
+      return browse.showComments(ctx,p[0],p[1],p[2],p[3],p[4],p[5],p[6]);
+    }
+    if (data.startsWith('cmt_pg_')) {
+      const p=data.replace('cmt_pg_','').split('_');
+      return browse.showComments(ctx,p[0],p[1],p[2],p[3],p[4],p[5],p[6],parseInt(p[7]));
+    }
+    if (data.startsWith('add_cmt_')) {
+      const p=data.replace('add_cmt_','').split('_');
+      await global.setState(ctx.uid, {type:'add_comment',fid:p[0],spId:p[1],yrId:p[2],smId:p[3],sbId:p[4],catId:p[5]});
+      return ctx.reply('✍️ اكتب تعليقك:\n_(أو /cancel)_',{parse_mode:'Markdown'});
+    }
+    if (data.startsWith('dcmt_')) {
+      const p=data.replace('dcmt_','').split('_');
+      await commentsDb.deleteCommentAdmin(p[0]);
+      await ctx.answerCbQuery('✅ تم الحذف').catch(()=>{});
+      return browse.showComments(ctx,p[1],p[2],p[3],p[4],p[5],p[6],p[7]);
+    }
     if (data.startsWith('unfav_')) return userH.toggleFav(ctx, data.replace('unfav_',''), true);
     if (data.startsWith('mg_')) {
       if (!ctx.isAdmin) return ctx.answerCbQuery('🚫 ليس لديك صلاحية.', { show_alert:true });
@@ -300,6 +322,15 @@ bot.on('text', async ctx => {
     return ctx.reply('اكتب نص الرسالة مع الرابط (او skip):');
   }
   if (state.type === 'search') return userH.handleSearch(ctx, ctx.message.text.trim());
+  if (state.type === 'add_comment') {
+    const text = ctx.message.text?.trim();
+    if (!text || text === '/cancel') { await global.delState(ctx.uid); return ctx.reply('❌ تم الإلغاء.'); }
+    if (text.length > 500) return ctx.reply('⚠️ التعليق طويل جداً. الحد 500 حرف.');
+    await commentsDb.addComment(state.fid, ctx.uid, text);
+    await global.delState(ctx.uid);
+    await ctx.reply('✅ تم إضافة تعليقك!');
+    return browse.showComments(ctx, state.fid, state.spId, state.yrId, state.smId, state.sbId, state.catId);
+  }
   if (state.type?.startsWith('mg_') && ctx.isAdmin) return manage.handleText(ctx, state);
 });
 

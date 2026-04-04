@@ -85,14 +85,50 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
 async function showPreview(ctx,fid,spId,yrId,smId,sbId,catId) {
   const uid=ctx.uid; const f=await filesDb.getFile(fid);
   if(!f) return ctx.reply(t(uid,'not_found'));
+  const commentsDb=require('../database/comments');
   const fav=await interactions.isFav(uid,fid); const favCnt=await interactions.favCount(fid);
   const userRating=await interactions.getUserRating(uid,fid);
   const {avg,cnt}=await interactions.getAvgRating(fid);
   const ratingText = starsDisplay(avg, cnt);
-  const text='📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 _'+escMd(f.description)+'_\n':'')+'\n📁 '+escMd(f.cat_name)+'\n📖 '+escMd(f.sub_name)+'\n⬇️ تحميل: *'+f.downloads+'*\n⭐ محفوظ: *'+favCnt+'* مستخدم\n'+ratingText;
+  const commentCount=await commentsDb.countComments(fid);
+  const text='📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 _'+escMd(f.description)+'_\n':'')+
+    '\n📁 '+escMd(f.cat_name)+'\n📖 '+escMd(f.sub_name)+
+    '\n⬇️ تحميل: *'+f.downloads+'*\n⭐ محفوظ: *'+favCnt+'* مستخدم\n'+
+    '💬 تعليقات: *'+commentCount+'*\n'+ratingText;
   const backCb = catId!=='0' ? 'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId : 'main_menu';
   const ratingBtns=[1,2,3,4,5].map(i=>btn(i<=userRating?'⭐':'☆','rate_'+fid+'_'+i+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId));
-  const rows=[[btn('⬇️ تحميل','fl_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)],[btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid)],ratingBtns,[btn('◀️ رجوع',backCb)]];
+  const rows=[
+    [btn('⬇️ تحميل','fl_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)],
+    [btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid),btn('💬 تعليقات ('+commentCount+')','cmt_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)],
+    ratingBtns,
+    [btn('◀️ رجوع',backCb)]
+  ];
+  return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
+}
+
+async function showComments(ctx,fid,spId,yrId,smId,sbId,catId,page=0) {
+  const uid=ctx.uid;
+  const commentsDb=require('../database/comments');
+  const comments=await commentsDb.getComments(fid,50);
+  const f=await filesDb.getFile(fid);
+  const PS=5;
+  const total=comments.length;
+  const list=comments.slice(page*PS,(page+1)*PS);
+  let text='💬 *تعليقات: '+escMd(f?.title||'')+'*\n━━━━━━━━━━━━\n';
+  if(!list.length) text+='_لا توجد تعليقات بعد._';
+  else list.forEach((c,i)=>{
+    const name=escMd(c.first_name||'مجهول');
+    const date=new Date(c.created_at).toLocaleDateString('en-GB');
+    text+='\n👤 *'+name+'* — _'+date+'_\n'+escMd(c.text)+'\n';
+  });
+  const rows=[];
+  if(ctx.isAdmin) list.forEach(c=>{rows.push([btn('🗑 حذف: '+c.text.substring(0,20),'dcmt_'+c.id+'_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)]);});
+  const nav=[];
+  if(page>0) nav.push(btn('⬅️','cmt_pg_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId+'_'+(page-1)));
+  if((page+1)*PS<total) nav.push(btn('➡️','cmt_pg_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId+'_'+(page+1)));
+  if(nav.length) rows.push(nav);
+  rows.push([btn('✍️ أضف تعليق','add_cmt_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)]);
+  rows.push([btn('◀️ رجوع','preview_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)]);
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
 
@@ -118,7 +154,7 @@ async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
   }catch(e){ctx.reply('❌ تعذر إرسال الملف. حاول مجدداً.');}
 }
 
-module.exports={showSpecs,showYears,showSemesters,showSubjects,showCategories,showFiles,showPreview,sendFile,showBundle,sendBundle};
+module.exports={showSpecs,showYears,showSemesters,showSubjects,showCategories,showFiles,showPreview,sendFile,showBundle,sendBundle,showComments};
 
 async function showBundle(ctx,bundleId,spId,yrId,smId,sbId,catId){
   const bundlesDb=require('../database/bundles');

@@ -103,12 +103,63 @@ async function showMgFiles(ctx,spId,yrId,smId,sbId,catId,page=0){
 }
 
 async function showAnalytics(ctx){
-  const top=await filesDb.topDownloaded(5); const recent=await filesDb.recentFiles(5);
-  let text='📊 *لوحة الإحصائيات*\n\n👥 المستخدمون: *'+await usersDb.count()+'*\n🟢 نشطون اليوم: *'+await usersDb.activeToday()+'*\n📁 الملفات: *'+await filesDb.totalFiles()+'*\n⬇️ التحميلات: *'+await filesDb.totalDownloads()+'*\n🎓 التخصصات: *'+(await content.getSpecs()).length+'*\n\n🏆 *الأكثر تحميلاً:*\n';
+  const {all} = require('../database/db');
+  const [top, recent, totalUsers, activeToday, totalFiles, totalDl, specs] = await Promise.all([
+    filesDb.topDownloaded(5),
+    filesDb.recentFiles(5),
+    usersDb.count(),
+    usersDb.activeToday(),
+    filesDb.totalFiles(),
+    filesDb.totalDownloads(),
+    content.getSpecs(),
+  ]);
+
+  // توزيع المستخدمين على التخصصات
+  const spDist = await all(`SELECT sp.name, COUNT(us.user_id) as cnt FROM user_specialties us LEFT JOIN specialties sp ON us.specialty_id=sp.id GROUP BY sp.name ORDER BY cnt DESC LIMIT 5`);
+
+  // أكثر 5 مستخدمين نشاطاً
+  const topUsers = await all(`SELECT u.first_name, u.username, COUNT(h.id) as cnt FROM history h LEFT JOIN users u ON h.user_id=u.id GROUP BY h.user_id, u.first_name, u.username ORDER BY cnt DESC LIMIT 5`);
+
+  // أوقات الذروة
+  const peakHours = await all(`SELECT EXTRACT(HOUR FROM viewed_at::timestamp) as hour, COUNT(*) as cnt FROM history GROUP BY hour ORDER BY cnt DESC LIMIT 3`);
+
+  // أكثر فئة تحميلاً هذا الأسبوع
+  const topCats = await all(`SELECT c.name, COUNT(h.id) as cnt FROM history h LEFT JOIN files f ON h.file_id=f.id LEFT JOIN categories c ON f.category_id=c.id WHERE h.viewed_at >= NOW() - INTERVAL '7 days' GROUP BY c.name ORDER BY cnt DESC LIMIT 3`);
+
+  let text = '📊 *لوحة الإحصائيات المتقدمة*\n━━━━━━━━━━━━\n';
+  text += '👥 المستخدمون: *'+totalUsers+'*\n';
+  text += '🟢 نشطون اليوم: *'+activeToday+'*\n';
+  text += '📁 الملفات: *'+totalFiles+'*\n';
+  text += '⬇️ التحميلات: *'+totalDl+'*\n';
+  text += '🎓 التخصصات: *'+specs.length+'*\n';
+
+  text += '\n🎓 *توزيع التخصصات:*\n';
+  if(spDist.length) spDist.forEach((s,i)=>{ text+=(i+1)+'. '+escMd(s.name||'غير محدد')+' — *'+s.cnt+'* مستخدم\n'; });
+  else text+='_لا بيانات._\n';
+
+  text += '\n🏆 *أكثر المستخدمين نشاطاً:*\n';
+  if(topUsers.length) topUsers.forEach((u,i)=>{ text+=(i+1)+'. '+(escMd(u.first_name)||'مجهول')+(u.username?' @'+escMd(u.username):'')+' — *'+u.cnt+'* تحميل\n'; });
+  else text+='_لا بيانات._\n';
+
+  text += '\n⏰ *أوقات الذروة:*\n';
+  if(peakHours.length) peakHours.forEach((h,i)=>{ text+=(i+1)+'. الساعة *'+Math.round(h.hour)+':00* — *'+h.cnt+'* نشاط\n'; });
+  else text+='_لا بيانات._\n';
+
+  text += '\n📁 *أكثر الفئات هذا الأسبوع:*\n';
+  if(topCats.length) topCats.forEach((c,i)=>{ text+=(i+1)+'. '+escMd(c.name||'غير محدد')+' — *'+c.cnt+'* تحميل\n'; });
+  else text+='_لا بيانات._\n';
+
+  text += '\n🏆 *الأكثر تحميلاً:*\n';
   top.forEach((f,i)=>{text+=(i+1)+'. '+escMd(f.title)+' ⬇️*'+f.downloads+'*\n';});
-  text+='\n🆕 *أحدث الملفات:*\n';
+
+  text += '\n🆕 *أحدث الملفات:*\n';
   recent.forEach((f,i)=>{text+=(i+1)+'. '+escMd(f.title)+'\n';});
-  return eos(ctx,text,{parse_mode:'Markdown',...build([back('mg_menu')])});
+
+  const rows = [
+    [btn('🔄 تحديث','mg_analytics')],
+    back('mg_menu')
+  ];
+  return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
 
 async function showLogs(ctx){
