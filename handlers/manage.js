@@ -484,16 +484,22 @@ async function showUserProfile(ctx, userId) {
   if (!user) return ctx.reply('❌ المستخدم غير موجود.');
   const dlCount = await require('../database/interactions').getUserDownloadCount(userId);
   const favs = await require('../database/interactions').getFavs(userId);
+  const spRow = await require('../database/users').getSpecialty(userId);
+  const spId = spRow?.specialty_id;
+  const sp = spId&&spId!=0 ? await require('../database/content').getSpec(spId) : null;
+  const lastFile = await require('../database/interactions').getLastFile(userId);
   const text = '👤 *بروفايل المستخدم*\n\n' +
     '🆔 ID: `' + userId + '`\n' +
     '👋 الاسم: ' + (user.first_name||'؟') + ' ' + (user.last_name||'') + '\n' +
     (user.username ? '📛 @' + user.username + '\n' : '') +
     '📅 انضم: ' + (user.joined_at ? new Date(user.joined_at).toLocaleDateString('en-GB') : '؟') + '\n' +
     '🕐 آخر نشاط: ' + (user.last_active ? new Date(user.last_active).toLocaleDateString('en-GB') : '؟') + '\n' +
+    '🎓 التخصص: *' + (sp ? (sp.name||'غير محدد') : 'غير محدد') + '*\n' +
     '🚫 محظور: ' + (user.is_banned ? 'نعم' : 'لا') + '\n\n' +
     '📊 *النشاط:*\n' +
     '⬇️ التحميلات: *' + dlCount + '*\n' +
-    '⭐ المفضلة: *' + favs.length + '*';
+    '⭐ المفضلة: *' + favs.length + '*' +
+    (lastFile ? '\n📄 آخر ملف: *' + (lastFile.title||'') + '*' : '');
   const {build, btn, back} = require('../utils/keyboard');
   const rows = [
     [btn(user.is_banned ? '✅ إلغاء الحظر' : '🚫 حظر', (user.is_banned ? 'mg_unban_' : 'mg_ban_') + userId)],
