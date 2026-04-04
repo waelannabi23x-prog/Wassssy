@@ -1,9 +1,17 @@
 const { all, get, run } = require('./db');
 const J = `SELECT f.*,c.name as cat_name,s.name as sub_name FROM files f JOIN categories c ON f.category_id=c.id JOIN subjects s ON c.subject_id=s.id`;
 const getFavs = uid => all(J+' JOIN favorites fv ON fv.file_id=f.id WHERE fv.user_id=? AND f.is_deleted=0 ORDER BY fv.file_id DESC',[uid]);
-const isFav = async (uid,fid) => !!(await get('SELECT 1 FROM favorites WHERE user_id=? AND file_id=?',[uid,fid]));
-const addFav = (uid,fid) => run('INSERT INTO favorites(user_id,file_id) VALUES(?,?) ON CONFLICT(user_id,file_id) DO NOTHING',[uid,fid]);
-const removeFav = (uid,fid) => run('DELETE FROM favorites WHERE user_id=? AND file_id=?',[uid,fid]);
+const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
+const isFav = async (uid,fid) => {
+  const key='fav_'+uid+'_'+fid;
+  const cached=cacheGet(key);
+  if(cached!==null) return cached;
+  const r=!!(await get('SELECT 1 FROM favorites WHERE user_id=? AND file_id=?',[uid,fid]));
+  cacheSet(key,r,300000);
+  return r;
+};
+const addFav = (uid,fid) => { cacheClear('fav_'+uid+'_'+fid); return run('INSERT INTO favorites(user_id,file_id) VALUES(?,?) ON CONFLICT(user_id,file_id) DO NOTHING',[uid,fid]); };
+const removeFav = (uid,fid) => { cacheClear('fav_'+uid+'_'+fid); return run('DELETE FROM favorites WHERE user_id=? AND file_id=?',[uid,fid]); };
 const favCount = async fid => (await get('SELECT COUNT(*) as c FROM favorites WHERE file_id=?',[fid]))?.c || 0;
 const addHistory = (uid,fid) => run('INSERT INTO history(user_id,file_id) VALUES(?,?)',[uid,fid]);
 const getHistory = (uid,n=15) => all(J+' JOIN history h ON h.file_id=f.id WHERE h.user_id=? AND f.is_deleted=0 ORDER BY h.viewed_at DESC LIMIT ?',[uid,n]);
