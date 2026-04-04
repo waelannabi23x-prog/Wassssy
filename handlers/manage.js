@@ -13,7 +13,7 @@ if(!global.userStates) global.userStates={};
 const setState=(uid,s)=>global.userStates[uid]=s;
 const clearState=uid=>delete global.userStates[uid];
 const PS=10;
-const esc=t=>(t||"").replace(/[*_`\[\]()~>#+=|{}.!-]/g,"\\$1");
+const esc=t=>(t||"").replace(/[*_`\[\]()~>#+=|{}.!\-]/g,"\\const esc=t=>(t||"").replace(/[*_`\[\]()~>#+=|{}.!-]/g,"\\$1");");
 
 async function mainMenu(ctx){
   const uid=ctx.uid;

@@ -1,5 +1,5 @@
 const { all, get, run } = require('./db');
-const upsert = (id,fn,ln,un) => run(`INSERT INTO users(id,first_name,last_name,username,last_active) VALUES(?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET first_name=EXCLUDED.first_name,last_name=EXCLUDED.last_name,username=EXCLUDED.username,last_active=CURRENT_TIMESTAMP`,[id,fn||'',ln||'',un||'']);
+const upsert = (id,fn,ln,un) => run(`INSERT INTO users(id,first_name,last_name,username,joined_at,last_active) VALUES(?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET first_name=EXCLUDED.first_name,last_name=EXCLUDED.last_name,username=EXCLUDED.username,last_active=CURRENT_TIMESTAMP`,[id,fn||'',ln||'',un||'']);
 const getAll = (page=0,limit=20) => all('SELECT * FROM users ORDER BY last_active DESC LIMIT ? OFFSET ?',[limit,page*limit]);
 const count = async () => (await get('SELECT COUNT(*) as c FROM users'))?.c || 0;
 const activeToday = async () => (await get(`SELECT COUNT(*) as c FROM users WHERE last_active::timestamp >= NOW() - INTERVAL '1 day'`))?.c || 0;
