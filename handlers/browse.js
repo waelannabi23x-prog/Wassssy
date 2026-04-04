@@ -105,11 +105,15 @@ async function showPreview(ctx,fid,spId,yrId,smId,sbId,catId) {
   const uid=ctx.uid; const f=await filesDb.getFile(fid);
   if(!f) return ctx.reply(t(uid,'not_found'));
   const commentsDb=require('../database/comments');
-  const fav=await interactions.isFav(uid,fid); const favCnt=await interactions.favCount(fid);
-  const userRating=await interactions.getUserRating(uid,fid);
-  const {avg,cnt}=await interactions.getAvgRating(fid);
+  const [fav, favCnt, userRating, ratingData, commentCount] = await Promise.all([
+    interactions.isFav(uid,fid),
+    interactions.favCount(fid),
+    interactions.getUserRating(uid,fid),
+    interactions.getAvgRating(fid),
+    commentsDb.countComments(fid)
+  ]);
+  const {avg,cnt} = ratingData;
   const ratingText = starsDisplay(avg, cnt);
-  const commentCount=await commentsDb.countComments(fid);
   const text='📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 _'+escMd(f.description)+'_\n':'')+
     '\n📁 '+escMd(f.cat_name)+'\n📖 '+escMd(f.sub_name)+
     '\n⬇️ تحميل: *'+f.downloads+'*\n⭐ محفوظ: *'+favCnt+'* مستخدم\n'+
