@@ -67,7 +67,17 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
   const all=await filesDb.getFiles(catId); const total=all.length; const list=all.slice(page*PS,(page+1)*PS);
   const pathStr=buildPath([sp?.name,yr?.name,sm?.name,sb?.name,cat?.name]);
   let text=pathStr+'\n━━━━━━━━━━━━\n'+(total?'📄 *'+total+' ملف*':t(uid,'no_files'));
-  const rows=await Promise.all(list.map(async f=>{const fav=await interactions.isFav(uid,f.id);const {avg}=await interactions.getAvgRating(f.id);const star=avg>=4?'⭐':avg>=2?'🌟':'📄';return[btn(star+' '+f.title+(avg>0?' '+avg+'★':''),'preview_'+f.id+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId),btn(fav?'⭐':'☆','fav_'+f.id)];}));
+  const fileIds = list.map(f=>f.id);
+  const [favMap, ratingMap] = await Promise.all([
+    interactions.getFavBatch(uid, fileIds),
+    interactions.getRatingBatch(fileIds)
+  ]);
+  const rows = list.map(f=>{
+    const fav = favMap[f.id]||false;
+    const avg = ratingMap[f.id]||0;
+    const star = avg>=4?'⭐':avg>=2?'🌟':'📄';
+    return [btn(star+' '+f.title+(avg>0?' '+avg+'★':''),'preview_'+f.id+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId),btn(fav?'⭐':'☆','fav_'+f.id)];
+  });
   if(total>PS){const nav=[];if(page>0)nav.push(btn('⬅️','ct_page_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId+'_'+(page-1)));nav.push(btn((page+1)+'/'+Math.ceil(total/PS),'noop'));if((page+1)*PS<total)nav.push(btn('➡️','ct_page_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId+'_'+(page+1)));rows.push(nav);}
   // Show bundles
   const bundlesDb = require('../database/bundles');

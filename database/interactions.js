@@ -49,4 +49,21 @@ const getActiveUsers = async (days=7) => (await all(`SELECT id FROM users WHERE 
 const addRating = (uid,fid,rating) => run('INSERT INTO ratings(user_id,file_id,rating) VALUES(?,?,?) ON CONFLICT(user_id,file_id) DO UPDATE SET rating=excluded.rating',[uid,fid,rating]);
 const getUserRating = async (uid,fid) => (await get('SELECT rating FROM ratings WHERE user_id=? AND file_id=?',[uid,fid]))?.rating || 0;
 const getAvgRating = async fid => { const r=await get('SELECT ROUND(AVG(rating),1) as avg, COUNT(*) as cnt FROM ratings WHERE file_id=?',[fid]); return {avg:parseFloat(r?.avg||0), cnt:parseInt(r?.cnt||0)}; };
-module.exports = { getFavs,isFav,addFav,removeFav,favCount,addHistory,getHistory,getLastFile,getUserDownloadCount,getRecommended,getSimilar,addLog,getLogs,clearOldLogs,getActiveUsers,addRating,getUserRating,getAvgRating };
+
+// Batch queries - أسرع بكثير
+const getFavBatch = async (uid, fileIds) => {
+  if(!fileIds.length) return {};
+  const ph = fileIds.map(()=>'?').join(',');
+  const rows = await all('SELECT file_id FROM favorites WHERE user_id=? AND file_id IN ('+ph+')', [uid,...fileIds]);
+  const set = new Set(rows.map(r=>r.file_id));
+  return Object.fromEntries(fileIds.map(id=>[id, set.has(id)]));
+};
+
+const getRatingBatch = async (fileIds) => {
+  if(!fileIds.length) return {};
+  const ph = fileIds.map(()=>'?').join(',');
+  const rows = await all('SELECT file_id, ROUND(AVG(rating),1) as avg FROM ratings WHERE file_id IN ('+ph+') GROUP BY file_id', [...fileIds]);
+  return Object.fromEntries(rows.map(r=>[r.file_id, parseFloat(r.avg||0)]));
+};
+
+module.exports = { getFavs,isFav,addFav,removeFav,favCount,addHistory,getHistory,getLastFile,getUserDownloadCount,getRecommended,getSimilar,addLog,getLogs,clearOldLogs,getActiveUsers,addRating,getUserRating,getAvgRating,getFavBatch,getRatingBatch };

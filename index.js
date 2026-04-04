@@ -340,6 +340,8 @@ async function launch() {
     await initSchema();
     await loadMaintenance();
     await loadStates();
+    const { cacheWarmup } = require('./utils/cache');
+    await cacheWarmup();
     const m = await getSetting('maintenance');
     if (m === 'true') global.maintenanceMode = true;
     console.log('✅ Database ready');
