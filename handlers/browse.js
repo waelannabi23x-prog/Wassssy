@@ -184,7 +184,7 @@ async function showBundle(ctx,bundleId,spId,yrId,smId,sbId,catId){
   const b=await bundlesDb.getBundle(bundleId);
   if(!b) return ctx.reply('الحزمة غير موجودة');
   const files=await bundlesDb.getBundleFiles(bundleId);
-  const text='📦 *'+b.title+'*'+(b.description?'\n📝 '+b.description:'')+'\n\n📄 *'+files.length+' ملف*\n'+files.map((f,i)=>(i+1)+'. '+f.title).join('\n')+'\n\n⬇️ تحميل: *'+b.downloads+'*';
+  const text='📦 *'+escMd(b.title)+'*'+(b.description?'\n📝 '+escMd(b.description):'')+'\n\n📄 *'+files.length+' ملف*\n'+files.map((f,i)=>(i+1)+'. '+escMd(f.title||f.file_title||'')).join('\n')+'\n\n⬇️ تحميل: *'+b.downloads+'*';
   const backCb=catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
   const rows=[[btn('⬇️ تحميل الكل','bdl_'+bundleId+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)]];
   if(ctx.isAdmin) rows.push([btn('✏️ تعديل الاسم','mg_rn_bundle_'+bundleId+'_'+catId+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId),btn('🗑 حذف','mg_dl_bundle_'+bundleId+'_'+catId+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId)]);
