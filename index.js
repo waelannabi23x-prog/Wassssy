@@ -346,7 +346,12 @@ async function launch() {
     if (m === 'true') global.maintenanceMode = true;
     console.log('✅ Database ready');
     startScheduler(bot, [OWNER_ID]);
+    const WEBHOOK_URL = 'https://lwss-production.up.railway.app';
     await bot.launch({
+      webhook: {
+        domain: WEBHOOK_URL,
+        port: 3000,
+      },
       allowedUpdates: ['message', 'callback_query'],
       dropPendingUpdates: true,
     });
