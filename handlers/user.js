@@ -86,7 +86,21 @@ async function showProfile(ctx){
   const dlCount=await interactions.getUserDownloadCount(uid);
   const _favs=await interactions.getFavs(uid); const favCount=_favs.length;
   const lang=getLang(uid);
-  const text='👤 *ملفك الشخصي*\n\n🆔 ID: `'+uid+'`\n👋 الاسم: '+(user?.first_name||'غير معروف')+'\n'+(user?.username?'📛 @'+user.username+'\n':'')+'📅 انضم: '+(user?.joined_at?formatDate(user.joined_at):'غير معروف')+'\n\n📊 *النشاط:*\n⬇️ التحميلات: *'+dlCount+'*\n⭐ المفضلة: *'+favCount+'*\n🌍 اللغة: *'+(lang==='ar'?'العربية 🇩🇿':'English 🇬🇧')+'*';
+  const spRow=await usersDb.getSpecialty(uid);
+  const spId=spRow?.specialty_id;
+  const sp=spId&&spId!=0?await content.getSpec(spId):null;
+  const lastFile=await interactions.getLastFile(uid);
+  let text='👤 *ملفك الشخصي*\n\n';
+  text+='🆔 ID: `'+uid+'`\n';
+  text+='👋 الاسم: '+(user?.first_name||'غير معروف')+'\n';
+  if(user?.username) text+='📛 @'+escMd(user.username)+'\n';
+  text+='📅 انضم: '+(user?.joined_at?formatDate(user.joined_at):'غير معروف')+'\n';
+  text+='🎓 التخصص: *'+(sp?escMd(sp.name):'غير محدد')+'*\n';
+  text+='\n📊 *النشاط:*\n';
+  text+='⬇️ التحميلات: *'+dlCount+'*\n';
+  text+='⭐ المفضلة: *'+favCount+'*\n';
+  if(lastFile) text+='📄 آخر ملف: *'+escMd(lastFile.title)+'*\n';
+  text+='🌍 اللغة: *'+(lang==='ar'?'العربية 🇩🇿':'English 🇬🇧')+'*';
   const rows=[[btn(lang==='ar'?'Switch to English 🇬🇧':'التبديل للعربية 🇩🇿','lang_'+(lang==='ar'?'en':'ar'))],[btn('🎯 موصى به','recommended')],back('main_menu')];
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
