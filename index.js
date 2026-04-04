@@ -14,6 +14,9 @@ const path = require('path');
 const fs = require('fs');
 
 const TOKEN = process.env.BOT_TOKEN;
+const express = require('express');
+const app = express();
+app.use(express.json());
 global.userStates = {};
 global.maintenanceMode = false;
 // Load maintenance mode from DB
@@ -347,14 +350,17 @@ async function launch() {
     console.log('✅ Database ready');
     startScheduler(bot, [OWNER_ID]);
     const WEBHOOK_URL = 'https://lwss-production.up.railway.app';
+    const PORT = process.env.PORT || 3000;
     await bot.launch({
       webhook: {
         domain: WEBHOOK_URL,
-        port: 3000,
+        port: PORT,
+        hookPath: '/webhook/'+TOKEN,
       },
       allowedUpdates: ['message', 'callback_query'],
       dropPendingUpdates: true,
     });
+    app.listen(PORT, () => console.log('✅ Webhook server on port '+PORT));
     console.log('🚀 Study Bot Pro v3.0 is running!');
   } catch(e) {
     console.error('Launch error:', e.message);
