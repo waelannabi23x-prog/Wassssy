@@ -214,6 +214,7 @@ async function initSchema() {
     "ALTER TABLE bundles ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
     "ALTER TABLE bundles ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''",
     "ALTER TABLE bundles ADD COLUMN IF NOT EXISTS downloads INTEGER DEFAULT 0",
+    "ALTER TABLE bundles ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
   ];
   for(const sql of alterCols){
     try {
