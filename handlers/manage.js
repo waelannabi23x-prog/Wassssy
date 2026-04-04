@@ -484,7 +484,11 @@ async function showUserProfile(ctx, userId) {
   if (!user) return ctx.reply('❌ المستخدم غير موجود.');
   const dlCount = await require('../database/interactions').getUserDownloadCount(userId);
   const favs = await require('../database/interactions').getFavs(userId);
-  const text = '👤 *بروفايل المستخدم*\n\n' +
+  const spRow = await require('../database/users').getSpecialty(userId);
+  const spId = spRow?.specialty_id;
+  const sp = spId&&spId!=0 ? await require('../database/content').getSpec(spId) : null;
+  const lastFile = await require('../database/interactions').getLastFile(userId);
+  const escMd2 = s => (s||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\  const text = '👤 *بروفايل المستخدم*\n\n' +
     '🆔 ID: `' + userId + '`\n' +
     '👋 الاسم: ' + (user.first_name||'؟') + ' ' + (user.last_name||'') + '\n' +
     (user.username ? '📛 @' + user.username + '\n' : '') +
@@ -493,7 +497,19 @@ async function showUserProfile(ctx, userId) {
     '🚫 محظور: ' + (user.is_banned ? 'نعم' : 'لا') + '\n\n' +
     '📊 *النشاط:*\n' +
     '⬇️ التحميلات: *' + dlCount + '*\n' +
-    '⭐ المفضلة: *' + favs.length + '*';
+    '⭐ المفضلة: *' + favs.length + '*';');
+  let text = '👤 *بروفايل المستخدم*\n\n';
+  text += '🆔 ID: `' + userId + '`\n';
+  text += '👋 الاسم: ' + escMd2(user.first_name||'؟') + ' ' + escMd2(user.last_name||'') + '\n';
+  if(user.username) text += '📛 @' + escMd2(user.username) + '\n';
+  text += '📅 انضم: ' + (user.joined_at ? new Date(user.joined_at).toLocaleDateString('en-GB') : '؟') + '\n';
+  text += '🕐 آخر نشاط: ' + (user.last_active ? new Date(user.last_active).toLocaleDateString('en-GB') : '؟') + '\n';
+  text += '🎓 التخصص: *' + (sp ? escMd2(sp.name) : 'غير محدد') + '*\n';
+  text += '🚫 محظور: ' + (user.is_banned ? 'نعم' : 'لا') + '\n\n';
+  text += '📊 *النشاط:*\n';
+  text += '⬇️ التحميلات: *' + dlCount + '*\n';
+  text += '⭐ المفضلة: *' + favs.length + '*\n';
+  if(lastFile) text += '📄 آخر ملف: *' + escMd2(lastFile.title) + '*';
   const {build, btn, back} = require('../utils/keyboard');
   const rows = [
     [btn(user.is_banned ? '✅ إلغاء الحظر' : '🚫 حظر', (user.is_banned ? 'mg_unban_' : 'mg_ban_') + userId)],
