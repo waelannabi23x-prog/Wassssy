@@ -27,9 +27,34 @@ async function askSpecialty(ctx, name) {
 
 async function showMainMenu(ctx, name) {
   const uid = ctx.uid;
-  if (!name) name = ctx.from?.first_name || 'Student';
-  const last = await interactions.getLastFile(uid);
-  const sp = await usersDb.getSpecialty(uid);
+  if (!name) name = escMd(ctx.from?.first_name || 'Student');
+
+  const [last, spRow] = await Promise.all([
+    interactions.getLastFile(uid),
+    usersDb.getSpecialty(uid)
+  ]);
+
+  const spId = spRow?.specialty_id;
+  const sp = spId && spId != 0 ? await content.getSpec(spId) : null;
+
+  // تحيات عشوائية احترافية
+  const hour = new Date().getHours();
+  let timeGreet = hour < 12 ? '🌅 صباح النور' : hour < 17 ? '☀️ مساء الخير' : hour < 21 ? '🌆 مساء النور' : '🌙 مساء الخير';
+
+  const greetings = [
+    timeGreet + '، *' + name + '!* 👋',
+    '✨ أهلاً بك، *' + name + '!*',
+    '🎓 مرحباً، *' + name + '!*',
+    '💡 يسعدنا وجودك، *' + name + '!*',
+    '🚀 أهلاً وسهلاً، *' + name + '!*',
+  ];
+  const greet = greetings[Math.floor(Math.random() * greetings.length)];
+
+  let welcome = greet + '\n';
+  if (sp) welcome += '🎓 ' + escMd(sp.name) + '\n';
+  welcome += '━━━━━━━━━━━━━━━━\n';
+  welcome += '📚 *منصتك الأكاديمية على تيليغرام*';
+
   const rows = [
     [btn('📚 تصفح المحتوى', 'browse')],
     [btn('🔍 بحث', 'search_prompt'), btn('🆕 الأحدث', 'latest')],
@@ -40,7 +65,7 @@ async function showMainMenu(ctx, name) {
   if (sp) rows.push([btn('🎓 تغيير تخصصي', 'change_sp')]);
   if (last && last.title) rows.push([btn('▶️ استكمال: ' + last.title.substring(0,20), 'preview_' + last.id + '_0_0_0_0_0')]);
   if (ctx.isAdmin) rows.push([btn('🛠 لوحة الإدارة', 'mg_menu')]);
-  return eos(ctx, t(uid, 'welcome', name), { parse_mode: 'Markdown', ...build(rows) });
+  return eos(ctx, welcome, { parse_mode: 'Markdown', ...build(rows) });
 }
 
 module.exports = startHandler;
