@@ -346,7 +346,10 @@ async function launch() {
     if (m === 'true') global.maintenanceMode = true;
     console.log('✅ Database ready');
     startScheduler(bot, [OWNER_ID]);
-    await bot.launch();
+    await bot.launch({
+      allowedUpdates: ['message', 'callback_query'],
+      dropPendingUpdates: true,
+    });
     console.log('🚀 Study Bot Pro v3.0 is running!');
   } catch(e) {
     console.error('Launch error:', e.message);
