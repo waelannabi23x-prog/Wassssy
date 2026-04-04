@@ -205,6 +205,7 @@ bot.on('callback_query', async ctx => {
       await ctx.answerCbQuery('تم الحذف').catch(()=>{});
       return userH.handleSearch(ctx, query);
     }
+    if (data === 'progress') return userH.showProgress(ctx);
     if (data.startsWith('fav_')) return userH.toggleFav(ctx, data.replace('fav_',''));
 
     // ── COMMENTS ──
