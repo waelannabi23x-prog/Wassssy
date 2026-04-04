@@ -168,10 +168,24 @@ async function initSchema() {
   // Indexes
   const indexes = [
     'CREATE INDEX IF NOT EXISTS idx_files_category ON files(category_id)',
+    'CREATE INDEX IF NOT EXISTS idx_files_deleted ON files(is_deleted)',
+    'CREATE INDEX IF NOT EXISTS idx_files_downloads ON files(downloads DESC)',
+    'CREATE INDEX IF NOT EXISTS idx_files_uploaded ON files(uploaded_at DESC)',
     'CREATE INDEX IF NOT EXISTS idx_history_user ON history(user_id)',
+    'CREATE INDEX IF NOT EXISTS idx_history_file ON history(file_id)',
+    'CREATE INDEX IF NOT EXISTS idx_history_viewed ON history(viewed_at DESC)',
     'CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id)',
+    'CREATE INDEX IF NOT EXISTS idx_favorites_file ON favorites(file_id)',
     'CREATE INDEX IF NOT EXISTS idx_users_active ON users(last_active)',
+    'CREATE INDEX IF NOT EXISTS idx_users_banned ON users(is_banned)',
+    'CREATE INDEX IF NOT EXISTS idx_ratings_file ON ratings(file_id)',
+    'CREATE INDEX IF NOT EXISTS idx_comments_file ON comments(file_id)',
+    'CREATE INDEX IF NOT EXISTS idx_categories_subject ON categories(subject_id)',
+    'CREATE INDEX IF NOT EXISTS idx_subjects_semester ON subjects(semester_id)',
+    'CREATE INDEX IF NOT EXISTS idx_semesters_year ON semesters(year_id)',
+    'CREATE INDEX IF NOT EXISTS idx_years_specialty ON years(specialty_id)',
     'CREATE INDEX IF NOT EXISTS idx_logs_created ON logs(created_at)',
+    'CREATE INDEX IF NOT EXISTS idx_user_specialties ON user_specialties(specialty_id)',
   ];
   for(const idx of indexes) {
     try {
