@@ -73,22 +73,28 @@ function toPg(sql) {
   return sql;
 }
 
+// cache للـ toPg لتجنب تحويل نفس الـ query مرتين
+const pgSqlCache = new Map();
+function toPgCached(sql) {
+  if(pgSqlCache.has(sql)) return pgSqlCache.get(sql);
+  const converted = toPg(sql);
+  if(pgSqlCache.size > 500) pgSqlCache.clear();
+  pgSqlCache.set(sql, converted);
+  return converted;
+}
+
 async function all(sql, params=[]) {
   const pg = getPg();
   if(pg) {
+    const converted = toPgCached(sql);
     try {
-      const converted = toPg(sql);
       const res = await pg.query(converted, params);
       return res.rows;
-    } catch(e) { console.error('DB all error:', e.message, '| SQL:', toPg(sql).substring(0,80)); return []; }
+    } catch(e) { console.error('DB all error:', e.message, '| SQL:', converted.substring(0,80)); return []; }
   }
-  // SQLite
   try {
     const db = getSqlite();
-    if(db) {
-      const stmt = db.prepare(sql);
-      return Promise.resolve(stmt.all(...params));
-    }
+    if(db) return Promise.resolve(db.prepare(sql).all(...params));
     const stmt = sqlJs.prepare(sql);
     stmt.bind(params);
     const rows = [];
@@ -105,12 +111,12 @@ function get(sql, params=[]) {
 async function run(sql, params=[]) {
   const pg = getPg();
   if(pg) {
+    const converted = toPgCached(sql);
     try {
-      await pg.query(toPg(sql), params);
+      await pg.query(converted, params);
       return;
     } catch(e) { console.error('DB run error:', e.message); throw e; }
   }
-  // SQLite
   try {
     const db = getSqlite();
     if(db) { db.prepare(sql).run(...params); return; }

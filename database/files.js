@@ -41,7 +41,7 @@ const recentFiles = (n=15) => all(J+' WHERE f.is_deleted=0 ORDER BY f.uploaded_a
 const getTrash = () => all(J+' WHERE f.is_deleted=1 ORDER BY f.uploaded_at DESC LIMIT 30');
 const search = q => {
   const words = q.trim().split(/\s+/);
-  const conditions = words.map(() => '(f.title ILIKE ? OR f.description ILIKE ? OR s.name ILIKE ? OR c.name ILIKE ? OR sp.name ILIKE ? OR y.name ILIKE ? OR sm.name ILIKE ?)').join(' AND ');
+  const conditions = words.map(() => '(f.title LIKE ? OR f.description LIKE ? OR s.name LIKE ? OR c.name LIKE ? OR sp.name LIKE ? OR y.name LIKE ? OR sm.name LIKE ?)').join(' AND ');
   const params = words.flatMap(w => Array(7).fill('%'+w+'%'));
   return all(J+' WHERE f.is_deleted=0 AND ('+conditions+') ORDER BY f.downloads DESC, f.uploaded_at DESC LIMIT 30', params);
 };

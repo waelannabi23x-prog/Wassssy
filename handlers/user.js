@@ -154,14 +154,18 @@ async function showProgress(ctx) {
 }
 
 async function showProfile(ctx){
-  const uid=ctx.uid; const user=await usersDb.getById(uid);
-  const dlCount=await interactions.getUserDownloadCount(uid);
-  const _favs=await interactions.getFavs(uid); const favCount=_favs.length;
+  const uid=ctx.uid;
   const lang=getLang(uid);
-  const spRow=await usersDb.getSpecialty(uid);
+  const [user, dlCount, _favs, spRow, lastFile] = await Promise.all([
+    usersDb.getById(uid),
+    interactions.getUserDownloadCount(uid),
+    interactions.getFavs(uid),
+    usersDb.getSpecialty(uid),
+    interactions.getLastFile(uid)
+  ]);
+  const favCount=_favs.length;
   const spId=spRow?.specialty_id;
   const sp=spId&&spId!=0?await content.getSpec(spId):null;
-  const lastFile=await interactions.getLastFile(uid);
   let text='👤 *ملفك الشخصي*\n\n';
   text+='🆔 ID: `'+uid+'`\n';
   text+='👋 الاسم: '+(user?.first_name||'غير معروف')+'\n';
@@ -178,7 +182,10 @@ async function showProfile(ctx){
 }
 
 async function showStats(ctx){
-  const text='📊 *الإحصائيات*\n\n👥 المستخدمون: *'+await usersDb.count()+'*\n🟢 نشطون اليوم: *'+await usersDb.activeToday()+'*\n📁 الملفات: *'+await filesDb.totalFiles()+'*\n⬇️ التحميلات: *'+await filesDb.totalDownloads()+'*\n🎓 التخصصات: *'+(await content.getSpecs()).length+'*';
+  const [totalUsers, activeToday, totalFiles, totalDl, specs] = await Promise.all([
+    usersDb.count(), usersDb.activeToday(), filesDb.totalFiles(), filesDb.totalDownloads(), content.getSpecs()
+  ]);
+  const text='📊 *الإحصائيات*\n\n👥 المستخدمون: *'+totalUsers+'*\n🟢 نشطون اليوم: *'+activeToday+'*\n📁 الملفات: *'+totalFiles+'*\n⬇️ التحميلات: *'+totalDl+'*\n🎓 التخصصات: *'+specs.length+'*';
   return eos(ctx,text,{parse_mode:'Markdown',...build([back('main_menu')])});
 }
 

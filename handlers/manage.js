@@ -17,7 +17,8 @@ const esc=t=>(t||"").replace(/[*_`\[\]()~>#+=|{}.!\-]/g,"\\$&");
 
 async function mainMenu(ctx){
   const uid=ctx.uid;
-  const text='🛠 *لوحة الإدارة*\n\n📚 التخصصات: *'+(await content.getSpecs()).length+'*\n📁 الملفات: *'+await filesDb.totalFiles()+'*\n🔧 الصيانة: *'+(global.maintenanceMode?'🔴 مفعّل':'🟢 متوقف')+'*';
+  const [specs0, files0] = await Promise.all([content.getSpecs(), filesDb.totalFiles()]);
+  const text='🛠 *لوحة الإدارة*\n\n📚 التخصصات: *'+specs0.length+'*\n📁 الملفات: *'+files0+'*\n🔧 الصيانة: *'+(global.maintenanceMode?'🔴 مفعّل':'🟢 متوقف')+'*';
   const rows=[[btn('📂 المحتوى','mg_content')],[btn('📊 الإحصائيات','mg_analytics'),btn('📜 السجلات','mg_logs')]];
   if(isOwner(uid)){
     rows.push([btn('📢 بث','mg_broadcast'),btn('👥 المستخدمون','mg_users')]);
@@ -45,7 +46,7 @@ async function showContent(ctx){
 }
 
 async function showYears(ctx,spId){
-  const sp=await content.getSpec(spId); const years=await content.getYears(spId);
+  const [sp, years] = await Promise.all([content.getSpec(spId), content.getYears(spId)]);
   const rows=years.map(y=>[btn('📅 '+y.name,'mg_sems_'+spId+'_'+y.id),btn('✏️','mg_rn_yr_'+spId+'_'+y.id),btn('🗑','mg_dl_yr_'+spId+'_'+y.id)]);
   rows.push([btn('➕ إضافة سنة','mg_add_yr_'+spId)]);
   rows.push(back('mg_content'));
@@ -53,7 +54,7 @@ async function showYears(ctx,spId){
 }
 
 async function showSemesters(ctx,spId,yrId){
-  const sp=await content.getSpec(spId); const yr=await content.getYear(yrId); const sems=await content.getSemesters(yrId);
+  const [sp, yr, sems] = await Promise.all([content.getSpec(spId), content.getYear(yrId), content.getSemesters(yrId)]);
   const rows=sems.map(s=>[btn('📆 '+s.name,'mg_sbs_'+spId+'_'+yrId+'_'+s.id),btn('✏️','mg_rn_sem_'+spId+'_'+yrId+'_'+s.id),btn('🗑','mg_dl_sem_'+spId+'_'+yrId+'_'+s.id)]);
   rows.push([btn('➕ إضافة فصل','mg_add_sem_'+spId+'_'+yrId)]);
   rows.push(back('mg_yrs_'+spId));
@@ -61,7 +62,7 @@ async function showSemesters(ctx,spId,yrId){
 }
 
 async function showSubjects(ctx,spId,yrId,smId){
-  const sm=await content.getSemester(smId); const subs=await content.getSubjects(smId);
+  const [sm, subs] = await Promise.all([content.getSemester(smId), content.getSubjects(smId)]);
   const rows=subs.map(s=>[btn('📖 '+s.name,'mg_cats_'+spId+'_'+yrId+'_'+smId+'_'+s.id),btn('✏️','mg_rn_sb_'+spId+'_'+yrId+'_'+smId+'_'+s.id),btn('🗑','mg_dl_sb_'+spId+'_'+yrId+'_'+smId+'_'+s.id)]);
   rows.push([btn('➕ إضافة مادة','mg_add_sb_'+spId+'_'+yrId+'_'+smId)]);
   rows.push(back('mg_sems_'+spId+'_'+yrId));
@@ -69,7 +70,7 @@ async function showSubjects(ctx,spId,yrId,smId){
 }
 
 async function showCategories(ctx,spId,yrId,smId,sbId){
-  const sb=await content.getSubject(sbId); const cats=await content.getCategories(sbId);
+  const [sb, cats] = await Promise.all([content.getSubject(sbId), content.getCategories(sbId)]);
   const rows=cats.map(c=>[btn('📁 '+c.name,'mg_fls_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+c.id),btn('✏️','mg_rn_cat_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+c.id),btn('🗑','mg_dl_cat_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+c.id)]);
   rows.push([btn('➕ إضافة فئة','mg_add_cat_'+spId+'_'+yrId+'_'+smId+'_'+sbId)]);
   rows.push(back('mg_sbs_'+spId+'_'+yrId+'_'+smId));
@@ -77,7 +78,7 @@ async function showCategories(ctx,spId,yrId,smId,sbId){
 }
 
 async function showMgFiles(ctx,spId,yrId,smId,sbId,catId,page=0){
-  const cat=await content.getCategory(catId); const all=await filesDb.getFiles(catId);
+  const [cat, all] = await Promise.all([content.getCategory(catId), filesDb.getFiles(catId)]);
   const total=all.length; const list=all.slice(page*PS,(page+1)*PS);
   let text='📁 *'+cat?.name+'*\n━━━━━━━━━━━━\n'+(total?'📄 *'+total+' ملف*':'_لا توجد ملفات._');
   const rows=[];
@@ -171,7 +172,7 @@ async function showLogs(ctx){
 }
 
 async function showUsers(ctx,page=0){
-  const list=await usersDb.getAll(page,PS); const total=await usersDb.count();
+  const [list, total] = await Promise.all([usersDb.getAll(page,PS), usersDb.count()]);
   let text='👥 *المستخدمون ('+total+')*\n\n';
   list.forEach((u,i)=>{const j=u.joined_at?new Date(u.joined_at).toLocaleDateString("en-GB"):"?";const a=u.last_active?new Date(u.last_active).toLocaleDateString("en-GB"):"?";text+=(page*PS+i+1)+". "+(esc(u.first_name))+  (u.username?" @"+esc(u.username):" ID:"+u.id)+(u.is_banned?" 🚫":"")+"\n   📅 "+j+" | 🕐 "+a+"\n";});
   const rows=list.map(u=>[
