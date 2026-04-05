@@ -62,7 +62,7 @@ async function showMainMenu(ctx, name) {
     [btn('⭐ المفضلة', 'favorites'), btn('📂 السجل', 'history')],
     [btn('👤 ملفي', 'profile'), btn('📊 إحصائيات', 'stats')],
   ];
-  if (sp) rows.push([btn('🎓 تغيير تخصصي', 'change_sp')]);
+  rows.push([btn(sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', 'change_sp')]);
   if (last && last.title) rows.push([btn('▶️ استكمال: ' + last.title.substring(0,20), 'preview_' + last.id + '_0_0_0_0_0')]);
   if (ctx.isAdmin) rows.push([btn('🛠 لوحة الإدارة', 'mg_menu')]);
   return eos(ctx, welcome, { parse_mode: 'Markdown', ...build(rows) });
