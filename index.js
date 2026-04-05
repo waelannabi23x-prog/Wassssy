@@ -41,22 +41,33 @@ async function loadStates() {
   } catch(e) { console.error('States load error:', e.message); }
 }
 
-// Save state to DB
+// Save state to DB - deferred
+const _stateDirty = new Set();
+let _stateTimer = null;
+function _scheduleStateFlush() {
+  if(_stateTimer) return;
+  _stateTimer = setTimeout(async () => {
+    _stateTimer = null;
+    const uids = [..._stateDirty]; _stateDirty.clear();
+    const { run } = require('./database/db');
+    for(const uid of uids) {
+      const state = global.userStates[uid];
+      if(state) await run('INSERT INTO user_states(user_id,state,updated_at) VALUES(?,?,NOW()) ON CONFLICT(user_id) DO UPDATE SET state=EXCLUDED.state,updated_at=NOW()',[uid,JSON.stringify(state)]).catch(()=>{});
+      else await run('DELETE FROM user_states WHERE user_id=?',[uid]).catch(()=>{});
+    }
+  }, 2000);
+}
+
 global.setState = async function(uid, state) {
   global.userStates[uid] = state;
-  try {
-    const { run } = require('./database/db');
-    await run('INSERT INTO user_states(user_id,state,updated_at) VALUES(?,?,NOW()) ON CONFLICT(user_id) DO UPDATE SET state=EXCLUDED.state,updated_at=NOW()', [uid, JSON.stringify(state)]);
-  } catch(e) {}
+  _stateDirty.add(uid);
+  _scheduleStateFlush();
 };
 
-// Delete state from DB
 global.delState = async function(uid) {
   delete global.userStates[uid];
-  try {
-    const { run } = require('./database/db');
-    await run('DELETE FROM user_states WHERE user_id=?', [uid]);
-  } catch(e) {}
+  _stateDirty.add(uid);
+  _scheduleStateFlush();
 };
 
 // Cleanup old states every hour
