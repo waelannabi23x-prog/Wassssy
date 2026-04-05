@@ -12,7 +12,8 @@ async function checkScheduledMessages(bot) {
       if(msg.target === 'all') ids = await usersDb.allIds();
       else if(msg.target === 'specialty') ids = await usersDb.getUsersBySpecialty(msg.specialty_id);
       let sent = 0, failed = 0;
-      for(const id of ids) {
+      for(let idx=0; idx<ids.length; idx++) {
+        const id = ids[idx];
         try {
           if(msg.type === 'text') await bot.telegram.sendMessage(id, msg.content, {parse_mode:'Markdown'});
           else if(msg.type === 'photo') await bot.telegram.sendPhoto(id, msg.file_id, {caption:msg.content});
@@ -20,7 +21,7 @@ async function checkScheduledMessages(bot) {
           else if(msg.type === 'link') await bot.telegram.sendMessage(id, msg.content+'\n\n'+msg.file_id);
           sent++;
         } catch { failed++; }
-        await new Promise(r => setTimeout(r, 50));
+        await new Promise(r => setTimeout(r, idx%10===9?1000:50));
       }
       await messagesDb.markSent(msg.id);
       console.log('Scheduled msg sent:', msg.name, 'sent:', sent, 'failed:', failed);
@@ -28,37 +29,46 @@ async function checkScheduledMessages(bot) {
   } catch(e) { console.error('Scheduler msg error:', e.message); }
 }
 
+async function sendBackupStats(bot, ownerIds) {
+  try {
+    const { all } = require('../database/db');
+    const [users, files, downloads] = await Promise.all([
+      all('SELECT COUNT(*) as c FROM users'),
+      all('SELECT COUNT(*) as c FROM files WHERE is_deleted=0'),
+      all('SELECT SUM(downloads) as t FROM files WHERE is_deleted=0'),
+    ]);
+    const stamp = new Date().toLocaleDateString('en-GB');
+    const msg = '💾 *Daily Backup — '+stamp+'*\n\n'+
+      '👥 المستخدمون: *'+(users[0]?.c||0)+'*\n'+
+      '📁 الملفات: *'+(files[0]?.c||0)+'*\n'+
+      '⬇️ التحميلات: *'+(downloads[0]?.t||0)+'*';
+    for(const oid of ownerIds) {
+      bot.telegram.sendMessage(oid, msg, {parse_mode:'Markdown'}).catch(()=>{});
+    }
+  } catch(e) { console.error('Backup stats error:', e.message); }
+}
+
 function startScheduler(bot, ownerIds) {
-  if(!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR);
+  if(!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, {recursive:true});
 
   // Check scheduled messages every minute
   setInterval(() => checkScheduledMessages(bot), 60000);
   setTimeout(() => checkScheduledMessages(bot), 5000);
 
+  // Daily backup stats
   scheduleDaily(async () => {
-    try {
-      const { DB_PATH } = require('../database/db');
-      const stamp = new Date().toISOString().split('T')[0];
-      const dest = path.join(BACKUP_DIR, 'backup_' + stamp + '.db');
-      fs.copyFileSync(DB_PATH, dest);
-      const files = fs.readdirSync(BACKUP_DIR).filter(f => f.endsWith('.db')).sort();
-      if(files.length > 7) fs.unlinkSync(path.join(BACKUP_DIR, files[0]));
-      for(const oid of ownerIds) {
-      bot.telegram.sendMessage(oid, 'Backup Done ' + stamp).catch(() => {});
-      // Send backup file to owner
-      try {
-        await bot.telegram.sendDocument(oid, {source: dest, filename: 'backup_'+stamp+'.db'}, {caption: 'Daily Backup'});
-      } catch(e) { console.error('Backup send error:', e.message); }
-    }
-      console.log('Backup:', dest);
-    } catch(e) { console.error('Backup error:', e.message); }
+    await sendBackupStats(bot, ownerIds);
   });
 
-  scheduleDaily(() => {
-    require('../database/interactions').clearOldLogs();
-    const { run } = require('../database/db');
-    run(`DELETE FROM files WHERE is_deleted=1 AND uploaded_at < datetime('now','-30 days')`);
-    console.log('Cleanup done');
+  // Daily cleanup
+  scheduleDaily(async () => {
+    try {
+      const { run } = require('../database/db');
+      await run(`DELETE FROM files WHERE is_deleted=1 AND uploaded_at < NOW() - INTERVAL '30 days'`);
+      await run(`DELETE FROM logs WHERE created_at < NOW() - INTERVAL '30 days'`);
+      await run(`DELETE FROM cache_store WHERE expires_at < ?`,[Date.now()]);
+      console.log('✅ Cleanup done');
+    } catch(e) { console.error('Cleanup error:', e.message); }
   });
 }
 

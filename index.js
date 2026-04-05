@@ -160,8 +160,9 @@ bot.on('callback_query', async ctx => {
     }
     if (data === 'change_sp') {
       const specs = await require('./database/content').getSpecs();
-      const rows = specs.map(s => [require('./utils/keyboard').btn('🎓 ' + s.name, 'set_sp_' + s.id)]);
-      return ctx.reply('🎓 اختر تخصصك:', {parse_mode:'Markdown', ...require('./utils/keyboard').build(rows)});
+      const { btn: _btn, build: _build } = require('./utils/keyboard');
+      const rows = specs.map(s => [_btn('🎓 ' + s.name, 'set_sp_' + s.id)]);
+      return ctx.reply('🎓 اختر تخصصك:', {parse_mode:'Markdown', ..._build(rows)});
     }
     if (data === 'latest') return userH.showLatest(ctx);
     if (data === 'new_in_sp') return userH.showNewInSpecialty(ctx);
