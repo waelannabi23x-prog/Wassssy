@@ -11,7 +11,7 @@ const addBundle = async (catId,title,desc,by) => {
 const deleteBundle = id => run('UPDATE bundles SET is_deleted=1 WHERE id=?',[id]);
 const incBundleDownloads = id => run('UPDATE bundles SET downloads=downloads+1 WHERE id=?',[id]);
 
-const getBundleFiles = bundleId => all('SELECT bf.*, f.title as file_title, f.file_type as real_type, f.is_deleted FROM bundle_files bf LEFT JOIN files f ON bf.file_id = f.file_id WHERE bf.bundle_id=? AND (f.is_deleted=0 OR f.is_deleted IS NULL)',[bundleId]);
+const getBundleFiles = bundleId => all('SELECT bf.*, bf.title as file_title, bf.file_type as real_type FROM bundle_files bf WHERE bf.bundle_id=?',[bundleId]);
 const addBundleFile = (bundleId,fileId,fileType,title) => run('INSERT INTO bundle_files(bundle_id,file_id,file_type,title) VALUES(?,?,?,?)',[bundleId,fileId,fileType||'document',title||'']);
 const removeBundleFile = id => run('DELETE FROM bundle_files WHERE id=?',[id]);
 const getBundleCount = async catId => (await get('SELECT COUNT(*) as c FROM bundles WHERE category_id=? AND is_deleted=0',[catId]))?.c||0;
