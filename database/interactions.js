@@ -40,8 +40,19 @@ const getLogs = (n=20) => all('SELECT l.*,u.first_name FROM logs l LEFT JOIN use
 const clearOldLogs = () => run(`DELETE FROM logs WHERE created_at < NOW() - INTERVAL '30 days'`);
 const getActiveUsers = async (days=7) => (await all(`SELECT id FROM users WHERE is_banned=0 AND last_active::timestamp >= NOW() - (? || ' days')::INTERVAL`)).map(r=>r.id);
 
-const addRating = (uid,fid,rating) => run('INSERT INTO ratings(user_id,file_id,rating) VALUES(?,?,?) ON CONFLICT(user_id,file_id) DO UPDATE SET rating=excluded.rating',[uid,fid,rating]);
-const getUserRating = async (uid,fid) => (await get('SELECT rating FROM ratings WHERE user_id=? AND file_id=?',[uid,fid]))?.rating || 0;
+const addRating = (uid,fid,rating) => {
+  cacheClear('urating_'+uid+'_'+fid);
+  cacheClear('avg_'+fid);
+  return run('INSERT INTO ratings(user_id,file_id,rating) VALUES(?,?,?) ON CONFLICT(user_id,file_id) DO UPDATE SET rating=excluded.rating',[uid,fid,rating]);
+};
+const getUserRating = async (uid,fid) => {
+  const key='urating_'+uid+'_'+fid;
+  const cached=cacheGet(key);
+  if(cached!==null) return cached;
+  const r=(await get('SELECT rating FROM ratings WHERE user_id=? AND file_id=?',[uid,fid]))?.rating || 0;
+  cacheSet(key,r,300000);
+  return r;
+};
 const getAvgRating = async fid => {
   const key='avg_'+fid;
   const cached=cacheGet(key);
