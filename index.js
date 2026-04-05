@@ -14,6 +14,7 @@ const path = require('path');
 const fs = require('fs');
 
 const TOKEN = process.env.BOT_TOKEN;
+const { run: dbRun, all: dbAll } = require('./database/db');
 const express = require('express');
 const app = express();
 app.use(express.json());
@@ -22,7 +23,6 @@ global.maintenanceMode = false;
 // Load maintenance mode from DB
 async function loadMaintenance() {
   try {
-    const { getSetting } = require('./database/db');
     const val = await getSetting('maintenance');
     global.maintenanceMode = val === 'true';
     console.log('🔧 Maintenance mode:', global.maintenanceMode);
@@ -32,8 +32,7 @@ async function loadMaintenance() {
 // Load states from DB
 async function loadStates() {
   try {
-    const { all } = require('./database/db');
-    const rows = await all('SELECT user_id, state FROM user_states');
+    const rows = await dbAll('SELECT user_id, state FROM user_states');
     for(const r of rows) {
       try { global.userStates[r.user_id] = JSON.parse(r.state); } catch {}
     }
@@ -49,11 +48,10 @@ function _scheduleStateFlush() {
   _stateTimer = setTimeout(async () => {
     _stateTimer = null;
     const uids = [..._stateDirty]; _stateDirty.clear();
-    const { run } = require('./database/db');
     for(const uid of uids) {
       const state = global.userStates[uid];
-      if(state) await run('INSERT INTO user_states(user_id,state,updated_at) VALUES(?,?,NOW()) ON CONFLICT(user_id) DO UPDATE SET state=EXCLUDED.state,updated_at=NOW()',[uid,JSON.stringify(state)]).catch(()=>{});
-      else await run('DELETE FROM user_states WHERE user_id=?',[uid]).catch(()=>{});
+      if(state) await dbRun('INSERT INTO user_states(user_id,state,updated_at) VALUES(?,?,NOW()) ON CONFLICT(user_id) DO UPDATE SET state=EXCLUDED.state,updated_at=NOW()',[uid,JSON.stringify(state)]).catch(()=>{});
+      else await dbRun('DELETE FROM user_states WHERE user_id=?',[uid]).catch(()=>{});
     }
   }, 2000);
 }
@@ -73,8 +71,7 @@ global.delState = async function(uid) {
 // Cleanup old states every hour
 setInterval(async () => {
   try {
-    const { run } = require('./database/db');
-    await run(`DELETE FROM user_states WHERE updated_at < NOW() - INTERVAL '1 hour'`);
+    await dbRun(`DELETE FROM user_states WHERE updated_at < NOW() - INTERVAL '1 hour'`);
     const now = Date.now();
     for(const uid in global.userStates){
       if(global.userStates[uid]?._ts && now - global.userStates[uid]._ts > 3600000) global.delState(uid);
@@ -115,8 +112,7 @@ bot.command('done', async ctx => {
 
 bot.command('leaveall', async ctx => {
   if(!ctx.isOwner) return ctx.reply('🚫 ليس لديك صلاحية.');
-  const { all } = require('./database/db');
-  const chats = await all('SELECT chat_id FROM group_chats');
+  const chats = await dbAll('SELECT chat_id FROM group_chats');
   let left = 0;
   for(const ch of chats){
     try { await ctx.telegram.leaveChat(ch.chat_id); left++; } catch(e) {}
@@ -308,22 +304,8 @@ bot.on('document', async ctx => {
   if (state?.type === 'mg_file') return manage.handleFileUpload(ctx);
 });
 
-bot.on('photo', async ctx => {
-  if (!ctx.isAdmin && !ctx.isOwner) return;
-  if (global.userStates?.[ctx.uid]?.type === 'mg_file') return manage.handleFileUpload(ctx);
-});
-
-bot.on('video', async ctx => {
-  if (!ctx.isAdmin && !ctx.isOwner) return;
-  if (global.userStates?.[ctx.uid]?.type === 'mg_file') return manage.handleFileUpload(ctx);
-});
-
-bot.on('audio', async ctx => {
-  if (!ctx.isAdmin && !ctx.isOwner) return;
-  if (global.userStates?.[ctx.uid]?.type === 'mg_file') return manage.handleFileUpload(ctx);
-});
-
-bot.on('voice', async ctx => {
+// جمع handlers الميديا في واحد
+bot.on(['photo','video','audio','voice'], async ctx => {
   if (!ctx.isAdmin && !ctx.isOwner) return;
   if (global.userStates?.[ctx.uid]?.type === 'mg_file') return manage.handleFileUpload(ctx);
 });
@@ -353,12 +335,9 @@ bot.on('text', async ctx => {
 async function launch() {
   try {
     await initSchema();
-    await loadMaintenance();
-    await loadStates();
+    await Promise.all([loadMaintenance(), loadStates()]);
     const { cacheWarmup } = require('./utils/cache');
     await cacheWarmup();
-    const m = await getSetting('maintenance');
-    if (m === 'true') global.maintenanceMode = true;
     console.log('✅ Database ready');
     startScheduler(bot, [OWNER_ID]);
     const WEBHOOK_URL = 'https://lwss-production.up.railway.app';
@@ -387,8 +366,7 @@ bot.on('my_chat_member', async ctx => {
   const chat = ctx.myChatMember.chat;
   if(chat.type !== 'private') {
     try {
-      const { run } = require('./database/db');
-      await run('INSERT OR IGNORE INTO group_chats(chat_id,title) VALUES(?,?)', [chat.id, chat.title||'']);
+      await dbRun('INSERT INTO group_chats(chat_id,title) VALUES(?,?) ON CONFLICT(chat_id) DO NOTHING', [chat.id, chat.title||'']);
       await ctx.telegram.leaveChat(chat.id);
       console.log('Left chat:', chat.id, chat.title||'');
     } catch(e) {}
