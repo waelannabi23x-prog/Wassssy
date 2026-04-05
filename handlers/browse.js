@@ -66,14 +66,14 @@ async function showCategories(ctx,spId,yrId,smId,sbId) {
 
 async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
   const uid=ctx.uid;
-  const [cat, sb, sp, yr, sm] = await Promise.all([
+  const [cat, sb, sp, yr, sm, all] = await Promise.all([
     content.getCategory(catId),
     content.getSubject(sbId),
     content.getSpec(spId),
     content.getYear(yrId),
-    content.getSemester(smId)
-  ]);
-  const all=await filesDb.getFiles(catId); const total=all.length; const list=all.slice(page*PS,(page+1)*PS);
+    content.getSemester(smId),
+    filesDb.getFiles(catId)
+  ]); const total=all.length; const list=all.slice(page*PS,(page+1)*PS);
   const pathStr=buildPath([sp?.name,yr?.name,sm?.name,sb?.name,cat?.name]);
   let text=pathStr+'\n━━━━━━━━━━━━\n'+(total?'📄 *'+total+' ملف*':t(uid,'no_files'));
   const fileIds = list.map(f=>f.id);
@@ -168,12 +168,13 @@ async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
     else if(f.file_type==='photo') await ctx.replyWithPhoto(f.file_id,{caption,parse_mode:'Markdown',...kb});
     else await ctx.replyWithDocument(f.file_id,{caption,parse_mode:'Markdown',...kb});
     try{await ctx.deleteMessage();}catch(e){}
-    const similar=await interactions.getSimilar(fid,4);
-    if(similar.length){
-      const simRows=similar.map(sf=>[btn('📄 '+sf.title+' · '+sf.sub_name,'preview_'+sf.id+'_0_0_0_0_0')]);
-      simRows.push([btn('🏠 القائمة','main_menu')]);
-      await ctx.reply('ملفات قد تهمك ('+similar.length+'):',{...build(simRows)});
-    }
+    interactions.getSimilar(fid,4).then(similar=>{
+      if(similar.length){
+        const simRows=similar.map(sf=>[btn('📄 '+sf.title+' · '+sf.sub_name,'preview_'+sf.id+'_0_0_0_0_0')]);
+        simRows.push([btn('🏠 القائمة','main_menu')]);
+        ctx.reply('ملفات قد تهمك:',{...build(simRows)});
+      }
+    }).catch(()=>{});
   }catch(e){ctx.reply('❌ تعذر إرسال الملف. حاول مجدداً.');}
 }
 
