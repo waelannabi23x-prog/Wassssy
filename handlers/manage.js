@@ -9,6 +9,9 @@ const {build,btn,back,backMenu}=require('../utils/keyboard');
 const {eos,buildPath}=require('../utils/helpers');
 const {isOwner}=require('../middlewares/auth');
 const path=require('path');
+const bundlesDb=require('../database/bundles');
+const messagesDb=require('../database/messages');
+const {all, run: dbRun, getSetting, setSetting, DB_PATH}=require('../database/db');
 if(!global.userStates) global.userStates={};
 const setState=(uid,s)=>global.userStates[uid]=s;
 const clearState=uid=>delete global.userStates[uid];
@@ -88,8 +91,7 @@ async function showMgFiles(ctx,spId,yrId,smId,sbId,catId,page=0){
   });
   if(total>PS){const nav=[];if(page>0)nav.push(btn('⬅️','mg_fls_pg_'+[spId,yrId,smId,sbId,catId,page-1].join('_')));nav.push(btn((page+1)+'/'+Math.ceil(total/PS),'noop'));if((page+1)*PS<total)nav.push(btn('➡️','mg_fls_pg_'+[spId,yrId,smId,sbId,catId,page+1].join('_')));rows.push(nav);}
   // Show bundles
-  const bundlesDb2 = require('../database/bundles');
-  const bundles2 = await bundlesDb2.getBundles(catId);
+  const bundles2 = await bundlesDb.getBundles(catId);
   if(bundles2.length){
     rows.unshift([btn('━━━ الحزم ('+bundles2.length+') ━━━','noop')]);
     bundles2.forEach(b=>{
@@ -104,7 +106,6 @@ async function showMgFiles(ctx,spId,yrId,smId,sbId,catId,page=0){
 }
 
 async function showAnalytics(ctx){
-  const {all} = require('../database/db');
   const [top, recent, totalUsers, activeToday, totalFiles, totalDl, specs] = await Promise.all([
     filesDb.topDownloaded(5),
     filesDb.recentFiles(5),
@@ -232,7 +233,6 @@ async function handleBundleFileUpload(ctx){
   else if(msg.audio){fid=msg.audio.file_id;ftype='document';}
   else if(msg.voice){fid=msg.voice.file_id;ftype='document';}
   else return false;
-  const bundlesDb=require('../database/bundles');
   await bundlesDb.addBundleFile(state.bundleId,fid,ftype,title);
   state.fileCount=(state.fileCount||0)+1;
   await ctx.reply('✅ ملف '+state.fileCount+' تم الحفظ. ابعث المزيد أو /done للانتهاء.');
@@ -282,8 +282,7 @@ async function handleText(ctx,state){
       case 'mg_add_cat': await content.addCategory(state.sbId,text); done('✅ تمت إضافة *'+text+'*!','mg_cats_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId); break;
       case 'mg_rn_cat': await content.renameCategory(state.id,text); done('✅ تمت إعادة التسمية!','mg_cats_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId); break;
       case 'mg_rename_bundle':
-        const bundlesDb2=require('../database/bundles');
-        await bundlesDb2.renameBundle(state.bundleId,text);
+        await bundlesDb.renameBundle(state.bundleId,text);
         clearState(uid);
         ctx.reply('تم تعديل الاسم',build([[btn('رجوع','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_'))]]));
         break;
@@ -292,8 +291,7 @@ async function handleText(ctx,state){
         ctx.reply('📝 وصف الحزمة (أو skip):'); break;
       case 'mg_bundle_desc':
         try{
-          const bundlesDb=require('../database/bundles');
-          const bid=await bundlesDb.addBundle(state.catId,state.title,text==='skip'?'':text,uid);
+                  const bid=await bundlesDb.addBundle(state.catId,state.title,text==='skip'?'':text,uid);
           setState(uid,{...state,type:'mg_bundle_files',bundleId:bid,fileCount:0});
           ctx.reply('✅ تم إنشاء الحزمة! ابعث الملفات الآن واحد واحد.\nعندما تنتهي ابعث /done');
         }catch(e){clearState(uid);ctx.reply(e.message==='exists'?'حزمة بهذا الاسم موجودة':'خطأ: '+e.message);}
@@ -362,10 +360,9 @@ async function handleText(ctx,state){
         break;
       case 'mg_tpl_content':
         try{
-          const messagesDb2=require('../database/messages');
-          const content2=text==='skip'?'':text;
-          await messagesDb2.addTemplate(state.name,state.tplType,content2,state.fileId||'');
-          const savedTpl=await messagesDb2.getTemplates();
+            const content2=text==='skip'?'':text;
+          await messagesDb.addTemplate(state.name,state.tplType,content2,state.fileId||'');
+          const savedTpl=await messagesDb.getTemplates();
           const lastTpl=savedTpl[0];
           clearState(uid);
           const schedRows=[[btn('كل المستخدمين','mg_sched_all_'+lastTpl.id)],[btn('تخصص معين','mg_sched_sp_'+lastTpl.id)],[btn('حفظ فقط','mg_templates')]];
@@ -374,8 +371,7 @@ async function handleText(ctx,state){
         break;
       case 'mg_sched_time':
         try{
-          const messagesDb=require('../database/messages');
-          await messagesDb.addScheduled(state.tplId,state.target,state.spId||0,text);
+            await messagesDb.addScheduled(state.tplId,state.target,state.spId||0,text);
           clearState(uid);
           ctx.reply('تمت الجدولة',build([[btn('المجدولة','mg_scheduled')]]));
         }catch(e){clearState(uid);ctx.reply('خطأ: '+e.message);}
@@ -405,14 +401,12 @@ async function handleCallback(ctx,data){
   if(data==='mg_add_template'){setState(uid,{type:'mg_tpl_name'});return ctx.reply('اسم القالب:');}
   if(data.startsWith('mg_tpl_')){
     const id=data.replace('mg_tpl_','');
-    const messagesDb=require('../database/messages');
     const t=await messagesDb.getTemplate(id);
     if(!t) return ctx.reply('غير موجود');
     const rows=[[btn('📅 جدولة','mg_sched_'+id)],[btn('🗑 حذف','mg_del_tpl_'+id)],[back('mg_templates')[0]]];
         return eos(ctx,'القالب: '+t.name+' | النوع: '+t.type+'\n\n'+(t.content||''),{parse_mode:'Markdown',...build(rows)});
   }
   if(data.startsWith('mg_del_tpl_')){
-    const messagesDb=require('../database/messages');
     await messagesDb.deleteTemplate(data.replace('mg_del_tpl_',''));
     return showTemplates(ctx);
   }
@@ -439,14 +433,13 @@ async function handleCallback(ctx,data){
   }
   if(data==='mg_scheduled') return showScheduled(ctx);
   if(data.startsWith('mg_del_sched_')){
-    const messagesDb=require('../database/messages');
     await messagesDb.deleteScheduled(data.replace('mg_del_sched_',''));
     return showScheduled(ctx);
   }
   if(data==='mg_notify'){setState(uid,{type:'mg_notify_msg'});return ctx.reply('🔔 رسالة الإشعار للمستخدمين النشطين (آخر 7 أيام):\n_(أو /cancel)_');}
-  if(data==='mg_maint'){await ctx.answerCbQuery().catch(()=>{});global.maintenanceMode=!global.maintenanceMode;const {setSetting}=require('../database/db');setSetting('maintenance',global.maintenanceMode?'true':'false');await interactions.addLog(uid,'maintenance',global.maintenanceMode?'ON':'OFF');return eos(ctx,'🔧 *الصيانة: '+(global.maintenanceMode?'🔴 مفعّلة':'🟢 متوقفة')+'*',{parse_mode:'Markdown',...build([[btn(global.maintenanceMode?'🟢 إيقاف':'🔴 تفعيل','mg_maint')],[btn('📝 تعديل الرسالة','mg_set_maint_msg'),btn('◀️ رجوع','mg_menu')]])});}
+  if(data==='mg_maint'){await ctx.answerCbQuery().catch(()=>{});global.maintenanceMode=!global.maintenanceMode;setSetting('maintenance',global.maintenanceMode?'true':'false');await interactions.addLog(uid,'maintenance',global.maintenanceMode?'ON':'OFF');return eos(ctx,'🔧 *الصيانة: '+(global.maintenanceMode?'🔴 مفعّلة':'🟢 متوقفة')+'*',{parse_mode:'Markdown',...build([[btn(global.maintenanceMode?'🟢 إيقاف':'🔴 تفعيل','mg_maint')],[btn('📝 تعديل الرسالة','mg_set_maint_msg'),btn('◀️ رجوع','mg_menu')]])});}
   if(data==='mg_set_maint_msg'){setState(uid,{type:'mg_maint_msg'});return ctx.reply('📝 أدخل رسالة الصيانة:');}
-  if(data==='mg_backup'){try{await ctx.replyWithDocument({source:require('../database/db').DB_PATH,filename:'backup_'+Date.now()+'.db'},{caption:'💾 نسخ احتياطي — '+new Date().toLocaleString()});}catch(e){ctx.reply('❌ فشل: '+e.message);}return;}
+  if(data==='mg_backup'){try{await ctx.replyWithDocument({source:DB_PATH,filename:'backup_'+Date.now()+'.db'},{caption:'💾 نسخ احتياطي — '+new Date().toLocaleString()});}catch(e){ctx.reply('❌ فشل: '+e.message);}return;}
   if(data==='mg_restore'){setState(uid,{type:'mg_awaiting_restore'});return eos(ctx,'♻️ *استعادة قاعدة البيانات*\n\n⚠️ سيتم استبدال جميع البيانات!\n\nأرسل ملف `.db`:',{parse_mode:'Markdown',...build([back('mg_menu')])});}
   if(data==='mg_broadcast'){setState(uid,{type:'mg_broadcast'});return ctx.reply('📢 رسالة البث:\n_(أو /cancel)_');}
   if(data==='mg_add_admin'){setState(uid,{type:'mg_add_admin_id'});return ctx.reply('👤 أدخل ID المستخدم:\n_(أو /cancel)_');}
@@ -472,16 +465,14 @@ async function handleCallback(ctx,data){
   if(data.startsWith('mg_users_p')){return showUsers(ctx,parseInt(data.replace('mg_users_p','')));}
   if(data.startsWith('mg_restore_fl_')){await filesDb.restore(data.replace('mg_restore_fl_',''));return showTrash(ctx);}
   if(data.startsWith('mg_pdl_fl_')){
-    const {run}=require('../database/db');
-    await run('DELETE FROM files WHERE id=?',[data.replace('mg_pdl_fl_','')]);
+    await dbRun('DELETE FROM files WHERE id=?',[data.replace('mg_pdl_fl_','')]);
     return showTrash(ctx);
   }
   if(data==='mg_empty_trash'){
     return eos(ctx,'هل تريد حذف كل السلة نهائيا؟',{...build([[btn('تاكيد الحذف','mg_confirm_empty')],[btn('الغاء','mg_trash')]])});
   }
   if(data==='mg_confirm_empty'){
-    const {run}=require('../database/db');
-    await run('DELETE FROM files WHERE is_deleted=1');
+    await dbRun('DELETE FROM files WHERE is_deleted=1');
     return eos(ctx,'✅ تم حذف السلة نهائياً!',{parse_mode:'Markdown',...build([back('mg_menu')])});
   }
   if(data.startsWith('mg_yrs_')) return showYears(ctx,data.replace('mg_yrs_',''));
@@ -512,8 +503,7 @@ async function handleCallback(ctx,data){
   if(data.startsWith('mg_cdl_cat_')){const p=data.replace('mg_cdl_cat_','').split('_');await content.deleteCategory(p[4]);return showCategories(ctx,p[0],p[1],p[2],p[3]);}
   if(data.startsWith('mg_dl_bundle_')){
     const p=data.replace('mg_dl_bundle_','').split('_');
-    const bundlesDb=require('../database/bundles');
-    await bundlesDb.deleteBundle(p[0]);
+      await bundlesDb.deleteBundle(p[0]);
     await ctx.answerCbQuery('تم الحذف').catch(()=>{});
     return browse.showFiles(ctx,p[2],p[3],p[4],p[5],p[1]);
   }
@@ -544,19 +534,16 @@ async function handleCallback(ctx,data){
 module.exports={mainMenu,handleCallback,handleText,handleFileUpload,showUserProfile,showUsers};
 
 async function showUserProfile(ctx, userId) {
-  const usersDb2 = require('../database/users');
-  const interactions2 = require('../database/interactions');
-  const content2 = require('../database/content');
   const [user, dlCount, favs, spRow, lastFile] = await Promise.all([
-    usersDb2.getById(userId),
-    interactions2.getUserDownloadCount(userId),
-    interactions2.getFavs(userId),
-    usersDb2.getSpecialty(userId),
-    interactions2.getLastFile(userId)
+    usersDb.getById(userId),
+    interactions.getUserDownloadCount(userId),
+    interactions.getFavs(userId),
+    usersDb.getSpecialty(userId),
+    interactions.getLastFile(userId)
   ]);
   if (!user) return ctx.reply('❌ المستخدم غير موجود.');
   const spId = spRow?.specialty_id;
-  const sp = spId&&spId!=0 ? await content2.getSpec(spId) : null;
+  const sp = spId&&spId!=0 ? await content.getSpec(spId) : null;
   const text = '👤 *بروفايل المستخدم*\n\n' +
     '🆔 ID: `' + userId + '`\n' +
     '👋 الاسم: ' + (user.first_name||'؟') + ' ' + (user.last_name||'') + '\n' +
@@ -569,16 +556,14 @@ async function showUserProfile(ctx, userId) {
     '⬇️ التحميلات: *' + dlCount + '*\n' +
     '⭐ المفضلة: *' + favs.length + '*' +
     (lastFile ? '\n📄 آخر ملف: *' + (lastFile.title||'') + '*' : '');
-  const {build, btn, back} = require('../utils/keyboard');
   const rows = [
     [btn(user.is_banned ? '✅ إلغاء الحظر' : '🚫 حظر', (user.is_banned ? 'mg_unban_' : 'mg_ban_') + userId)],
     [back('mg_users')[0]]
   ];
-  return require('../utils/helpers').eos(ctx, text, {parse_mode:'Markdown', ...build(rows)});
+  return eos(ctx, text, {parse_mode:'Markdown', ...build(rows)});
 }
 
 async function showMsgsMenu(ctx){
-  const messagesDb=require('../database/messages');
   const templates=await messagesDb.getTemplates();
   const scheduled=await messagesDb.getScheduled();
   const text='نظام الرسائل - القوالب: '+templates.length+' - المجدولة: '+scheduled.length;
@@ -589,7 +574,6 @@ async function showMsgsMenu(ctx){
 }
 
 async function showTemplates(ctx){
-  const messagesDb=require('../database/messages');
   const list=await messagesDb.getTemplates();
   const text='القوالب ('+list.length+')';
   const rows=list.map(t=>[btn(t.name,'mg_tpl_'+t.id)]);
@@ -599,7 +583,6 @@ async function showTemplates(ctx){
 }
 
 async function showScheduled(ctx){
-  const messagesDb=require('../database/messages');
   const list=await messagesDb.getScheduled();
   const text='المجدولة ('+list.length+')';
   const rows=list.map(s=>[btn(s.name+' - '+s.send_at,'noop'),btn('حذف','mg_del_sched_'+s.id)]);
