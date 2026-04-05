@@ -1,6 +1,6 @@
 require("dotenv").config();
 const { Telegraf } = require('telegraf');
-const { initSchema, getSetting } = require("./database/db");
+const { initSchema, getSetting, run: dbRun, all: dbAll } = require("./database/db");
 const { authMiddleware, isOwner, OWNER_ID } = require('./middlewares/auth');
 const interactions = require('./database/interactions');
 const startHandler = require('./handlers/start');
@@ -14,6 +14,7 @@ const usersDb = require('./database/users');
 const filesDb = require('./database/files');
 
 const contentDb = require('./database/content');
+const bundlesDb = require('./database/bundles');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { cacheWarmup } = require('./utils/cache');
 const { setLang } = require('./utils/i18n');
@@ -21,7 +22,6 @@ const path = require('path');
 const fs = require('fs');
 
 const TOKEN = process.env.BOT_TOKEN;
-const { run: dbRun, all: dbAll } = require('./database/db');
 const express = require('express');
 const app = express();
 app.use(express.json());
