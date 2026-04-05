@@ -116,16 +116,12 @@ async function showAnalytics(ctx){
   ]);
 
   // توزيع المستخدمين على التخصصات
-  const spDist = await all(`SELECT sp.name, COUNT(us.user_id) as cnt FROM user_specialties us LEFT JOIN specialties sp ON us.specialty_id=sp.id GROUP BY sp.name ORDER BY cnt DESC LIMIT 5`);
-
-  // أكثر 5 مستخدمين نشاطاً
-  const topUsers = await all(`SELECT u.first_name, u.username, COUNT(h.id) as cnt FROM history h LEFT JOIN users u ON h.user_id=u.id GROUP BY h.user_id, u.first_name, u.username ORDER BY cnt DESC LIMIT 5`);
-
-  // أوقات الذروة
-  const peakHours = await all(`SELECT EXTRACT(HOUR FROM viewed_at::timestamp) as hour, COUNT(*) as cnt FROM history GROUP BY hour ORDER BY cnt DESC LIMIT 3`);
-
-  // أكثر فئة تحميلاً هذا الأسبوع
-  const topCats = await all(`SELECT c.name, COUNT(h.id) as cnt FROM history h LEFT JOIN files f ON h.file_id=f.id LEFT JOIN categories c ON f.category_id=c.id WHERE h.viewed_at >= NOW() - INTERVAL '7 days' GROUP BY c.name ORDER BY cnt DESC LIMIT 3`);
+  const [spDist, topUsers, peakHours, topCats] = await Promise.all([
+    all(`SELECT sp.name, COUNT(us.user_id) as cnt FROM user_specialties us LEFT JOIN specialties sp ON us.specialty_id=sp.id GROUP BY sp.name ORDER BY cnt DESC LIMIT 5`),
+    all(`SELECT u.first_name, u.username, COUNT(h.id) as cnt FROM history h LEFT JOIN users u ON h.user_id=u.id GROUP BY h.user_id, u.first_name, u.username ORDER BY cnt DESC LIMIT 5`),
+    all(`SELECT EXTRACT(HOUR FROM viewed_at::timestamp) as hour, COUNT(*) as cnt FROM history GROUP BY hour ORDER BY cnt DESC LIMIT 3`),
+    all(`SELECT c.name, COUNT(h.id) as cnt FROM history h LEFT JOIN files f ON h.file_id=f.id LEFT JOIN categories c ON f.category_id=c.id WHERE h.viewed_at >= NOW() - INTERVAL '7 days' GROUP BY c.name ORDER BY cnt DESC LIMIT 3`)
+  ]);
 
   let text = '📊 *لوحة الإحصائيات المتقدمة*\n━━━━━━━━━━━━\n';
   text += '👥 المستخدمون: *'+totalUsers+'*\n';
@@ -548,14 +544,19 @@ async function handleCallback(ctx,data){
 module.exports={mainMenu,handleCallback,handleText,handleFileUpload,showUserProfile,showUsers};
 
 async function showUserProfile(ctx, userId) {
-  const user = await require('../database/users').getById(userId);
+  const usersDb2 = require('../database/users');
+  const interactions2 = require('../database/interactions');
+  const content2 = require('../database/content');
+  const [user, dlCount, favs, spRow, lastFile] = await Promise.all([
+    usersDb2.getById(userId),
+    interactions2.getUserDownloadCount(userId),
+    interactions2.getFavs(userId),
+    usersDb2.getSpecialty(userId),
+    interactions2.getLastFile(userId)
+  ]);
   if (!user) return ctx.reply('❌ المستخدم غير موجود.');
-  const dlCount = await require('../database/interactions').getUserDownloadCount(userId);
-  const favs = await require('../database/interactions').getFavs(userId);
-  const spRow = await require('../database/users').getSpecialty(userId);
   const spId = spRow?.specialty_id;
-  const sp = spId&&spId!=0 ? await require('../database/content').getSpec(spId) : null;
-  const lastFile = await require('../database/interactions').getLastFile(userId);
+  const sp = spId&&spId!=0 ? await content2.getSpec(spId) : null;
   const text = '👤 *بروفايل المستخدم*\n\n' +
     '🆔 ID: `' + userId + '`\n' +
     '👋 الاسم: ' + (user.first_name||'؟') + ' ' + (user.last_name||'') + '\n' +
