@@ -9,6 +9,13 @@ const commentsDb = require('./database/comments');
 const userH = require('./handlers/user');
 const manage = require('./handlers/manage');
 const { startScheduler } = require('./utils/scheduler');
+const adminsDb = require('./database/admins');
+const usersDb = require('./database/users');
+const filesDb = require('./database/files');
+
+const contentDb = require('./database/content');
+const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
+const { cacheWarmup } = require('./utils/cache');
 const { setLang } = require('./utils/i18n');
 const path = require('path');
 const fs = require('fs');
@@ -126,7 +133,7 @@ bot.command('cancel', ctx => {
 bot.command('users', async ctx => {
   if(!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫 ليس لديك صلاحية.');
   if(ctx.isAdmin && !ctx.isOwner){
-    const perms = await require('./database/admins').getPerms(ctx.uid);
+    const perms = await adminsDb.getPerms(ctx.uid);
     if(!perms.includes('full') && !perms.includes('view_users')) return ctx.reply('🚫 ليس لديك صلاحية.');
   }
   return manage.showUsers(ctx);
@@ -146,17 +153,17 @@ bot.on('callback_query', async ctx => {
     if (data === 'browse') return browse.showSpecs(ctx);
     if (data.startsWith('set_sp_')) {
       const spId = data.replace('set_sp_','');
-      await require('./database/users').setSpecialty(ctx.uid, spId);
+      await usersDb.setSpecialty(ctx.uid, spId);
       await ctx.answerCbQuery('تم حفظ تخصصك').catch(()=>{});
-      return require('./handlers/start').showMainMenu(ctx);
+      return startHandler.showMainMenu(ctx);
     }
     if (data === 'skip_sp') {
-      await require('./database/users').setSpecialty(ctx.uid, 0);
-      return require('./handlers/start').showMainMenu(ctx);
+      await usersDb.setSpecialty(ctx.uid, 0);
+      return startHandler.showMainMenu(ctx);
     }
     if (data === 'change_sp') {
-      const specs = await require('./database/content').getSpecs();
-      const { btn: _btn, build: _build } = require('./utils/keyboard');
+      const specs = await contentDb.getSpecs();
+      const _btn=kbBtn, _build=kbBuild;
       const rows = specs.map(s => [_btn('🎓 ' + s.name, 'set_sp_' + s.id)]);
       return ctx.reply('🎓 اختر تخصصك:', {parse_mode:'Markdown', ..._build(rows)});
     }
@@ -212,7 +219,7 @@ bot.on('callback_query', async ctx => {
       const parts = data.replace('search_del_','').split('_');
       const fid = parts[0];
       const query = decodeURIComponent(parts.slice(1).join('_'));
-      await require('./database/files').softDelete(fid);
+      await filesDb.softDelete(fid);
       await ctx.answerCbQuery('تم الحذف').catch(()=>{});
       return userH.handleSearch(ctx, query);
     }
@@ -265,7 +272,6 @@ bot.on('message', async (ctx, next) => {
   if(mediaGroups[mgId].length===1){
     setTimeout(async()=>{
       const msgs = mediaGroups[mgId]||[];
-      const bundlesDb = require('./database/bundles');
       let count=0;
       for(const m of msgs){
         let fid,ftype,title='';
@@ -336,7 +342,6 @@ async function launch() {
   try {
     await initSchema();
     await Promise.all([loadMaintenance(), loadStates()]);
-    const { cacheWarmup } = require('./utils/cache');
     await cacheWarmup();
     console.log('✅ Database ready');
     startScheduler(bot, [OWNER_ID]);
