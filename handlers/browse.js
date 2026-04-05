@@ -158,8 +158,8 @@ async function showComments(ctx,fid,spId,yrId,smId,sbId,catId,page=0) {
 async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
   const uid=ctx.uid; const f=await filesDb.getFile(fid);
   if(!f) return ctx.reply(t(uid,'not_found'));
-  filesDb.incDownloads(fid); interactions.addHistory(uid,fid); interactions.addLog(uid,'download',f.title);
   const fav=await interactions.isFav(uid,fid);
+  Promise.all([filesDb.incDownloads(fid),interactions.addHistory(uid,fid),interactions.addLog(uid,'download',f.title)]).catch(()=>{});
   const caption='📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 '+escMd(f.description)+'\n':'')+'📁 '+escMd(f.cat_name)+' | 📖 '+escMd(f.sub_name)+'\n⬇️ '+(f.downloads+1);
   const backCb=catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
   const kb=build([[btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid)],[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]]);
