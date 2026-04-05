@@ -67,22 +67,7 @@ function startScheduler(bot, ownerIds) {
       await run(`DELETE FROM files WHERE is_deleted=1 AND uploaded_at < NOW() - INTERVAL '30 days'`);
       await run(`DELETE FROM logs WHERE created_at < NOW() - INTERVAL '30 days'`);
       await run(`DELETE FROM cache_store WHERE expires_at < ?`,[Date.now()]);
-      // حذف كامل للمستخدمين غير النشطين منذ 7 أيام
-      const { all: dbAll2 } = require('../database/db');
-      const inactiveIds = await dbAll2(`SELECT id FROM users WHERE last_active < NOW() - INTERVAL '7 days' AND is_banned=0`);
-      if(inactiveIds.length) {
-        const ids = inactiveIds.map(r=>r.id);
-        const ph = ids.map(()=>'?').join(',');
-        await run(`DELETE FROM user_specialties WHERE user_id IN (${ph})`, ids);
-        await run(`DELETE FROM user_states WHERE user_id IN (${ph})`, ids);
-        await run(`DELETE FROM favorites WHERE user_id IN (${ph})`, ids);
-        await run(`DELETE FROM history WHERE user_id IN (${ph})`, ids);
-        await run(`DELETE FROM ratings WHERE user_id IN (${ph})`, ids);
-        await run(`DELETE FROM comments WHERE user_id IN (${ph})`, ids);
-        await run(`DELETE FROM logs WHERE user_id IN (${ph})`, ids);
-        await run(`DELETE FROM users WHERE id IN (${ph})`, ids);
-        console.log('🗑 Cleaned', ids.length, 'inactive users');
-      }
+
       console.log('✅ Cleanup done');
     } catch(e) { console.error('Cleanup error:', e.message); }
   });
