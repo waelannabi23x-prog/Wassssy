@@ -7,6 +7,8 @@ function starsDisplay(avg, cnt) {
 }
 
 const content = require('../database/content');
+const bundlesDb = require('../database/bundles');
+const commentsDb = require('../database/comments');
 const filesDb = require('../database/files');
 const interactions = require('../database/interactions');
 const { build, btn, back, backMenu } = require('../utils/keyboard');
@@ -24,7 +26,8 @@ async function showSpecs(ctx) {
 }
 
 async function showYears(ctx,spId,page=0) {
-  const uid=ctx.uid; const sp=await content.getSpec(spId); const all=await content.getYears(spId);
+  const uid=ctx.uid;
+  const [sp, all] = await Promise.all([content.getSpec(spId), content.getYears(spId)]);
   const total=all.length; const years=all.slice(page*PS,(page+1)*PS);
   if(!years.length) return eos(ctx,buildPath([escMd(sp?.name)])+'\n\n📭 لا توجد سنوات.',build([backMenu('browse')]));
   const rows=years.map(y=>[btn('📅 '+y.name,'yr_'+spId+'_'+y.id)]);
@@ -35,8 +38,7 @@ async function showYears(ctx,spId,page=0) {
 
 async function showSemesters(ctx,spId,yrId) {
   const uid=ctx.uid;
-  const [sp, yr] = await Promise.all([content.getSpec(spId), content.getYear(yrId)]);
-  const sems=await content.getSemesters(yrId);
+  const [sp, yr, sems] = await Promise.all([content.getSpec(spId), content.getYear(yrId), content.getSemesters(yrId)]);
   if(!sems.length) return eos(ctx,buildPath([sp?.name,yr?.name])+'\n\n📭 لا توجد فصول.',build([backMenu('yr_'+spId+'_'+yrId)]));
   const rows=sems.map(s=>[btn('📆 '+s.name,'sm_'+spId+'_'+yrId+'_'+s.id)]);
   rows.push(backMenu('yrs_'+spId+'_'+yrId));
@@ -45,8 +47,7 @@ async function showSemesters(ctx,spId,yrId) {
 
 async function showSubjects(ctx,spId,yrId,smId,page=0) {
   const uid=ctx.uid;
-  const [sp, yr, sm] = await Promise.all([content.getSpec(spId), content.getYear(yrId), content.getSemester(smId)]);
-  const all=await content.getSubjects(smId); const total=all.length; const subs=all.slice(page*PS,(page+1)*PS);
+  const [sp, yr, sm, all] = await Promise.all([content.getSpec(spId), content.getYear(yrId), content.getSemester(smId), content.getSubjects(smId)]); const total=all.length; const subs=all.slice(page*PS,(page+1)*PS);
   if(!subs.length) return eos(ctx,buildPath([sp?.name,yr?.name,sm?.name])+'\n\n📭 لا توجد مواد.',build([backMenu('sm_'+spId+'_'+yrId+'_'+smId)]));
   const rows=subs.map(s=>[btn('📖 '+s.name,'sb_'+spId+'_'+yrId+'_'+smId+'_'+s.id)]);
   if(total>PS){const nav=[];if(page>0)nav.push(btn('⬅️','sb_page_'+spId+'_'+yrId+'_'+smId+'_'+(page-1)));nav.push(btn((page+1)+'/'+Math.ceil(total/PS),'noop'));if((page+1)*PS<total)nav.push(btn('➡️','sb_page_'+spId+'_'+yrId+'_'+smId+'_'+(page+1)));rows.push(nav);}
@@ -56,8 +57,7 @@ async function showSubjects(ctx,spId,yrId,smId,page=0) {
 
 async function showCategories(ctx,spId,yrId,smId,sbId) {
   const uid=ctx.uid;
-  const [sp, yr, sm, sb] = await Promise.all([content.getSpec(spId), content.getYear(yrId), content.getSemester(smId), content.getSubject(sbId)]);
-  const cats=await content.getCategories(sbId);
+  const [sp, yr, sm, sb, cats] = await Promise.all([content.getSpec(spId), content.getYear(yrId), content.getSemester(smId), content.getSubject(sbId), content.getCategories(sbId)]);
   if(!cats.length) return eos(ctx,buildPath([sp?.name,yr?.name,sm?.name,sb?.name])+'\n\n📭 لا توجد فئات.',build([backMenu('sb_'+spId+'_'+yrId+'_'+smId+'_'+sbId)]));
   const rows=cats.map(c=>[btn('📁 '+c.name,'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+c.id)]);
   rows.push(backMenu('sbs_'+spId+'_'+yrId+'_'+smId+'_'+sbId));
@@ -66,13 +66,14 @@ async function showCategories(ctx,spId,yrId,smId,sbId) {
 
 async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
   const uid=ctx.uid;
-  const [cat, sb, sp, yr, sm, all] = await Promise.all([
+  const [cat, sb, sp, yr, sm, all, bundles] = await Promise.all([
     content.getCategory(catId),
     content.getSubject(sbId),
     content.getSpec(spId),
     content.getYear(yrId),
     content.getSemester(smId),
-    filesDb.getFiles(catId)
+    filesDb.getFiles(catId),
+    bundlesDb.getBundles(catId)
   ]); const total=all.length; const list=all.slice(page*PS,(page+1)*PS);
   const pathStr=buildPath([sp?.name,yr?.name,sm?.name,sb?.name,cat?.name]);
   let text=pathStr+'\n━━━━━━━━━━━━\n'+(total?'📄 *'+total+' ملف*':t(uid,'no_files'));
@@ -89,8 +90,6 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
   });
   if(total>PS){const nav=[];if(page>0)nav.push(btn('⬅️','ct_page_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId+'_'+(page-1)));nav.push(btn((page+1)+'/'+Math.ceil(total/PS),'noop'));if((page+1)*PS<total)nav.push(btn('➡️','ct_page_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId+'_'+(page+1)));rows.push(nav);}
   // Show bundles
-  const bundlesDb = require('../database/bundles');
-  const bundles = await bundlesDb.getBundles(catId);
   if(bundles.length){
     rows.unshift([btn('━━━ الحزم ('+bundles.length+') ━━━','noop')]);
     bundles.forEach(b=>{
@@ -104,7 +103,6 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
 async function showPreview(ctx,fid,spId,yrId,smId,sbId,catId) {
   const uid=ctx.uid; const f=await filesDb.getFile(fid);
   if(!f) return ctx.reply(t(uid,'not_found'));
-  const commentsDb=require('../database/comments');
   const [fav, favCnt, userRating, ratingData, commentCount] = await Promise.all([
     interactions.isFav(uid,fid),
     interactions.favCount(fid),
@@ -131,9 +129,10 @@ async function showPreview(ctx,fid,spId,yrId,smId,sbId,catId) {
 
 async function showComments(ctx,fid,spId,yrId,smId,sbId,catId,page=0) {
   const uid=ctx.uid;
-  const commentsDb=require('../database/comments');
-  const comments=await commentsDb.getComments(fid,50);
-  const f=await filesDb.getFile(fid);
+  const [comments, f] = await Promise.all([
+    commentsDb.getComments(fid,50),
+    filesDb.getFile(fid)
+  ]);
   const PS=5;
   const total=comments.length;
   const list=comments.slice(page*PS,(page+1)*PS);
@@ -156,9 +155,9 @@ async function showComments(ctx,fid,spId,yrId,smId,sbId,catId,page=0) {
 }
 
 async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
-  const uid=ctx.uid; const f=await filesDb.getFile(fid);
+  const uid=ctx.uid;
+  const [f, fav] = await Promise.all([filesDb.getFile(fid), interactions.isFav(uid,fid)]);
   if(!f) return ctx.reply(t(uid,'not_found'));
-  const fav=await interactions.isFav(uid,fid);
   Promise.all([filesDb.incDownloads(fid),interactions.addHistory(uid,fid),interactions.addLog(uid,'download',f.title)]).catch(()=>{});
   const caption='📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 '+escMd(f.description)+'\n':'')+'📁 '+escMd(f.cat_name)+' | 📖 '+escMd(f.sub_name)+'\n⬇️ '+(f.downloads+1);
   const backCb=catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
@@ -181,10 +180,8 @@ async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
 module.exports={showSpecs,showYears,showSemesters,showSubjects,showCategories,showFiles,showPreview,sendFile,showBundle,sendBundle,showComments};
 
 async function showBundle(ctx,bundleId,spId,yrId,smId,sbId,catId){
-  const bundlesDb=require('../database/bundles');
-  const b=await bundlesDb.getBundle(bundleId);
+  const [b, files] = await Promise.all([bundlesDb.getBundle(bundleId), bundlesDb.getBundleFiles(bundleId)]);
   if(!b) return ctx.reply('الحزمة غير موجودة');
-  const files=await bundlesDb.getBundleFiles(bundleId);
   const text='📦 *'+escMd(b.title)+'*'+(b.description?'\n📝 '+escMd(b.description):'')+'\n\n📄 *'+files.length+' ملف*\n'+files.map((f,i)=>(i+1)+'. '+escMd(f.title||f.file_title||'')).join('\n')+'\n\n⬇️ تحميل: *'+b.downloads+'*';
   const backCb=catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
   const rows=[[btn('⬇️ تحميل الكل','bdl_'+bundleId+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)]];
@@ -194,9 +191,7 @@ async function showBundle(ctx,bundleId,spId,yrId,smId,sbId,catId){
 }
 
 async function sendBundle(ctx,bundleId,spId,yrId,smId,sbId,catId){
-  const bundlesDb=require('../database/bundles');
-  const b=await bundlesDb.getBundle(bundleId);
-  const files=await bundlesDb.getBundleFiles(bundleId);
+  const [b, files] = await Promise.all([bundlesDb.getBundle(bundleId), bundlesDb.getBundleFiles(bundleId)]);
   if(!files.length) return ctx.reply('الحزمة فارغة');
   bundlesDb.incBundleDownloads(bundleId);
   await ctx.reply('📦 *'+b.title+'* — جاري الإرسال...',{parse_mode:'Markdown'});
