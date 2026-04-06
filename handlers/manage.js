@@ -355,19 +355,33 @@ async function handleText(ctx,state){
         try{ctx.telegram.sendMessage(tid,'🎉 تمت إضافتك مشرفا في بوت الدراسة',{parse_mode:'Markdown'});}catch{} break;
       case 'mg_maint_msg': global.maintenanceMsg=text; clearState(uid); ctx.reply('تم تحديث رسالة الصيانة',build([back('mg_menu')])); break;
       case 'mg_tpl_name':
-        setState(uid,{...state,type:'mg_tpl_type',name:text});
-        ctx.reply('نوع القالب:',{...build([[btn('📝 نص','mg_ttype_text_'+encodeURIComponent(text))],[btn('🖼 صورة','mg_ttype_photo_'+encodeURIComponent(text))],[btn('📄 ملف PDF','mg_ttype_document_'+encodeURIComponent(text))],[btn('🔗 رابط','mg_ttype_link_'+encodeURIComponent(text))]])});
+        setState(uid,{...state,type:'mg_tpl_content',name:text,tplType:'auto',fileId:''});
+        ctx.reply('📨 *'+text+'*\n\nأرسل محتوى الرسالة:\n_(نص، صورة، ملف، فيديو، أو رابط)_',{parse_mode:'Markdown',...build([[btn('❌ إلغاء','mg_templates')]])});
         break;
       case 'mg_tpl_content':
         try{
-            const content2=text==='skip'?'':text;
-          await messagesDb.addTemplate(state.name,state.tplType,content2,state.fileId||'');
+          const msg2=ctx.message;
+          let tplType='text', fileId='', tplContent=text||'';
+          if(msg2.photo){tplType='photo';fileId=msg2.photo[msg2.photo.length-1].file_id;tplContent=msg2.caption||'';}
+          else if(msg2.document){tplType='document';fileId=msg2.document.file_id;tplContent=msg2.caption||'';}
+          else if(msg2.video){tplType='video';fileId=msg2.video.file_id;tplContent=msg2.caption||'';}
+          else if(msg2.audio){tplType='audio';fileId=msg2.audio.file_id;tplContent=msg2.caption||'';}
+          else if(text&&(text.startsWith('http')||text.startsWith('www'))){tplType='link';fileId=text;tplContent=text;}
+          await messagesDb.addTemplate(state.name,tplType,tplContent,fileId);
           const savedTpl=await messagesDb.getTemplates();
           const lastTpl=savedTpl[0];
           clearState(uid);
-          const schedRows=[[btn('كل المستخدمين','mg_sched_all_'+lastTpl.id)],[btn('تخصص معين','mg_sched_sp_'+lastTpl.id)],[btn('حفظ فقط','mg_templates')]];
-          ctx.reply('تم حفظ القالب! هل تريد جدولته الان؟',{...build(schedRows)});
-        }catch(e){clearState(uid);ctx.reply(e.message==='exists'?'قالب بهذا الاسم موجود':'خطأ: '+e.message);}
+          const schedRows=[
+            [btn('📤 إرسال الآن','mg_send_now_'+lastTpl.id)],
+            [btn('👥 كل المستخدمين','mg_sched_all_'+lastTpl.id)],
+            [btn('🎓 تخصص معين','mg_sched_sp_'+lastTpl.id)],
+            [btn('💾 حفظ فقط','mg_templates')]
+          ];
+          ctx.reply('✅ *تم حفظ القالب!*
+النوع: '+tplType+'
+
+هل تريد إرساله؟',{parse_mode:'Markdown',...build(schedRows)});
+        }catch(e){clearState(uid);ctx.reply(e.message==='exists'?'❌ قالب بهذا الاسم موجود!':'❌ خطأ: '+e.message);}
         break;
       case 'mg_sched_time':
         try{
@@ -398,13 +412,20 @@ async function handleCallback(ctx,data){
   if(data.startsWith('mg_notify_sp_')){const spId=data.replace('mg_notify_sp_','');setState(uid,{type:'mg_notify_sp_msg',spId});return ctx.reply('📝 رسالة الإشعار لهذا التخصص:\n_(أو /cancel)_');}
   if(data==='mg_msgs') return showMsgsMenu(ctx);
   if(data==='mg_templates') return showTemplates(ctx);
-  if(data==='mg_add_template'){setState(uid,{type:'mg_tpl_name'});return ctx.reply('اسم القالب:');}
+  if(data==='mg_add_template'){setState(uid,{type:'mg_tpl_name'});return ctx.reply('📝 *قالب جديد*\n\nأرسل اسم القالب:',{parse_mode:'Markdown',...build([[btn('❌ إلغاء','mg_templates')]])});}
   if(data.startsWith('mg_tpl_')){
     const id=data.replace('mg_tpl_','');
     const t=await messagesDb.getTemplate(id);
     if(!t) return ctx.reply('غير موجود');
-    const rows=[[btn('📅 جدولة','mg_sched_'+id)],[btn('🗑 حذف','mg_del_tpl_'+id)],[back('mg_templates')[0]]];
-        return eos(ctx,'القالب: '+t.name+' | النوع: '+t.type+'\n\n'+(t.content||''),{parse_mode:'Markdown',...build(rows)});
+    const typeIcon={'text':'📝','photo':'🖼','document':'📄','link':'🔗','video':'🎥'}[t.type]||'📝';
+    const rows=[
+      [btn('📤 إرسال الآن','mg_send_now_'+id)],
+      [btn('📅 جدولة','mg_sched_'+id)],
+      [btn('🗑 حذف','mg_del_tpl_'+id)],
+      [back('mg_templates')[0]]
+    ];
+    const preview = t.content ? t.content.substring(0,200) : '(بدون نص)';
+    return eos(ctx,typeIcon+' *'+t.name+'*\nالنوع: '+t.type+'\n\n'+preview,{parse_mode:'Markdown',...build(rows)});
   }
   if(data.startsWith('mg_del_tpl_')){
     await messagesDb.deleteTemplate(data.replace('mg_del_tpl_',''));
@@ -430,6 +451,45 @@ async function handleCallback(ctx,data){
     const p=data.replace('mg_sched_spid_','').split('_');
     setState(uid,{type:'mg_sched_time',tplId:p[0],target:'specialty',spId:p[1]});
     return ctx.reply('ادخل وقت الارسال مثال: 2026-04-01 20:00');
+  }
+  if(data.startsWith('mg_send_now_')){
+    const tplId=data.replace('mg_send_now_','');
+    const tpl=await messagesDb.getTemplate(tplId);
+    if(!tpl) return ctx.reply('❌ القالب غير موجود');
+    const ids=await usersDb.allIds();
+    let sent=0,failed=0;
+    const total=ids.length;
+    const sm=await ctx.reply('📤 *جاري الإرسال...*
+`[░░░░░░░░░░] 0%`
+✅ 0 | ❌ 0 | ⏳ '+total,{parse_mode:'Markdown'});
+    for(let i=0;i<ids.length;i++){
+      try{
+        if(tpl.type==='text') await ctx.telegram.sendMessage(ids[i],tpl.content,{parse_mode:'Markdown'});
+        else if(tpl.type==='photo') await ctx.telegram.sendPhoto(ids[i],tpl.file_id,{caption:tpl.content,parse_mode:'Markdown'});
+        else if(tpl.type==='document') await ctx.telegram.sendDocument(ids[i],tpl.file_id,{caption:tpl.content,parse_mode:'Markdown'});
+        else if(tpl.type==='video') await ctx.telegram.sendVideo(ids[i],tpl.file_id,{caption:tpl.content,parse_mode:'Markdown'});
+        else if(tpl.type==='link') await ctx.telegram.sendMessage(ids[i],tpl.content);
+        sent++;
+      }catch{failed++;}
+      await new Promise(r=>setTimeout(r,i%10===9?1000:50));
+      if(i%10===0||i===ids.length-1){
+        const pct=Math.round((i+1)/total*100);
+        const filled=Math.round(pct/10);
+        const bar='█'.repeat(filled)+'░'.repeat(10-filled);
+        ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,
+          '📤 *جاري الإرسال...*
+`['+bar+'] '+pct+'%`
+✅ '+sent+' | ❌ '+failed+' | ⏳ '+(total-i-1),
+          {parse_mode:'Markdown'}
+        ).catch(()=>{});
+      }
+    }
+    return ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,
+      '✅ *اكتمل الإرسال!*
+`[██████████] 100%`
+✅ '+sent+' | ❌ '+failed,
+      {parse_mode:'Markdown',...build([back('mg_templates')])}
+    );
   }
   if(data==='mg_scheduled') return showScheduled(ctx);
   if(data.startsWith('mg_del_sched_')){

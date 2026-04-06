@@ -1,5 +1,6 @@
 const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
 const filesDb=require('../database/files');
+const {all}=require('../database/db');
 const interactions=require('../database/interactions');
 const usersDb=require('../database/users');
 const content=require('../database/content');
@@ -25,10 +26,9 @@ async function showPopular(ctx){
 
 async function showNewInSpecialty(ctx){
   const uid=ctx.uid;
-  const spRow=await require('../database/users').getSpecialty(uid);
+  const spRow=await usersDb.getSpecialty(uid);
   const spId=spRow?.specialty_id;
   if(!spId||spId==0) return showLatest(ctx);
-  const {all}=require('../database/db');
   const list=await all(
     `SELECT f.*,c.name as cat_name,s.name as sub_name FROM files f
      JOIN categories c ON f.category_id=c.id
