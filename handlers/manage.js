@@ -377,10 +377,7 @@ async function handleText(ctx,state){
             [btn('🎓 تخصص معين','mg_sched_sp_'+lastTpl.id)],
             [btn('💾 حفظ فقط','mg_templates')]
           ];
-          ctx.reply('✅ *تم حفظ القالب!*
-النوع: '+tplType+'
-
-هل تريد إرساله؟',{parse_mode:'Markdown',...build(schedRows)});
+          ctx.reply('✅ *تم حفظ القالب!*\nالنوع: '+tplType+'\n\nهل تريد إرساله؟',{parse_mode:'Markdown',...build(schedRows)});
         }catch(e){clearState(uid);ctx.reply(e.message==='exists'?'❌ قالب بهذا الاسم موجود!':'❌ خطأ: '+e.message);}
         break;
       case 'mg_sched_time':
@@ -459,9 +456,7 @@ async function handleCallback(ctx,data){
     const ids=await usersDb.allIds();
     let sent=0,failed=0;
     const total=ids.length;
-    const sm=await ctx.reply('📤 *جاري الإرسال...*
-`[░░░░░░░░░░] 0%`
-✅ 0 | ❌ 0 | ⏳ '+total,{parse_mode:'Markdown'});
+    const sm=await ctx.reply('📤 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total,{parse_mode:'Markdown'});
     for(let i=0;i<ids.length;i++){
       try{
         if(tpl.type==='text') await ctx.telegram.sendMessage(ids[i],tpl.content,{parse_mode:'Markdown'});
@@ -477,17 +472,13 @@ async function handleCallback(ctx,data){
         const filled=Math.round(pct/10);
         const bar='█'.repeat(filled)+'░'.repeat(10-filled);
         ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,
-          '📤 *جاري الإرسال...*
-`['+bar+'] '+pct+'%`
-✅ '+sent+' | ❌ '+failed+' | ⏳ '+(total-i-1),
+          '📤 *جاري الإرسال...*\n`['+bar+'] '+pct+'%`\n✅ '+sent+' | ❌ '+failed+' | ⏳ '+(total-i-1),
           {parse_mode:'Markdown'}
         ).catch(()=>{});
       }
     }
     return ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,
-      '✅ *اكتمل الإرسال!*
-`[██████████] 100%`
-✅ '+sent+' | ❌ '+failed,
+      '✅ *اكتمل الإرسال!*\n`[██████████] 100%`\n✅ '+sent+' | ❌ '+failed,
       {parse_mode:'Markdown',...build([back('mg_templates')])}
     );
   }
