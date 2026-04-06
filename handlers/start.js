@@ -1,7 +1,6 @@
 const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
 const { build, btn } = require('../utils/keyboard');
 const { eos } = require('../utils/helpers');
-const { t } = require('../utils/i18n');
 const interactions = require('../database/interactions');
 const usersDb = require('../database/users');
 const content = require('../database/content');
@@ -15,14 +14,17 @@ async function startHandler(ctx) {
 }
 
 async function askSpecialty(ctx, name) {
-  const uid = ctx.uid;
   const specs = await content.getSpecs();
   if (!specs.length) return showMainMenu(ctx, name);
   const rows = specs.map(s => [btn('🎓 ' + s.name, 'set_sp_' + s.id)]);
-  rows.push([btn('⏭ تخطي', 'skip_sp')]);
-  return eos(ctx, '👋 *مرحباً ' + name + '!*\n\n🎓 اختر تخصصك:', {
-    parse_mode: 'Markdown', ...build(rows)
-  });
+  rows.push([btn('⏭ تخطي لأختار لاحقاً', 'skip_sp')]);
+  return eos(ctx,
+    '👋 *أهلاً ' + name + '!*\n\n' +
+    '📚 منصتك الأكاديمية على تيليغرام\n' +
+    '━━━━━━━━━━━━━━━━\n' +
+    '🎓 *اختر تخصصك للبدء:*',
+    { parse_mode: 'Markdown', ...build(rows) }
+  );
 }
 
 async function showMainMenu(ctx, name) {
@@ -37,34 +39,25 @@ async function showMainMenu(ctx, name) {
   const spId = spRow?.specialty_id;
   const sp = spId && spId != 0 ? await content.getSpec(spId) : null;
 
-  // تحيات عشوائية احترافية
   const hour = new Date().getHours();
-  let timeGreet = hour < 12 ? '🌅 صباح النور' : hour < 17 ? '☀️ مساء الخير' : hour < 21 ? '🌆 مساء النور' : '🌙 مساء الخير';
+  const timeGreet = hour < 12 ? '🌅 صباح النور' : hour < 17 ? '☀️ مساء الخير' : '🌙 مساء الخير';
 
-  const greetings = [
-    timeGreet + '، *' + name + '!* 👋',
-    '✨ أهلاً بك، *' + name + '!*',
-    '🎓 مرحباً، *' + name + '!*',
-    '💡 يسعدنا وجودك، *' + name + '!*',
-    '🚀 أهلاً وسهلاً، *' + name + '!*',
-  ];
-  const greet = greetings[Math.floor(Math.random() * greetings.length)];
-
-  let welcome = greet + '\n';
-  if (sp) welcome += '🎓 ' + escMd(sp.name) + '\n';
+  let welcome = timeGreet + '، *' + name + '!*\n';
+  if (sp) welcome += '🎓 *' + escMd(sp.name) + '*\n';
   welcome += '━━━━━━━━━━━━━━━━\n';
-  welcome += '📚 *منصتك الأكاديمية على تيليغرام*';
+  welcome += '📚 منصتك الأكاديمية — اختر ما تريد:';
 
   const rows = [
-    [btn('📚 تصفح المحتوى', 'browse')],
+    [btn('📚  تصفح المحتوى', 'browse')],
     [btn('🔍 بحث', 'search_prompt'), btn('🆕 الأحدث', 'latest')],
-    [btn('🆕 جديد في تخصصي', 'new_in_sp'), btn('🎯 موصى به', 'recommended')],
-    [btn('⭐ المفضلة', 'favorites'), btn('📂 السجل', 'history')],
+    [btn('⭐ المفضلة', 'favorites'), btn('📂 سجلي', 'history')],
     [btn('👤 ملفي', 'profile'), btn('📊 إحصائيات', 'stats')],
+    [btn(sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', 'change_sp')],
   ];
-  rows.push([btn(sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', 'change_sp')]);
-  if (last && last.title) rows.push([btn('▶️ استكمال: ' + last.title.substring(0,20), 'preview_' + last.id + '_0_0_0_0_0')]);
+
+  if (last?.title) rows.push([btn('▶️ استكمال: ' + last.title.substring(0, 25), 'preview_' + last.id + '_0_0_0_0_0')]);
   if (ctx.isAdmin) rows.push([btn('🛠 لوحة الإدارة', 'mg_menu')]);
+
   return eos(ctx, welcome, { parse_mode: 'Markdown', ...build(rows) });
 }
 
