@@ -1,15 +1,19 @@
 const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
 const filesDb=require('../database/files');
-const {all}=require('../database/db');
+const {all, get}=require('../database/db');
 const interactions=require('../database/interactions');
 const usersDb=require('../database/users');
 const content=require('../database/content');
 const {build,btn,back}=require('../utils/keyboard');
 const {eos,formatDate}=require('../utils/helpers');
 const {t,getLang,setLang}=require('../utils/i18n');
+const {cacheGet,cacheSet,cacheClear}=require('../utils/cache');
 
 async function showLatest(ctx){
-  const uid=ctx.uid; const list=await filesDb.recentFiles(15);
+  const uid=ctx.uid;
+  const key='latest_15';
+  let list=cacheGet(key);
+  if(!list){ list=await filesDb.recentFiles(15); cacheSet(key,list,120000); }
   if(!list.length) return eos(ctx,'🆕 لا توجد ملفات بعد.',build([back('main_menu')]));
   const rows=list.map(f=>[btn('📄 '+f.title+' · '+f.sub_name,'preview_'+f.id+'_0_0_0_0_0')]);
   rows.push(back('main_menu'));
@@ -17,7 +21,9 @@ async function showLatest(ctx){
 }
 
 async function showPopular(ctx){
-  const list=await filesDb.topDownloaded(15);
+  const key='popular_15';
+  let list=cacheGet(key);
+  if(!list){ list=await filesDb.topDownloaded(15); cacheSet(key,list,300000); }
   if(!list.length) return eos(ctx,'🔥 لا توجد ملفات.',build([back('main_menu')]));
   const rows=list.map((f,i)=>[btn((i+1)+'🔥 '+f.title+' ⬇️'+f.downloads,'preview_'+f.id+'_0_0_0_0_0')]);
   rows.push(back('main_menu'));
@@ -29,14 +35,19 @@ async function showNewInSpecialty(ctx){
   const spRow=await usersDb.getSpecialty(uid);
   const spId=spRow?.specialty_id;
   if(!spId||spId==0) return showLatest(ctx);
-  const list=await all(
-    `SELECT f.*,c.name as cat_name,s.name as sub_name FROM files f
-     JOIN categories c ON f.category_id=c.id
-     JOIN subjects s ON c.subject_id=s.id
-     JOIN semesters sm ON s.semester_id=sm.id
-     JOIN years y ON sm.year_id=y.id
-     WHERE y.specialty_id=? AND f.is_deleted=0
-     ORDER BY f.uploaded_at DESC LIMIT 15`,[spId]);
+  const key='new_sp_'+spId;
+  let list=cacheGet(key);
+  if(!list){
+    list=await all(
+      `SELECT f.*,c.name as cat_name,s.name as sub_name FROM files f
+       JOIN categories c ON f.category_id=c.id
+       JOIN subjects s ON c.subject_id=s.id
+       JOIN semesters sm ON s.semester_id=sm.id
+       JOIN years y ON sm.year_id=y.id
+       WHERE y.specialty_id=? AND f.is_deleted=0
+       ORDER BY f.uploaded_at DESC LIMIT 15`,[spId]);
+    cacheSet(key,list,120000);
+  }
   if(!list.length) return showLatest(ctx);
   const rows=list.map(f=>[btn('📄 '+f.title+' · '+escMd(f.sub_name),'preview_'+f.id+'_0_0_0_0_0')]);
   rows.push(back('main_menu'));
@@ -44,7 +55,10 @@ async function showNewInSpecialty(ctx){
 }
 
 async function showRecommended(ctx){
-  const uid=ctx.uid; const list=await interactions.getRecommended(uid,10);
+  const uid=ctx.uid;
+  const key='rec_'+uid;
+  let list=cacheGet(key);
+  if(!list){ list=await interactions.getRecommended(uid,10); cacheSet(key,list,300000); }
   if(!list.length) return showPopular(ctx);
   const rows=list.map(f=>[btn('📄 '+f.title+' · '+f.sub_name,'preview_'+f.id+'_0_0_0_0_0')]);
   rows.push(back('main_menu'));
@@ -52,7 +66,8 @@ async function showRecommended(ctx){
 }
 
 async function showFavorites(ctx){
-  const uid=ctx.uid; const favs=await interactions.getFavs(uid);
+  const uid=ctx.uid;
+  const favs=await interactions.getFavs(uid);
   if(!favs.length) return eos(ctx,'⭐ *المفضلة*\n\nلا توجد ملفات محفوظة.',{parse_mode:'Markdown',...build([back('main_menu')])});
   const rows=favs.map(f=>[btn('📄 '+f.title,'preview_'+f.id+'_0_0_0_0_0'),btn('🗑','unfav_'+f.id)]);
   rows.push(back('main_menu'));
@@ -74,7 +89,8 @@ async function toggleFav(ctx,fid,remove=false){
 }
 
 async function showHistory(ctx){
-  const uid=ctx.uid; const hist=await interactions.getHistory(uid);
+  const uid=ctx.uid;
+  const hist=await interactions.getHistory(uid);
   if(!hist.length) return eos(ctx,'📂 *السجل*\n\nلم تشاهد أي ملفات بعد.',{parse_mode:'Markdown',...build([back('main_menu')])});
   const rows=hist.map(f=>[btn('📄 '+f.title,'preview_'+f.id+'_0_0_0_0_0')]);
   rows.push(back('main_menu'));
@@ -82,16 +98,18 @@ async function showHistory(ctx){
 }
 
 async function showProgress(ctx) {
-  const uid = ctx.uid;
-  const spRow = await usersDb.getSpecialty(uid);
-  const spId = spRow?.specialty_id;
-  if (!spId || spId == 0) return eos(ctx, '⚠️ لم تحدد تخصصك بعد.', {parse_mode:'Markdown',...build([back('main_menu')])});
+  const uid=ctx.uid;
+  const spRow=await usersDb.getSpecialty(uid);
+  const spId=spRow?.specialty_id;
+  if(!spId||spId==0) return eos(ctx,'⚠️ لم تحدد تخصصك بعد.',{parse_mode:'Markdown',...build([back('main_menu')])});
 
-  const sp = await content.getSpec(spId);
-  const {all} = require('../database/db');
+  // cache لكل مستخدم لمدة 5 دقائق
+  const key='progress_'+uid;
+  let cached=cacheGet(key);
+  if(cached) return eos(ctx,cached.text,{parse_mode:'Markdown',...build(cached.kb)});
 
-  // كل المواد مع عدد ملفاتها وعدد اللي شافها المستخدم
-  const subjects = await all(`
+  const sp=await content.getSpec(spId);
+  const subjects=await all(`
     SELECT s.name as sub_name,
            COUNT(DISTINCT f.id) as total,
            COUNT(DISTINCT CASE WHEN h.user_id=? THEN h.file_id END) as seen
@@ -104,66 +122,49 @@ async function showProgress(ctx) {
     WHERE y.specialty_id=? AND s.is_deleted=0
     GROUP BY s.id, s.name
     ORDER BY seen DESC, total DESC
-  `, [uid, uid, spId]);
+  `,[uid,uid,spId]);
 
-  if (!subjects.length) return eos(ctx, '📭 لا يوجد محتوى في تخصصك بعد.', {parse_mode:'Markdown',...build([back('main_menu')])});
+  if(!subjects.length) return eos(ctx,'📭 لا يوجد محتوى في تخصصك بعد.',{parse_mode:'Markdown',...build([back('main_menu')])});
 
-  const totalFiles = subjects.reduce((a,s) => a + parseInt(s.total), 0);
-  const totalSeen = subjects.reduce((a,s) => a + parseInt(s.seen), 0);
-  const overallPct = totalFiles ? Math.round(totalSeen/totalFiles*100) : 0;
+  const totalFiles=subjects.reduce((a,s)=>a+parseInt(s.total),0);
+  const totalSeen=subjects.reduce((a,s)=>a+parseInt(s.seen),0);
+  const overallPct=totalFiles?Math.round(totalSeen/totalFiles*100):0;
 
-  function progressBar(seen, total) {
-    const pct = total ? Math.round(seen/total*100) : 0;
-    const filled = Math.round(pct/10);
-    const bar = '█'.repeat(filled) + '░'.repeat(10-filled);
-    return '['+bar+'] '+pct+'%';
+  function progressBar(seen,total){
+    const pct=total?Math.round(seen/total*100):0;
+    const filled=Math.round(pct/10);
+    return '['+'█'.repeat(filled)+'░'.repeat(10-filled)+'] '+pct+'%';
   }
+  function medal(pct){ return pct>=100?'🏆':pct>=75?'🥇':pct>=50?'🥈':pct>=25?'🥉':'📚'; }
 
-  function medal(pct) {
-    if(pct>=100) return '🏆';
-    if(pct>=75) return '🥇';
-    if(pct>=50) return '🥈';
-    if(pct>=25) return '🥉';
-    return '📚';
-  }
-
-  let text = '📊 *تقدمك في ' + escMd(sp.name) + '*\n';
-  text += '━━━━━━━━━━━━━━━━\n\n';
-
-  subjects.forEach(s => {
-    const seen = parseInt(s.seen);
-    const total = parseInt(s.total);
-    const pct = total ? Math.round(seen/total*100) : 0;
-    text += medal(pct)+' *'+escMd(s.sub_name)+'*\n';
-    text += '`'+progressBar(seen,total)+'`\n';
-    text += '📄 '+seen+'/'+total+' ملف\n\n';
+  let text='📊 *تقدمك في '+escMd(sp.name)+'*\n━━━━━━━━━━━━━━━━\n\n';
+  subjects.forEach(s=>{
+    const seen=parseInt(s.seen),total=parseInt(s.total);
+    const pct=total?Math.round(seen/total*100):0;
+    text+=medal(pct)+' *'+escMd(s.sub_name)+'*\n`'+progressBar(seen,total)+'`\n📄 '+seen+'/'+total+' ملف\n\n';
   });
+  text+='━━━━━━━━━━━━━━━━\n🎯 *الإجمالي: '+totalSeen+'/'+totalFiles+' ملف*\n`'+progressBar(totalSeen,totalFiles)+'`';
+  if(overallPct>=75) text+='\n\n🔥 *أداء ممتاز! استمر!*';
+  else if(overallPct>=50) text+='\n\n💪 *في المنتصف! لا تتوقف!*';
+  else if(overallPct>=25) text+='\n\n📖 *بداية جيدة! واصل!*';
+  else text+='\n\n🚀 *ابدأ رحلتك التعليمية!*';
 
-  text += '━━━━━━━━━━━━━━━━\n';
-  text += '🎯 *الإجمالي: '+totalSeen+'/'+totalFiles+' ملف*\n';
-  text += '`'+progressBar(totalSeen,totalFiles)+'`\n';
-  if(overallPct>=75) text += '\n🔥 *أداء ممتاز! استمر!*';
-  else if(overallPct>=50) text += '\n💪 *في المنتصف! لا تتوقف!*';
-  else if(overallPct>=25) text += '\n📖 *بداية جيدة! واصل!*';
-  else text += '\n🚀 *ابدأ رحلتك التعليمية!*';
-
-  return eos(ctx, text, {parse_mode:'Markdown',...build([
-    [btn('🔄 تحديث','progress')],
-    back('main_menu')
-  ])});
+  const kb=[[btn('🔄 تحديث','progress')],back('main_menu')];
+  cacheSet(key,{text,kb},300000);
+  return eos(ctx,text,{parse_mode:'Markdown',...build(kb)});
 }
 
 async function showProfile(ctx){
   const uid=ctx.uid;
   const lang=getLang(uid);
-  const [user, dlCount, _favs, spRow, lastFile] = await Promise.all([
+  // COUNT بدل getFavs الثقيلة
+  const [user, dlCount, favCount, spRow, lastFile] = await Promise.all([
     usersDb.getById(uid),
     interactions.getUserDownloadCount(uid),
-    interactions.getFavs(uid),
+    get('SELECT COUNT(*) as c FROM favorites WHERE user_id=?',[uid]).then(r=>r?.c||0),
     usersDb.getSpecialty(uid),
     interactions.getLastFile(uid)
   ]);
-  const favCount=_favs.length;
   const spId=spRow?.specialty_id;
   const sp=spId&&spId!=0?await content.getSpec(spId):null;
   let text='👤 *ملفك الشخصي*\n\n';
@@ -182,10 +183,14 @@ async function showProfile(ctx){
 }
 
 async function showStats(ctx){
-  const [totalUsers, activeToday, totalFiles, totalDl, specs] = await Promise.all([
-    usersDb.count(), usersDb.activeToday(), filesDb.totalFiles(), filesDb.totalDownloads(), content.getSpecs()
+  const key='stats_global';
+  let cached=cacheGet(key);
+  if(cached) return eos(ctx,cached,{parse_mode:'Markdown',...build([back('main_menu')])});
+  const [totalUsers,activeToday,totalFiles,totalDl,specs]=await Promise.all([
+    usersDb.count(),usersDb.activeToday(),filesDb.totalFiles(),filesDb.totalDownloads(),content.getSpecs()
   ]);
   const text='📊 *الإحصائيات*\n\n👥 المستخدمون: *'+totalUsers+'*\n🟢 نشطون اليوم: *'+activeToday+'*\n📁 الملفات: *'+totalFiles+'*\n⬇️ التحميلات: *'+totalDl+'*\n🎓 التخصصات: *'+specs.length+'*';
+  cacheSet(key,text,300000);
   return eos(ctx,text,{parse_mode:'Markdown',...build([back('main_menu')])});
 }
 
@@ -193,10 +198,14 @@ async function handleSearch(ctx,query){
   if(global.delState) await global.delState(ctx.uid); else delete global.userStates[ctx.uid];
   if(!query||query.trim().length<2) return ctx.reply('⚠️ قصير جداً. ادخل كلمة على الأقل.');
   if(query.trim().length>100) return ctx.reply('⚠️ البحث طويل جداً. اكتب أقل من 100 حرف.');
-  // Strip special chars that could break SQL
-  query = query.trim().replace(/[%;\\]/g,'');
+  query=query.trim().replace(/[%;\\]/g,'');
   if(!query.length) return ctx.reply('⚠️ كلمة البحث غير صالحة.');
-  const results=await filesDb.search(query.trim());
+
+  // cache للبحث 5 دقائق
+  const key='search_'+query.toLowerCase();
+  let results=cacheGet(key);
+  if(!results){ results=await filesDb.search(query); cacheSet(key,results,300000); }
+
   if(!results.length) return ctx.reply('لا نتائج لـ: '+query,{...build([[btn('بحث جديد','search_prompt')],back('main_menu')])});
   const rows=results.map(f=>{
     const row=[btn('📄 '+f.title+' · '+f.sub_name,'preview_'+f.id+'_0_0_0_0_0')];

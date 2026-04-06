@@ -8,20 +8,38 @@ async function checkScheduledMessages(bot) {
     const usersDb = require('../database/users');
     const pending = await messagesDb.getPending();
     for(const msg of pending) {
-      let ids = [];
-      if(msg.target === 'all') ids = await usersDb.allIds();
-      else if(msg.target === 'specialty') ids = await usersDb.getUsersBySpecialty(msg.specialty_id);
+      // pagination بدل تحميل كل IDs دفعة وحدة
+      const BATCH = 100;
+      let offset = 0;
       let sent = 0, failed = 0;
-      for(let idx=0; idx<ids.length; idx++) {
-        const id = ids[idx];
-        try {
-          if(msg.type === 'text') await bot.telegram.sendMessage(id, msg.content, {parse_mode:'Markdown'});
-          else if(msg.type === 'photo') await bot.telegram.sendPhoto(id, msg.file_id, {caption:msg.content});
-          else if(msg.type === 'document') await bot.telegram.sendDocument(id, msg.file_id, {caption:msg.content});
-          else if(msg.type === 'link') await bot.telegram.sendMessage(id, msg.content+'\n\n'+msg.file_id);
-          sent++;
-        } catch { failed++; }
-        await new Promise(r => setTimeout(r, idx%10===9?1000:50));
+      while(true) {
+        let ids = [];
+        if(msg.target === 'all') {
+          const rows = await require('../database/db').all(
+            'SELECT id FROM users WHERE is_banned=0 LIMIT ? OFFSET ?', [BATCH, offset]
+          );
+          ids = rows.map(r => r.id);
+        } else if(msg.target === 'specialty') {
+          const rows = await require('../database/db').all(
+            'SELECT user_id as id FROM user_specialties WHERE specialty_id=? LIMIT ? OFFSET ?',
+            [msg.specialty_id, BATCH, offset]
+          );
+          ids = rows.map(r => r.id);
+        }
+        if(!ids.length) break;
+        for(let idx=0; idx<ids.length; idx++) {
+          const id = ids[idx];
+          try {
+            if(msg.type==='text') await bot.telegram.sendMessage(id, msg.content, {parse_mode:'Markdown'});
+            else if(msg.type==='photo') await bot.telegram.sendPhoto(id, msg.file_id, {caption:msg.content});
+            else if(msg.type==='document') await bot.telegram.sendDocument(id, msg.file_id, {caption:msg.content});
+            else if(msg.type==='link') await bot.telegram.sendMessage(id, msg.content+'\n\n'+msg.file_id);
+            sent++;
+          } catch { failed++; }
+          await new Promise(r => setTimeout(r, idx%10===9 ? 1000 : 50));
+        }
+        offset += BATCH;
+        if(ids.length < BATCH) break;
       }
       await messagesDb.markSent(msg.id);
       console.log('Scheduled msg sent:', msg.name, 'sent:', sent, 'failed:', failed);
@@ -50,24 +68,15 @@ async function sendBackupStats(bot, ownerIds) {
 
 function startScheduler(bot, ownerIds) {
   if(!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, {recursive:true});
-
-  // Check scheduled messages every minute
   setInterval(() => checkScheduledMessages(bot), 60000);
   setTimeout(() => checkScheduledMessages(bot), 5000);
-
-  // Daily backup stats
-  scheduleDaily(async () => {
-    await sendBackupStats(bot, ownerIds);
-  });
-
-  // Daily cleanup
+  scheduleDaily(async () => { await sendBackupStats(bot, ownerIds); });
   scheduleDaily(async () => {
     try {
       const { run } = require('../database/db');
       await run(`DELETE FROM files WHERE is_deleted=1 AND uploaded_at < NOW() - INTERVAL '30 days'`);
       await run(`DELETE FROM logs WHERE created_at < NOW() - INTERVAL '30 days'`);
-      await run(`DELETE FROM cache_store WHERE expires_at < ?`,[Date.now()]);
-
+      await run(`DELETE FROM cache_store WHERE expires_at < ?`, [Date.now()]);
       console.log('✅ Cleanup done');
     } catch(e) { console.error('Cleanup error:', e.message); }
   });
