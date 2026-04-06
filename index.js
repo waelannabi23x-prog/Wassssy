@@ -313,7 +313,9 @@ bot.on('document', async ctx => {
 // جمع handlers الميديا في واحد
 bot.on(['photo','video','audio','voice'], async ctx => {
   if (!ctx.isAdmin && !ctx.isOwner) return;
-  if (global.userStates?.[ctx.uid]?.type === 'mg_file') return manage.handleFileUpload(ctx);
+  const state = global.userStates?.[ctx.uid];
+  if (state?.type === 'mg_file') return manage.handleFileUpload(ctx);
+  if (state?.type === 'mg_tpl_content') return manage.handleText(ctx, state);
 });
 
 bot.on('text', async ctx => {

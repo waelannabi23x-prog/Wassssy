@@ -595,18 +595,19 @@ async function showUserProfile(ctx, userId) {
   if (!user) return ctx.reply('❌ المستخدم غير موجود.');
   const spId = spRow?.specialty_id;
   const sp = spId&&spId!=0 ? await content.getSpec(spId) : null;
+  const esc3 = s => (s||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
   const text = '👤 *بروفايل المستخدم*\n\n' +
     '🆔 ID: `' + userId + '`\n' +
-    '👋 الاسم: ' + (user.first_name||'؟') + ' ' + (user.last_name||'') + '\n' +
-    (user.username ? '📛 @' + user.username + '\n' : '') +
+    '👋 الاسم: ' + esc3(user.first_name||'؟') + ' ' + esc3(user.last_name||'') + '\n' +
+    (user.username ? '📛 @' + esc3(user.username) + '\n' : '') +
     '📅 انضم: ' + (user.joined_at ? new Date(user.joined_at).toLocaleDateString('en-GB') : '؟') + '\n' +
     '🕐 آخر نشاط: ' + (user.last_active ? new Date(user.last_active).toLocaleDateString('en-GB') : '؟') + '\n' +
-    '🎓 التخصص: *' + (sp ? (sp.name||'غير محدد') : 'غير محدد') + '*\n' +
+    '🎓 التخصص: *' + esc3(sp ? (sp.name||'غير محدد') : 'غير محدد') + '*\n' +
     '🚫 محظور: ' + (user.is_banned ? 'نعم' : 'لا') + '\n\n' +
     '📊 *النشاط:*\n' +
     '⬇️ التحميلات: *' + dlCount + '*\n' +
     '⭐ المفضلة: *' + favs.length + '*' +
-    (lastFile ? '\n📄 آخر ملف: *' + (lastFile.title||'') + '*' : '');
+    (lastFile ? '\n📄 آخر ملف: *' + esc3(lastFile.title||'') + '*' : '');
   const rows = [
     [btn(user.is_banned ? '✅ إلغاء الحظر' : '🚫 حظر', (user.is_banned ? 'mg_unban_' : 'mg_ban_') + userId)],
     [back('mg_users')[0]]
