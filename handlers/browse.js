@@ -1,5 +1,13 @@
 const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
 const { cacheGet, cacheSet } = require('../utils/cache');
+const reportsDb = require('../database/reports');
+
+function formatSize(bytes) {
+  if(!bytes || bytes===0) return '';
+  if(bytes < 1024) return bytes+'B';
+  if(bytes < 1024*1024) return (bytes/1024).toFixed(1)+'KB';
+  return (bytes/(1024*1024)).toFixed(1)+'MB';
+}
 
 function starsDisplay(avg, cnt) {
   const full = Math.round(avg);
@@ -17,26 +25,23 @@ const { t } = require('../utils/i18n');
 
 const PS = 8;
 
-// helper - جيب بيانات المسار كلها بـ Promise.all مع cache
 async function getPathData(spId, yrId, smId, sbId, catId) {
   const key = 'path_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId;
   const cached = cacheGet(key);
   if(cached) return cached;
-  const jobs = [
+  const [sp, yr, sm, sb, cat] = await Promise.all([
     spId && spId!=='0' ? content.getSpec(spId) : null,
     yrId && yrId!=='0' ? content.getYear(yrId) : null,
     smId && smId!=='0' ? content.getSemester(smId) : null,
     sbId && sbId!=='0' ? content.getSubject(sbId) : null,
     catId && catId!=='0' ? content.getCategory(catId) : null,
-  ];
-  const [sp, yr, sm, sb, cat] = await Promise.all(jobs);
+  ]);
   const result = {sp, yr, sm, sb, cat};
-  cacheSet(key, result, 600000); // 10 دقائق
+  cacheSet(key, result, 600000);
   return result;
 }
 
 async function showSpecs(ctx) {
-  const uid = ctx.uid;
   const specs = await content.getSpecs();
   if(!specs.length) return eos(ctx,'📭 لا توجد تخصصات بعد.',build([back('main_menu')]));
   const rows = specs.map(s=>[btn('🎓 '+s.name,'sp_'+s.id)]);
@@ -45,7 +50,6 @@ async function showSpecs(ctx) {
 }
 
 async function showYears(ctx,spId,page=0) {
-  const uid = ctx.uid;
   const [sp, all] = await Promise.all([content.getSpec(spId), content.getYears(spId)]);
   const total = all.length;
   const years = all.slice(page*PS,(page+1)*PS);
@@ -97,7 +101,6 @@ async function showCategories(ctx,spId,yrId,smId,sbId) {
 
 async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
   const uid = ctx.uid;
-  // كل البيانات بـ Promise.all واحد
   const [{sp,yr,sm,sb,cat}, allFiles, bundles] = await Promise.all([
     getPathData(spId,yrId,smId,sbId,catId),
     filesDb.getFiles(catId),
@@ -107,13 +110,11 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
   const list = allFiles.slice(page*PS,(page+1)*PS);
   const pathStr = buildPath([sp?.name,yr?.name,sm?.name,sb?.name,cat?.name]);
   let text = pathStr+'\n━━━━━━━━━━━━\n'+(total?'📄 *'+total+' ملف*':t(uid,'no_files'));
-
   const fileIds = list.map(f=>f.id);
   const [favMap, ratingMap] = await Promise.all([
     interactions.getFavBatch(uid, fileIds),
     interactions.getRatingBatch(fileIds)
   ]);
-
   const rows = list.map(f=>{
     const fav = favMap[f.id]||false;
     const avg = ratingMap[f.id]||0;
@@ -123,7 +124,6 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
       btn(fav?'⭐':'☆','fav_'+f.id)
     ];
   });
-
   if(total>PS){
     const nav=[];
     if(page>0) nav.push(btn('⬅️','ct_page_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId+'_'+(page-1)));
@@ -131,7 +131,6 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
     if((page+1)*PS<total) nav.push(btn('➡️','ct_page_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId+'_'+(page+1)));
     rows.push(nav);
   }
-
   if(bundles.length){
     rows.unshift([btn('━━━ الحزم ('+bundles.length+') ━━━','noop')]);
     bundles.forEach(b=>{
@@ -144,11 +143,11 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
 
 async function showPreview(ctx,fid,spId,yrId,smId,sbId,catId) {
   const uid = ctx.uid;
-  // 3 queries بدل 5
-  const [f, ratingData, commentCount] = await Promise.all([
+  const [f, ratingData, commentCount, alreadyReported] = await Promise.all([
     filesDb.getFile(fid),
     interactions.getAvgRating(fid),
-    commentsDb.countComments(fid)
+    commentsDb.countComments(fid),
+    reportsDb.hasReported(uid, fid)
   ]);
   if(!f) return ctx.reply(t(uid,'not_found'));
   const [fav, favCnt, userRating] = await Promise.all([
@@ -157,19 +156,43 @@ async function showPreview(ctx,fid,spId,yrId,smId,sbId,catId) {
     interactions.getUserRating(uid,fid)
   ]);
   const {avg,cnt} = ratingData;
+  const sizeStr = f.file_size ? ' | 💾 '+formatSize(f.file_size) : '';
   const text = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 _'+escMd(f.description)+'_\n':'')+
     '\n📁 '+escMd(f.cat_name)+' | 📖 '+escMd(f.sub_name)+
-    '\n⬇️ *'+f.downloads+'* تحميل | ⭐ *'+favCnt+'* محفوظ\n'+
-    '💬 *'+commentCount+'* تعليق\n'+starsDisplay(avg,cnt);
+    '\n⬇️ *'+f.downloads+'* تحميل | ⭐ *'+favCnt+'* محفوظ'+sizeStr+
+    '\n💬 *'+commentCount+'* تعليق\n'+starsDisplay(avg,cnt);
   const backCb = catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
   const ratingBtns = [1,2,3,4,5].map(i=>btn(i<=userRating?'⭐':'☆','rate_'+fid+'_'+i+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId));
   const rows = [
     [btn('⬇️ تحميل الملف','fl_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)],
     [btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid), btn('💬 تعليقات ('+commentCount+')','cmt_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)],
     ratingBtns,
+    [btn(alreadyReported?'🚩 تم التبليغ':'⚠️ تبليغ عن مشكلة', alreadyReported?'noop':'report_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)],
     [btn('◀️ رجوع',backCb)]
   ];
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
+}
+
+async function showReportMenu(ctx, fid, spId, yrId, smId, sbId, catId) {
+  const reasons = [
+    ['🔗 رابط معطوب', 'broken_link'],
+    ['📄 ملف تالف', 'corrupted'],
+    ['❌ ملف خاطئ', 'wrong_file'],
+    ['🔄 ملف مكرر', 'duplicate'],
+    ['⚠️ محتوى غير لائق', 'inappropriate'],
+  ];
+  const rows = reasons.map(([label, reason])=>[btn(label,'do_report_'+fid+'_'+reason+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)]);
+  rows.push([btn('◀️ إلغاء','preview_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)]);
+  return eos(ctx,'⚠️ *تبليغ عن مشكلة*\n\nاختر نوع المشكلة:',{parse_mode:'Markdown',...build(rows)});
+}
+
+async function doReport(ctx, fid, reason, spId, yrId, smId, sbId, catId) {
+  const uid = ctx.uid;
+  const already = await reportsDb.hasReported(uid, fid);
+  if(already) return ctx.answerCbQuery('🚩 لقد أبلغت عن هذا الملف مسبقاً',{show_alert:true}).catch(()=>{});
+  await reportsDb.addReport(fid, uid, reason);
+  await ctx.answerCbQuery('✅ تم إرسال التبليغ، شكراً!',{show_alert:true}).catch(()=>{});
+  return showPreview(ctx,fid,spId,yrId,smId,sbId,catId);
 }
 
 async function showComments(ctx,fid,spId,yrId,smId,sbId,catId,page=0) {
@@ -201,7 +224,8 @@ async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
   const [f, fav] = await Promise.all([filesDb.getFile(fid), interactions.isFav(uid,fid)]);
   if(!f) return ctx.reply(t(uid,'not_found'));
   Promise.all([filesDb.incDownloads(fid), interactions.addHistory(uid,fid), interactions.addLog(uid,'download',f.title)]).catch(()=>{});
-  const caption = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 '+escMd(f.description)+'\n':'')+'📁 '+escMd(f.cat_name)+' | 📖 '+escMd(f.sub_name);
+  const sizeStr = f.file_size ? ' | 💾 '+formatSize(f.file_size) : '';
+  const caption = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 '+escMd(f.description)+'\n':'')+'📁 '+escMd(f.cat_name)+' | 📖 '+escMd(f.sub_name)+sizeStr;
   const backCb = catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
   const kb = build([[btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid)],[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]]);
   try {
@@ -209,7 +233,6 @@ async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
     else if(f.file_type==='photo') await ctx.replyWithPhoto(f.file_id,{caption,parse_mode:'Markdown',...kb});
     else await ctx.replyWithDocument(f.file_id,{caption,parse_mode:'Markdown',...kb});
     try{ await ctx.deleteMessage(); }catch(e){}
-    // ملفات مشابهة بشكل async لا تبطئ الرد
     interactions.getSimilar(fid,4).then(similar=>{
       if(similar.length){
         const simRows = similar.map(sf=>[btn('📄 '+sf.title+' · '+sf.sub_name,'preview_'+sf.id+'_0_0_0_0_0')]);
@@ -246,4 +269,4 @@ async function sendBundle(ctx,bundleId,spId,yrId,smId,sbId,catId) {
   await ctx.reply('✅ اكتمل الإرسال!',{...build([[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]])});
 }
 
-module.exports={showSpecs,showYears,showSemesters,showSubjects,showCategories,showFiles,showPreview,sendFile,showBundle,sendBundle,showComments};
+module.exports={showSpecs,showYears,showSemesters,showSubjects,showCategories,showFiles,showPreview,showReportMenu,doReport,sendFile,showBundle,sendBundle,showComments};
