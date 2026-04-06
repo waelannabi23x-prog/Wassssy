@@ -262,7 +262,7 @@ ctx.reply('✅ *'+state.title+'* رُفع بنجاح!',{parse_mode:'Markdown',..
 }
 
 async function handleText(ctx,state){
-  const uid=ctx.uid; const text=ctx.message.text.trim();
+  const uid=ctx.uid; const text=ctx.message.text?.trim()||ctx.message.caption?.trim()||'';
   if(text==='/cancel'){clearState(uid);return ctx.reply('تم الإلغاء.',build([back('mg_menu')]));}
   if(text==='/done'&&state.type==='mg_bundle_files'){
     clearState(uid);
