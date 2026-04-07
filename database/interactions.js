@@ -38,7 +38,7 @@ async function getSimilar(fileId,limit=4){
 const addLog = (uid,action,details) => run('INSERT INTO logs(user_id,action,details) VALUES(?,?,?)',[uid,action,details||'']);
 const getLogs = (n=20) => all('SELECT l.*,u.first_name FROM logs l LEFT JOIN users u ON l.user_id=u.id ORDER BY l.created_at DESC LIMIT ?',[n]);
 const clearOldLogs = () => run(`DELETE FROM logs WHERE created_at < NOW() - INTERVAL '30 days'`);
-const getActiveUsers = async (days=7) => (await all(`SELECT id FROM users WHERE is_banned=0 AND last_active::timestamp >= NOW() - (? || ' days')::INTERVAL`)).map(r=>r.id);
+const getActiveUsers = async (days=7) => (await all(`SELECT id FROM users WHERE is_banned=0 AND last_active::timestamp >= NOW() - (? || ' days')::INTERVAL`,[days])).map(r=>r.id);
 
 const addRating = (uid,fid,rating) => {
   cacheClear('urating_'+uid+'_'+fid);

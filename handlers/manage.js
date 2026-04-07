@@ -578,7 +578,7 @@ async function handleCallback(ctx,data){
   if(data.startsWith('mg_desc_fl_')){const p=data.replace('mg_desc_fl_','').split('_');setState(uid,{type:'mg_desc_fl',id:p[5],spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});return ctx.reply('📝 الوصف الجديد:\n_(أو /cancel)_');}
   if(data.startsWith('mg_dl_fl_')){
     const perms3=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);
-    if(!perms3.includes('full')&&!perms3.includes('delete')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});const p=data.replace('mg_dl_fl_','').split('_');const f=filesDb.getFile(p[5]);return eos(ctx,'🗑 نقل *'+(f?.title||'الملف')+'* لسلة المحذوفات؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_fl_'+p.join('_')),btn('❌ لا','mg_fls_'+p.slice(0,5).join('_'))]]) });}
+    if(!perms3.includes('full')&&!perms3.includes('delete')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});const p=data.replace('mg_dl_fl_','').split('_');const f=await filesDb.getFile(p[5]);return eos(ctx,'🗑 نقل *'+(f?.title||'الملف')+'* لسلة المحذوفات؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_fl_'+p.join('_')),btn('❌ لا','mg_fls_'+p.slice(0,5).join('_'))]]) });}
   if(data.startsWith('mg_cdl_fl_')){const p=data.replace('mg_cdl_fl_','').split('_');await filesDb.softDelete(p[5]);return showMgFiles(ctx,p[0],p[1],p[2],p[3],p[4]);}
 }
 

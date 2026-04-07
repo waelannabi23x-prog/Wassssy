@@ -260,6 +260,10 @@ bot.on('callback_query', async ctx => {
 // Handle media groups (multiple files at once)
 const mediaGroups = {};
 bot.on('message', async (ctx, next) => {
+  if(ctx.chat?.type !== 'private') {
+    try { await ctx.telegram.leaveChat(ctx.chat.id); } catch(e) {}
+    return;
+  }
   const uid = ctx.uid;
   const state = global.userStates?.[uid];
   if(state?.type !== 'mg_bundle_files') return next();
@@ -380,12 +384,7 @@ bot.on('my_chat_member', async ctx => {
   }
 });
 
-bot.on('message', async ctx => {
-  if(ctx.chat?.type !== 'private') {
-    try { await ctx.telegram.leaveChat(ctx.chat.id); } catch(e) {}
-    return;
-  }
-});
+
 
 process.once('SIGINT', () => bot.stop('SIGINT'));
 process.once('SIGTERM', () => bot.stop('SIGTERM'));
