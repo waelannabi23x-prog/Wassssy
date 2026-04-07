@@ -94,77 +94,77 @@ const getCategory = async id => {
 const addSpec = async (name) => {
   if (await get('SELECT 1 FROM specialties WHERE name=? AND is_deleted=0', [name])) throw new Error('exists');
   await run('INSERT INTO specialties(name) VALUES(?)', [name]);
-  cacheClear('specs');cacheClear('specs');
+  cacheClear('spec');cacheClear('specs');
 };
 
 const renameSpec = async (id, name) => {
   await run('UPDATE specialties SET name=? WHERE id=?', [name, id]);
-  cacheClear('specs');
+  cacheClear('spec');
 };
 
 const deleteSpec = async id => {
   await run('UPDATE specialties SET is_deleted=1 WHERE id=?', [id]);
-  cacheClear('specs');
+  cacheClear('spec');
 };
 
 const addYear = async (spId, name) => {
   await run('INSERT INTO years(specialty_id,name) VALUES(?,?)', [spId, name]);
-  cacheClear('years_');
+  cacheClear('year');
 };
 
 const renameYear = async (id, name) => {
   await run('UPDATE years SET name=? WHERE id=?', [name, id]);
-  cacheClear('years_');
+  cacheClear('year');
 };
 
 const deleteYear = async id => {
   await run('UPDATE years SET is_deleted=1 WHERE id=?', [id]);
-  cacheClear('years_');
+  cacheClear('year');
 };
 
 const addSemester = async (yrId, name) => {
   await run('INSERT INTO semesters(year_id,name) VALUES(?,?)', [yrId, name]);
-  cacheClear('sems_');
+  cacheClear('sem');
 };
 
 const renameSemester = async (id, name) => {
   await run('UPDATE semesters SET name=? WHERE id=?', [name, id]);
-  cacheClear('sems_');
+  cacheClear('sem');
 };
 
 const deleteSemester = async id => {
   await run('UPDATE semesters SET is_deleted=1 WHERE id=?', [id]);
-  cacheClear('sems_');
+  cacheClear('sem');
 };
 
 const addSubject = async (smId, name) => {
   await run('INSERT INTO subjects(semester_id,name) VALUES(?,?)', [smId, name]);
-  cacheClear('subs_');
+  cacheClear('sub');
 };
 
 const renameSubject = async (id, name) => {
   await run('UPDATE subjects SET name=? WHERE id=?', [name, id]);
-  cacheClear('subs_');
+  cacheClear('sub');
 };
 
 const deleteSubject = async id => {
   await run('UPDATE subjects SET is_deleted=1 WHERE id=?', [id]);
-  cacheClear('subs_');
+  cacheClear('sub');
 };
 
 const addCategory = async (sbId, name) => {
   await run('INSERT INTO categories(subject_id,name) VALUES(?,?)', [sbId, name]);
-  cacheClear('cats_');
+  cacheClear('cat');
 };
 
 const renameCategory = async (id, name) => {
   await run('UPDATE categories SET name=? WHERE id=?', [name, id]);
-  cacheClear('cats_');
+  cacheClear('cat');
 };
 
 const deleteCategory = async id => {
   await run('UPDATE categories SET is_deleted=1 WHERE id=?', [id]);
-  cacheClear('cats_');
+  cacheClear('cat');
 };
 
 module.exports = { getSpecs,getSpec,addSpec,renameSpec,deleteSpec,getYears,getYear,addYear,renameYear,deleteYear,getSemesters,getSemester,addSemester,renameSemester,deleteSemester,getSubjects,getSubject,addSubject,renameSubject,deleteSubject,getCategories,getCategory,addCategory,renameCategory,deleteCategory };

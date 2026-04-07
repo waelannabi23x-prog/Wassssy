@@ -143,16 +143,18 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
 
 async function showPreview(ctx,fid,spId,yrId,smId,sbId,catId) {
   const uid = ctx.uid;
-  const [f, ratingData, commentCount, alreadyReported, fav, favCnt, userRating] = await Promise.all([
+  const [f, ratingData, commentCount, alreadyReported] = await Promise.all([
     filesDb.getFile(fid),
     interactions.getAvgRating(fid),
     commentsDb.countComments(fid),
-    reportsDb.hasReported(uid, fid),
+    reportsDb.hasReported(uid, fid)
+  ]);
+  if(!f) return ctx.reply(t(uid,'not_found'));
+  const [fav, favCnt, userRating] = await Promise.all([
     interactions.isFav(uid,fid),
     interactions.favCount(fid),
     interactions.getUserRating(uid,fid)
   ]);
-  if(!f) return ctx.reply(t(uid,'not_found'));
   const {avg,cnt} = ratingData;
   const sizeStr = f.file_size ? ' | 💾 '+formatSize(f.file_size) : '';
   const text = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 _'+escMd(f.description)+'_\n':'')+
