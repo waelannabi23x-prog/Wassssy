@@ -149,6 +149,8 @@ bot.on('callback_query', async ctx => {
   try {
     await ctx.answerCbQuery().catch(()=>{});
     if (data === 'noop') return;
+    if (data.startsWith('report_')) { const p=data.replace('report_','').split('_'); return browse.showReportMenu(ctx,p[0],p[1],p[2],p[3],p[4],p[5],p[6]); }
+    if (data.startsWith('do_report_')) { const p=data.replace('do_report_','').split('_'); return browse.doReport(ctx,p[0],p[1],p[2],p[3],p[4],p[5],p[6],p[7]); }
     if (data === 'main_menu') return startHandler(ctx);
     if (data === 'browse') return browse.showSpecs(ctx);
     if (data.startsWith('set_sp_')) {

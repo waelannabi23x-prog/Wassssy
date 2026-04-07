@@ -59,14 +59,15 @@ const topDownloaded = (n=10) => all(J+' WHERE f.is_deleted=0 ORDER BY f.download
 const recentFiles = (n=15) => all(J+' WHERE f.is_deleted=0 ORDER BY f.uploaded_at DESC LIMIT ?',[n]);
 const getTrash = () => all(J+' WHERE f.is_deleted=1 ORDER BY f.uploaded_at DESC LIMIT 30');
 
-const search = async q => {
+const search = async (q, spId=0) => {
   const key='search_'+q.toLowerCase().trim();
   const cached=cacheGet(key);
   if(cached) return cached;
   const words=q.trim().split(/\s+/);
   const conditions=words.map(()=>'(f.title LIKE ? OR f.description LIKE ? OR s.name LIKE ? OR c.name LIKE ? OR sp.name LIKE ? OR y.name LIKE ? OR sm.name LIKE ?)').join(' AND ');
   const params=words.flatMap(w=>Array(7).fill('%'+w+'%'));
-  const result=await all(J+' WHERE f.is_deleted=0 AND ('+conditions+') ORDER BY f.downloads DESC, f.uploaded_at DESC LIMIT 30',params);
+  const spFilter = spId && spId!=0 ? ' AND y.specialty_id='+parseInt(spId) : '';
+  const result=await all(J+' WHERE f.is_deleted=0 AND ('+conditions+')'+spFilter+' ORDER BY f.downloads DESC, f.uploaded_at DESC LIMIT 30',params);
   cacheSet(key,result,300000);
   return result;
 };
