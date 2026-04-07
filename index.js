@@ -150,7 +150,7 @@ bot.on('callback_query', async ctx => {
     await ctx.answerCbQuery().catch(()=>{});
     if (data === 'noop') return;
     if (data.startsWith('report_')) { const p=data.replace('report_','').split('_'); return browse.showReportMenu(ctx,p[0],p[1],p[2],p[3],p[4],p[5],p[6]); }
-    if (data.startsWith('do_report_')) { const p=data.replace('do_report_','').split('_'); return browse.doReport(ctx,p[0],p[1],p[2],p[3],p[4],p[5],p[6],p[7]); }
+    if (data.startsWith('do_report_')) { const raw=data.replace('do_report_',''); const fid=raw.split('_')[0]; const rest=raw.slice(fid.length+1); const reasonEnd=rest.indexOf('_',rest.indexOf('_')+1); const reason=rest.substring(0,reasonEnd); const coords=rest.substring(reasonEnd+1).split('_'); return browse.doReport(ctx,fid,reason,coords[0],coords[1],coords[2],coords[3],coords[4]); }
     if (data === 'main_menu') return startHandler(ctx);
     if (data === 'browse') return browse.showSpecs(ctx);
     if (data.startsWith('set_sp_')) {

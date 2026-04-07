@@ -11,12 +11,47 @@ const {isOwner}=require('../middlewares/auth');
 const path=require('path');
 const bundlesDb=require('../database/bundles');
 const messagesDb=require('../database/messages');
-const {all, run: dbRun, getSetting, setSetting, DB_PATH}=require('../database/db');
+const {all, get, run: dbRun, getSetting, setSetting, DB_PATH}=require('../database/db');
+const {cacheGet,cacheSet,cacheClear}=require('../utils/cache');
 if(!global.userStates) global.userStates={};
 const setState=(uid,s)=>global.userStates[uid]=s;
 const clearState=uid=>delete global.userStates[uid];
 const PS=10;
 const esc=t=>(t||"").replace(/[*_`\[\]()~>#+=|{}.!\-]/g,"\\$&");
+
+// broadcast بـ pagination - آمن على memory
+async function broadcastPaginated(ctx, getMessage, target='all', spId=0) {
+  const BATCH=100;
+  let offset=0, sent=0, failed=0, total=0;
+  // نحسب العدد أول
+  if(target==='all') total=(await get('SELECT COUNT(*) as c FROM users WHERE is_banned=0'))?.c||0;
+  else total=(await get('SELECT COUNT(*) as c FROM user_specialties WHERE specialty_id=?',[spId]))?.c||0;
+  const sm=await ctx.reply('📤 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total,{parse_mode:'Markdown'});
+  let processed=0;
+  while(true){
+    let rows=[];
+    if(target==='all') rows=await all('SELECT id FROM users WHERE is_banned=0 LIMIT ? OFFSET ?',[BATCH,offset]);
+    else rows=await all('SELECT user_id as id FROM user_specialties WHERE specialty_id=? LIMIT ? OFFSET ?',[spId,BATCH,offset]);
+    if(!rows.length) break;
+    for(let i=0;i<rows.length;i++){
+      try{ await getMessage(rows[i].id); sent++; }catch{ failed++; }
+      await new Promise(r=>setTimeout(r,i%10===9?1000:50));
+      processed++;
+      if(processed%10===0||processed===total){
+        const pct=Math.round(processed/total*100);
+        const filled=Math.round(pct/10);
+        const bar='█'.repeat(filled)+'░'.repeat(10-filled);
+        ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,
+          '📤 *جاري الإرسال...*\n`['+bar+'] '+pct+'%`\n✅ '+sent+' | ❌ '+failed+' | ⏳ '+(total-processed),
+          {parse_mode:'Markdown'}
+        ).catch(()=>{});
+      }
+    }
+    offset+=BATCH;
+    if(rows.length<BATCH) break;
+  }
+  return {sent,failed,total};
+}
 
 async function mainMenu(ctx){
   const uid=ctx.uid;
@@ -29,8 +64,8 @@ async function mainMenu(ctx){
     rows.push([btn('💾 نسخ احتياطي','mg_backup'),btn(global.maintenanceMode?'🟢 إيقاف الصيانة':'🔴 وضع الصيانة','mg_maint')]);
     rows.push([btn('♻️ استعادة','mg_restore'),btn('🗑 سلة المحذوفات','mg_trash')]);
     rows.push([btn('🔔 إشعار للمستخدمين','mg_notify')]);
-  rows.push([btn('📨 نظام الرسائل','mg_msgs')]);
-  rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp')]);
+    rows.push([btn('📨 نظام الرسائل','mg_msgs')]);
+    rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp')]);
   }
   rows.push([btn('🏠 القائمة الرئيسية','main_menu')]);
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
@@ -81,8 +116,8 @@ async function showCategories(ctx,spId,yrId,smId,sbId){
 }
 
 async function showMgFiles(ctx,spId,yrId,smId,sbId,catId,page=0){
-  const [cat, all] = await Promise.all([content.getCategory(catId), filesDb.getFiles(catId)]);
-  const total=all.length; const list=all.slice(page*PS,(page+1)*PS);
+  const [cat, allFiles] = await Promise.all([content.getCategory(catId), filesDb.getFiles(catId)]);
+  const total=allFiles.length; const list=allFiles.slice(page*PS,(page+1)*PS);
   let text='📁 *'+cat?.name+'*\n━━━━━━━━━━━━\n'+(total?'📄 *'+total+' ملف*':'_لا توجد ملفات._');
   const rows=[];
   list.forEach(f=>{
@@ -90,13 +125,10 @@ async function showMgFiles(ctx,spId,yrId,smId,sbId,catId,page=0){
     rows.push([btn('✏️','mg_rn_fl_'+[spId,yrId,smId,sbId,catId,f.id].join('_')),btn('📝','mg_desc_fl_'+[spId,yrId,smId,sbId,catId,f.id].join('_')),btn('🗑','mg_dl_fl_'+[spId,yrId,smId,sbId,catId,f.id].join('_'))]);
   });
   if(total>PS){const nav=[];if(page>0)nav.push(btn('⬅️','mg_fls_pg_'+[spId,yrId,smId,sbId,catId,page-1].join('_')));nav.push(btn((page+1)+'/'+Math.ceil(total/PS),'noop'));if((page+1)*PS<total)nav.push(btn('➡️','mg_fls_pg_'+[spId,yrId,smId,sbId,catId,page+1].join('_')));rows.push(nav);}
-  // Show bundles
-  const bundles2 = await bundlesDb.getBundles(catId);
+  const bundles2=await bundlesDb.getBundles(catId);
   if(bundles2.length){
     rows.unshift([btn('━━━ الحزم ('+bundles2.length+') ━━━','noop')]);
-    bundles2.forEach(b=>{
-      rows.splice(1,0,[btn('📦 '+b.title,'bundle_'+b.id+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)]);
-    });
+    bundles2.forEach(b=>{rows.splice(1,0,[btn('📦 '+b.title,'bundle_'+b.id+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)]);});
   }
   const uploadRow=[btn('➕ رفع ملف','mg_upl_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)];
   if(ctx.isOwner) uploadRow.push(btn('📦 حزمة','mg_add_bundle_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId));
@@ -104,9 +136,13 @@ async function showMgFiles(ctx,spId,yrId,smId,sbId,catId,page=0){
   rows.push(back('mg_cats_'+spId+'_'+yrId+'_'+smId+'_'+sbId));
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
-
 async function showAnalytics(ctx){
-  const [top, recent, totalUsers, activeToday, totalFiles, totalDl, specs] = await Promise.all([
+  // cache 5 دقائق
+  const key='analytics_admin';
+  const cached=cacheGet(key);
+  if(cached) return eos(ctx,cached,{parse_mode:'Markdown',...build([[btn('🔄 تحديث','mg_analytics_refresh')],back('mg_menu')])});
+
+  const [top,recent,totalUsers,activeToday,totalFiles,totalDl,specs,spDist,topUsers,peakHours,topCats]=await Promise.all([
     filesDb.topDownloaded(5),
     filesDb.recentFiles(5),
     usersDb.count(),
@@ -114,50 +150,29 @@ async function showAnalytics(ctx){
     filesDb.totalFiles(),
     filesDb.totalDownloads(),
     content.getSpecs(),
-  ]);
-
-  // توزيع المستخدمين على التخصصات
-  const [spDist, topUsers, peakHours, topCats] = await Promise.all([
     all(`SELECT sp.name, COUNT(us.user_id) as cnt FROM user_specialties us LEFT JOIN specialties sp ON us.specialty_id=sp.id GROUP BY sp.name ORDER BY cnt DESC LIMIT 5`),
     all(`SELECT u.first_name, u.username, COUNT(h.id) as cnt FROM history h LEFT JOIN users u ON h.user_id=u.id GROUP BY h.user_id, u.first_name, u.username ORDER BY cnt DESC LIMIT 5`),
     all(`SELECT EXTRACT(HOUR FROM viewed_at::timestamp) as hour, COUNT(*) as cnt FROM history GROUP BY hour ORDER BY cnt DESC LIMIT 3`),
     all(`SELECT c.name, COUNT(h.id) as cnt FROM history h LEFT JOIN files f ON h.file_id=f.id LEFT JOIN categories c ON f.category_id=c.id WHERE h.viewed_at >= NOW() - INTERVAL '7 days' GROUP BY c.name ORDER BY cnt DESC LIMIT 3`)
   ]);
 
-  let text = '📊 *لوحة الإحصائيات المتقدمة*\n━━━━━━━━━━━━\n';
-  text += '👥 المستخدمون: *'+totalUsers+'*\n';
-  text += '🟢 نشطون اليوم: *'+activeToday+'*\n';
-  text += '📁 الملفات: *'+totalFiles+'*\n';
-  text += '⬇️ التحميلات: *'+totalDl+'*\n';
-  text += '🎓 التخصصات: *'+specs.length+'*\n';
-
-  text += '\n🎓 *توزيع التخصصات:*\n';
-  if(spDist.length) spDist.forEach((s,i)=>{ text+=(i+1)+'. '+escMd(s.name||'غير محدد')+' — *'+s.cnt+'* مستخدم\n'; });
-  else text+='_لا بيانات._\n';
-
-  text += '\n🏆 *أكثر المستخدمين نشاطاً:*\n';
-  if(topUsers.length) topUsers.forEach((u,i)=>{ text+=(i+1)+'. '+(escMd(u.first_name)||'مجهول')+(u.username?' @'+escMd(u.username):'')+' — *'+u.cnt+'* تحميل\n'; });
-  else text+='_لا بيانات._\n';
-
-  text += '\n⏰ *أوقات الذروة:*\n';
-  if(peakHours.length) peakHours.forEach((h,i)=>{ text+=(i+1)+'. الساعة *'+Math.round(h.hour)+':00* — *'+h.cnt+'* نشاط\n'; });
-  else text+='_لا بيانات._\n';
-
-  text += '\n📁 *أكثر الفئات هذا الأسبوع:*\n';
-  if(topCats.length) topCats.forEach((c,i)=>{ text+=(i+1)+'. '+escMd(c.name||'غير محدد')+' — *'+c.cnt+'* تحميل\n'; });
-  else text+='_لا بيانات._\n';
-
-  text += '\n🏆 *الأكثر تحميلاً:*\n';
+  let text='📊 *لوحة الإحصائيات*\n━━━━━━━━━━━━\n';
+  text+='👥 المستخدمون: *'+totalUsers+'*\n🟢 نشطون اليوم: *'+activeToday+'*\n📁 الملفات: *'+totalFiles+'*\n⬇️ التحميلات: *'+totalDl+'*\n🎓 التخصصات: *'+specs.length+'*\n';
+  text+='\n🎓 *توزيع التخصصات:*\n';
+  if(spDist.length) spDist.forEach((s,i)=>{text+=(i+1)+'. '+escMd(s.name||'غير محدد')+' — *'+s.cnt+'* مستخدم\n';});
+  text+='\n🏆 *الأكثر نشاطاً:*\n';
+  if(topUsers.length) topUsers.forEach((u,i)=>{text+=(i+1)+'. '+(escMd(u.first_name)||'مجهول')+(u.username?' @'+escMd(u.username):'')+' — *'+u.cnt+'*\n';});
+  text+='\n⏰ *أوقات الذروة:*\n';
+  if(peakHours.length) peakHours.forEach((h,i)=>{text+=(i+1)+'. الساعة *'+Math.round(h.hour)+':00* — *'+h.cnt+'*\n';});
+  text+='\n📁 *أكثر الفئات هذا الأسبوع:*\n';
+  if(topCats.length) topCats.forEach((c,i)=>{text+=(i+1)+'. '+escMd(c.name||'غير محدد')+' — *'+c.cnt+'*\n';});
+  text+='\n🔥 *الأكثر تحميلاً:*\n';
   top.forEach((f,i)=>{text+=(i+1)+'. '+escMd(f.title)+' ⬇️*'+f.downloads+'*\n';});
-
-  text += '\n🆕 *أحدث الملفات:*\n';
+  text+='\n🆕 *أحدث الملفات:*\n';
   recent.forEach((f,i)=>{text+=(i+1)+'. '+escMd(f.title)+'\n';});
 
-  const rows = [
-    [btn('🔄 تحديث','mg_analytics')],
-    back('mg_menu')
-  ];
-  return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
+  cacheSet(key,text,300000);
+  return eos(ctx,text,{parse_mode:'Markdown',...build([[btn('🔄 تحديث','mg_analytics_refresh')],back('mg_menu')])});
 }
 
 async function showLogs(ctx){
@@ -171,11 +186,8 @@ async function showLogs(ctx){
 async function showUsers(ctx,page=0){
   const [list, total] = await Promise.all([usersDb.getAll(page,PS), usersDb.count()]);
   let text='👥 *المستخدمون ('+total+')*\n\n';
-  list.forEach((u,i)=>{const j=u.joined_at?new Date(u.joined_at).toLocaleDateString("en-GB"):"?";const a=u.last_active?new Date(u.last_active).toLocaleDateString("en-GB"):"?";text+=(page*PS+i+1)+". "+(esc(u.first_name))+  (u.username?" @"+esc(u.username):" ID:"+u.id)+(u.is_banned?" 🚫":"")+"\n   📅 "+j+" | 🕐 "+a+"\n";});
-  const rows=list.map(u=>[
-    btn('👤 '+(u.first_name||u.id),'mg_profile_'+u.id),
-    btn(u.is_banned?'✅':'🚫',(u.is_banned?'mg_unban_':'mg_ban_')+u.id)
-  ]);
+  list.forEach((u,i)=>{const j=u.joined_at?new Date(u.joined_at).toLocaleDateString("en-GB"):"?";const a=u.last_active?new Date(u.last_active).toLocaleDateString("en-GB"):"?";text+=(page*PS+i+1)+". "+(esc(u.first_name))+(u.username?" @"+esc(u.username):" ID:"+u.id)+(u.is_banned?" 🚫":"")+"\n   📅 "+j+" | 🕐 "+a+"\n";});
+  const rows=list.map(u=>[btn('👤 '+(u.first_name||u.id),'mg_profile_'+u.id),btn(u.is_banned?'✅':'🚫',(u.is_banned?'mg_unban_':'mg_ban_')+u.id)]);
   const nav=[];
   if(page>0) nav.push(btn('⬅️','mg_users_p'+(page-1)));
   nav.push(btn((page+1)+'/'+Math.ceil(total/PS),'noop'));
@@ -184,7 +196,6 @@ async function showUsers(ctx,page=0){
   rows.push(back('mg_menu'));
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
-
 
 const ALL_PERMS=['upload','delete','add_content','view_users','full'];
 const PERM_LABELS={upload:'📤 رفع',delete:'🗑 حذف',add_content:'➕ إضافة محتوى',view_users:'👥 مشاهدة المستخدمين',full:'👑 كل الصلاحيات'};
@@ -202,10 +213,9 @@ async function showEditPerms(ctx,adminId){
 async function showAdmins(ctx){
   const list=await adminsDb.getAll();
   let text='👑 *الإداريون ('+list.length+')*\n\n';
-  list.forEach(a=>{text+='• '+(escMd(a.first_name||'ID:'+a.user_id))+(a.username?' @'+escMd(a.username):'')+'\n';});
   const rows=list.map(a=>{
     const perms=(a.permissions||'upload,add_content').split(',').map(p=>PERM_LABELS[p.trim()]||p).join(' | ');
-    text+='  🔑 '+perms+'\n';
+    text+='• '+(escMd(a.first_name||'ID:'+a.user_id))+(a.username?' @'+escMd(a.username):'')+'\n  🔑 '+perms+'\n';
     return [btn('⚙️ '+(a.first_name||a.user_id),'mg_ep_'+a.user_id),btn('🗑','mg_da_'+a.user_id)];
   });
   rows.push([btn('➕ إضافة مشرف','mg_add_admin')]);
@@ -218,7 +228,7 @@ async function showTrash(ctx){
   let text='🗑 *سلة المحذوفات ('+list.length+')*\n\n';
   if(!list.length) text+='_فارغة._';
   const rows=list.map(f=>[btn('📄 '+f.title,'noop'),btn('استعادة','mg_restore_fl_'+f.id)]);
-  if(list.length) rows.push([btn('حذف الكل نهائيا','mg_empty_trash')]);
+  if(list.length) rows.push([btn('حذف الكل نهائياً','mg_empty_trash')]);
   rows.push(back('mg_menu'));
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
@@ -244,8 +254,8 @@ async function handleFileUpload(ctx){
   const uid=ctx.uid; const state=global.userStates?.[uid];
   if(!state||state.type!=='mg_file') return;
   const msg=ctx.message; let fid,ftype;
-  let msgText = (msg.text||msg.caption||'').trim();
-  const isLink = msg.entities?.some(e=>e.type==='url'||e.type==='text_link') || msgText.startsWith('http');
+  let msgText=(msg.text||msg.caption||'').trim();
+  const isLink=msg.entities?.some(e=>e.type==='url'||e.type==='text_link')||msgText.startsWith('http');
   if(msg.document){fid=msg.document.file_id;ftype='document';}
   else if(msg.photo){fid=msg.photo[msg.photo.length-1].file_id;ftype='photo';}
   else if(msg.video){fid=msg.video.file_id;ftype='document';}
@@ -257,7 +267,7 @@ async function handleFileUpload(ctx){
     await filesDb.addFile(state.catId,state.title,state.desc||'',fid,ftype,uid,ftype==='link'?msgText:'');
     await interactions.addLog(uid,'upload',state.title);
     clearState(uid);
-ctx.reply('✅ *'+state.title+'* رُفع بنجاح!',{parse_mode:'Markdown',...build([[btn('➕ رفع آخر','mg_upl_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId+'_'+state.catId)],[btn('📁 عرض الملفات','mg_fls_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId+'_'+state.catId)]])});
+    ctx.reply('✅ *'+state.title+'* رُفع بنجاح!',{parse_mode:'Markdown',...build([[btn('➕ رفع آخر','mg_upl_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId+'_'+state.catId)],[btn('📁 عرض الملفات','mg_fls_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId+'_'+state.catId)]])});
   }catch(e){clearState(uid);ctx.reply(e.message==='exists'?'❌ يوجد ملف بهذا الاسم بالفعل!':'❌ فشل الرفع: '+e.message);}
 }
 
@@ -271,7 +281,7 @@ async function handleText(ctx,state){
   const done=(msg,cb)=>{clearState(uid);ctx.reply(msg,{parse_mode:'Markdown',...build([[btn('◀️ رجوع',cb)]])});};
   try{
     switch(state.type){
-      case 'mg_add_sp': await await content.addSpec(text); done('✅ تم إضافة *'+text+'*!','mg_content'); break;
+      case 'mg_add_sp': await content.addSpec(text); done('✅ تم إضافة *'+text+'*!','mg_content'); break;
       case 'mg_rn_sp': await content.renameSpec(state.id,text); done('✅ تمت إعادة التسمية!','mg_content'); break;
       case 'mg_add_yr': await content.addYear(state.spId,text); done('✅ تمت إضافة *'+text+'*!','mg_yrs_'+state.spId); break;
       case 'mg_rn_yr': await content.renameYear(state.id,text); done('✅ تمت إعادة التسمية!','mg_yrs_'+state.spId); break;
@@ -291,13 +301,13 @@ async function handleText(ctx,state){
         ctx.reply('📝 وصف الحزمة (أو skip):'); break;
       case 'mg_bundle_desc':
         try{
-                  const bid=await bundlesDb.addBundle(state.catId,state.title,text==='skip'?'':text,uid);
+          const bid=await bundlesDb.addBundle(state.catId,state.title,text==='skip'?'':text,uid);
           setState(uid,{...state,type:'mg_bundle_files',bundleId:bid,fileCount:0});
-          ctx.reply('✅ تم إنشاء الحزمة! ابعث الملفات الآن واحد واحد.\nعندما تنتهي ابعث /done');
+          ctx.reply('✅ تم إنشاء الحزمة! ابعث الملفات الآن.\nعندما تنتهي ابعث /done');
         }catch(e){clearState(uid);ctx.reply(e.message==='exists'?'حزمة بهذا الاسم موجودة':'خطأ: '+e.message);}
         break;
-      case 'mg_upl_title': setState(uid,{...state,type:'mg_upl_desc',title:text}); ctx.reply('📝 الوصف (أو *skip* للتخطي):',{parse_mode:'Markdown'}); break;
-      case 'mg_upl_desc': setState(uid,{...state,type:'mg_file',desc:text==='skip'?'':text}); ctx.reply('📎 أرسل الملف الآن:\n_(أو /cancel للإلغاء)_',{parse_mode:'Markdown'}); break;
+      case 'mg_upl_title': setState(uid,{...state,type:'mg_upl_desc',title:text}); ctx.reply('📝 الوصف (أو *skip*):',{parse_mode:'Markdown'}); break;
+      case 'mg_upl_desc': setState(uid,{...state,type:'mg_file',desc:text==='skip'?'':text}); ctx.reply('📎 أرسل الملف:\n_(أو /cancel)_',{parse_mode:'Markdown'}); break;
       case 'mg_rn_fl': await filesDb.rename(state.id,text); done('✅ تمت إعادة التسمية!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_')); break;
       case 'mg_desc_fl': await filesDb.updateDesc(state.id,text); done('✅ تم تحديث الوصف!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_')); break;
       case 'mg_admin_search':
@@ -310,38 +320,28 @@ async function handleText(ctx,state){
         ctx.reply(resp,{parse_mode:'Markdown',...build([back('mg_menu')])}); break;
       case 'mg_broadcast':
         clearState(uid);
-        const ids=await usersDb.allIds(); let sent=0,failed=0;
-        const total_bc=ids.length;
-        const sm=await ctx.reply('📢 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total_bc,{parse_mode:'Markdown'});
-        for(let i=0;i<ids.length;i++){
-          try{await ctx.telegram.sendMessage(ids[i],'📢 *إعلان*\n\n'+text,{parse_mode:'Markdown'});sent++;}catch{failed++;}
-          await new Promise(r=>setTimeout(r,50));
-          if(i%10===0||i===ids.length-1){
-            const pct=Math.round((i+1)/total_bc*100);
-            const filled=Math.round(pct/10);
-            const bar='█'.repeat(filled)+'░'.repeat(10-filled);
-            ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,
-              '📢 *جاري الإرسال...*\n`['+bar+'] '+pct+'%`\n✅ '+sent+' | ❌ '+failed+' | ⏳ '+(total_bc-i-1),
-              {parse_mode:'Markdown'}
-            ).catch(()=>{});
-          }
-        }
-        ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,
-          '✅ *اكتمل البث!*\n`[██████████] 100%`\n✅ '+sent+' | ❌ '+failed+' | 📊 '+Math.round(sent/total_bc*100)+'%',
+        const {sent:bs,failed:bf,total:bt}=await broadcastPaginated(ctx,
+          id=>ctx.telegram.sendMessage(id,'📢 *إعلان*\n\n'+text,{parse_mode:'Markdown'})
+        );
+        ctx.telegram.editMessageText(ctx.chat.id,ctx.message?.message_id||0,null,
+          '✅ *اكتمل البث!*\n✅ '+bs+' | ❌ '+bf+' | 📊 '+Math.round(bs/bt*100)+'%',
           {...build([back('mg_menu')]),parse_mode:'Markdown'}
-        ); break;
+        ).catch(()=>ctx.reply('✅ اكتمل البث! ✅ '+bs+' | ❌ '+bf));
+        break;
       case 'mg_notify_sp_msg':
         clearState(uid);
-        const spUsers = await usersDb.getUsersBySpecialty(state.spId);
-        let spSent = 0;
-        for(const id of spUsers){try{await ctx.telegram.sendMessage(id,'اشعار - '+text,{parse_mode:'Markdown'});spSent++;}catch{}await new Promise(r=>setTimeout(r,50));}
-        ctx.reply('تم الارسال لـ '+spSent+' مستخدم',build([back('mg_menu')]));
+        const {sent:ss}=await broadcastPaginated(ctx,
+          id=>ctx.telegram.sendMessage(id,'🔔 إشعار\n\n'+text,{parse_mode:'Markdown'}),
+          'specialty', state.spId
+        );
+        ctx.reply('✅ تم الإرسال لـ '+ss+' مستخدم',build([back('mg_menu')]));
         break;
       case 'mg_notify_msg':
         clearState(uid);
-        const nIds=await interactions.getActiveUsers(7); let nSent=0;
-        for(const id of nIds){try{await ctx.telegram.sendMessage(id,'🔔 *إشعار*\n\n'+text,{parse_mode:'Markdown'});nSent++;}catch{}await new Promise(r=>setTimeout(r,50));}
-        ctx.reply('✅ أُرسل الإشعار لـ '+nSent+' مستخدم نشط!',build([back('mg_menu')])); break;
+        const {sent:ns}=await broadcastPaginated(ctx,
+          id=>ctx.telegram.sendMessage(id,'🔔 *إشعار*\n\n'+text,{parse_mode:'Markdown'})
+        );
+        ctx.reply('✅ أُرسل لـ '+ns+' مستخدم!',build([back('mg_menu')])); break;
       case 'mg_add_admin_id':
         const tid=parseInt(text);
         if(isNaN(tid)){clearState(uid);return ctx.reply('❌ ID غير صحيح.');}
@@ -352,16 +352,17 @@ async function handleText(ctx,state){
         spRows.push([btn('كل التخصصات','mg_admin_sp_'+tid+'_0')]);
         clearState(uid);
         ctx.reply('اختر التخصص للمشرف:',{...build(spRows)});
-        try{ctx.telegram.sendMessage(tid,'🎉 تمت إضافتك مشرفا في بوت الدراسة',{parse_mode:'Markdown'});}catch{} break;
+        try{ctx.telegram.sendMessage(tid,'🎉 تمت إضافتك مشرفاً!',{parse_mode:'Markdown'});}catch{}
+        break;
       case 'mg_maint_msg': global.maintenanceMsg=text; clearState(uid); ctx.reply('تم تحديث رسالة الصيانة',build([back('mg_menu')])); break;
       case 'mg_tpl_name':
         setState(uid,{...state,type:'mg_tpl_content',name:text,tplType:'auto',fileId:''});
-        ctx.reply('📨 *'+text+'*\n\nأرسل محتوى الرسالة:\n_(نص، صورة، ملف، فيديو، أو رابط)_',{parse_mode:'Markdown',...build([[btn('❌ إلغاء','mg_templates')]])});
+        ctx.reply('📨 *'+text+'*\n\nأرسل محتوى الرسالة:',{parse_mode:'Markdown',...build([[btn('❌ إلغاء','mg_templates')]])});
         break;
       case 'mg_tpl_content':
         try{
           const msg2=ctx.message;
-          let tplType='text', fileId='', tplContent=text||'';
+          let tplType='text',fileId='',tplContent=text||'';
           if(msg2.photo){tplType='photo';fileId=msg2.photo[msg2.photo.length-1].file_id;tplContent=msg2.caption||'';}
           else if(msg2.document){tplType='document';fileId=msg2.document.file_id;tplContent=msg2.caption||'';}
           else if(msg2.video){tplType='video';fileId=msg2.video.file_id;tplContent=msg2.caption||'';}
@@ -371,18 +372,12 @@ async function handleText(ctx,state){
           const savedTpl=await messagesDb.getTemplates();
           const lastTpl=savedTpl[0];
           clearState(uid);
-          const schedRows=[
-            [btn('📤 إرسال الآن','mg_send_now_'+lastTpl.id)],
-            [btn('👥 كل المستخدمين','mg_sched_all_'+lastTpl.id)],
-            [btn('🎓 تخصص معين','mg_sched_sp_'+lastTpl.id)],
-            [btn('💾 حفظ فقط','mg_templates')]
-          ];
-          ctx.reply('✅ *تم حفظ القالب!*\nالنوع: '+tplType+'\n\nهل تريد إرساله؟',{parse_mode:'Markdown',...build(schedRows)});
-        }catch(e){clearState(uid);ctx.reply(e.message==='exists'?'❌ قالب بهذا الاسم موجود!':'❌ خطأ: '+e.message);}
+          ctx.reply('✅ *تم حفظ القالب!*',{parse_mode:'Markdown',...build([[btn('📤 إرسال الآن','mg_send_now_'+lastTpl.id)],[btn('💾 حفظ فقط','mg_templates')]])});
+        }catch(e){clearState(uid);ctx.reply(e.message==='exists'?'❌ قالب موجود!':'❌ خطأ: '+e.message);}
         break;
       case 'mg_sched_time':
         try{
-            await messagesDb.addScheduled(state.tplId,state.target,state.spId||0,text);
+          await messagesDb.addScheduled(state.tplId,state.target,state.spId||0,text);
           clearState(uid);
           ctx.reply('تمت الجدولة',build([[btn('المجدولة','mg_scheduled')]]));
         }catch(e){clearState(uid);ctx.reply('خطأ: '+e.message);}
@@ -395,7 +390,10 @@ async function handleCallback(ctx,data){
   const uid=ctx.uid;
   if(data==='mg_menu') return mainMenu(ctx);
   if(data==='mg_content') return showContent(ctx);
-  if(data==='mg_analytics') return showAnalytics(ctx);
+  if(data==='mg_analytics'||data==='mg_analytics_refresh'){
+    if(data==='mg_analytics_refresh') cacheClear('analytics_admin');
+    return showAnalytics(ctx);
+  }
   if(data==='mg_logs') return showLogs(ctx);
   if(data==='mg_users'){
     const perms2=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);
@@ -404,167 +402,103 @@ async function handleCallback(ctx,data){
   }
   if(data==='mg_admins') return showAdmins(ctx);
   if(data==='mg_trash') return showTrash(ctx);
-  if(data==='mg_search_prompt'){setState(uid,{type:'mg_admin_search'});return ctx.reply('🔍 بحث في الإدارة\n\nأدخل اسم الملف أو المستخدم:');}
-  if(data==='mg_notify_sp'){const specs=await content.getSpecs();const rows=specs.map(s=>[btn('🎓 '+s.name,'mg_notify_sp_'+s.id)]);rows.push(back('mg_menu'));return eos(ctx,'🎓 اختر التخصص لإرسال الإشعار:',{parse_mode:'Markdown',...build(rows)});}
-  if(data.startsWith('mg_notify_sp_')){const spId=data.replace('mg_notify_sp_','');setState(uid,{type:'mg_notify_sp_msg',spId});return ctx.reply('📝 رسالة الإشعار لهذا التخصص:\n_(أو /cancel)_');}
+  if(data==='mg_search_prompt'){setState(uid,{type:'mg_admin_search'});return ctx.reply('🔍 بحث:\n\nأدخل اسم الملف أو المستخدم:');}
+  if(data==='mg_notify_sp'){const specs=await content.getSpecs();const rows=specs.map(s=>[btn('🎓 '+s.name,'mg_notify_sp_'+s.id)]);rows.push(back('mg_menu'));return eos(ctx,'🎓 اختر التخصص:',{parse_mode:'Markdown',...build(rows)});}
+  if(data.startsWith('mg_notify_sp_')){const spId=data.replace('mg_notify_sp_','');setState(uid,{type:'mg_notify_sp_msg',spId});return ctx.reply('📝 رسالة الإشعار:\n_(أو /cancel)_');}
   if(data==='mg_msgs') return showMsgsMenu(ctx);
   if(data==='mg_templates') return showTemplates(ctx);
-  if(data==='mg_add_template'){setState(uid,{type:'mg_tpl_name'});return ctx.reply('📝 *قالب جديد*\n\nأرسل اسم القالب:',{parse_mode:'Markdown',...build([[btn('❌ إلغاء','mg_templates')]])});}
-  if(data.startsWith('mg_tpl_')){
+  if(data==='mg_add_template'){setState(uid,{type:'mg_tpl_name'});return ctx.reply('📝 اسم القالب:',{parse_mode:'Markdown',...build([[btn('❌ إلغاء','mg_templates')]])});}
+  if(data.startsWith('mg_tpl_')&&!data.startsWith('mg_tpl_name')&&!data.startsWith('mg_tpl_content')){
     const id=data.replace('mg_tpl_','');
     const t=await messagesDb.getTemplate(id);
     if(!t) return ctx.reply('غير موجود');
-    const typeIcon={'text':'📝','photo':'🖼','document':'📄','link':'🔗','video':'🎥'}[t.type]||'📝';
-    const rows=[
-      [btn('📤 إرسال الآن','mg_send_now_'+id)],
-      [btn('📅 جدولة','mg_sched_'+id)],
-      [btn('🗑 حذف','mg_del_tpl_'+id)],
-      [back('mg_templates')[0]]
-    ];
-    const preview = t.content ? t.content.substring(0,200) : '(بدون نص)';
-    return eos(ctx,typeIcon+' *'+t.name+'*\nالنوع: '+t.type+'\n\n'+preview,{parse_mode:'Markdown',...build(rows)});
+    const rows=[[btn('📤 إرسال الآن','mg_send_now_'+id)],[btn('📅 جدولة','mg_sched_'+id)],[btn('🗑 حذف','mg_del_tpl_'+id)],[back('mg_templates')[0]]];
+    return eos(ctx,'*'+t.name+'*\nالنوع: '+t.type+'\n\n'+(t.content||'').substring(0,200),{parse_mode:'Markdown',...build(rows)});
   }
-  if(data.startsWith('mg_del_tpl_')){
-    await messagesDb.deleteTemplate(data.replace('mg_del_tpl_',''));
-    return showTemplates(ctx);
-  }
+  if(data.startsWith('mg_del_tpl_')){await messagesDb.deleteTemplate(data.replace('mg_del_tpl_',''));return showTemplates(ctx);}
   if(data.startsWith('mg_sched_')&&!data.startsWith('mg_sched_all_')&&!data.startsWith('mg_sched_sp_')&&!data.startsWith('mg_sched_spid_')){
     const tplId=data.replace('mg_sched_','');
-    const rows=[[btn('👥 كل المستخدمين','mg_sched_all_'+tplId)],[btn('🎓 تخصص معين','mg_sched_sp_'+tplId)]];
-    rows.push([back('mg_templates')[0]]);
-    return eos(ctx,'📅 من تريد إرسال الرسالة لهم؟',{parse_mode:'Markdown',...build(rows)});
+    return eos(ctx,'📅 من تريد إرسال الرسالة لهم؟',{...build([[btn('👥 كل المستخدمين','mg_sched_all_'+tplId)],[btn('🎓 تخصص معين','mg_sched_sp_'+tplId)],[back('mg_templates')[0]])]);
   }
-  if(data.startsWith('mg_sched_all_')){
-    setState(uid,{type:'mg_sched_time',tplId:data.replace('mg_sched_all_',''),target:'all'});
-    return ctx.reply('ادخل وقت الارسال مثال: 2026-04-01 20:00');
-  }
+  if(data.startsWith('mg_sched_all_')){setState(uid,{type:'mg_sched_time',tplId:data.replace('mg_sched_all_',''),target:'all'});return ctx.reply('ادخل وقت الارسال مثال: 2026-04-01 20:00');}
   if(data.startsWith('mg_sched_sp_')){
     const tplId=data.replace('mg_sched_sp_','');
     const specs=await content.getSpecs();
     const rows=specs.map(s=>[btn('🎓 '+s.name,'mg_sched_spid_'+tplId+'_'+s.id)]);
     return eos(ctx,'اختر التخصص:',{...build(rows)});
   }
-  if(data.startsWith('mg_sched_spid_')){
-    const p=data.replace('mg_sched_spid_','').split('_');
-    setState(uid,{type:'mg_sched_time',tplId:p[0],target:'specialty',spId:p[1]});
-    return ctx.reply('ادخل وقت الارسال مثال: 2026-04-01 20:00');
-  }
+  if(data.startsWith('mg_sched_spid_')){const p=data.replace('mg_sched_spid_','').split('_');setState(uid,{type:'mg_sched_time',tplId:p[0],target:'specialty',spId:p[1]});return ctx.reply('ادخل وقت الارسال مثال: 2026-04-01 20:00');}
   if(data.startsWith('mg_send_now_')){
     const tplId=data.replace('mg_send_now_','');
     const tpl=await messagesDb.getTemplate(tplId);
     if(!tpl) return ctx.reply('❌ القالب غير موجود');
-    const ids=await usersDb.allIds();
-    let sent=0,failed=0;
-    const total=ids.length;
-    const sm=await ctx.reply('📤 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total,{parse_mode:'Markdown'});
-    for(let i=0;i<ids.length;i++){
-      try{
-        if(tpl.type==='text') await ctx.telegram.sendMessage(ids[i],tpl.content,{parse_mode:'Markdown'});
-        else if(tpl.type==='photo') await ctx.telegram.sendPhoto(ids[i],tpl.file_id,{caption:tpl.content,parse_mode:'Markdown'});
-        else if(tpl.type==='document') await ctx.telegram.sendDocument(ids[i],tpl.file_id,{caption:tpl.content,parse_mode:'Markdown'});
-        else if(tpl.type==='video') await ctx.telegram.sendVideo(ids[i],tpl.file_id,{caption:tpl.content,parse_mode:'Markdown'});
-        else if(tpl.type==='link') await ctx.telegram.sendMessage(ids[i],tpl.content);
-        sent++;
-      }catch{failed++;}
-      await new Promise(r=>setTimeout(r,i%10===9?1000:50));
-      if(i%10===0||i===ids.length-1){
-        const pct=Math.round((i+1)/total*100);
-        const filled=Math.round(pct/10);
-        const bar='█'.repeat(filled)+'░'.repeat(10-filled);
-        ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,
-          '📤 *جاري الإرسال...*\n`['+bar+'] '+pct+'%`\n✅ '+sent+' | ❌ '+failed+' | ⏳ '+(total-i-1),
-          {parse_mode:'Markdown'}
-        ).catch(()=>{});
-      }
-    }
-    return ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,
-      '✅ *اكتمل الإرسال!*\n`[██████████] 100%`\n✅ '+sent+' | ❌ '+failed,
-      {parse_mode:'Markdown',...build([back('mg_templates')])}
-    );
+    const {sent,failed}=await broadcastPaginated(ctx, async id=>{
+      if(tpl.type==='text') await ctx.telegram.sendMessage(id,tpl.content,{parse_mode:'Markdown'});
+      else if(tpl.type==='photo') await ctx.telegram.sendPhoto(id,tpl.file_id,{caption:tpl.content,parse_mode:'Markdown'});
+      else if(tpl.type==='document') await ctx.telegram.sendDocument(id,tpl.file_id,{caption:tpl.content,parse_mode:'Markdown'});
+      else if(tpl.type==='video') await ctx.telegram.sendVideo(id,tpl.file_id,{caption:tpl.content,parse_mode:'Markdown'});
+      else if(tpl.type==='link') await ctx.telegram.sendMessage(id,tpl.content);
+    });
+    return ctx.reply('✅ اكتمل! ✅ '+sent+' | ❌ '+failed,{...build([back('mg_templates')])});
   }
   if(data==='mg_scheduled') return showScheduled(ctx);
-  if(data.startsWith('mg_del_sched_')){
-    await messagesDb.deleteScheduled(data.replace('mg_del_sched_',''));
-    return showScheduled(ctx);
-  }
-  if(data==='mg_notify'){setState(uid,{type:'mg_notify_msg'});return ctx.reply('🔔 رسالة الإشعار للمستخدمين النشطين (آخر 7 أيام):\n_(أو /cancel)_');}
-  if(data==='mg_maint'){await ctx.answerCbQuery().catch(()=>{});global.maintenanceMode=!global.maintenanceMode;setSetting('maintenance',global.maintenanceMode?'true':'false');await interactions.addLog(uid,'maintenance',global.maintenanceMode?'ON':'OFF');return eos(ctx,'🔧 *الصيانة: '+(global.maintenanceMode?'🔴 مفعّلة':'🟢 متوقفة')+'*',{parse_mode:'Markdown',...build([[btn(global.maintenanceMode?'🟢 إيقاف':'🔴 تفعيل','mg_maint')],[btn('📝 تعديل الرسالة','mg_set_maint_msg'),btn('◀️ رجوع','mg_menu')]])});}
+  if(data.startsWith('mg_del_sched_')){await messagesDb.deleteScheduled(data.replace('mg_del_sched_',''));return showScheduled(ctx);}
+  if(data==='mg_notify'){setState(uid,{type:'mg_notify_msg'});return ctx.reply('🔔 رسالة الإشعار:\n_(أو /cancel)_');}
+  if(data==='mg_maint'){await ctx.answerCbQuery().catch(()=>{});global.maintenanceMode=!global.maintenanceMode;setSetting('maintenance',global.maintenanceMode?'true':'false');return eos(ctx,'🔧 *الصيانة: '+(global.maintenanceMode?'🔴 مفعّلة':'🟢 متوقفة')+'*',{parse_mode:'Markdown',...build([[btn(global.maintenanceMode?'🟢 إيقاف':'🔴 تفعيل','mg_maint')],[btn('📝 تعديل الرسالة','mg_set_maint_msg'),btn('◀️ رجوع','mg_menu')]])});}
   if(data==='mg_set_maint_msg'){setState(uid,{type:'mg_maint_msg'});return ctx.reply('📝 أدخل رسالة الصيانة:');}
-  if(data==='mg_backup'){try{await ctx.replyWithDocument({source:DB_PATH,filename:'backup_'+Date.now()+'.db'},{caption:'💾 نسخ احتياطي — '+new Date().toLocaleString()});}catch(e){ctx.reply('❌ فشل: '+e.message);}return;}
-  if(data==='mg_restore'){setState(uid,{type:'mg_awaiting_restore'});return eos(ctx,'♻️ *استعادة قاعدة البيانات*\n\n⚠️ سيتم استبدال جميع البيانات!\n\nأرسل ملف `.db`:',{parse_mode:'Markdown',...build([back('mg_menu')])});}
+  if(data==='mg_backup'){try{await ctx.replyWithDocument({source:DB_PATH,filename:'backup_'+Date.now()+'.db'},{caption:'💾 نسخ احتياطي'});}catch(e){ctx.reply('❌ فشل: '+e.message);}return;}
+  if(data==='mg_restore'){setState(uid,{type:'mg_awaiting_restore'});return eos(ctx,'♻️ أرسل ملف `.db`:',{parse_mode:'Markdown',...build([back('mg_menu')])});}
   if(data==='mg_broadcast'){setState(uid,{type:'mg_broadcast'});return ctx.reply('📢 رسالة البث:\n_(أو /cancel)_');}
-  if(data==='mg_add_admin'){setState(uid,{type:'mg_add_admin_id'});return ctx.reply('👤 أدخل ID المستخدم:\n_(أو /cancel)_');}
-  if(data.startsWith('mg_admin_sp_')){
-    const p=data.replace('mg_admin_sp_','').split('_');
-    await adminsDb.setSpecialty(p[0],p[1]);
-    return eos(ctx,'تم تحديد التخصص للمشرف',{...build([back('mg_admins')])});
-  }
+  if(data==='mg_add_admin'){setState(uid,{type:'mg_add_admin_id'});return ctx.reply('👤 أدخل ID المستخدم:');}
+  if(data.startsWith('mg_admin_sp_')){const p=data.replace('mg_admin_sp_','').split('_');await adminsDb.setSpecialty(p[0],p[1]);return eos(ctx,'تم تحديد التخصص',{...build([back('mg_admins')])});}
   if(data.startsWith('mg_da_')){await adminsDb.remove(parseInt(data.replace('mg_da_','')));return showAdmins(ctx);}
-  if(data.startsWith('mg_ep_')){return showEditPerms(ctx,data.replace('mg_ep_',''));}
+  if(data.startsWith('mg_ep_')) return showEditPerms(ctx,data.replace('mg_ep_',''));
   if(data.startsWith('mg_tp_')){
     const p=data.replace('mg_tp_','').split('_'); const adminId=p[0]; const perm=p.slice(1).join('_');
     const list=await adminsDb.getAll(); const admin=list.find(a=>a.user_id==adminId);
     let perms=(admin.permissions||'').split(',').map(x=>x.trim()).filter(Boolean);
     if(perms.includes(perm)) perms=perms.filter(x=>x!==perm);
-    else { if(perm==='full') perms=['full']; else { perms=perms.filter(x=>x!=='full'); perms.push(perm); } }
+    else{if(perm==='full') perms=['full'];else{perms=perms.filter(x=>x!=='full');perms.push(perm);}}
     await adminsDb.updatePerms(adminId,perms.join(','));
     return showEditPerms(ctx,adminId);
   }
-  if(data.startsWith('mg_profile_')){return showUserProfile(ctx,data.replace('mg_profile_',''));}
-  if(data.startsWith('mg_ban_')){await usersDb.ban(parseInt(data.replace('mg_ban_','')));await interactions.addLog(uid,'ban',data.replace('mg_ban_',''));return showUsers(ctx);}
+  if(data.startsWith('mg_profile_')) return showUserProfile(ctx,data.replace('mg_profile_',''));
+  if(data.startsWith('mg_ban_')){await usersDb.ban(parseInt(data.replace('mg_ban_','')));return showUsers(ctx);}
   if(data.startsWith('mg_unban_')){await usersDb.unban(parseInt(data.replace('mg_unban_','')));return showUsers(ctx);}
-  if(data.startsWith('mg_users_p')){return showUsers(ctx,parseInt(data.replace('mg_users_p','')));}
+  if(data.startsWith('mg_users_p')) return showUsers(ctx,parseInt(data.replace('mg_users_p','')));
   if(data.startsWith('mg_restore_fl_')){await filesDb.restore(data.replace('mg_restore_fl_',''));return showTrash(ctx);}
-  if(data.startsWith('mg_pdl_fl_')){
-    await dbRun('DELETE FROM files WHERE id=?',[data.replace('mg_pdl_fl_','')]);
-    return showTrash(ctx);
-  }
-  if(data==='mg_empty_trash'){
-    return eos(ctx,'هل تريد حذف كل السلة نهائيا؟',{...build([[btn('تاكيد الحذف','mg_confirm_empty')],[btn('الغاء','mg_trash')]])});
-  }
-  if(data==='mg_confirm_empty'){
-    await dbRun('DELETE FROM files WHERE is_deleted=1');
-    return eos(ctx,'✅ تم حذف السلة نهائياً!',{parse_mode:'Markdown',...build([back('mg_menu')])});
-  }
+  if(data==='mg_empty_trash') return eos(ctx,'هل تريد حذف كل السلة نهائياً؟',{...build([[btn('✅ تأكيد','mg_confirm_empty')],[btn('❌ إلغاء','mg_trash')]])});
+  if(data==='mg_confirm_empty'){await dbRun('DELETE FROM files WHERE is_deleted=1');return eos(ctx,'✅ تم!',{parse_mode:'Markdown',...build([back('mg_menu')])});}
   if(data.startsWith('mg_yrs_')) return showYears(ctx,data.replace('mg_yrs_',''));
   if(data.startsWith('mg_sems_')){const p=data.replace('mg_sems_','').split('_');return showSemesters(ctx,p[0],p[1]);}
   if(data.startsWith('mg_sbs_')){const p=data.replace('mg_sbs_','').split('_');return showSubjects(ctx,p[0],p[1],p[2]);}
   if(data.startsWith('mg_cats_')){const p=data.replace('mg_cats_','').split('_');return showCategories(ctx,p[0],p[1],p[2],p[3]);}
   if(data.startsWith('mg_fls_pg_')){const p=data.replace('mg_fls_pg_','').split('_');return showMgFiles(ctx,p[0],p[1],p[2],p[3],p[4],parseInt(p[5]));}
   if(data.startsWith('mg_fls_')){const p=data.replace('mg_fls_','').split('_');return showMgFiles(ctx,p[0],p[1],p[2],p[3],p[4]);}
-  if(data==='mg_add_sp'){setState(uid,{type:'mg_add_sp'});return ctx.reply('🎓 اسم التخصص:\n_(أو /cancel)_');}
-  if(data.startsWith('mg_rn_sp_')){const id=data.replace('mg_rn_sp_','');setState(uid,{type:'mg_rn_sp',id});return ctx.reply('✏️ الاسم الجديد:\n_(أو /cancel)_');}
-  if(data.startsWith('mg_dl_sp_')){const id=data.replace('mg_dl_sp_','');return eos(ctx,'🗑 حذف *'+content.getSpec(id)?.name+'*؟\n⚠️ سيتم حذف كل المحتوى!',{parse_mode:'Markdown',...build([[btn('✅ تأكيد','mg_cdl_sp_'+id),btn('❌ إلغاء','mg_content')]])});}
+  if(data==='mg_add_sp'){setState(uid,{type:'mg_add_sp'});return ctx.reply('🎓 اسم التخصص:');}
+  if(data.startsWith('mg_rn_sp_')){const id=data.replace('mg_rn_sp_','');setState(uid,{type:'mg_rn_sp',id});return ctx.reply('✏️ الاسم الجديد:');}
+  if(data.startsWith('mg_dl_sp_')){const id=data.replace('mg_dl_sp_','');return eos(ctx,'🗑 حذف التخصص؟\n⚠️ سيتم حذف كل المحتوى!',{parse_mode:'Markdown',...build([[btn('✅ تأكيد','mg_cdl_sp_'+id),btn('❌ إلغاء','mg_content')]])});}
   if(data.startsWith('mg_cdl_sp_')){await content.deleteSpec(data.replace('mg_cdl_sp_',''));return showContent(ctx);}
-  if(data.startsWith('mg_add_yr_')){setState(uid,{type:'mg_add_yr',spId:data.replace('mg_add_yr_','')});return ctx.reply('📅 اسم السنة:\n_(أو /cancel)_');}
-  if(data.startsWith('mg_rn_yr_')){const p=data.replace('mg_rn_yr_','').split('_');setState(uid,{type:'mg_rn_yr',id:p[1],spId:p[0]});return ctx.reply('✏️ الاسم الجديد:\n_(أو /cancel)_');}
-  if(data.startsWith('mg_dl_yr_')){const p=data.replace('mg_dl_yr_','').split('_');return eos(ctx,'🗑 حذف السنة *'+content.getYear(p[1])?.name+'*؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_yr_'+p[0]+'_'+p[1]),btn('❌ لا','mg_yrs_'+p[0])]])});}
+  if(data.startsWith('mg_add_yr_')){setState(uid,{type:'mg_add_yr',spId:data.replace('mg_add_yr_','')});return ctx.reply('📅 اسم السنة:');}
+  if(data.startsWith('mg_rn_yr_')){const p=data.replace('mg_rn_yr_','').split('_');setState(uid,{type:'mg_rn_yr',id:p[1],spId:p[0]});return ctx.reply('✏️ الاسم الجديد:');}
+  if(data.startsWith('mg_dl_yr_')){const p=data.replace('mg_dl_yr_','').split('_');return eos(ctx,'🗑 حذف السنة؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_yr_'+p[0]+'_'+p[1]),btn('❌ لا','mg_yrs_'+p[0])]])});}
   if(data.startsWith('mg_cdl_yr_')){const p=data.replace('mg_cdl_yr_','').split('_');await content.deleteYear(p[1]);return showYears(ctx,p[0]);}
-  if(data.startsWith('mg_add_sem_')){const p=data.replace('mg_add_sem_','').split('_');setState(uid,{type:'mg_add_sem',spId:p[0],yrId:p[1]});return ctx.reply('📆 اسم الفصل:\n_(أو /cancel)_');}
-  if(data.startsWith('mg_rn_sem_')){const p=data.replace('mg_rn_sem_','').split('_');setState(uid,{type:'mg_rn_sem',id:p[2],spId:p[0],yrId:p[1]});return ctx.reply('✏️ الاسم الجديد:\n_(أو /cancel)_');}
-  if(data.startsWith('mg_dl_sem_')){const p=data.replace('mg_dl_sem_','').split('_');return eos(ctx,'🗑 حذف الفصل *'+content.getSemester(p[2])?.name+'*؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_sem_'+p[0]+'_'+p[1]+'_'+p[2]),btn('❌ لا','mg_sems_'+p[0]+'_'+p[1])]])});}
+  if(data.startsWith('mg_add_sem_')){const p=data.replace('mg_add_sem_','').split('_');setState(uid,{type:'mg_add_sem',spId:p[0],yrId:p[1]});return ctx.reply('📆 اسم الفصل:');}
+  if(data.startsWith('mg_rn_sem_')){const p=data.replace('mg_rn_sem_','').split('_');setState(uid,{type:'mg_rn_sem',id:p[2],spId:p[0],yrId:p[1]});return ctx.reply('✏️ الاسم الجديد:');}
+  if(data.startsWith('mg_dl_sem_')){const p=data.replace('mg_dl_sem_','').split('_');return eos(ctx,'🗑 حذف الفصل؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_sem_'+p[0]+'_'+p[1]+'_'+p[2]),btn('❌ لا','mg_sems_'+p[0]+'_'+p[1])]])});}
   if(data.startsWith('mg_cdl_sem_')){const p=data.replace('mg_cdl_sem_','').split('_');await content.deleteSemester(p[2]);return showSemesters(ctx,p[0],p[1]);}
-  if(data.startsWith('mg_add_sb_')){const p=data.replace('mg_add_sb_','').split('_');setState(uid,{type:'mg_add_sb',spId:p[0],yrId:p[1],smId:p[2]});return ctx.reply('📖 اسم المادة:\n_(أو /cancel)_');}
-  if(data.startsWith('mg_rn_sb_')){const p=data.replace('mg_rn_sb_','').split('_');setState(uid,{type:'mg_rn_sb',id:p[3],spId:p[0],yrId:p[1],smId:p[2]});return ctx.reply('✏️ الاسم الجديد:\n_(أو /cancel)_');}
-  if(data.startsWith('mg_dl_sb_')){const p=data.replace('mg_dl_sb_','').split('_');return eos(ctx,'🗑 حذف المادة *'+content.getSubject(p[3])?.name+'*؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_sb_'+p[0]+'_'+p[1]+'_'+p[2]+'_'+p[3]),btn('❌ لا','mg_sbs_'+p[0]+'_'+p[1]+'_'+p[2])]])});}
+  if(data.startsWith('mg_add_sb_')){const p=data.replace('mg_add_sb_','').split('_');setState(uid,{type:'mg_add_sb',spId:p[0],yrId:p[1],smId:p[2]});return ctx.reply('📖 اسم المادة:');}
+  if(data.startsWith('mg_rn_sb_')){const p=data.replace('mg_rn_sb_','').split('_');setState(uid,{type:'mg_rn_sb',id:p[3],spId:p[0],yrId:p[1],smId:p[2]});return ctx.reply('✏️ الاسم الجديد:');}
+  if(data.startsWith('mg_dl_sb_')){const p=data.replace('mg_dl_sb_','').split('_');return eos(ctx,'🗑 حذف المادة؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_sb_'+p[0]+'_'+p[1]+'_'+p[2]+'_'+p[3]),btn('❌ لا','mg_sbs_'+p[0]+'_'+p[1]+'_'+p[2])]])});}
   if(data.startsWith('mg_cdl_sb_')){const p=data.replace('mg_cdl_sb_','').split('_');await content.deleteSubject(p[3]);return showSubjects(ctx,p[0],p[1],p[2]);}
-  if(data.startsWith('mg_add_cat_')){const p=data.replace('mg_add_cat_','').split('_');setState(uid,{type:'mg_add_cat',spId:p[0],yrId:p[1],smId:p[2],sbId:p[3]});return ctx.reply('📁 اسم الفئة:\n_(أو /cancel)_');}
-  if(data.startsWith('mg_rn_cat_')){const p=data.replace('mg_rn_cat_','').split('_');setState(uid,{type:'mg_rn_cat',id:p[4],spId:p[0],yrId:p[1],smId:p[2],sbId:p[3]});return ctx.reply('✏️ الاسم الجديد:\n_(أو /cancel)_');}
-  if(data.startsWith('mg_dl_cat_')){const p=data.replace('mg_dl_cat_','').split('_');return eos(ctx,'🗑 حذف الفئة *'+content.getCategory(p[4])?.name+'*؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_cat_'+p[0]+'_'+p[1]+'_'+p[2]+'_'+p[3]+'_'+p[4]),btn('❌ لا','mg_cats_'+p[0]+'_'+p[1]+'_'+p[2]+'_'+p[3])]])});}
+  if(data.startsWith('mg_add_cat_')){const p=data.replace('mg_add_cat_','').split('_');setState(uid,{type:'mg_add_cat',spId:p[0],yrId:p[1],smId:p[2],sbId:p[3]});return ctx.reply('📁 اسم الفئة:');}
+  if(data.startsWith('mg_rn_cat_')){const p=data.replace('mg_rn_cat_','').split('_');setState(uid,{type:'mg_rn_cat',id:p[4],spId:p[0],yrId:p[1],smId:p[2],sbId:p[3]});return ctx.reply('✏️ الاسم الجديد:');}
+  if(data.startsWith('mg_dl_cat_')){const p=data.replace('mg_dl_cat_','').split('_');return eos(ctx,'🗑 حذف الفئة؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_cat_'+p[0]+'_'+p[1]+'_'+p[2]+'_'+p[3]+'_'+p[4]),btn('❌ لا','mg_cats_'+p[0]+'_'+p[1]+'_'+p[2]+'_'+p[3])]])});}
   if(data.startsWith('mg_cdl_cat_')){const p=data.replace('mg_cdl_cat_','').split('_');await content.deleteCategory(p[4]);return showCategories(ctx,p[0],p[1],p[2],p[3]);}
-  if(data.startsWith('mg_dl_bundle_')){
-    const p=data.replace('mg_dl_bundle_','').split('_');
-      await bundlesDb.deleteBundle(p[0]);
-    await ctx.answerCbQuery('تم الحذف').catch(()=>{});
-    return browse.showFiles(ctx,p[2],p[3],p[4],p[5],p[1]);
-  }
-  if(data.startsWith('mg_rn_bundle_')){
-    const p=data.replace('mg_rn_bundle_','').split('_');
-    setState(uid,{type:'mg_rename_bundle',bundleId:p[0],catId:p[1],spId:p[2],yrId:p[3],smId:p[4],sbId:p[5]});
-    return ctx.reply('✏️ الاسم الجديد للحزمة:');
-  }
+  if(data.startsWith('mg_dl_bundle_')){const p=data.replace('mg_dl_bundle_','').split('_');await bundlesDb.deleteBundle(p[0]);return browse.showFiles(ctx,p[2],p[3],p[4],p[5],p[1]);}
+  if(data.startsWith('mg_rn_bundle_')){const p=data.replace('mg_rn_bundle_','').split('_');setState(uid,{type:'mg_rename_bundle',bundleId:p[0],catId:p[1],spId:p[2],yrId:p[3],smId:p[4],sbId:p[5]});return ctx.reply('✏️ الاسم الجديد للحزمة:');}
   if(data.startsWith('mg_add_bundle_')){
-    if(!ctx.isOwner) return ctx.answerCbQuery('🚫 هذه الميزة للمالك فقط.',{show_alert:true});
+    if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط.',{show_alert:true});
     const p=data.replace('mg_add_bundle_','').split('_');
     setState(uid,{type:'mg_bundle_title',spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});
     return ctx.reply('📦 اسم الحزمة:');
@@ -574,70 +508,63 @@ async function handleCallback(ctx,data){
     if(!perms4.includes('full')&&!perms4.includes('upload')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});
     const p=data.replace('mg_upl_','').split('_');setState(uid,{type:'mg_upl_title',spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});return ctx.reply('عنوان الملف:');
   }
-  if(data.startsWith('mg_rn_fl_')){const p=data.replace('mg_rn_fl_','').split('_');setState(uid,{type:'mg_rn_fl',id:p[5],spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});return ctx.reply('✏️ العنوان الجديد:\n_(أو /cancel)_');}
-  if(data.startsWith('mg_desc_fl_')){const p=data.replace('mg_desc_fl_','').split('_');setState(uid,{type:'mg_desc_fl',id:p[5],spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});return ctx.reply('📝 الوصف الجديد:\n_(أو /cancel)_');}
+  if(data.startsWith('mg_rn_fl_')){const p=data.replace('mg_rn_fl_','').split('_');setState(uid,{type:'mg_rn_fl',id:p[5],spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});return ctx.reply('✏️ العنوان الجديد:');}
+  if(data.startsWith('mg_desc_fl_')){const p=data.replace('mg_desc_fl_','').split('_');setState(uid,{type:'mg_desc_fl',id:p[5],spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});return ctx.reply('📝 الوصف الجديد:');}
   if(data.startsWith('mg_dl_fl_')){
     const perms3=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);
-    if(!perms3.includes('full')&&!perms3.includes('delete')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});const p=data.replace('mg_dl_fl_','').split('_');const f=await filesDb.getFile(p[5]);return eos(ctx,'🗑 نقل *'+(f?.title||'الملف')+'* لسلة المحذوفات؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_fl_'+p.join('_')),btn('❌ لا','mg_fls_'+p.slice(0,5).join('_'))]]) });}
+    if(!perms3.includes('full')&&!perms3.includes('delete')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});
+    const p=data.replace('mg_dl_fl_','').split('_');
+    return eos(ctx,'🗑 نقل الملف لسلة المحذوفات؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_fl_'+p.join('_')),btn('❌ لا','mg_fls_'+p.slice(0,5).join('_'))]]) });
+  }
   if(data.startsWith('mg_cdl_fl_')){const p=data.replace('mg_cdl_fl_','').split('_');await filesDb.softDelete(p[5]);return showMgFiles(ctx,p[0],p[1],p[2],p[3],p[4]);}
 }
 
-module.exports={mainMenu,handleCallback,handleText,handleFileUpload,showUserProfile,showUsers};
-
 async function showUserProfile(ctx, userId) {
-  const [user, dlCount, favs, spRow, lastFile] = await Promise.all([
+  const [user, dlCount, favCount, spRow, lastFile] = await Promise.all([
     usersDb.getById(userId),
     interactions.getUserDownloadCount(userId),
-    interactions.getFavs(userId),
+    get('SELECT COUNT(*) as c FROM favorites WHERE user_id=?',[userId]).then(r=>r?.c||0),
     usersDb.getSpecialty(userId),
     interactions.getLastFile(userId)
   ]);
-  if (!user) return ctx.reply('❌ المستخدم غير موجود.');
-  const spId = spRow?.specialty_id;
-  const sp = spId&&spId!=0 ? await content.getSpec(spId) : null;
-  const esc3 = s => (s||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
-  const text = '👤 *بروفايل المستخدم*\n\n' +
-    '🆔 ID: `' + userId + '`\n' +
-    '👋 الاسم: ' + esc3(user.first_name||'؟') + ' ' + esc3(user.last_name||'') + '\n' +
-    (user.username ? '📛 @' + esc3(user.username) + '\n' : '') +
-    '📅 انضم: ' + (user.joined_at ? new Date(user.joined_at).toLocaleDateString('en-GB') : '؟') + '\n' +
-    '🕐 آخر نشاط: ' + (user.last_active ? new Date(user.last_active).toLocaleDateString('en-GB') : '؟') + '\n' +
-    '🎓 التخصص: *' + esc3(sp ? (sp.name||'غير محدد') : 'غير محدد') + '*\n' +
-    '🚫 محظور: ' + (user.is_banned ? 'نعم' : 'لا') + '\n\n' +
-    '📊 *النشاط:*\n' +
-    '⬇️ التحميلات: *' + dlCount + '*\n' +
-    '⭐ المفضلة: *' + favs.length + '*' +
-    (lastFile ? '\n📄 آخر ملف: *' + esc3(lastFile.title||'') + '*' : '');
-  const rows = [
-    [btn(user.is_banned ? '✅ إلغاء الحظر' : '🚫 حظر', (user.is_banned ? 'mg_unban_' : 'mg_ban_') + userId)],
-    [back('mg_users')[0]]
-  ];
-  return eos(ctx, text, {parse_mode:'Markdown', ...build(rows)});
+  if(!user) return ctx.reply('❌ المستخدم غير موجود.');
+  const spId=spRow?.specialty_id;
+  const sp=spId&&spId!=0?await content.getSpec(spId):null;
+  const text='👤 *بروفايل المستخدم*\n\n'+
+    '🆔 ID: `'+userId+'`\n'+
+    '👋 الاسم: '+escMd(user.first_name||'؟')+' '+escMd(user.last_name||'')+'\n'+
+    (user.username?'📛 @'+escMd(user.username)+'\n':'')+
+    '📅 انضم: '+(user.joined_at?new Date(user.joined_at).toLocaleDateString('en-GB'):'؟')+'\n'+
+    '🕐 آخر نشاط: '+(user.last_active?new Date(user.last_active).toLocaleDateString('en-GB'):'؟')+'\n'+
+    '🎓 التخصص: *'+escMd(sp?sp.name:'غير محدد')+'*\n'+
+    '🚫 محظور: '+(user.is_banned?'نعم':'لا')+'\n\n'+
+    '📊 *النشاط:*\n'+
+    '⬇️ التحميلات: *'+dlCount+'*\n'+
+    '⭐ المفضلة: *'+favCount+'*'+
+    (lastFile?'\n📄 آخر ملف: *'+escMd(lastFile.title||'')+'*':'');
+  const rows=[[btn(user.is_banned?'✅ إلغاء الحظر':'🚫 حظر',(user.is_banned?'mg_unban_':'mg_ban_')+userId)],[back('mg_users')[0]]];
+  return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
 
 async function showMsgsMenu(ctx){
-  const templates=await messagesDb.getTemplates();
-  const scheduled=await messagesDb.getScheduled();
-  const text='نظام الرسائل - القوالب: '+templates.length+' - المجدولة: '+scheduled.length;
-  const rows=[[btn('القوالب','mg_templates'),btn('المجدولة','mg_scheduled')]];
-  rows.push([btn('قالب جديد','mg_add_template')]);
-  rows.push(back('mg_menu'));
-  return eos(ctx,text,{...build(rows)});
+  const [templates,scheduled]=await Promise.all([messagesDb.getTemplates(),messagesDb.getScheduled()]);
+  const text='📨 نظام الرسائل\nالقوالب: '+templates.length+' | المجدولة: '+scheduled.length;
+  return eos(ctx,text,{...build([[btn('القوالب','mg_templates'),btn('المجدولة','mg_scheduled')],[btn('قالب جديد','mg_add_template')],back('mg_menu')])});
 }
 
 async function showTemplates(ctx){
   const list=await messagesDb.getTemplates();
-  const text='القوالب ('+list.length+')';
   const rows=list.map(t=>[btn(t.name,'mg_tpl_'+t.id)]);
   rows.push([btn('قالب جديد','mg_add_template')]);
   rows.push(back('mg_msgs'));
-  return eos(ctx,text,{...build(rows)});
+  return eos(ctx,'القوالب ('+list.length+')',{...build(rows)});
 }
 
 async function showScheduled(ctx){
   const list=await messagesDb.getScheduled();
-  const text='المجدولة ('+list.length+')';
   const rows=list.map(s=>[btn(s.name+' - '+s.send_at,'noop'),btn('حذف','mg_del_sched_'+s.id)]);
   rows.push(back('mg_msgs'));
-  return eos(ctx,text,{...build(rows)});
+  return eos(ctx,'المجدولة ('+list.length+')',{...build(rows)});
 }
+
+module.exports={mainMenu,handleCallback,handleText,handleFileUpload,showUserProfile,showUsers};
