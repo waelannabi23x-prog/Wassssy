@@ -224,7 +224,7 @@ async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
     else await ctx.replyWithDocument(f.file_id,{caption,parse_mode:'Markdown',...kb});
     try{ await ctx.deleteMessage(); }catch(e){}
     if(similar.length){
-      const simRows = similar.map(sf=>[btn('📄 '+sf.title+' · '+sf.sf.sub_name,'preview_'+sf.id+'_0_0_0_0_0')]);
+      const simRows = similar.map(sf=>[btn('📄 '+sf.title+' · '+sf.sub_name,'preview_'+sf.id+'_0_0_0_0_0')]);
       simRows.push([btn('🏠 القائمة','main_menu')]);
       ctx.reply('📎 ملفات قد تهمك:',{...build(simRows)});
     }
