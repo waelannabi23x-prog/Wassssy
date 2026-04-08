@@ -35,8 +35,10 @@ async function getPathData(spId, yrId, smId, sbId, catId) {
 }
 
 async function showSpecs(ctx) {
+  const { cacheGet } = require('../utils/cache');
+  const pre = cacheGet('precomp_specs');
+  if(pre) return eos(ctx, pre.text, pre.extra);
   const specs = await content.getSpecs();
-  if(!specs.length) return eos(ctx,'📭 لا توجد تخصصات بعد.',build([back('main_menu')]));
   const rows = specs.map(s=>[btn('🎓 '+s.name,'sp_'+s.id)]);
   rows.push(back('main_menu'));
   return eos(ctx,'🎓 *اختر تخصصك:*',{parse_mode:'Markdown',...build(rows)});

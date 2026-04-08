@@ -16,6 +16,7 @@ const contentDb = require('./database/content');
 const bundlesDb = require('./database/bundles');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { cacheWarmup } = require('./utils/cache');
+const { precomputeAll } = require('./utils/precompute');
 const { setLang } = require('./utils/i18n');
 const path = require('path');
 const fs = require('fs');
@@ -377,6 +378,7 @@ async function launch() {
     await initSchema();
     await Promise.all([loadMaintenance(), loadStates()]);
     await cacheWarmup();
+    await precomputeAll();
     console.log('✅ Database ready');
     startScheduler(bot, [OWNER_ID]);
 
