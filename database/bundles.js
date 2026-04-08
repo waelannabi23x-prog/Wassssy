@@ -6,10 +6,11 @@ const getBundle = id => get('SELECT * FROM bundles WHERE id=?',[id]);
 const addBundle = async (catId,title,desc,by) => {
   if(await get('SELECT 1 FROM bundles WHERE category_id=? AND title=? AND is_deleted=0',[catId,title])) throw new Error('exists');
   await run('INSERT INTO bundles(category_id,title,description,uploaded_by) VALUES(?,?,?,?)',[catId,title,desc||'',by]);
+  cacheClear('bdls_'+catId);
   const b = await get('SELECT id FROM bundles WHERE category_id=? AND title=? ORDER BY id DESC LIMIT 1',[catId,title]);
   return b.id;
 };
-const deleteBundle = id => run('UPDATE bundles SET is_deleted=1 WHERE id=?',[id]);
+const deleteBundle = async id => { cacheClear('bdls_'); await run('UPDATE bundles SET is_deleted=1 WHERE id=?',[id]); };
 const incBundleDownloads = id => run('UPDATE bundles SET downloads=downloads+1 WHERE id=?',[id]);
 
 const getBundleFiles = bundleId => all('SELECT bf.*, bf.title as file_title, bf.file_type as real_type FROM bundle_files bf WHERE bf.bundle_id=?',[bundleId]);
