@@ -211,7 +211,7 @@ async function showComments(ctx,fid,spId,yrId,smId,sbId,catId,page=0) {
 
 async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
   const uid = ctx.uid;
-  const [f, fav] = await Promise.all([filesDb.getFile(fid), interactions.isFav(uid,fid)]);
+  const [f, fav, similar] = await Promise.all([filesDb.getFile(fid), interactions.isFav(uid,fid), interactions.getSimilar(fid,4)]);
   if(!f) return ctx.reply(t(uid,'not_found'));
   Promise.all([filesDb.incDownloads(fid), interactions.addHistory(uid,fid), interactions.addLog(uid,'download',f.title)]).catch(()=>{});
   
@@ -223,13 +223,11 @@ async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
     else if(f.file_type==='photo') await ctx.replyWithPhoto(f.file_id,{caption,parse_mode:'Markdown',...kb});
     else await ctx.replyWithDocument(f.file_id,{caption,parse_mode:'Markdown',...kb});
     try{ await ctx.deleteMessage(); }catch(e){}
-    interactions.getSimilar(fid,4).then(similar=>{
-      if(similar.length){
-        const simRows = similar.map(sf=>[btn('📄 '+sf.title+' · '+sf.sub_name,'preview_'+sf.id+'_0_0_0_0_0')]);
-        simRows.push([btn('🏠 القائمة','main_menu')]);
-        ctx.reply('📎 ملفات قد تهمك:',{...build(simRows)});
-      }
-    }).catch(()=>{});
+    if(similar.length){
+      const simRows = similar.map(sf=>[btn('📄 '+sf.title+' · '+sf.sf.sub_name,'preview_'+sf.id+'_0_0_0_0_0')]);
+      simRows.push([btn('🏠 القائمة','main_menu')]);
+      ctx.reply('📎 ملفات قد تهمك:',{...build(simRows)});
+    }
   } catch(e) { ctx.reply('❌ تعذر إرسال الملف. حاول مجدداً.'); }
 }
 
