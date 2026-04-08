@@ -9,7 +9,7 @@ function getPg() {
   if(!process.env.DATABASE_URL) return null;
   try {
     const { Pool } = require('pg');
-    pgPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 30, min: 5, idleTimeoutMillis: 60000, connectionTimeoutMillis: 3000, allowExitOnIdle: false });
+    pgPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 10, min: 2, idleTimeoutMillis: 600000, connectionTimeoutMillis: 10000, allowExitOnIdle: false, keepAlive: true, keepAliveInitialDelayMillis: 10000 });
     console.log('✅ Using PostgreSQL');
     return pgPool;
   } catch(e) { console.error('PG error:', e.message); return null; }
