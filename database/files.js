@@ -49,12 +49,9 @@ const rename = async (id,title) => {
 };
 
 const updateDesc = (id,desc) => { cacheClear('file_'+id); return run('UPDATE files SET description=? WHERE id=?',[desc,id]); };
-
-// بدون cacheClear — downloads لا يأثر على التصفح
 const incDownloads = id => run('UPDATE files SET downloads=downloads+1 WHERE id=?',[id]);
-
-const totalFiles = async () => (await get('SELECT COUNT(*) as c FROM files WHERE is_deleted=0'))?.c || 0;
-const totalDownloads = async () => (await get('SELECT SUM(downloads) as t FROM files WHERE is_deleted=0'))?.t || 0;
+const totalFiles = async () => (await get('SELECT COUNT(*) as c FROM files WHERE is_deleted=0'))?.c||0;
+const totalDownloads = async () => (await get('SELECT SUM(downloads) as t FROM files WHERE is_deleted=0'))?.t||0;
 const topDownloaded = (n=10) => all(J+' WHERE f.is_deleted=0 ORDER BY f.downloads DESC LIMIT ?',[n]);
 const recentFiles = (n=15) => all(J+' WHERE f.is_deleted=0 ORDER BY f.uploaded_at DESC LIMIT ?',[n]);
 const getTrash = () => all(J+' WHERE f.is_deleted=1 ORDER BY f.uploaded_at DESC LIMIT 30');
@@ -64,11 +61,11 @@ const search = async q => {
   const cached=cacheGet(key);
   if(cached) return cached;
   const words=q.trim().split(/\s+/);
-  const conditions=words.map(()=>'(f.title LIKE ? OR f.description LIKE ? OR s.name LIKE ? OR c.name LIKE ? OR sp.name LIKE ? OR y.name LIKE ? OR sm.name LIKE ?)').join(' AND ');
-  const params=words.flatMap(w=>Array(7).fill('%'+w+'%'));
+  const conditions=words.map(()=>'(f.title ILIKE ? OR f.description ILIKE ? OR s.name ILIKE ? OR c.name ILIKE ? OR sp.name ILIKE ?)').join(' AND ');
+  const params=words.flatMap(w=>Array(5).fill('%'+w+'%'));
   const result=await all(J+' WHERE f.is_deleted=0 AND ('+conditions+') ORDER BY f.downloads DESC, f.uploaded_at DESC LIMIT 30',params);
   cacheSet(key,result,300000);
   return result;
 };
 
-module.exports={getFiles,getFile,addFile,softDelete,restore,rename,updateDesc,incDownloads,totalFiles,totalDownloads,topDownloaded,recentFiles,getTrash,search};
+module.exports = { getFiles,getFile,addFile,softDelete,restore,rename,updateDesc,incDownloads,totalFiles,totalDownloads,topDownloaded,recentFiles,getTrash,search };
