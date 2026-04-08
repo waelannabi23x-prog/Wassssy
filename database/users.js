@@ -3,6 +3,7 @@ const { all, get, run } = require('./db');
 const spCache = new Map();
 const CACHE_TTL = 600000; // 10 دقائق
 
+const updateLastActive = id => run('UPDATE users SET last_active=CURRENT_TIMESTAMP WHERE id=?',[id]);
 const upsert = (id,fn,ln,un) => run(`INSERT INTO users(id,first_name,last_name,username,joined_at,last_active) VALUES(?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET first_name=EXCLUDED.first_name,last_name=EXCLUDED.last_name,username=EXCLUDED.username,last_active=CURRENT_TIMESTAMP`,[id,fn||'',ln||'',un||'']);
 
 const getAll = (page=0,limit=20) => all('SELECT * FROM users ORDER BY last_active DESC LIMIT ? OFFSET ?',[limit,page*limit]);
@@ -33,4 +34,4 @@ const getUsersBySpecialty = async spId => (await all('SELECT user_id as id FROM 
 // تنظيف cache كل 10 دقائق
 setInterval(()=>{ const now=Date.now(); for(const [k,v] of spCache) if(now>v.exp) spCache.delete(k); },600000);
 
-module.exports = { upsert,getAll,count,activeToday,allIds,ban,unban,isBanned,getById,searchUsers,setSpecialty,getSpecialty,getUsersBySpecialty };
+module.exports = { upsert,updateLastActive,getAll,count,activeToday,allIds,ban,unban,isBanned,getById,searchUsers,setSpecialty,getSpecialty,getUsersBySpecialty };

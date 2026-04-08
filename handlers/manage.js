@@ -350,6 +350,7 @@ async function handleText(ctx,state){
         if(isNaN(tid)){clearState(uid);return ctx.reply('❌ ID غير صحيح.');}
         await adminsDb.add(tid,uid);
         await interactions.addLog(uid,'add_admin','ID: '+tid);
+        if(global.invalidateAdmin) global.invalidateAdmin(tid);
         const specs=await content.getSpecs();
         const spRows=specs.map(s=>[btn('🎓 '+s.name,'mg_admin_sp_'+tid+'_'+s.id)]);
         spRows.push([btn('كل التخصصات','mg_admin_sp_'+tid+'_0')]);
@@ -502,7 +503,7 @@ async function handleCallback(ctx,data){
     await adminsDb.setSpecialty(p[0],p[1]);
     return eos(ctx,'تم تحديد التخصص للمشرف',{...build([back('mg_admins')])});
   }
-  if(data.startsWith('mg_da_')){await adminsDb.remove(parseInt(data.replace('mg_da_','')));return showAdmins(ctx);}
+  if(data.startsWith('mg_da_')){const rid=parseInt(data.replace('mg_da_',''));await adminsDb.remove(rid);if(global.invalidateAdmin) global.invalidateAdmin(rid);return showAdmins(ctx);}
   if(data.startsWith('mg_ep_')){return showEditPerms(ctx,data.replace('mg_ep_',''));}
   if(data.startsWith('mg_tp_')){
     const p=data.replace('mg_tp_','').split('_'); const adminId=p[0]; const perm=p.slice(1).join('_');

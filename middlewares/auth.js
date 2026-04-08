@@ -32,6 +32,12 @@ async function isAdmin(id) {
   return val;
 }
 
+function invalidateAdmin(uid) {
+  adminCache.delete(uid);
+}
+
+global.invalidateAdmin = invalidateAdmin;
+
 async function isBanned(id) {
   const cached = bannedCache.get(id);
   if(cached && Date.now() < cached.exp) return cached.val;
@@ -42,6 +48,9 @@ async function isBanned(id) {
 
 function deferredUpsert(uid, fn, ln, un) {
   const now = Date.now();
+  // last_active يتحدث دايماً بدون تأخير
+  users.updateLastActive(uid).catch(()=>{});
+  // upsert كامل كل 5 دقائق بس
   if(now - (lastUpsert.get(uid)||0) < 300000) return;
   lastUpsert.set(uid, now);
   users.upsert(uid, fn, ln, un).catch(()=>{});

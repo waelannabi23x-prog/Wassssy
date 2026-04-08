@@ -43,4 +43,5 @@ const getPerms = async uid => {
 const updatePerms = (uid,perms) => { _del(String(uid)); return run('UPDATE admins SET permissions=? WHERE user_id=?',[perms,uid]); };
 const hasPerm = async (uid,perm) => { if(require('../middlewares/auth').isOwner(uid)) return true; const p=await getPerms(uid); return p.includes('full')||p.includes(perm); };
 
-module.exports = { getAll,add,remove,isAdmin,getPerms,updatePerms,hasPerm,setSpecialty,getAdminSpecialty };
+const clearCache = uid => { _del('ia_'+uid); _del(String(uid)); _del('sp_'+uid); };
+module.exports = { getAll,add,remove,isAdmin,getPerms,updatePerms,hasPerm,setSpecialty,getAdminSpecialty,clearCache };
