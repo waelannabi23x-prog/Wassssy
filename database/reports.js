@@ -1,3 +1,4 @@
+const { cacheGet, cacheSet } = require('../utils/cache');
 const { all, get, run } = require('./db');
 
 const addReport = (fileId, userId, reason) =>
