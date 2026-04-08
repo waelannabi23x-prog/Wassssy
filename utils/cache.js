@@ -1,35 +1,58 @@
-const memStore = new Map();
+const store = new Map();
+const timers = new Map();
 
 function cacheGet(key) {
-  const m = memStore.get(key);
-  if(!m) return null;
-  if(Date.now() > m.expires) { memStore.delete(key); return null; }
-  return m.value;
+  const e = store.get(key);
+  if(!e) return null;
+  if(e.exp && Date.now() > e.exp) { store.delete(key); timers.delete(key); return null; }
+  return e.val;
 }
 
-function cacheSet(key, value, ttl = 1800000) {
-  memStore.set(key, { value, expires: Date.now() + ttl });
+function cacheSet(key, val, ttl=300000) {
+  if(timers.has(key)) clearTimeout(timers.get(key));
+  store.set(key, { val, exp: Date.now()+ttl });
+  const t = setTimeout(() => { store.delete(key); timers.delete(key); }, ttl);
+  if(t.unref) t.unref();
+  timers.set(key, t);
 }
 
-function cacheClear(prefix) {
-  for(const k of memStore.keys()) if(k.startsWith(prefix)) memStore.delete(k);
+function cacheClear(key) {
+  if(timers.has(key)) clearTimeout(timers.get(key));
+  store.delete(key); timers.delete(key);
+}
+
+function cacheClearPrefix(prefix) {
+  for(const k of store.keys()) if(k.startsWith(prefix)) cacheClear(k);
 }
 
 async function cacheWarmup() {
   try {
     const { all } = require('../database/db');
-    const rows = await all('SELECT key,value,expires_at FROM cache_store WHERE expires_at > ?', [Date.now()]);
-    rows.forEach(r => {
-      try { memStore.set(r.key, { value: JSON.parse(r.value), expires: Number(r.expires_at) }); } catch(e) {}
-    });
-    console.log('✅ Cache warmed up:', rows.length, 'entries');
-  } catch(e) {}
+    const { getSpecs, getYears, getSemesters, getSubjects, getCategories } = require('../database/content');
+    const specs = await getSpecs();
+    cacheSet('specs', specs, 3600000);
+    for(const sp of specs) {
+      const years = await getYears(sp.id);
+      cacheSet('yrs_'+sp.id, {sp, all:years}, 3600000);
+      for(const yr of years) {
+        const sems = await getSemesters(yr.id);
+        cacheSet('sems_'+sp.id+'_'+yr.id, {sp, yr, sems}, 3600000);
+        for(const sm of sems) {
+          const subs = await getSubjects(sm.id);
+          cacheSet('subs_'+sp.id+'_'+yr.id+'_'+sm.id, {sp,yr,sm,all:subs}, 3600000);
+          for(const sb of subs) {
+            const cats = await getCategories(sb.id);
+            cacheSet('cats_'+sp.id+'_'+yr.id+'_'+sm.id+'_'+sb.id, {sp,yr,sm,sb,cats}, 3600000);
+          }
+        }
+      }
+    }
+    console.log('✅ Cache warmed up:', store.size, 'entries');
+  } catch(e) { console.error('Warmup error:', e.message); }
 }
 
-// تنظيف كل 5 دقائق
-setInterval(() => {
-  const now = Date.now();
-  for(const [k,v] of memStore.entries()) if(now > v.expires) memStore.delete(k);
-}, 300000);
+function cacheStats() {
+  return { size: store.size, keys: [...store.keys()].slice(0,20) };
+}
 
-module.exports = { cacheGet, cacheSet, cacheClear, cacheWarmup };
+module.exports = { cacheGet, cacheSet, cacheClear, cacheClearPrefix, cacheWarmup, cacheStats };

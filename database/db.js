@@ -2,20 +2,28 @@ const fs = require('fs');
 const path = require('path');
 const DB_PATH = path.join(__dirname, '..', 'study_bot.db');
 
-// ── PostgreSQL ──
 let pgPool = null;
 function getPg() {
   if(pgPool) return pgPool;
   if(!process.env.DATABASE_URL) return null;
   try {
     const { Pool } = require('pg');
-    pgPool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejectUnauthorized: false }, max: 20, min: 3, idleTimeoutMillis: 600000, connectionTimeoutMillis: 10000, allowExitOnIdle: false, keepAlive: true, keepAliveInitialDelayMillis: 10000 });
+    pgPool = new Pool({
+      connectionString: process.env.DATABASE_URL,
+      ssl: { rejectUnauthorized: false },
+      max: 20, min: 3,
+      idleTimeoutMillis: 600000,
+      connectionTimeoutMillis: 10000,
+      allowExitOnIdle: false,
+      keepAlive: true,
+      keepAliveInitialDelayMillis: 10000
+    });
+    pgPool.on('error', (err) => console.error('PG pool error:', err.message));
     console.log('✅ Using PostgreSQL');
     return pgPool;
   } catch(e) { console.error('PG error:', e.message); return null; }
 }
 
-// ── SQLite (better-sqlite3 or sql.js fallback) ──
 let sqliteDb = null;
 let sqlJs = null;
 let dirty = false;
@@ -54,26 +62,6 @@ function getSqlite() {
   }
 }
 
-// ── Convert SQLite query to PostgreSQL ──
-function toPg(sql) {
-  if(!sql || typeof sql !== "string") return sql || "";
-  // Replace ? with $1, $2, ... but not inside ON CONFLICT(...)
-  let i = 0;
-  sql = sql
-    .replace(/datetime\('now'\)/g, 'NOW()')
-    .replace(/datetime\('now',\s*'([^']+)'\)/g, (_, interval) => {
-      const m = interval.match(/([+-]\d+)\s+(\w+)/);
-      if(m) return `NOW() + INTERVAL '${m[1]} ${m[2]}'`;
-      return 'NOW()';
-    })
-    .replace(/INSERT OR REPLACE INTO (\w+)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/gi, (_, table, cols, vals) => { const colList = cols.split(',').map(c => c.trim()); const pk = colList[0]; const updates = colList.slice(1).map(c => c+'=EXCLUDED.'+c).join(','); return 'INSERT INTO '+table+'('+cols+') VALUES('+vals+') ON CONFLICT('+pk+') DO UPDATE SET '+updates; })
-    .replace(/LIKE \?/gi, 'ILIKE ?');
-  // Now replace ? with $N
-  sql = sql.replace(/\?/g, () => '$' + (++i));
-  return sql;
-}
-
-// cache للـ toPg لتجنب تحويل نفس الـ query مرتين
 const pgSqlCache = new Map();
 function toPgCached(sql) {
   if(pgSqlCache.has(sql)) return pgSqlCache.get(sql);
@@ -83,6 +71,28 @@ function toPgCached(sql) {
   return converted;
 }
 
+function toPg(sql) {
+  if(!sql || typeof sql !== "string") return sql || "";
+  let i = 0;
+  sql = sql
+    .replace(/datetime\('now'\)/g, 'NOW()')
+    .replace(/datetime\('now',\s*'([^']+)'\)/g, (_, interval) => {
+      const m = interval.match(/([+-]\d+)\s+(\w+)/);
+      if(m) return `NOW() + INTERVAL '${m[1]} ${m[2]}'`;
+      return 'NOW()';
+    })
+    .replace(/CURRENT_TIMESTAMP - INTERVAL '(\d+) (\w+)'/g, "NOW() - INTERVAL '$1 $2'")
+    .replace(/INSERT OR REPLACE INTO (\w+)\s*\(([^)]+)\)\s*VALUES\s*\(([^)]+)\)/gi, (_, table, cols, vals) => {
+      const colList = cols.split(',').map(c => c.trim());
+      const pk = colList[0];
+      const updates = colList.slice(1).map(c => c+'=EXCLUDED.'+c).join(',');
+      return 'INSERT INTO '+table+'('+cols+') VALUES('+vals+') ON CONFLICT('+pk+') DO UPDATE SET '+updates;
+    })
+    .replace(/LIKE \?/gi, 'ILIKE ?');
+  sql = sql.replace(/\?/g, () => '$' + (++i));
+  return sql;
+}
+
 async function all(sql, params=[]) {
   const pg = getPg();
   if(pg) {
@@ -90,7 +100,7 @@ async function all(sql, params=[]) {
     try {
       const res = await pg.query(converted, params);
       return res.rows;
-    } catch(e) { console.error('DB all error:', e.message, '| SQL:', converted.substring(0,80)); return []; }
+    } catch(e) { console.error('DB all error:', e.message, '| SQL:', converted.substring(0,100)); return []; }
   }
   try {
     const db = getSqlite();
@@ -112,10 +122,8 @@ async function run(sql, params=[]) {
   const pg = getPg();
   if(pg) {
     const converted = toPgCached(sql);
-    try {
-      await pg.query(converted, params);
-      return;
-    } catch(e) { console.error('DB run error:', e.message); throw e; }
+    try { await pg.query(converted, params); return; }
+    catch(e) { console.error('DB run error:', e.message); throw e; }
   }
   try {
     const db = getSqlite();
@@ -153,7 +161,7 @@ async function initSchema() {
     `CREATE TABLE IF NOT EXISTS ratings (user_id BIGINT, file_id INTEGER, rating INTEGER, PRIMARY KEY(user_id, file_id))`,
     `CREATE TABLE IF NOT EXISTS user_specialties (user_id BIGINT PRIMARY KEY, specialty_id INTEGER, updated_at TEXT DEFAULT (CURRENT_TIMESTAMP))`,
     `CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`,
-    `CREATE TABLE IF NOT EXISTS bundles (id SERIAL PRIMARY KEY, category_id INTEGER NOT NULL, title TEXT NOT NULL, description TEXT DEFAULT '', downloads INTEGER DEFAULT 0, created_at TEXT DEFAULT (CURRENT_TIMESTAMP))`,
+    `CREATE TABLE IF NOT EXISTS bundles (id SERIAL PRIMARY KEY, category_id INTEGER NOT NULL, title TEXT NOT NULL, description TEXT DEFAULT '', downloads INTEGER DEFAULT 0, uploaded_by BIGINT DEFAULT 0, is_deleted INTEGER DEFAULT 0, created_at TEXT DEFAULT (CURRENT_TIMESTAMP))`,
     `CREATE TABLE IF NOT EXISTS bundle_files (id SERIAL PRIMARY KEY, bundle_id INTEGER NOT NULL, file_id TEXT NOT NULL, file_type TEXT DEFAULT 'document', title TEXT DEFAULT '')`,
     `CREATE TABLE IF NOT EXISTS message_templates (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, type TEXT DEFAULT 'text', content TEXT DEFAULT '', file_id TEXT DEFAULT '', created_at TEXT DEFAULT (CURRENT_TIMESTAMP))`,
     `CREATE TABLE IF NOT EXISTS scheduled_messages (id SERIAL PRIMARY KEY, template_id INTEGER, target TEXT DEFAULT 'all', specialty_id INTEGER DEFAULT 0, send_at TEXT, sent INTEGER DEFAULT 0, created_at TEXT DEFAULT (CURRENT_TIMESTAMP))`,
@@ -166,13 +174,12 @@ async function initSchema() {
 
   for(const sql of tables) {
     try {
-      if(pg) await pg.query(sql.replace(/SERIAL/g,'BIGSERIAL').replace(/INTEGER DEFAULT 0\)/g,'INTEGER DEFAULT 0)'));
+      if(pg) await pg.query(sql.replace(/SERIAL/g,'BIGSERIAL'));
       else if(getSqlite()) getSqlite().exec(sql.replace(/SERIAL/g,'INTEGER').replace(/BIGINT/g,'INTEGER').replace(/BIGSERIAL/g,'INTEGER'));
       else sqlJs.run(sql.replace(/SERIAL/g,'INTEGER').replace(/BIGINT/g,'INTEGER').replace(/BIGSERIAL/g,'INTEGER'));
     } catch(e) { console.error('Table error:', e.message.substring(0,60)); }
   }
 
-  // Indexes
   const indexes = [
     'CREATE INDEX IF NOT EXISTS idx_files_category ON files(category_id)',
     'CREATE INDEX IF NOT EXISTS idx_files_deleted ON files(is_deleted)',
@@ -203,40 +210,32 @@ async function initSchema() {
   }
 
   if(!pg) saveDB();
-  // Add missing columns if not exist
+
   const alterCols = [
     "ALTER TABLE files ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
     "ALTER TABLE files ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''",
     "ALTER TABLE files ADD COLUMN IF NOT EXISTS file_type TEXT DEFAULT 'document'",
     "ALTER TABLE files ADD COLUMN IF NOT EXISTS downloads INTEGER DEFAULT 0",
     "ALTER TABLE files ADD COLUMN IF NOT EXISTS uploaded_by BIGINT DEFAULT 0",
-    "ALTER TABLE files ADD COLUMN IF NOT EXISTS uploaded_at TEXT DEFAULT (CURRENT_TIMESTAMP)",
-    "ALTER TABLE specialties ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
-    "ALTER TABLE years ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
-    "ALTER TABLE semesters ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
-    "ALTER TABLE subjects ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
-    "ALTER TABLE categories ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
     "ALTER TABLE users ADD COLUMN IF NOT EXISTS is_banned INTEGER DEFAULT 0",
     "ALTER TABLE bundles ADD COLUMN IF NOT EXISTS uploaded_by BIGINT DEFAULT 0",
     "ALTER TABLE bundles ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
     "ALTER TABLE bundles ADD COLUMN IF NOT EXISTS description TEXT DEFAULT ''",
     "ALTER TABLE bundles ADD COLUMN IF NOT EXISTS downloads INTEGER DEFAULT 0",
-    "ALTER TABLE bundles ADD COLUMN IF NOT EXISTS is_deleted INTEGER DEFAULT 0",
   ];
   for(const sql of alterCols){
     try {
       if(pg) {
-        // PostgreSQL safe column add
         const match = sql.match(/ALTER TABLE (\w+) ADD COLUMN IF NOT EXISTS (\w+) (.+)/);
         if(match) {
           const [,table,col,type] = match;
           const exists = await pg.query(`SELECT 1 FROM information_schema.columns WHERE table_name=$1 AND column_name=$2`,[table,col]);
           if(!exists.rows.length) await pg.query(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
-        } else {
-          await pg.query(sql);
         }
-      } else if(getSqlite()) getSqlite().exec(sql.replace(/IF NOT EXISTS/g,''));
-    } catch(e) { console.error('Alter error:', e.message.substring(0,60)); }
+      } else if(getSqlite()) {
+        try { getSqlite().exec(sql.replace(/IF NOT EXISTS /g,'')); } catch(e) {}
+      }
+    } catch(e) {}
   }
   console.log('✅ DB schema ready');
 }

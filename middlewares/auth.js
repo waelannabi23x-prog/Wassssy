@@ -1,83 +1,65 @@
-const admins = require('../database/admins');
-const users = require('../database/users');
-const OWNER_ID = 5534474259;
-const isOwner = id => id === OWNER_ID;
+const { get, run } = require('../database/db');
+const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
 
-const adminCache = new Map();
-const bannedCache = new Map();
-const lastUpsert = new Map();
-const rateLimits = new Map();
-const CACHE_TTL = 600000; // 10 دقائق بدل 5
+const OWNER_ID = parseInt(process.env.OWNER_ID || '5534474259');
 
-setInterval(() => {
+const isOwner = uid => parseInt(uid) === OWNER_ID;
+
+const _adminCache = new Map();
+const ADMIN_TTL = 300000;
+
+async function getAdminInfo(uid) {
   const now = Date.now();
-  for(const [uid,v] of rateLimits) if(now > v.reset) rateLimits.delete(uid);
-  for(const [uid,v] of adminCache) if(now > v.exp) adminCache.delete(uid);
-  for(const [uid,v] of bannedCache) if(now > v.exp) bannedCache.delete(uid);
-}, 600000);
-
-function checkRateLimit(uid) {
-  const now = Date.now();
-  let r = rateLimits.get(uid);
-  if(!r || now > r.reset) { r = {count:0, reset:now+10000}; rateLimits.set(uid,r); }
-  return ++r.count > 20;
+  const cached = _adminCache.get(uid);
+  if(cached && now - cached.ts < ADMIN_TTL) return cached.data;
+  const row = await get('SELECT * FROM admins WHERE user_id=?',[uid]);
+  const data = row ? { isAdmin:true, perms:(row.permissions||'').split(',').map(p=>p.trim()) } : { isAdmin:false, perms:[] };
+  _adminCache.set(uid, { data, ts:now });
+  return data;
 }
 
-async function isAdmin(id) {
-  if(isOwner(id)) return true;
-  const cached = adminCache.get(id);
-  if(cached && Date.now() < cached.exp) return cached.val;
-  const val = await admins.isAdmin(id);
-  adminCache.set(id, {val, exp: Date.now()+CACHE_TTL});
-  return val;
-}
-
-function invalidateAdmin(uid) {
-  adminCache.delete(uid);
-}
-
-global.invalidateAdmin = invalidateAdmin;
-
-async function isBanned(id) {
-  const cached = bannedCache.get(id);
-  if(cached && Date.now() < cached.exp) return cached.val;
-  const val = await users.isBanned(id);
-  bannedCache.set(id, {val, exp: Date.now()+CACHE_TTL});
-  return val;
-}
-
-function deferredUpsert(uid, fn, ln, un) {
-  const now = Date.now();
-  const last = lastUpsert.get(uid)||0;
-  // last_active كل دقيقتين بس - ما نثقل DB بكل request
-  if(now - last > 120000) {
-    lastUpsert.set(uid, now);
-    users.upsert(uid, fn, ln, un).catch(()=>{});
-  }
-}
+global.invalidateAdmin = uid => _adminCache.delete(uid);
 
 async function authMiddleware(ctx, next) {
-  if(!ctx.from) return next();
-  const uid = ctx.from.id;
-  deferredUpsert(uid, ctx.from.first_name, ctx.from.last_name, ctx.from.username);
-  if(checkRateLimit(uid) && !isOwner(uid)) {
-    return ctx.answerCbQuery?.('⏳ بطيء شوي!').catch(()=>{});
-  }
-  // فحص واحد بالتوازي بدل اثنين بالتسلسل
-  // كل شي من الكاش - ما يروح للـ DB إلا أول مرة
-  const ownerCheck = isOwner(uid);
-  if(!ownerCheck) {
-    const banned = await isBanned(uid);
-    if(banned) return ctx.reply('🚫 You are banned.');
-  }
-  const adminVal = ownerCheck || await isAdmin(uid);
-  if(global.maintenanceMode === true && !adminVal) {
-    return ctx.reply('🔧 *'+(global.maintenanceMsg||'Bot under maintenance')+'*\n\nPlease wait! 🙏', {parse_mode:'Markdown'});
-  }
-  ctx.isOwner = ownerCheck;
-  ctx.isAdmin = adminVal;
+  const uid = ctx.from?.id;
+  if(!uid) return next();
+
   ctx.uid = uid;
+  ctx.isOwner = isOwner(uid);
+
+  // تحديث بيانات المستخدم fire and forget
+  const f = ctx.from;
+  run('INSERT INTO users(id,first_name,last_name,username,last_active) VALUES(?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET first_name=EXCLUDED.first_name,last_name=EXCLUDED.last_name,username=EXCLUDED.username,last_active=CURRENT_TIMESTAMP',
+    [uid,f.first_name||'',f.last_name||'',f.username||'']).catch(()=>{});
+
+  // صلاحيات
+  if(ctx.isOwner) {
+    ctx.isAdmin = true;
+    ctx.adminPerms = ['full'];
+  } else {
+    const info = await getAdminInfo(uid);
+    ctx.isAdmin = info.isAdmin;
+    ctx.adminPerms = info.perms;
+  }
+
+  // حظر
+  if(!ctx.isOwner && !ctx.isAdmin) {
+    const banned = cacheGet('ban_'+uid);
+    if(banned === null) {
+      const u = await get('SELECT is_banned FROM users WHERE id=?',[uid]);
+      cacheSet('ban_'+uid, u?.is_banned||0, 300000);
+      if(u?.is_banned) return ctx.reply('🚫 أنت محظور من استخدام البوت.').catch(()=>{});
+    } else if(banned) {
+      return ctx.reply('🚫 أنت محظور من استخدام البوت.').catch(()=>{});
+    }
+  }
+
+  // صيانة
+  if(global.maintenanceMode && !ctx.isOwner && !ctx.isAdmin) {
+    return ctx.reply('🔧 '+global.maintenanceMsg).catch(()=>{});
+  }
+
   return next();
 }
 
-module.exports = {authMiddleware, isOwner, isAdmin, OWNER_ID};
+module.exports = { authMiddleware, isOwner, OWNER_ID };

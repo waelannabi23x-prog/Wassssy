@@ -1,28 +1,23 @@
-const msgs={
-  ar:{
-    welcome:name=>`🎓 *مرحباً، ${name}!*\n\n_منصتك الأكاديمية على تيليغرام._`,
-    choose_specialty:'📚 *اختر التخصص:*',choose_year:'📅 *اختر السنة:*',
-    choose_semester:'📆 *اختر الفصل:*',choose_subject:'📖 *اختر المادة:*',
-    choose_category:'📁 *اختر الفئة:*',no_files:'_لا توجد ملفات بعد._',
-    not_found:'❌ غير موجود.',cancelled:'❌ تم الإلغاء.',
-    error:'⚠️ حدث خطأ. حاول مجدداً.',loading:'⏳ جاري التحميل...',
+const langs = new Map();
+
+const messages = {
+  ar: {
+    no_files: '_لا توجد ملفات في هذا القسم._',
+    not_found: '❌ الملف غير موجود.',
+    error: '⚠️ حدث خطأ. يرجى المحاولة مجدداً.',
   },
-  en:{
-    welcome:name=>`🎓 *Welcome, ${name}!*\n\n_Your academic platform on Telegram._`,
-    choose_specialty:'📚 *Choose your Specialty:*',choose_year:'📅 *Choose Year:*',
-    choose_semester:'📆 *Choose Semester:*',choose_subject:'📖 *Choose Subject:*',
-    choose_category:'📁 *Choose Category:*',no_files:'_No files yet._',
-    not_found:'❌ Not found.',cancelled:'❌ Cancelled.',
-    error:'⚠️ Something went wrong.',loading:'⏳ Loading...',
+  en: {
+    no_files: '_No files in this section._',
+    not_found: '❌ File not found.',
+    error: '⚠️ An error occurred. Please try again.',
   }
 };
-const userLangs=new Map();
-const getLang=uid=>userLangs.get(uid)||'ar';
-const setLang=(uid,lang)=>userLangs.set(uid,lang);
-function t(uid,key,...args){
-  const lang=getLang(uid);
-  const msg=msgs[lang]?.[key]||msgs['en'][key];
-  if(!msg) return key;
-  return typeof msg==='function'?msg(...args):msg;
+
+function getLang(uid) { return langs.get(uid) || 'ar'; }
+function setLang(uid, lang) { langs.set(uid, lang); }
+function t(uid, key) {
+  const lang = getLang(uid);
+  return (messages[lang] || messages.ar)[key] || key;
 }
-module.exports={t,getLang,setLang};
+
+module.exports = { t, getLang, setLang };

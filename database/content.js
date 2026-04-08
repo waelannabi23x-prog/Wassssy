@@ -1,33 +1,49 @@
 const { all, get, run } = require('./db');
-const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
+const { cacheGet, cacheSet, cacheClear, cacheClearPrefix } = require('../utils/cache');
 
-const TTL = 21600000; // 6 ساعات
+const TTL = 3600000;
 
-const getSpecs = async () => { const k='specs'; const c=cacheGet(k); if(c) return c; const r=await all('SELECT * FROM specialties WHERE is_deleted=0 ORDER BY name'); cacheSet(k,r,TTL); return r; };
-const getSpec = async id => { const k='spec_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT * FROM specialties WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
-const getYears = async spId => { const k='years_'+spId; const c=cacheGet(k); if(c) return c; const r=await all('SELECT * FROM years WHERE specialty_id=? AND is_deleted=0 ORDER BY name',[spId]); cacheSet(k,r,TTL); return r; };
-const getYear = async id => { const k='year_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT * FROM years WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
-const getSemesters = async yrId => { const k='sems_'+yrId; const c=cacheGet(k); if(c) return c; const r=await all('SELECT * FROM semesters WHERE year_id=? AND is_deleted=0 ORDER BY name',[yrId]); cacheSet(k,r,TTL); return r; };
-const getSemester = async id => { const k='sem_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT * FROM semesters WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
-const getSubjects = async smId => { const k='subs_'+smId; const c=cacheGet(k); if(c) return c; const r=await all('SELECT * FROM subjects WHERE semester_id=? AND is_deleted=0 ORDER BY name',[smId]); cacheSet(k,r,TTL); return r; };
-const getSubject = async id => { const k='sub_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT * FROM subjects WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
-const getCategories = async sbId => { const k='cats_'+sbId; const c=cacheGet(k); if(c) return c; const r=await all('SELECT * FROM categories WHERE subject_id=? AND is_deleted=0 ORDER BY name',[sbId]); cacheSet(k,r,TTL); return r; };
-const getCategory = async id => { const k='cat_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT * FROM categories WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
+const getSpecs  = async () => { const k='specs'; const c=cacheGet(k); if(c) return c; const r=await all('SELECT * FROM specialties WHERE is_deleted=0 ORDER BY id'); cacheSet(k,r,TTL); return r; };
+const getSpec   = async id => { const k='spec_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT * FROM specialties WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
+const getYears  = async spId => { const k='years_'+spId; const c=cacheGet(k); if(c) return c; const r=await all('SELECT * FROM years WHERE specialty_id=? AND is_deleted=0 ORDER BY id',[spId]); cacheSet(k,r,TTL); return r; };
+const getYear   = async id => { const k='year_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT * FROM years WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
+const getSemesters = async yrId => { const k='sems_raw_'+yrId; const c=cacheGet(k); if(c) return c; const r=await all('SELECT * FROM semesters WHERE year_id=? AND is_deleted=0 ORDER BY id',[yrId]); cacheSet(k,r,TTL); return r; };
+const getSemester  = async id => { const k='sem_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT * FROM semesters WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
+const getSubjects  = async smId => { const k='subs_raw_'+smId; const c=cacheGet(k); if(c) return c; const r=await all('SELECT * FROM subjects WHERE semester_id=? AND is_deleted=0 ORDER BY id',[smId]); cacheSet(k,r,TTL); return r; };
+const getSubject   = async id => { const k='sub_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT * FROM subjects WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
+const getCategories = async sbId => { const k='cats_raw_'+sbId; const c=cacheGet(k); if(c) return c; const r=await all('SELECT * FROM categories WHERE subject_id=? AND is_deleted=0 ORDER BY id',[sbId]); cacheSet(k,r,TTL); return r; };
+const getCategory   = async id => { const k='cat_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT * FROM categories WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
 
-const addSpec = async name => { if(await get('SELECT 1 FROM specialties WHERE name=? AND is_deleted=0',[name])) throw new Error('exists'); await run('INSERT INTO specialties(name) VALUES(?)',[name]); cacheClear('spec'); cacheClear('specs'); };
-const renameSpec = async (id,name) => { await run('UPDATE specialties SET name=? WHERE id=?',[name,id]); cacheClear('spec'); cacheClear('specs'); };
-const deleteSpec = async id => { await run('UPDATE specialties SET is_deleted=1 WHERE id=?',[id]); cacheClear('spec'); cacheClear('specs'); };
-const addYear = async (spId,name) => { await run('INSERT INTO years(specialty_id,name) VALUES(?,?)',[spId,name]); cacheClear('years_'+spId); };
-const renameYear = async (id,name) => { await run('UPDATE years SET name=? WHERE id=?',[name,id]); cacheClear('year_'+id); };
-const deleteYear = async id => { await run('UPDATE years SET is_deleted=1 WHERE id=?',[id]); cacheClear('year_'+id); };
-const addSemester = async (yrId,name) => { await run('INSERT INTO semesters(year_id,name) VALUES(?,?)',[yrId,name]); cacheClear('sems_'+yrId); };
-const renameSemester = async (id,name) => { await run('UPDATE semesters SET name=? WHERE id=?',[name,id]); cacheClear('sem_'+id); };
-const deleteSemester = async id => { await run('UPDATE semesters SET is_deleted=1 WHERE id=?',[id]); cacheClear('sem_'+id); };
-const addSubject = async (smId,name) => { await run('INSERT INTO subjects(semester_id,name) VALUES(?,?)',[smId,name]); cacheClear('subs_'+smId); };
-const renameSubject = async (id,name) => { await run('UPDATE subjects SET name=? WHERE id=?',[name,id]); cacheClear('sub_'+id); };
-const deleteSubject = async id => { await run('UPDATE subjects SET is_deleted=1 WHERE id=?',[id]); cacheClear('sub_'+id); };
-const addCategory = async (sbId,name) => { await run('INSERT INTO categories(subject_id,name) VALUES(?,?)',[sbId,name]); cacheClear('cats_'+sbId); };
-const renameCategory = async (id,name) => { await run('UPDATE categories SET name=? WHERE id=?',[name,id]); cacheClear('cat_'+id); };
-const deleteCategory = async id => { await run('UPDATE categories SET is_deleted=1 WHERE id=?',[id]); cacheClear('cat_'+id); };
+const invalidateSpec = spId => { cacheClear('specs'); cacheClear('spec_'+spId); cacheClearPrefix('yrs_'+spId); cacheClearPrefix('sems_'+spId); cacheClearPrefix('subs_'+spId); cacheClearPrefix('cats_'+spId); cacheClearPrefix('path_'+spId); };
+const invalidateYear = (spId,yrId) => { cacheClear('years_'+spId); cacheClear('year_'+yrId); cacheClearPrefix('sems_raw_'+yrId); cacheClearPrefix('sems_'+spId+'_'+yrId); cacheClearPrefix('subs_'+spId+'_'+yrId); cacheClearPrefix('path_'); };
+const invalidateSem  = (spId,yrId,smId) => { cacheClear('sems_raw_'+yrId); cacheClear('sem_'+smId); cacheClearPrefix('subs_raw_'+smId); cacheClearPrefix('subs_'+spId+'_'+yrId+'_'+smId); cacheClearPrefix('path_'); };
+const invalidateSub  = (spId,yrId,smId,sbId) => { cacheClear('subs_raw_'+smId); cacheClear('sub_'+sbId); cacheClearPrefix('cats_raw_'+sbId); cacheClearPrefix('cats_'+spId+'_'+yrId+'_'+smId+'_'+sbId); cacheClearPrefix('path_'); };
+const invalidateCat  = (spId,yrId,smId,sbId,catId) => { cacheClear('cats_raw_'+sbId); cacheClear('cat_'+catId); cacheClearPrefix('showfiles_'+catId); cacheClearPrefix('path_'); };
 
-module.exports = { getSpecs,getSpec,addSpec,renameSpec,deleteSpec,getYears,getYear,addYear,renameYear,deleteYear,getSemesters,getSemester,addSemester,renameSemester,deleteSemester,getSubjects,getSubject,addSubject,renameSubject,deleteSubject,getCategories,getCategory,addCategory,renameCategory,deleteCategory };
+const addSpec    = async name => { const r=await get('SELECT id FROM specialties WHERE name=?',[name]); if(r) throw new Error('exists'); await run('INSERT INTO specialties(name) VALUES(?)',[name]); cacheClear('specs'); };
+const renameSpec = async (id,name) => { await run('UPDATE specialties SET name=? WHERE id=?',[name,id]); cacheClear('specs'); cacheClear('spec_'+id); cacheClearPrefix('path_'); };
+const deleteSpec = async id => { await run('UPDATE specialties SET is_deleted=1 WHERE id=?',[id]); invalidateSpec(id); };
+
+const addYear    = async (spId,name) => { const r=await get('SELECT id FROM years WHERE specialty_id=? AND name=?',[spId,name]); if(r) throw new Error('exists'); await run('INSERT INTO years(specialty_id,name) VALUES(?,?)',[spId,name]); cacheClear('years_'+spId); cacheClearPrefix('yrs_'+spId); };
+const renameYear = async (id,name) => { const y=await getYear(id); await run('UPDATE years SET name=? WHERE id=?',[name,id]); cacheClear('year_'+id); cacheClear('years_'+y?.specialty_id); cacheClearPrefix('path_'); };
+const deleteYear = async id => { await run('UPDATE years SET is_deleted=1 WHERE id=?',[id]); const y=await get('SELECT specialty_id FROM years WHERE id=?',[id]); invalidateYear(y?.specialty_id,id); };
+
+const addSemester    = async (yrId,name) => { const r=await get('SELECT id FROM semesters WHERE year_id=? AND name=?',[yrId,name]); if(r) throw new Error('exists'); await run('INSERT INTO semesters(year_id,name) VALUES(?,?)',[yrId,name]); cacheClear('sems_raw_'+yrId); };
+const renameSemester = async (id,name) => { await run('UPDATE semesters SET name=? WHERE id=?',[name,id]); cacheClear('sem_'+id); cacheClearPrefix('sems_raw_'); cacheClearPrefix('path_'); };
+const deleteSemester = async id => { await run('UPDATE semesters SET is_deleted=1 WHERE id=?',[id]); cacheClear('sem_'+id); cacheClearPrefix('sems_raw_'); cacheClearPrefix('path_'); };
+
+const addSubject    = async (smId,name) => { const r=await get('SELECT id FROM subjects WHERE semester_id=? AND name=?',[smId,name]); if(r) throw new Error('exists'); await run('INSERT INTO subjects(semester_id,name) VALUES(?,?)',[smId,name]); cacheClear('subs_raw_'+smId); };
+const renameSubject = async (id,name) => { await run('UPDATE subjects SET name=? WHERE id=?',[name,id]); cacheClear('sub_'+id); cacheClearPrefix('subs_raw_'); cacheClearPrefix('path_'); };
+const deleteSubject = async id => { await run('UPDATE subjects SET is_deleted=1 WHERE id=?',[id]); cacheClear('sub_'+id); cacheClearPrefix('subs_raw_'); cacheClearPrefix('path_'); };
+
+const addCategory    = async (sbId,name) => { const r=await get('SELECT id FROM categories WHERE subject_id=? AND name=?',[sbId,name]); if(r) throw new Error('exists'); await run('INSERT INTO categories(subject_id,name) VALUES(?,?)',[sbId,name]); cacheClear('cats_raw_'+sbId); };
+const renameCategory = async (id,name) => { await run('UPDATE categories SET name=? WHERE id=?',[name,id]); cacheClear('cat_'+id); cacheClearPrefix('cats_raw_'); cacheClearPrefix('path_'); cacheClearPrefix('showfiles_'); };
+const deleteCategory = async id => { await run('UPDATE categories SET is_deleted=1 WHERE id=?',[id]); cacheClear('cat_'+id); cacheClearPrefix('cats_raw_'); cacheClearPrefix('showfiles_'); cacheClearPrefix('path_'); };
+
+module.exports = {
+  getSpecs,getSpec,getYears,getYear,getSemesters,getSemester,getSubjects,getSubject,getCategories,getCategory,
+  addSpec,renameSpec,deleteSpec,addYear,renameYear,deleteYear,
+  addSemester,renameSemester,deleteSemester,addSubject,renameSubject,deleteSubject,
+  addCategory,renameCategory,deleteCategory,
+  invalidateSpec,invalidateYear,invalidateSem,invalidateSub,invalidateCat
+};
