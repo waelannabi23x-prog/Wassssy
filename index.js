@@ -387,19 +387,10 @@ async function launch() {
 
     // Express health check
     app.get('/', (req,res) => res.send('OK'));
+    app.use(bot.webhookCallback("/webhook/"+TOKEN));
     app.listen(PORT, () => console.log('✅ Express on port '+PORT));
 
-    app.use(bot.webhookCallback("/webhook/"+TOKEN));
-    await bot.telegram.setWebhook(WEBHOOK_URL+"/webhook/"+TOKEN);
-    await bot.launch({
-      webhook: {
-        domain: WEBHOOK_URL,
-        port: parseInt(PORT),
-        hookPath: '/webhook/'+TOKEN,
-      },
-      allowedUpdates: ['message', 'callback_query'],
-      dropPendingUpdates: true,
-    });
+    await bot.telegram.setWebhook(WEBHOOK_URL+"/webhook/"+TOKEN, { allowed_updates:["message","callback_query"], drop_pending_updates:true });
 
     console.log('🚀 Study Bot Pro v3.1 is running!');
   } catch(e) {
