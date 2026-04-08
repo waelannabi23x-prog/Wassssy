@@ -44,7 +44,10 @@ async function showSpecs(ctx) {
 }
 
 async function showYears(ctx,spId,page=0) {
-  const [sp, all] = await Promise.all([content.getSpec(spId), content.getYears(spId)]);
+  const ckey='yrs_'+spId;
+  let yd=cacheGet(ckey);
+  if(!yd){ const [sp,all]=await Promise.all([content.getSpec(spId),content.getYears(spId)]); yd={sp,all}; cacheSet(ckey,yd,600000); }
+  const {sp, all} = yd;
   const total = all.length;
   const years = all.slice(page*PS,(page+1)*PS);
   if(!years.length) return eos(ctx,buildPath([escMd(sp?.name)])+'\n\n📭 لا توجد سنوات.',build([backMenu('browse')]));
@@ -61,7 +64,10 @@ async function showYears(ctx,spId,page=0) {
 }
 
 async function showSemesters(ctx,spId,yrId) {
-  const [sp, yr, sems] = await Promise.all([content.getSpec(spId), content.getYear(yrId), content.getSemesters(yrId)]);
+  const ckey='sems_'+spId+'_'+yrId;
+  let sd=cacheGet(ckey);
+  if(!sd){ const [sp,yr,sems]=await Promise.all([content.getSpec(spId),content.getYear(yrId),content.getSemesters(yrId)]); sd={sp,yr,sems}; cacheSet(ckey,sd,600000); }
+  const {sp, yr, sems} = sd;
   if(!sems.length) return eos(ctx,buildPath([sp?.name,yr?.name])+'\n\n📭 لا توجد فصول.',build([backMenu('yr_'+spId+'_'+yrId)]));
   const rows = sems.map(s=>[btn('📆 '+s.name,'sm_'+spId+'_'+yrId+'_'+s.id)]);
   rows.push(backMenu('yrs_'+spId+'_'+yrId));
@@ -69,7 +75,10 @@ async function showSemesters(ctx,spId,yrId) {
 }
 
 async function showSubjects(ctx,spId,yrId,smId,page=0) {
-  const [sp, yr, sm, all] = await Promise.all([content.getSpec(spId), content.getYear(yrId), content.getSemester(smId), content.getSubjects(smId)]);
+  const ckey='subs_'+spId+'_'+yrId+'_'+smId;
+  let subd=cacheGet(ckey);
+  if(!subd){ const [sp,yr,sm,all]=await Promise.all([content.getSpec(spId),content.getYear(yrId),content.getSemester(smId),content.getSubjects(smId)]); subd={sp,yr,sm,all}; cacheSet(ckey,subd,600000); }
+  const {sp, yr, sm, all} = subd;
   const total = all.length;
   const subs = all.slice(page*PS,(page+1)*PS);
   if(!subs.length) return eos(ctx,buildPath([sp?.name,yr?.name,sm?.name])+'\n\n📭 لا توجد مواد.',build([backMenu('sm_'+spId+'_'+yrId+'_'+smId)]));
@@ -86,7 +95,10 @@ async function showSubjects(ctx,spId,yrId,smId,page=0) {
 }
 
 async function showCategories(ctx,spId,yrId,smId,sbId) {
-  const [sp, yr, sm, sb, cats] = await Promise.all([content.getSpec(spId), content.getYear(yrId), content.getSemester(smId), content.getSubject(sbId), content.getCategories(sbId)]);
+  const ckey='cats_'+spId+'_'+yrId+'_'+smId+'_'+sbId;
+  let catd=cacheGet(ckey);
+  if(!catd){ const [sp,yr,sm,sb,cats]=await Promise.all([content.getSpec(spId),content.getYear(yrId),content.getSemester(smId),content.getSubject(sbId),content.getCategories(sbId)]); catd={sp,yr,sm,sb,cats}; cacheSet(ckey,catd,600000); }
+  const {sp, yr, sm, sb, cats} = catd;
   if(!cats.length) return eos(ctx,buildPath([sp?.name,yr?.name,sm?.name,sb?.name])+'\n\n📭 لا توجد فئات.',build([backMenu('sb_'+spId+'_'+yrId+'_'+smId+'_'+sbId)]));
   const rows = cats.map(c=>[btn('📁 '+c.name,'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+c.id)]);
   rows.push(backMenu('sbs_'+spId+'_'+yrId+'_'+smId+'_'+sbId));
@@ -231,6 +243,7 @@ async function showComments(ctx,fid,spId,yrId,smId,sbId,catId,page=0) {
 
 async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
   const uid = ctx.uid;
+  ctx.sendChatAction('upload_document').catch(()=>{});
   const [f, fav, similar] = await Promise.all([filesDb.getFile(fid), interactions.isFav(uid,fid), interactions.getSimilar(fid,4)]);
   if(!f) return ctx.reply(t(uid,'not_found'));
   Promise.all([filesDb.incDownloads(fid), interactions.addHistory(uid,fid), interactions.addLog(uid,'download',f.title)]).catch(()=>{});

@@ -54,7 +54,7 @@ async function getSimilar(fileId,limit=4) {
   return final;
 }
 
-const addLog = (uid,action,details) => run('INSERT INTO logs(user_id,action,details) VALUES(?,?,?)',[uid,action,details||'']);
+const addLog = (uid,action,details) => { run('INSERT INTO logs(user_id,action,details) VALUES(?,?,?)',[uid,action,details||'']).catch(()=>{}); };
 const getLogs = (n=20) => all('SELECT l.*,u.first_name FROM logs l LEFT JOIN users u ON l.user_id=u.id ORDER BY l.created_at DESC LIMIT ?',[n]);
 const getActiveUsers = async (days=7) => (await all(`SELECT id FROM users WHERE is_banned=0 AND last_active >= NOW() - INTERVAL '${parseInt(days)} days'`)).map(r=>r.id);
 
