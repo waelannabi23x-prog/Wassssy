@@ -389,10 +389,12 @@ async function launch() {
     app.get('/', (req,res) => res.send('OK'));
     app.listen(PORT, () => console.log('✅ Express on port '+PORT));
 
+    app.use(bot.webhookCallback("/webhook/"+TOKEN));
+    await bot.telegram.setWebhook(WEBHOOK_URL+"/webhook/"+TOKEN);
     await bot.launch({
       webhook: {
         domain: WEBHOOK_URL,
-        port: PORT + 1,
+        port: parseInt(PORT),
         hookPath: '/webhook/'+TOKEN,
       },
       allowedUpdates: ['message', 'callback_query'],
