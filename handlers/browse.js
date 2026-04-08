@@ -95,11 +95,19 @@ async function showCategories(ctx,spId,yrId,smId,sbId) {
 
 async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
   const uid = ctx.uid;
-  const [{sp,yr,sm,sb,cat}, allFiles, bundles] = await Promise.all([
-    getPathData(spId,yrId,smId,sbId,catId),
-    filesDb.getFiles(catId),
-    bundlesDb.getBundles(catId)
-  ]);
+  // cache للبيانات الثابتة - ملفات+حزم+مسار - 5 دقائق
+  const staticKey='showfiles_'+catId+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId;
+  let staticData=cacheGet(staticKey);
+  if(!staticData){
+    const [pathData, allFiles, bundles] = await Promise.all([
+      getPathData(spId,yrId,smId,sbId,catId),
+      filesDb.getFiles(catId),
+      bundlesDb.getBundles(catId)
+    ]);
+    staticData={pathData,allFiles,bundles};
+    cacheSet(staticKey,staticData,300000);
+  }
+  const {pathData:{sp,yr,sm,sb,cat}, allFiles, bundles} = staticData;
   const total = allFiles.length;
   const list = allFiles.slice(page*PS,(page+1)*PS);
   const pathStr = buildPath([sp?.name,yr?.name,sm?.name,sb?.name,cat?.name]);
