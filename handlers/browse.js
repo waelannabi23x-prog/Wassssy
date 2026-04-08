@@ -137,19 +137,31 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
 
 async function showPreview(ctx,fid,spId,yrId,smId,sbId,catId) {
   const uid = ctx.uid;
-  const [f, ratingData, commentCount, alreadyReported, fav, favCnt, userRating] = await Promise.all([
-    filesDb.getFile(fid),
-    interactions.getAvgRating(fid),
-    commentsDb.countComments(fid),
+  // cache للبيانات الثابتة (ملف + تقييم + عدد تعليقات) - 2 دقيقة
+  const staticKey = 'prev_static_'+fid;
+  let staticData = cacheGet(staticKey);
+  if(!staticData) {
+    const [f, ratingData, commentCount, favCnt] = await Promise.all([
+      filesDb.getFile(fid),
+      interactions.getAvgRating(fid),
+      commentsDb.countComments(fid),
+      interactions.favCount(fid),
+    ]);
+    staticData = {f, ratingData, commentCount, favCnt};
+    if(f) cacheSet(staticKey, staticData, 120000);
+  }
+  const {f, ratingData, commentCount, favCnt} = staticData;
+  if(!f) return ctx.reply(t(uid,'not_found'));
+
+  // البيانات الشخصية بالتوازي - ما تتكاش لأنها تختلف لكل مستخدم
+  const [alreadyReported, fav, userRating] = await Promise.all([
     reportsDb.hasReported(uid, fid),
     interactions.isFav(uid,fid),
-    interactions.favCount(fid),
     interactions.getUserRating(uid,fid)
   ]);
-  if(!f) return ctx.reply(t(uid,'not_found'));
-  const {avg,cnt} = ratingData;
-  const text = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 _'+escMd(f.description)+'_\n':'')+'\n📁 '+escMd(f.cat_name)+' | 📖 '+escMd(f.sub_name)+'\n⬇️ *'+f.downloads+'* تحميل | ⭐ *'+favCnt+'* محفوظ\n💬 *'+commentCount+'* تعليق\n'+starsDisplay(avg,cnt);
 
+  const {avg,cnt} = ratingData;
+  const text = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 _'+escMd(f.description)+'_\n':'')+' \n📁 '+escMd(f.cat_name)+' | 📖 '+escMd(f.sub_name)+'\n⬇️ *'+f.downloads+'* تحميل | ⭐ *'+favCnt+'* محفوظ\n💬 *'+commentCount+'* تعليق\n'+starsDisplay(avg,cnt);
 
   const backCb = catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
   const ratingBtns = [1,2,3,4,5].map(i=>btn(i<=userRating?'⭐':'☆','rate_'+fid+'_'+i+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId));
