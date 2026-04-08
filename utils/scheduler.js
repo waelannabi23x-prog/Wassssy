@@ -76,6 +76,7 @@ function startScheduler(bot, ownerIds) {
       const { run } = require('../database/db');
       await run(`DELETE FROM files WHERE is_deleted=1 AND uploaded_at < NOW() - INTERVAL '30 days'`);
       await run(`DELETE FROM logs WHERE created_at < NOW() - INTERVAL '30 days'`);
+      await run(`DELETE FROM history WHERE id NOT IN (SELECT id FROM history ORDER BY viewed_at DESC LIMIT 100000)`);
       await run(`DELETE FROM cache_store WHERE expires_at < ?`, [Date.now()]);
       console.log('✅ Cleanup done');
     } catch(e) { console.error('Cleanup error:', e.message); }

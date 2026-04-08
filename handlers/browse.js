@@ -2,12 +2,6 @@ const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
 const { cacheGet, cacheSet } = require('../utils/cache');
 const reportsDb = require('../database/reports');
 
-function formatSize(bytes) {
-  if(!bytes || bytes===0) return '';
-  if(bytes < 1024) return bytes+'B';
-  if(bytes < 1024*1024) return (bytes/1024).toFixed(1)+'KB';
-  return (bytes/(1024*1024)).toFixed(1)+'MB';
-}
 
 function starsDisplay(avg, cnt) {
   const full = Math.round(avg);
@@ -143,26 +137,21 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
 
 async function showPreview(ctx,fid,spId,yrId,smId,sbId,catId) {
   const uid = ctx.uid;
-  const [f, ratingData, commentCount, alreadyReported] = await Promise.all([
+  const [f, ratingData, commentCount, alreadyReported, fav, favCnt, userRating] = await Promise.all([
     filesDb.getFile(fid),
     interactions.getAvgRating(fid),
     commentsDb.countComments(fid),
-    reportsDb.hasReported(uid, fid)
-  ]);
-  if(!f) return ctx.reply(t(uid,'not_found'));
-  const [fav, favCnt, userRating] = await Promise.all([
+    reportsDb.hasReported(uid, fid),
     interactions.isFav(uid,fid),
     interactions.favCount(fid),
     interactions.getUserRating(uid,fid)
   ]);
+  if(!f) return ctx.reply(t(uid,'not_found'));
   const {avg,cnt} = ratingData;
-  const sizeStr = f.file_size ? ' | 💾 '+formatSize(f.file_size) : '';
-  const text = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 _'+escMd(f.description)+'_\n':'')+
-    '\n📁 '+escMd(f.cat_name)+' | 📖 '+escMd(f.sub_name)+
-    '\n⬇️ *'+f.downloads+'* تحميل | ⭐ *'+favCnt+'* محفوظ'+sizeStr+
-    '\n💬 *'+commentCount+'* تعليق\n'+starsDisplay(avg,cnt);
+  const text = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 _'+escMd(f.description)+'_\n':'')+'\n📁 '+escMd(f.cat_name)+' | 📖 '+escMd(f.sub_name)+'\n⬇️ *'+f.downloads+'* تحميل | ⭐ *'+favCnt+'* محفوظ\n💬 *'+commentCount+'* تعليق\n'+starsDisplay(avg,cnt);
+
+
   const backCb = catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
-  const ratingBtns = [1,2,3,4,5].map(i=>btn(i<=userRating?'⭐':'☆','rate_'+fid+'_'+i+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId));
   const rows = [
     [btn('⬇️ تحميل الملف','fl_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)],
     [btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid), btn('💬 تعليقات ('+commentCount+')','cmt_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)],
@@ -224,8 +213,8 @@ async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
   const [f, fav] = await Promise.all([filesDb.getFile(fid), interactions.isFav(uid,fid)]);
   if(!f) return ctx.reply(t(uid,'not_found'));
   Promise.all([filesDb.incDownloads(fid), interactions.addHistory(uid,fid), interactions.addLog(uid,'download',f.title)]).catch(()=>{});
-  const sizeStr = f.file_size ? ' | 💾 '+formatSize(f.file_size) : '';
-  const caption = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 '+escMd(f.description)+'\n':'')+'📁 '+escMd(f.cat_name)+' | 📖 '+escMd(f.sub_name)+sizeStr;
+  
+  const caption = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 '+escMd(f.description)+'\n':'')+'📁 '+escMd(f.cat_name)+' | 📖 '+escMd(f.sub_name);
   const backCb = catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
   const kb = build([[btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid)],[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]]);
   try {

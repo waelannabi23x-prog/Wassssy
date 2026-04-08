@@ -5,10 +5,10 @@ const CACHE_TTL = 300000;
 
 const getAll = () => all('SELECT a.*,u.first_name,u.username FROM admins a LEFT JOIN users u ON a.user_id=u.id');
 const setSpecialty = (uid,spId) => run('UPDATE admins SET specialty_id=? WHERE user_id=?',[spId,uid]);
-const getAdminSpecialty = async uid => (await get('SELECT specialty_id FROM admins WHERE user_id=?',[uid]))?.specialty_id||0;
+const getAdminSpecialty = async uid => { const cached=permsCache.get('sp_'+uid); if(cached && Date.now()<cached.exp) return cached.val; const r=(await get('SELECT specialty_id FROM admins WHERE user_id=?',[uid]))?.specialty_id||0; permsCache.set('sp_'+uid,{val:r,exp:Date.now()+CACHE_TTL}); return r; };
 const add = (uid,by,perms='upload,add_content') => { permsCache.delete(uid); return run('INSERT INTO admins(user_id,added_by,permissions) VALUES(?,?,?) ON CONFLICT(user_id) DO NOTHING',[uid,by,perms]); };
 const remove = uid => { permsCache.delete(uid); return run('DELETE FROM admins WHERE user_id=?',[uid]); };
-const isAdmin = async uid => !!(await get('SELECT 1 FROM admins WHERE user_id=?',[uid]));
+const isAdmin = async uid => { const cached=permsCache.get("ia_"+uid); if(cached && Date.now()<cached.exp) return cached.val; const r=!!(await get("SELECT 1 FROM admins WHERE user_id=?",[uid])); permsCache.set("ia_"+uid,{val:r,exp:Date.now()+CACHE_TTL}); return r; };
 
 const getPerms = async uid => {
   const cached = permsCache.get(uid);
