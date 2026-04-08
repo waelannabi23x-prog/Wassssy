@@ -18,7 +18,6 @@ const resolveReport = (id) =>
 const dismissReport = (id) =>
   run("UPDATE reports SET status='dismissed' WHERE id=?", [id]);
 
-const hasReported = async (userId, fileId) =>
-  !!(await get('SELECT 1 FROM reports WHERE user_id=? AND file_id=? AND status=?', [userId, fileId, 'pending']));
+const hasReported = async (userId, fileId) => { const key="rep_"+userId+"_"+fileId; const c=cacheGet(key); if(c!==null) return c; const r=!!(await get("SELECT 1 FROM reports WHERE user_id=? AND file_id=? AND status=?", [userId, fileId, "pending"])); cacheSet(key,r,600000); return r; };
 
 module.exports = { addReport, getReports, countPending, resolveReport, dismissReport, hasReported };

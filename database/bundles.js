@@ -1,6 +1,7 @@
+const { cacheGet, cacheSet, cacheClear } = require("../utils/cache");
 const { all, get, run } = require('./db');
 
-const getBundles = catId => all('SELECT * FROM bundles WHERE category_id=? AND is_deleted=0 ORDER BY created_at DESC',[catId]);
+const getBundles = async catId => { const key="bdls_"+catId; const c=cacheGet(key); if(c) return c; const r=await all('SELECT * FROM bundles WHERE category_id=? AND is_deleted=0 ORDER BY created_at DESC',[catId]); cacheSet(key,r,300000); return r; };
 const getBundle = id => get('SELECT * FROM bundles WHERE id=?',[id]);
 const addBundle = async (catId,title,desc,by) => {
   if(await get('SELECT 1 FROM bundles WHERE category_id=? AND title=? AND is_deleted=0',[catId,title])) throw new Error('exists');
