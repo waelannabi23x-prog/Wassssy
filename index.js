@@ -147,8 +147,16 @@ bot.command('help', ctx => ctx.reply(
 bot.on('callback_query', async ctx => {
   const data = ctx.callbackQuery.data;
   try {
-    await ctx.answerCbQuery().catch(()=>{});
+    // answerCbQuery مرة وحدة بس - بدون await لأنها ما تأثر على النتيجة
+    ctx.answerCbQuery().catch(()=>{});
     if (data === 'noop') return;
+    // الأكثر استخداماً أول = أسرع
+    if (data.startsWith('preview_')) { const p=data.split('_'); return browse.showPreview(ctx,p[1],p[2],p[3],p[4],p[5],p[6]); }
+    if (data.startsWith('fl_')) { const p=data.split('_'); return browse.sendFile(ctx,p[1],p[2],p[3],p[4],p[5],p[6]); }
+    if (data.startsWith('ct_page_')) { const p=data.replace('ct_page_','').split('_'); return browse.showFiles(ctx,p[0],p[1],p[2],p[3],p[4],parseInt(p[5])); }
+    if (data.startsWith('ct_')) { const p=data.split('_'); return browse.showFiles(ctx,p[1],p[2],p[3],p[4],p[5]); }
+    if (data.startsWith('fav_')) return userH.toggleFav(ctx, data.replace('fav_',''));
+    if (data.startsWith('unfav_')) return userH.toggleFav(ctx, data.replace('unfav_',''), true);
     if (data === 'main_menu') return startHandler(ctx);
     if (data === 'browse') return browse.showSpecs(ctx);
     if (data.startsWith('set_sp_')) {
@@ -189,8 +197,6 @@ bot.on('callback_query', async ctx => {
     if (data.startsWith('ct_')) { const p=data.split('_'); return browse.showFiles(ctx,p[1],p[2],p[3],p[4],p[5]); }
     if (data.startsWith('bundle_')) { const p=data.split('_'); return browse.showBundle(ctx,p[1],p[2],p[3],p[4],p[5],p[6]); }
     if (data.startsWith('bdl_')) { const p=data.split('_'); return browse.sendBundle(ctx,p[1],p[2],p[3],p[4],p[5],p[6]); }
-    if (data.startsWith('preview_')) { const p=data.split('_'); return browse.showPreview(ctx,p[1],p[2],p[3],p[4],p[5],p[6]); }
-    if (data.startsWith('fl_')) { const p=data.split('_'); return browse.sendFile(ctx,p[1],p[2],p[3],p[4],p[5],p[6]); }
     if (data.startsWith('rate_')) {
       const p=data.replace('rate_','').split('_');
       const fid=p[0]; const rating=parseInt(p[1]);
@@ -224,8 +230,6 @@ bot.on('callback_query', async ctx => {
       return userH.handleSearch(ctx, query);
     }
     if (data === 'progress') return userH.showProgress(ctx);
-    if (data.startsWith('fav_')) return userH.toggleFav(ctx, data.replace('fav_',''));
-
     // ── COMMENTS ──
     if (data.startsWith('cmt_') && !data.startsWith('cmt_pg_')) {
       const p=data.replace('cmt_','').split('_');
@@ -246,7 +250,6 @@ bot.on('callback_query', async ctx => {
       await ctx.answerCbQuery('✅ تم الحذف').catch(()=>{});
       return browse.showComments(ctx,p[1],p[2],p[3],p[4],p[5],p[6],p[7]);
     }
-    if (data.startsWith('unfav_')) return userH.toggleFav(ctx, data.replace('unfav_',''), true);
     if (data.startsWith('mg_')) {
       if (!ctx.isAdmin) return ctx.answerCbQuery('🚫 ليس لديك صلاحية.', { show_alert:true });
       return manage.handleCallback(ctx, data);

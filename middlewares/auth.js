@@ -48,12 +48,12 @@ async function isBanned(id) {
 
 function deferredUpsert(uid, fn, ln, un) {
   const now = Date.now();
-  // last_active يتحدث دايماً بدون تأخير
-  users.updateLastActive(uid).catch(()=>{});
-  // upsert كامل كل 5 دقائق بس
-  if(now - (lastUpsert.get(uid)||0) < 300000) return;
-  lastUpsert.set(uid, now);
-  users.upsert(uid, fn, ln, un).catch(()=>{});
+  const last = lastUpsert.get(uid)||0;
+  // last_active كل دقيقتين بس - ما نثقل DB بكل request
+  if(now - last > 120000) {
+    lastUpsert.set(uid, now);
+    users.upsert(uid, fn, ln, un).catch(()=>{});
+  }
 }
 
 async function authMiddleware(ctx, next) {
@@ -64,15 +64,17 @@ async function authMiddleware(ctx, next) {
     return ctx.answerCbQuery?.('⏳ بطيء شوي!').catch(()=>{});
   }
   // فحص واحد بالتوازي بدل اثنين بالتسلسل
-  const [banned, adminVal] = await Promise.all([
-    isOwner(uid) ? Promise.resolve(false) : isBanned(uid),
-    isAdmin(uid)
-  ]);
-  if(banned) return ctx.reply('🚫 You are banned.');
+  // كل شي من الكاش - ما يروح للـ DB إلا أول مرة
+  const ownerCheck = isOwner(uid);
+  if(!ownerCheck) {
+    const banned = await isBanned(uid);
+    if(banned) return ctx.reply('🚫 You are banned.');
+  }
+  const adminVal = ownerCheck || await isAdmin(uid);
   if(global.maintenanceMode === true && !adminVal) {
     return ctx.reply('🔧 *'+(global.maintenanceMsg||'Bot under maintenance')+'*\n\nPlease wait! 🙏', {parse_mode:'Markdown'});
   }
-  ctx.isOwner = isOwner(uid);
+  ctx.isOwner = ownerCheck;
   ctx.isAdmin = adminVal;
   ctx.uid = uid;
   return next();
