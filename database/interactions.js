@@ -39,6 +39,9 @@ async function getRecommended(uid,limit=8) {
 }
 
 async function getSimilar(fileId,limit=4) {
+  const ckey="similar_"+fileId;
+  const cc=cacheGet(ckey);
+  if(cc) return cc;
   const f=await get('SELECT f.id,f.category_id,c.subject_id FROM files f JOIN categories c ON f.category_id=c.id WHERE f.id=?',[fileId]);
   if(!f) return [];
   const results=await all(J+' WHERE f.id!=? AND f.is_deleted=0 AND f.category_id=? ORDER BY f.downloads DESC LIMIT ?',[fileId,f.category_id,limit]);
@@ -46,7 +49,9 @@ async function getSimilar(fileId,limit=4) {
   const ids=[parseInt(fileId),...results.map(r=>r.id)];
   const ph=ids.map(()=>'?').join(',');
   const more=await all(J+' JOIN categories c2 ON f.category_id=c2.id WHERE c2.subject_id=? AND f.id NOT IN ('+ph+') AND f.is_deleted=0 ORDER BY f.downloads DESC LIMIT ?',[f.subject_id,...ids,limit-results.length]);
-  return [...results,...more].slice(0,limit);
+  const final=[...results,...more].slice(0,limit);
+  cacheSet(ckey,final,600000);
+  return final;
 }
 
 const addLog = (uid,action,details) => run('INSERT INTO logs(user_id,action,details) VALUES(?,?,?)',[uid,action,details||'']);
