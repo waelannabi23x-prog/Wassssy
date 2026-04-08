@@ -37,7 +37,7 @@ async function showMainMenu(ctx, name) {
   ]);
 
   const spId = spRow?.specialty_id;
-  const sp = spId && spId != 0 ? await content.getSpec(spId) : null;
+  const sp = spId && spId != 0 ? await content.getSpec(spId) : null; // من الكاش دايماً - سريع
 
   const hour = new Date().getHours();
   const timeGreet = hour < 12 ? '🌅 صباح النور' : hour < 17 ? '☀️ مساء الخير' : '🌙 مساء الخير';

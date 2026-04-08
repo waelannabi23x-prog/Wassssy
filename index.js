@@ -404,7 +404,7 @@ process.on('unhandledRejection', (err) => {
 // Auto restart on memory leak (>200MB)
 setInterval(() => {
   const mem = process.memoryUsage().heapUsed / 1024 / 1024;
-  if(mem > 200) {
+  if(mem > 400) {
     console.error('Memory too high:', mem.toFixed(0)+'MB - restarting');
     process.exit(1);
   }

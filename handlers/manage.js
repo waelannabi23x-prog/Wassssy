@@ -274,7 +274,7 @@ async function handleText(ctx,state){
   const done=(msg,cb)=>{clearState(uid);ctx.reply(msg,{parse_mode:'Markdown',...build([[btn('◀️ رجوع',cb)]])});};
   try{
     switch(state.type){
-      case 'mg_add_sp': await await content.addSpec(text); done('✅ تم إضافة *'+text+'*!','mg_content'); break;
+      case 'mg_add_sp': await content.addSpec(text); done('✅ تم إضافة *'+text+'*!','mg_content'); break;
       case 'mg_rn_sp': await content.renameSpec(state.id,text); done('✅ تمت إعادة التسمية!','mg_content'); break;
       case 'mg_add_yr': await content.addYear(state.spId,text); done('✅ تمت إضافة *'+text+'*!','mg_yrs_'+state.spId); break;
       case 'mg_rn_yr': await content.renameYear(state.id,text); done('✅ تمت إعادة التسمية!','mg_yrs_'+state.spId); break;

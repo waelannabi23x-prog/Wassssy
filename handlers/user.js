@@ -78,12 +78,10 @@ async function toggleFav(ctx,fid,remove=false){
   const uid=ctx.uid;
   const isFaved=await interactions.isFav(uid,fid);
   if(remove||isFaved){
-    await interactions.removeFav(uid,fid);
-    await ctx.answerCbQuery('').catch(()=>{});
+    interactions.removeFav(uid,fid).catch(()=>{});
     try{await ctx.editMessageReplyMarkup({inline_keyboard:ctx.callbackQuery.message.reply_markup.inline_keyboard.map(row=>row.map(b=>b.callback_data===('fav_'+fid)||b.callback_data===('unfav_'+fid)?{...b,text:'☆ حفظ',callback_data:'fav_'+fid}:b))});}catch(e){}
   } else {
-    await interactions.addFav(uid,fid);
-    await ctx.answerCbQuery('').catch(()=>{});
+    interactions.addFav(uid,fid).catch(()=>{});
     try{await ctx.editMessageReplyMarkup({inline_keyboard:ctx.callbackQuery.message.reply_markup.inline_keyboard.map(row=>row.map(b=>b.callback_data===('fav_'+fid)||b.callback_data===('unfav_'+fid)?{...b,text:'⭐ محفوظ',callback_data:'unfav_'+fid}:b))});}catch(e){}
   }
 }
