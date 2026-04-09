@@ -49,7 +49,7 @@ const favCount = async fid => {
   const key='favcnt_'+fid;
   const cached=cacheGet(key);
   if(cached!==null) return cached;
-  const r=(await get('SELECT COUNT(*) as c FROM favorites WHERE file_id=?',[fid]))?.c||0;
+  const r=(await get('SELECT COUNT(*) as c FROM favorites WHERE file_id=$1',[fid]))?.c||0;
   cacheSet(key,r,600000);
   return r;
 };
@@ -76,7 +76,7 @@ const getLastFile = async uid => {
   const key='lastfile_'+uid;
   const cached=cacheGet(key);
   if(cached!==undefined) return cached||null;
-  const r=(await all(J+' JOIN history h ON h.file_id=f.id WHERE h.user_id=? AND f.is_deleted=0 ORDER BY h.viewed_at DESC LIMIT 1',[uid]))[0]||null;
+  const r=(await all(J+' JOIN history h ON h.file_id=f.id WHERE h.user_id=$1 AND f.is_deleted=0 ORDER BY h.viewed_at DESC LIMIT 1',[uid]))[0]||null;
   cacheSet(key,r,600000);
   return r;
 };
@@ -88,7 +88,7 @@ const getUserDownloadCount = async uid => {
   const key='dlcnt_'+uid;
   const cached=cacheGet(key);
   if(cached!==null) return cached;
-  const r=(await get('SELECT COUNT(*) as c FROM history WHERE user_id=?',[uid]))?.c||0;
+  const r=(await get('SELECT COUNT(*) as c FROM history WHERE user_id=$1',[uid]))?.c||0;
   cacheSet(key,r,300000);
   return r;
 };
@@ -103,7 +103,7 @@ async function getRecommended(uid,limit=8) {
   )).map(r=>r.id);
   let result;
   if(!cats.length) {
-    result=await all(J+' WHERE f.is_deleted=0 ORDER BY f.downloads DESC LIMIT ?',[limit]);
+    result=await all(J+' WHERE f.is_deleted=0 ORDER BY f.downloads DESC LIMIT $1',[limit]);
   } else {
     const ph=cats.map(()=>'?').join(',');
     result=await all(
@@ -119,9 +119,9 @@ async function getSimilar(fileId,limit=4) {
   const ckey='similar_'+fileId;
   const cc=cacheGet(ckey);
   if(cc) return cc;
-  const f=await get('SELECT f.id,f.category_id,c.subject_id FROM files f JOIN categories c ON f.category_id=c.id WHERE f.id=?',[fileId]);
+  const f=await get('SELECT f.id,f.category_id,c.subject_id FROM files f JOIN categories c ON f.category_id=c.id WHERE f.id=$1',[fileId]);
   if(!f) return [];
-  const results=await all(J+' WHERE f.id!=? AND f.is_deleted=0 AND f.category_id=? ORDER BY f.downloads DESC LIMIT ?',[fileId,f.category_id,limit]);
+  const results=await all(J+' WHERE f.id!=$1 AND f.is_deleted=0 AND f.category_id=$2 ORDER BY f.downloads DESC LIMIT $3',[fileId,f.category_id,limit]);
   if(results.length>=limit) { cacheSet(ckey,results,7200000); return results; }
   const ids=[parseInt(fileId),...results.map(r=>r.id)];
   const ph=ids.map(()=>'?').join(',');
@@ -171,7 +171,7 @@ const getAvgRating = async fid => {
   const key='avg_'+fid;
   const cached=cacheGet(key);
   if(cached) return cached;
-  const r=await get('SELECT ROUND(AVG(rating),1) as avg, COUNT(*) as cnt FROM ratings WHERE file_id=?',[fid]);
+  const r=await get('SELECT ROUND(AVG(rating),1) as avg, COUNT(*) as cnt FROM ratings WHERE file_id=$1',[fid]);
   const result={avg:parseFloat(r?.avg||0),cnt:parseInt(r?.cnt||0)};
   cacheSet(key,result,600000);
   return result;

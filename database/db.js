@@ -13,7 +13,9 @@ function getPg() {
       ssl: { rejectUnauthorized: false },
       max: 20, min: 5,
       idleTimeoutMillis: 60000,
-      connectionTimeoutMillis: 10000,
+      connectionTimeoutMillis: 5000,
+      statement_timeout: 10000,
+      query_timeout: 10000,
       allowExitOnIdle: false,
       keepAlive: true,
       keepAliveInitialDelayMillis: 10000
