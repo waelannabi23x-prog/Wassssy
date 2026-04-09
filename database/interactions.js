@@ -193,6 +193,7 @@ const getRatingBatch = async fileIds => {
 };
 
 module.exports = {
+  getPreviewPersonal,
   getFavs,isFav,addFav,removeFav,favCount,
   addHistory,invalidateLastFile,getHistory,getLastFile,getUserDownloadCount,
   getRecommended,getSimilar,
