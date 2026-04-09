@@ -25,7 +25,7 @@ console.log('6. health check:', idx.includes("'/'")||idx.includes('health')?'✅
 console.log('7. cache cleanup:', fs.readFileSync('utils/cache.js','utf8').includes('unref')?'✅':'❌');
 
 // هل فيه rate limiting
-console.log('8. rate limiting:', idx.includes('rateLimit')||idx.includes('rate_limit')?'✅':'❌');
+console.log('8. rate limiting:', idx.includes('checkRL')?'✅':'❌');
 
 // هل فيه compression
 console.log('9. compression:', idx.includes('compression')?'✅':'❌');
