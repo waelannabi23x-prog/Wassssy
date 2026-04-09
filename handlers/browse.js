@@ -263,43 +263,29 @@ async function showComments(ctx,fid,spId,yrId,smId,sbId,catId,page=0) {
 }
 
 async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
-  const uid = ctx.uid;
-  // إرسال chat action بدون انتظار
+  const uid=ctx.uid;
   ctx.sendChatAction('upload_document').catch(()=>{});
-  // جلب الملف والمشابهة بالتوازي - كلاهما من الكاش غالباً
-  const [f, similar, fav] = await Promise.all([
-    filesDb.getFile(fid),
-    interactions.getSimilar(fid,4),
-    interactions.isFav(uid,fid)
-  ]);
+  const [f,similar,fav]=await Promise.all([filesDb.getFile(fid),interactions.getSimilar(fid,4),interactions.isFav(uid,fid)]);
   if(!f) return ctx.reply(t(uid,'not_found'));
-
-  // fire and forget - ما ننتظرها
-  Promise.all([
-    filesDb.incDownloads(fid),
-    interactions.addHistory(uid,fid),
-    interactions.addLog(uid,'download',f.title),
-    interactions.invalidateLastFile(uid),
-  ]).catch(()=>{});
-
-  const caption = '📄 *'+escMd(f.title)+'*\n'+
-    (f.description?'📝 '+escMd(f.description)+'\n':'')+
-    '📁 '+escMd(f.cat_name)+' | 📖 '+escMd(f.sub_name);
-  const backCb = catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
-  const kb = build([[btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid)],[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]]);
+  filesDb.incDownloads(fid).catch(()=>{});
+  interactions.addHistory(uid,fid).catch(()=>{});
+  interactions.addLog(uid,'download',f.title);
+  interactions.invalidateLastFile(uid);
+  const caption='📄 *'+escMd(f.title)+'*
+'+(f.description?'📝 '+escMd(f.description)+'
+':'')+'📁 '+escMd(f.cat_name)+' | 📖 '+escMd(f.sub_name);
+  const backCb=catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
+  const kb=build([[btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid)],[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]]);
   try {
-    if(f.file_type==='link') await ctx.reply(caption+'\n\n🔗 '+f.file_id,{parse_mode:'Markdown',...kb});
+    if(f.file_type==='link') await ctx.reply(caption+'
+
+🔗 '+f.file_id,{parse_mode:'Markdown',...kb});
     else if(f.file_type==='photo') await ctx.replyWithPhoto(f.file_id,{caption,parse_mode:'Markdown',...kb});
     else await ctx.replyWithDocument(f.file_id,{caption,parse_mode:'Markdown',...kb});
     ctx.deleteMessage().catch(()=>{});
-    if(similar.length){
-      const simRows = similar.map(sf=>[btn('📄 '+sf.title+' · '+sf.sub_name,'preview_'+sf.id+'_0_0_0_0_0')]);
-      simRows.push([btn('🏠 القائمة','main_menu')]);
-      ctx.reply('📎 ملفات قد تهمك:',{...build(simRows)});
-    }
-  } catch(e) { ctx.reply('❌ تعذر إرسال الملف. حاول مجدداً.'); }
+    if(similar.length){const simRows=similar.map(sf=>[btn('📄 '+sf.title+' · '+sf.sub_name,'preview_'+sf.id+'_0_0_0_0_0')]);simRows.push([btn('🏠 القائمة','main_menu')]);ctx.reply('📎 ملفات قد تهمك:',{...build(simRows)});}
+  } catch(e){ctx.reply('❌ تعذر إرسال الملف. حاول مجدداً.');}
 }
-
 async function showBundle(ctx,bundleId,spId,yrId,smId,sbId,catId) {
   const [b, files] = await Promise.all([bundlesDb.getBundle(bundleId), bundlesDb.getBundleFiles(bundleId)]);
   if(!b) return ctx.reply('الحزمة غير موجودة');

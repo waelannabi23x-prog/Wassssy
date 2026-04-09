@@ -4,6 +4,7 @@ const { eos } = require('../utils/helpers');
 const interactions = require('../database/interactions');
 const usersDb = require('../database/users');
 const content = require('../database/content');
+const { cacheGet, cacheSet } = require('../utils/cache');
 
 async function startHandler(ctx) {
   const uid = ctx.uid;
@@ -31,13 +32,20 @@ async function showMainMenu(ctx, name) {
   const uid = ctx.uid;
   if (!name) name = escMd(ctx.from?.first_name || 'Student');
 
-  const [last, spRow] = await Promise.all([
-    interactions.getLastFile(uid),
-    usersDb.getSpecialty(uid)
-  ]);
+  const menuKey = 'menu_data_' + uid;
+  let menuData = cacheGet(menuKey);
+  if (!menuData) {
+    const [last, spRow] = await Promise.all([
+      interactions.getLastFile(uid),
+      usersDb.getSpecialty(uid)
+    ]);
+    menuData = { last, spRow };
+    cacheSet(menuKey, menuData, 60000);
+  }
+  const { last, spRow } = menuData;
 
   const spId = spRow?.specialty_id;
-  const sp = spId && spId != 0 ? await content.getSpec(spId) : null; // من الكاش دايماً - سريع
+  const sp = spId && spId != 0 ? await content.getSpec(spId) : null;
 
   const hour = new Date().getHours();
   const timeGreet = hour < 12 ? '🌅 صباح النور' : hour < 17 ? '☀️ مساء الخير' : '🌙 مساء الخير';
