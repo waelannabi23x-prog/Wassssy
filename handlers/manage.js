@@ -522,9 +522,8 @@ async function handleCallback(ctx,data){
     return eos(ctx,txt,{parse_mode:'Markdown',...build(rrows)});
   }
   if(data.startsWith('mg_dismiss_')){run('UPDATE reports SET status=$1 WHERE id=$2',['dismissed',data.replace('mg_dismiss_','')]).catch(()=>{});return handleCallback(ctx,'mg_reports');}
-    return handleCallback(ctx,'mg_reports');
-  }
   if(data==='mg_maint'){
+    global.maintenanceMode=!global.maintenanceMode;
     await setSetting('maintenance',global.maintenanceMode?'true':'false');
     await interactions.addLog(uid,'maintenance',global.maintenanceMode?'ON':'OFF');
     return eos(ctx,'🔧 *الصيانة: '+(global.maintenanceMode?'🔴 مفعّلة':'🟢 متوقفة')+'*',{parse_mode:'Markdown',...build([[btn(global.maintenanceMode?'🟢 إيقاف':'🔴 تفعيل','mg_maint')],[btn('📝 تعديل الرسالة','mg_set_maint_msg'),btn('◀️ رجوع','mg_menu')]])});
