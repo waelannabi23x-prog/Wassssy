@@ -521,7 +521,7 @@ async function handleCallback(ctx,data){
     rrows.push(back('mg_menu'));
     return eos(ctx,txt,{parse_mode:'Markdown',...build(rrows)});
   }
-  if(data.startsWith('mg_dismiss_')){dbRun('UPDATE reports SET status=$1 WHERE id=$2',['dismissed',data.replace('mg_dismiss_','')]).catch(()=>{});return handleCallback(ctx,'mg_reports');}
+  if(data.startsWith('mg_dismiss_')){const rid=data.replace('mg_dismiss_report_','').replace('mg_dismiss_','');dbRun('UPDATE reports SET status=$1 WHERE id=$2',['dismissed',rid]).catch(()=>{});return handleCallback(ctx,'mg_reports');}
   if(data==='mg_maint'){
     global.maintenanceMode=!global.maintenanceMode;
     await setSetting('maintenance',global.maintenanceMode?'true':'false');
@@ -550,8 +550,8 @@ async function handleCallback(ctx,data){
     return showEditPerms(ctx,adminId);
   }
   if(data.startsWith('mg_profile_')){return showUserProfile(ctx,data.replace('mg_profile_',''));}
-  if(data.startsWith('mg_ban_')){await usersDb.ban(parseInt(data.replace('mg_ban_','')));await interactions.addLog(uid,'ban',data.replace('mg_ban_',''));return showUsers(ctx);}
-  if(data.startsWith('mg_unban_')){await usersDb.unban(parseInt(data.replace('mg_unban_','')));return showUsers(ctx);}
+  if(data.startsWith('mg_ban_')){const bid=parseInt(data.replace('mg_ban_',''));await usersDb.ban(bid);const {cacheClear}=require('../utils/cache');cacheClear('ban_'+bid);await interactions.addLog(uid,'ban',String(bid));return showUsers(ctx);}
+  if(data.startsWith('mg_unban_')){const ubid=parseInt(data.replace('mg_unban_',''));await usersDb.unban(ubid);const {cacheClear}=require('../utils/cache');cacheClear('ban_'+ubid);return showUsers(ctx);}
   if(data.startsWith('mg_users_p')){return showUsers(ctx,parseInt(data.replace('mg_users_p','')));}
   if(data.startsWith('mg_restore_fl_')){await filesDb.restore(data.replace('mg_restore_fl_',''));return showTrash(ctx);}
   if(data.startsWith('mg_pdl_fl_')){await dbRun('DELETE FROM files WHERE id=?',[data.replace('mg_pdl_fl_','')]);return showTrash(ctx);}
@@ -615,7 +615,6 @@ async function handleCallback(ctx,data){
     rrows.push(back('mg_menu'));
     return eos(ctx,txt,{parse_mode:'Markdown',...build(rrows)});
   }
-  if(data.startsWith('mg_dismiss_')){dbRun('UPDATE reports SET status=$1 WHERE id=$2',['dismissed',data.replace('mg_dismiss_','')]).catch(()=>{});return handleCallback(ctx,'mg_reports');}
   if(data.startsWith('mg_cdl_fl_')){const p=data.replace('mg_cdl_fl_','').split('_');await filesDb.softDelete(p[5]);return showMgFiles(ctx,p[0],p[1],p[2],p[3],p[4]);}
 }
 
