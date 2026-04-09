@@ -84,6 +84,10 @@ async function showSemesters(ctx,spId,yrId) {
 }
 
 async function showSubjects(ctx,spId,yrId,smId,page=0) {
+  if(page===0) {
+    const pre=cacheGet('precomp_subs_'+spId+'_'+yrId+'_'+smId);
+    if(pre) return eos(ctx,pre.text,pre.extra);
+  }
   const ckey='subs_'+spId+'_'+yrId+'_'+smId;
   let subd=cacheGet(ckey);
   if(!subd) {
@@ -108,6 +112,8 @@ async function showSubjects(ctx,spId,yrId,smId,page=0) {
 }
 
 async function showCategories(ctx,spId,yrId,smId,sbId) {
+  const pre=cacheGet('precomp_cats_'+spId+'_'+yrId+'_'+smId+'_'+sbId);
+  if(pre) return eos(ctx,pre.text,pre.extra);
   const ckey='cats_'+spId+'_'+yrId+'_'+smId+'_'+sbId;
   let catd=cacheGet(ckey);
   if(!catd) {
