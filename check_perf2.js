@@ -1,0 +1,28 @@
+const fs=require('fs');
+const idx=fs.readFileSync('index.js','utf8');
+const db=fs.readFileSync('database/db.js','utf8');
+const browse=fs.readFileSync('handlers/browse.js','utf8');
+const inter=fs.readFileSync('database/interactions.js','utf8');
+const auth=fs.readFileSync('middlewares/auth.js','utf8');
+
+console.log('=== فحص شامل ===');
+console.log('1. compression:', idx.includes('compression')?'✅':'❌');
+console.log('2. express.json limit:', idx.includes('limit')?'✅':'❌');
+console.log('3. PG pool max 20:', db.includes('max: 20')?'✅':'❌');
+console.log('4. PG pool min 5:', db.includes('min: 5')?'✅':'❌');
+console.log('5. prepared statements:', db.includes('pgPrepared')?'✅':'❌');
+console.log('6. keepAlive PG:', db.includes('keepAlive')?'✅':'❌');
+console.log('7. precomp_specs:', browse.includes('precomp_specs')?'✅':'❌');
+console.log('8. per-user cache 120s:', browse.includes('120000')?'✅':'❌');
+console.log('9. static cache 900s:', browse.includes('900000')?'✅':'❌');
+console.log('10. preview cache 1800s:', browse.includes('1800000')?'✅':'❌');
+console.log('11. similar cache 7200s:', inter.includes('7200000')?'✅':'❌');
+console.log('12. getPreviewPersonal:', inter.includes('getPreviewPersonal')?'✅':'❌');
+console.log('13. dedup history:', inter.includes('_historyRecent')?'✅':'❌');
+console.log('14. admin cache 5min:', auth.includes('300000')?'✅':'❌');
+console.log('15. ban cache:', auth.includes("'ban_'")?'✅':'❌');
+console.log('16. worker threads removed:', !idx.includes('dbPool')?'✅':'❌');
+console.log('17. cacheWarmup:', idx.includes('await cacheWarmup')?'✅':'❌');
+console.log('18. precomputeAll:', idx.includes('await precomputeAll')?'✅':'❌');
+console.log('19. fire&forget history:', inter.includes('Promise.resolve()')?'✅':browse.includes('fire and forget')?'✅':'❌');
+console.log('20. getFavBatch+getRatingBatch:', inter.includes('getFavBatch')&&inter.includes('getRatingBatch')?'✅':'❌');

@@ -122,7 +122,7 @@ async function getSimilar(fileId,limit=4) {
   const f=await get('SELECT f.id,f.category_id,c.subject_id FROM files f JOIN categories c ON f.category_id=c.id WHERE f.id=?',[fileId]);
   if(!f) return [];
   const results=await all(J+' WHERE f.id!=? AND f.is_deleted=0 AND f.category_id=? ORDER BY f.downloads DESC LIMIT ?',[fileId,f.category_id,limit]);
-  if(results.length>=limit) { cacheSet(ckey,results,3600000); return results; }
+  if(results.length>=limit) { cacheSet(ckey,results,7200000); return results; }
   const ids=[parseInt(fileId),...results.map(r=>r.id)];
   const ph=ids.map(()=>'?').join(',');
   const more=await all(
@@ -130,7 +130,7 @@ async function getSimilar(fileId,limit=4) {
     [f.subject_id,...ids,limit-results.length]
   );
   const final=[...results,...more].slice(0,limit);
-  cacheSet(ckey,final,3600000);
+  cacheSet(ckey,final,7200000);
   return final;
 }
 
