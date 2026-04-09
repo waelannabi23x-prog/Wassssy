@@ -77,7 +77,7 @@ const getLastFile = async uid => {
   const cached=cacheGet(key);
   if(cached!==undefined) return cached||null;
   const r=(await all(J+' JOIN history h ON h.file_id=f.id WHERE h.user_id=? AND f.is_deleted=0 ORDER BY h.viewed_at DESC LIMIT 1',[uid]))[0]||null;
-  cacheSet(key,r,180000);
+  cacheSet(key,r,600000);
   return r;
 };
 
@@ -162,7 +162,7 @@ const getUserRating = async (uid,fid) => {
   const key='urating_'+uid+'_'+fid;
   const cached=cacheGet(key);
   if(cached!==null) return cached;
-  const r=(await get('SELECT rating FROM ratings WHERE user_id=? AND file_id=?',[uid,fid]))?.rating||0;
+  const r=(await get('SELECT rating FROM ratings WHERE user_id=$1 AND file_id=$2',[uid,fid]))?.rating||0;
   cacheSet(key,r,600000);
   return r;
 };
@@ -180,7 +180,7 @@ const getAvgRating = async fid => {
 const getFavBatch = async (uid,fileIds) => {
   if(!fileIds.length) return {};
   const ph=fileIds.map(()=>'?').join(',');
-  const rows=await all('SELECT file_id FROM favorites WHERE user_id=? AND file_id IN ('+ph+')',[uid,...fileIds]);
+  const rows=await all('SELECT file_id FROM favorites WHERE user_id=$1 AND file_id IN ('+ph+')',[uid,...fileIds]);
   const set=new Set(rows.map(r=>String(r.file_id)));
   return Object.fromEntries(fileIds.map(id=>[id,set.has(String(id))]));
 };

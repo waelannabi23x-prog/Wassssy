@@ -138,7 +138,7 @@ async function showAnalytics(ctx){
   text+='\n🆕 *أحدث الملفات:*\n';
   recent.forEach((f,i)=>{ text+=(i+1)+'. '+escMd(f.title)+'\n'; });
   const rows=[[btn('🔄 تحديث','mg_analytics')],back('mg_menu')];
-  cacheSet(_ckey,{text,rows},300000);
+  cacheSet(_ckey,{text,rows},600000);
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
 

@@ -30,7 +30,7 @@ async function getPathData(spId, yrId, smId, sbId, catId) {
     catId && catId!=='0' ? content.getCategory(catId) : null,
   ]);
   const result = {sp, yr, sm, sb, cat};
-  cacheSet(key, result, 600000);
+  cacheSet(key, result, 3600000);
   return result;
 }
 
@@ -50,7 +50,7 @@ async function showYears(ctx,spId,page=0) {
   if(!yd) {
     const [sp,all]=await Promise.all([content.getSpec(spId),content.getYears(spId)]);
     yd={sp,all};
-    cacheSet(ckey,yd,600000);
+    cacheSet(ckey,yd,3600000);
   }
   const {sp, all} = yd;
   const total = all.length;
@@ -74,7 +74,7 @@ async function showSemesters(ctx,spId,yrId) {
   if(!sd) {
     const [sp,yr,sems]=await Promise.all([content.getSpec(spId),content.getYear(yrId),content.getSemesters(yrId)]);
     sd={sp,yr,sems};
-    cacheSet(ckey,sd,600000);
+    cacheSet(ckey,sd,3600000);
   }
   const {sp, yr, sems} = sd;
   if(!sems.length) return eos(ctx,buildPath([escMd(sp?.name),escMd(yr?.name)])+'\n\n📭 لا توجد فصول.',build([backMenu('yr_'+spId+'_'+yrId)]));
@@ -89,7 +89,7 @@ async function showSubjects(ctx,spId,yrId,smId,page=0) {
   if(!subd) {
     const [sp,yr,sm,all]=await Promise.all([content.getSpec(spId),content.getYear(yrId),content.getSemester(smId),content.getSubjects(smId)]);
     subd={sp,yr,sm,all};
-    cacheSet(ckey,subd,600000);
+    cacheSet(ckey,subd,3600000);
   }
   const {sp, yr, sm, all} = subd;
   const total = all.length;
@@ -113,7 +113,7 @@ async function showCategories(ctx,spId,yrId,smId,sbId) {
   if(!catd) {
     const [sp,yr,sm,sb,cats]=await Promise.all([content.getSpec(spId),content.getYear(yrId),content.getSemester(smId),content.getSubject(sbId),content.getCategories(sbId)]);
     catd={sp,yr,sm,sb,cats};
-    cacheSet(ckey,catd,600000);
+    cacheSet(ckey,catd,3600000);
   }
   const {sp, yr, sm, sb, cats} = catd;
   if(!cats.length) return eos(ctx,buildPath([escMd(sp?.name),escMd(yr?.name),escMd(sm?.name),escMd(sb?.name)])+'\n\n📭 لا توجد فئات.',build([backMenu('sb_'+spId+'_'+yrId+'_'+smId+'_'+sbId)]));
@@ -173,7 +173,7 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
   }
   rows.push(backMenu('sbs_'+spId+'_'+yrId+'_'+smId+'_'+sbId));
   const extra={parse_mode:'Markdown',...build(rows)};
-  cacheSet(userKey,{text,extra},120000);
+  cacheSet(userKey,{text,extra},300000);
   return eos(ctx,text,extra);
 }
 
@@ -271,15 +271,11 @@ async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
   interactions.addHistory(uid,fid).catch(()=>{});
   interactions.addLog(uid,'download',f.title);
   interactions.invalidateLastFile(uid);
-  const caption='📄 *'+escMd(f.title)+'*
-'+(f.description?'📝 '+escMd(f.description)+'
-':'')+'📁 '+escMd(f.cat_name)+' | 📖 '+escMd(f.sub_name);
+  const caption='📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 '+escMd(f.description)+'\n':'')+'📁 '+escMd(f.cat_name)+' | 📖 '+escMd(f.sub_name);
   const backCb=catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
   const kb=build([[btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid)],[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]]);
   try {
-    if(f.file_type==='link') await ctx.reply(caption+'
-
-🔗 '+f.file_id,{parse_mode:'Markdown',...kb});
+    if(f.file_type==='link') await ctx.reply(caption+'\n\n🔗 '+f.file_id,{parse_mode:'Markdown',...kb});
     else if(f.file_type==='photo') await ctx.replyWithPhoto(f.file_id,{caption,parse_mode:'Markdown',...kb});
     else await ctx.replyWithDocument(f.file_id,{caption,parse_mode:'Markdown',...kb});
     ctx.deleteMessage().catch(()=>{});

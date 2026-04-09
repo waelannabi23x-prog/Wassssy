@@ -17,7 +17,7 @@ const getFiles = async catId => {
   const c=cacheGet(k);
   if(c) return c;
   const r=await all(J+' WHERE f.category_id=? AND f.is_deleted=0 ORDER BY f.uploaded_at DESC',[catId]);
-  cacheSet(k,r,300000);
+  cacheSet(k,r,600000);
   return r;
 };
 
