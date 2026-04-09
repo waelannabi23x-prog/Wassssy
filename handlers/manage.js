@@ -31,6 +31,7 @@ async function mainMenu(ctx){
     rows.push([btn('💾 نسخ احتياطي','mg_backup'),btn(global.maintenanceMode?'🟢 إيقاف الصيانة':'🔴 وضع الصيانة','mg_maint')]);
     rows.push([btn('♻️ استعادة','mg_restore'),btn('🗑 سلة المحذوفات','mg_trash')]);
     rows.push([btn('🔔 إشعار للمستخدمين','mg_notify')]);
+  rows.push([btn('🚩 البلاغات','mg_reports')]);
     rows.push([btn('📨 نظام الرسائل','mg_msgs')]);
     rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp')]);
   }
@@ -511,9 +512,20 @@ async function handleCallback(ctx,data){
   }
   if(data==='mg_scheduled') return showScheduled(ctx);
   if(data.startsWith('mg_del_sched_')){await messagesDb.deleteScheduled(data.replace('mg_del_sched_',''));return showScheduled(ctx);}
-  if(data==='mg_notify'){setState(uid,{type:'mg_notify_msg'});return ctx.reply('🔔 رسالة الإشعار للمستخدمين النشطين (آخر 7 أيام):\n_(أو /cancel)_',{parse_mode:'Markdown'});}
+  if(data==='mg_reports'){
+    const rpts=await all(`SELECT r.*,f.title as ft,u.first_name as fn FROM reports r LEFT JOIN files f ON r.file_id=f.id LEFT JOIN users u ON r.user_id=u.id WHERE r.status='pending' ORDER BY r.created_at DESC LIMIT 20`);
+    let txt='البلاغات ('+rpts.length+')\n\n';
+    if(!rpts.length) txt+='لا توجد بلاغات.';
+    else rpts.forEach((r,i)=>{ txt+=(i+1)+'. '+escMd(r.ft||'?')+' | '+escMd(r.reason||'?')+' | '+(r.fn||r.user_id)+'\n'; });
+    const rrows=rpts.map(r=>[btn('حذف','mg_cdl_fl_0_0_0_0_'+r.file_id),btn('تجاهل','mg_dismiss_report_'+r.id)]);
+    rrows.push(back('mg_menu'));
+    return eos(ctx,txt,{parse_mode:'Markdown',...build(rrows)});
+  }
+  if(data.startsWith('mg_dismiss_report_')){
+  if(data.startsWith('mg_dismiss_')){run('UPDATE reports SET status=dismissed WHERE id=?',[data.replace('mg_dismiss_','')]).catch(()=>{});return handleCallback(ctx,'mg_reports');}
+    return handleCallback(ctx,'mg_reports');
+  }
   if(data==='mg_maint'){
-    global.maintenanceMode=!global.maintenanceMode;
     await setSetting('maintenance',global.maintenanceMode?'true':'false');
     await interactions.addLog(uid,'maintenance',global.maintenanceMode?'ON':'OFF');
     return eos(ctx,'🔧 *الصيانة: '+(global.maintenanceMode?'🔴 مفعّلة':'🟢 متوقفة')+'*',{parse_mode:'Markdown',...build([[btn(global.maintenanceMode?'🟢 إيقاف':'🔴 تفعيل','mg_maint')],[btn('📝 تعديل الرسالة','mg_set_maint_msg'),btn('◀️ رجوع','mg_menu')]])});
@@ -597,6 +609,15 @@ async function handleCallback(ctx,data){
     const f=await filesDb.getFile(p[5]);
     return eos(ctx,'🗑 نقل *'+escMd(f?.title||'الملف')+'* لسلة المحذوفات؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_fl_'+p.join('_')),btn('❌ لا','mg_fls_'+p.slice(0,5).join('_'))]]) });
   }
+  if(data==='mg_reports'){
+    const rpts=await all('SELECT r.*,f.title as ft,u.first_name as fn FROM reports r LEFT JOIN files f ON r.file_id=f.id LEFT JOIN users u ON r.user_id=u.id ORDER BY r.created_at DESC LIMIT 20');
+    let txt=''+rpts.length+' بلاغ\n\n';
+    if(!rpts.length) txt+='لا توجد بلاغات.';
+    else rpts.forEach((r,i)=>{ txt+=(i+1)+'. '+escMd(r.ft||'?')+' | '+escMd(r.reason||'?')+' | '+(r.fn||r.user_id)+'\n'; });
+    rrows.push(back('mg_menu'));
+    return eos(ctx,txt,{parse_mode:'Markdown',...build(rrows)});
+  }
+  if(data.startsWith('mg_dismiss_')){run('UPDATE reports SET status=dismissed WHERE id=?',[data.replace('mg_dismiss_','')]).catch(()=>{});return handleCallback(ctx,'mg_reports');}
   if(data.startsWith('mg_cdl_fl_')){const p=data.replace('mg_cdl_fl_','').split('_');await filesDb.softDelete(p[5]);return showMgFiles(ctx,p[0],p[1],p[2],p[3],p[4]);}
 }
 
