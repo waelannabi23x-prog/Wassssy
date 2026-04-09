@@ -39,13 +39,13 @@ async function showMainMenu(ctx, name) {
       interactions.getLastFile(uid),
       usersDb.getSpecialty(uid)
     ]);
-    menuData = { last, spRow };
+    const _spId = spRow?.specialty_id;
+    const sp = _spId && _spId != 0 ? await content.getSpec(_spId) : null;
+    menuData = { last, spRow, sp };
     cacheSet(menuKey, menuData, 60000);
   }
-  const { last, spRow } = menuData;
-
+  const { last, spRow, sp } = menuData;
   const spId = spRow?.specialty_id;
-  const sp = spId && spId != 0 ? await content.getSpec(spId) : null;
 
   const hour = new Date().getHours();
   const timeGreet = hour < 12 ? '🌅 صباح النور' : hour < 17 ? '☀️ مساء الخير' : '🌙 مساء الخير';

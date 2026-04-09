@@ -10,7 +10,7 @@ const {eos,buildPath}=require('../utils/helpers');
 const {isOwner}=require('../middlewares/auth');
 const path=require('path');
 const bundlesDb=require('../database/bundles');
-const { cacheGet, cacheSet } = require('../utils/cache');
+const { cacheGet, cacheSet, cacheClear, cacheClearPrefix } = require('../utils/cache');
 const messagesDb=require('../database/messages');
 const {all, run: dbRun, getSetting, setSetting, DB_PATH}=require('../database/db');
 
@@ -143,7 +143,10 @@ async function showAnalytics(ctx){
 }
 
 async function showLogs(ctx){
-  const logs=await interactions.getLogs(20);
+  const _lk='admin_logs';
+  const _lc=cacheGet(_lk);
+  const logs=_lc||await interactions.getLogs(20);
+  if(!_lc) cacheSet(_lk,logs,60000);
   let text='📜 *آخر السجلات*\n\n';
   if(logs.length) logs.forEach(l=>{ text+='• '+(l.first_name||'ID:'+l.user_id)+': '+l.action+(l.details?' — '+l.details:'')+'\n'; });
   else text+='_لا توجد سجلات._';
@@ -151,7 +154,9 @@ async function showLogs(ctx){
 }
 
 async function showUsers(ctx,page=0){
-  const [list, total] = await Promise.all([usersDb.getAll(page,PS), usersDb.count()]);
+  const _uk='admin_users_'+page;
+  const _uc=cacheGet(_uk);
+  const [list, total] = _uc ? [_uc.list,_uc.total] : await Promise.all([usersDb.getAll(page,PS), usersDb.count()]).then(([l,t])=>{cacheSet(_uk,{list:l,total:t},30000);return[l,t];});
   let text='👥 *المستخدمون ('+total+')*\n\n';
   list.forEach((u,i)=>{
     const j=u.joined_at?new Date(u.joined_at).toLocaleDateString("en-GB"):"?";
@@ -172,13 +177,14 @@ async function showUsers(ctx,page=0){
 }
 
 async function showUserProfile(ctx, userId) {
-  const [user, dlCount, favs, spRow, lastFile] = await Promise.all([
+  const [user, dlCount, favCount, spRow, lastFile] = await Promise.all([
     usersDb.getById(userId),
     interactions.getUserDownloadCount(userId),
-    interactions.getFavs(userId),
+    require('../database/db').get('SELECT COUNT(*) as c FROM favorites WHERE user_id=?',[userId]).then(r=>r?.c||0),
     usersDb.getSpecialty(userId),
     interactions.getLastFile(userId)
   ]);
+  const favs = { length: favCount };
   if (!user) return ctx.reply('❌ المستخدم غير موجود.');
   const spId = spRow?.specialty_id;
   const sp = spId&&spId!=0 ? await content.getSpec(spId) : null;
@@ -216,6 +222,7 @@ async function showEditPerms(ctx,adminId){
 
 async function showAdmins(ctx){
   const list=await adminsDb.getAll();
+  // invalidate cache عند التعديل
   let text='👑 *الإداريون ('+list.length+')*\n\n';
   const rows=list.map(a=>{
     const perms=(a.permissions||'upload,add_content').split(',').map(p=>PERM_LABELS[p.trim()]||p).join(' | ');
@@ -550,8 +557,8 @@ async function handleCallback(ctx,data){
     return showEditPerms(ctx,adminId);
   }
   if(data.startsWith('mg_profile_')){return showUserProfile(ctx,data.replace('mg_profile_',''));}
-  if(data.startsWith('mg_ban_')){const bid=parseInt(data.replace('mg_ban_',''));await usersDb.ban(bid);const {cacheClear}=require('../utils/cache');cacheClear('ban_'+bid);await interactions.addLog(uid,'ban',String(bid));return showUsers(ctx);}
-  if(data.startsWith('mg_unban_')){const ubid=parseInt(data.replace('mg_unban_',''));await usersDb.unban(ubid);const {cacheClear}=require('../utils/cache');cacheClear('ban_'+ubid);return showUsers(ctx);}
+  if(data.startsWith('mg_ban_')){const bid=parseInt(data.replace('mg_ban_',''));await usersDb.ban(bid);cacheClearPrefix('admin_users_');cacheClear('ban_'+bid);await interactions.addLog(uid,'ban',String(bid));return showUsers(ctx);}
+  if(data.startsWith('mg_unban_')){const ubid=parseInt(data.replace('mg_unban_',''));await usersDb.unban(ubid);cacheClearPrefix('admin_users_');cacheClear('ban_'+ubid);return showUsers(ctx);}
   if(data.startsWith('mg_users_p')){return showUsers(ctx,parseInt(data.replace('mg_users_p','')));}
   if(data.startsWith('mg_restore_fl_')){await filesDb.restore(data.replace('mg_restore_fl_',''));return showTrash(ctx);}
   if(data.startsWith('mg_pdl_fl_')){await dbRun('DELETE FROM files WHERE id=?',[data.replace('mg_pdl_fl_','')]);return showTrash(ctx);}

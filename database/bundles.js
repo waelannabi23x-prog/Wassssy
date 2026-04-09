@@ -2,7 +2,14 @@ const { cacheGet, cacheSet, cacheClear } = require("../utils/cache");
 const { all, get, run } = require('./db');
 
 const getBundles = async catId => { const key="bdls_"+catId; const c=cacheGet(key); if(c) return c; const r=await all('SELECT * FROM bundles WHERE category_id=? AND is_deleted=0 ORDER BY created_at DESC',[catId]); cacheSet(key,r,300000); return r; };
-const getBundle = id => get('SELECT * FROM bundles WHERE id=?',[id]);
+const getBundle = async id => {
+  const key='bundle_'+id;
+  const c=cacheGet(key);
+  if(c) return c;
+  const r=await get('SELECT * FROM bundles WHERE id=?',[id]);
+  if(r) cacheSet(key,r,600000);
+  return r;
+};
 const addBundle = async (catId,title,desc,by) => {
   if(await get('SELECT 1 FROM bundles WHERE category_id=? AND title=? AND is_deleted=0',[catId,title])) throw new Error('exists');
   await run('INSERT INTO bundles(category_id,title,description,uploaded_by) VALUES(?,?,?,?)',[catId,title,desc||'',by]);
