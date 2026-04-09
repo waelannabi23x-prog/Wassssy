@@ -24,6 +24,7 @@ const getFiles = async catId => {
 const invalidateFilesCache = catId => {
   cacheClearPrefix('files_cat_'+catId);
   cacheClearPrefix('showfiles_'+catId);
+  cacheClearPrefix('showfiles_');
 };
 
 const addFile = async (catId,title,desc,fileId,fileType,uploadedBy,extra='') => {

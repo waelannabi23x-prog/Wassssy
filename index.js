@@ -237,9 +237,9 @@ bot.on('callback_query', async ctx => {
     // Search delete
     if (data.startsWith('search_del_')) {
       if (!ctx.isAdmin) return ctx.answerCbQuery('ليس لديك صلاحية', {show_alert:true});
-      const parts = data.replace('search_del_','').split('_');
+      const parts = data.replace('search_del_','').split('|');
       const fid = parts[0];
-      const query = decodeURIComponent(parts.slice(1).join('_'));
+      const query = decodeURIComponent(parts[1]||'');
       await filesDb.softDelete(fid);
       await ctx.answerCbQuery('تم الحذف').catch(()=>{});
       return userH.handleSearch(ctx, query);

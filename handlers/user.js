@@ -207,7 +207,7 @@ async function handleSearch(ctx,query){
   if(!results.length) return ctx.reply('لا نتائج لـ: '+query,{...build([[btn('بحث جديد','search_prompt')],back('main_menu')])});
   const rows=results.map(f=>{
     const row=[btn('📄 '+f.title+' · '+f.sub_name,'preview_'+f.id+'_0_0_0_0_0')];
-    if(ctx.isAdmin) row.push(btn('🗑','search_del_'+f.id+'_'+encodeURIComponent(query)));
+    if(ctx.isAdmin) row.push(btn('🗑','search_del_'+f.id+'|'+encodeURIComponent(query)));
     return row;
   });
   rows.push([btn('بحث جديد','search_prompt'),btn('🏠','main_menu')]);

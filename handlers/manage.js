@@ -521,8 +521,7 @@ async function handleCallback(ctx,data){
     rrows.push(back('mg_menu'));
     return eos(ctx,txt,{parse_mode:'Markdown',...build(rrows)});
   }
-  if(data.startsWith('mg_dismiss_report_')){
-  if(data.startsWith('mg_dismiss_')){run('UPDATE reports SET status=dismissed WHERE id=?',[data.replace('mg_dismiss_','')]).catch(()=>{});return handleCallback(ctx,'mg_reports');}
+  if(data.startsWith('mg_dismiss_')){run('UPDATE reports SET status=$1 WHERE id=$2',['dismissed',data.replace('mg_dismiss_','')]).catch(()=>{});return handleCallback(ctx,'mg_reports');}
     return handleCallback(ctx,'mg_reports');
   }
   if(data==='mg_maint'){
@@ -617,7 +616,7 @@ async function handleCallback(ctx,data){
     rrows.push(back('mg_menu'));
     return eos(ctx,txt,{parse_mode:'Markdown',...build(rrows)});
   }
-  if(data.startsWith('mg_dismiss_')){run('UPDATE reports SET status=dismissed WHERE id=?',[data.replace('mg_dismiss_','')]).catch(()=>{});return handleCallback(ctx,'mg_reports');}
+  if(data.startsWith('mg_dismiss_')){run('UPDATE reports SET status=$1 WHERE id=$2',['dismissed',data.replace('mg_dismiss_','')]).catch(()=>{});return handleCallback(ctx,'mg_reports');}
   if(data.startsWith('mg_cdl_fl_')){const p=data.replace('mg_cdl_fl_','').split('_');await filesDb.softDelete(p[5]);return showMgFiles(ctx,p[0],p[1],p[2],p[3],p[4]);}
 }
 
