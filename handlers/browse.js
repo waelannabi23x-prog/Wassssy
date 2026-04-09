@@ -136,7 +136,7 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
       bundlesDb.getBundles(catId)
     ]);
     staticData={pathData,allFiles,bundles};
-    cacheSet(staticKey,staticData,300000);
+    cacheSet(staticKey,staticData,900000);
   }
   const {pathData:{sp,yr,sm,sb,cat}, allFiles, bundles} = staticData;
   const total = allFiles.length;
@@ -173,7 +173,7 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
   }
   rows.push(backMenu('sbs_'+spId+'_'+yrId+'_'+smId+'_'+sbId));
   const extra={parse_mode:'Markdown',...build(rows)};
-  cacheSet(userKey,{text,extra},60000);
+  cacheSet(userKey,{text,extra},120000);
   return eos(ctx,text,extra);
 }
 
@@ -189,7 +189,7 @@ async function showPreview(ctx,fid,spId,yrId,smId,sbId,catId) {
       interactions.favCount(fid),
     ]);
     staticData = {f, ratingData, commentCount, favCnt};
-    if(f) cacheSet(staticKey, staticData, 600000);
+    if(f) cacheSet(staticKey, staticData, 1800000);
   }
   const {f, ratingData, commentCount, favCnt} = staticData;
   if(!f) return ctx.reply(t(uid,'not_found'));
@@ -266,15 +266,13 @@ async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
   const uid = ctx.uid;
   // إرسال chat action بدون انتظار
   ctx.sendChatAction('upload_document').catch(()=>{});
-  // جلب الملف والملفات المشابهة بالتوازي
-  const [f, similar] = await Promise.all([
+  // جلب الملف والمشابهة بالتوازي - كلاهما من الكاش غالباً
+  const [f, similar, fav] = await Promise.all([
     filesDb.getFile(fid),
-    interactions.getSimilar(fid,4)
+    interactions.getSimilar(fid,4),
+    interactions.isFav(uid,fid)
   ]);
   if(!f) return ctx.reply(t(uid,'not_found'));
-
-  // isFav من الكاش - سريع
-  const fav = await interactions.isFav(uid,fid);
 
   // fire and forget - ما ننتظرها
   Promise.all([

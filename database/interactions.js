@@ -30,7 +30,7 @@ const getPreviewPersonal = async (uid,fid) => {
     cachedReport===null ? get('SELECT 1 FROM reports WHERE user_id=$1 AND file_id=$2 AND status!=\'dismissed\'',[uid,fid]) : Promise.resolve(cachedReport?{1:1}:null),
   ]);
   const fav=!!favRow; const userRating=ratingRow?.rating||0; const alreadyReported=!!reportRow;
-  cacheSet(favKey,fav,600000); cacheSet(ratingKey,userRating,600000); cacheSet(reportKey,alreadyReported,600000);
+  cacheSet(favKey,fav,1800000); cacheSet(ratingKey,userRating,1800000); cacheSet(reportKey,alreadyReported,1800000);
   return { fav, userRating, alreadyReported };
 };
 
