@@ -116,7 +116,7 @@ async function showAnalytics(ctx){
   const [spDist, topUsers, peakHours, topCats] = await Promise.all([
     all(`SELECT sp.name, COUNT(us.user_id) as cnt FROM user_specialties us LEFT JOIN specialties sp ON us.specialty_id=sp.id GROUP BY sp.name ORDER BY cnt DESC LIMIT 5`),
     all(`SELECT u.first_name, u.username, COUNT(h.id) as cnt FROM history h LEFT JOIN users u ON h.user_id=u.id GROUP BY h.user_id, u.first_name, u.username ORDER BY cnt DESC LIMIT 5`),
-    all(`SELECT EXTRACT(HOUR FROM viewed_at::timestamp) as hour, COUNT(*) as cnt FROM history GROUP BY hour ORDER BY cnt DESC LIMIT 3`),
+    all(`SELECT date_part('hour', viewed_at::timestamptz) as hour, COUNT(*) as cnt FROM history GROUP BY hour ORDER BY cnt DESC LIMIT 3`),
     all(`SELECT c.name, COUNT(h.id) as cnt FROM history h LEFT JOIN files f ON h.file_id=f.id LEFT JOIN categories c ON f.category_id=c.id WHERE h.viewed_at >= NOW() - INTERVAL '7 days' GROUP BY c.name ORDER BY cnt DESC LIMIT 3`)
   ]);
   let text='📊 *لوحة الإحصائيات المتقدمة*\n━━━━━━━━━━━━\n';

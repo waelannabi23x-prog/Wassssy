@@ -4,15 +4,24 @@ function buildPath(parts) {
   return parts.filter(Boolean).map(p=>'*'+escMd(p)+'*').join(' › ');
 }
 
-// eos - edit or send مع retry تلقائي
+function formatDate(dateStr) {
+  if(!dateStr) return 'غير معروف';
+  try {
+    const d = new Date(dateStr);
+    if(isNaN(d.getTime())) return 'غير معروف';
+    return d.toLocaleDateString('en-GB', { day:'2-digit', month:'2-digit', year:'numeric' });
+  } catch(e) { return 'غير معروف'; }
+}
+
+// eos محسّن — edit أو send مع retry تلقائي
 async function eos(ctx, text, extra={}) {
   const msg = ctx.callbackQuery?.message;
   if(msg) {
     try {
-      if(msg.text !== text || JSON.stringify(msg.reply_markup) !== JSON.stringify(extra.reply_markup)) {
-        return await ctx.editMessageText(text, extra);
-      }
-      return;
+      const sameText = msg.text === text;
+      const sameKb = JSON.stringify(msg.reply_markup) === JSON.stringify(extra.reply_markup);
+      if(sameText && sameKb) return; // لا تغيير = لا طلب
+      return await ctx.editMessageText(text, extra);
     } catch(e) {
       if(e.description?.includes('message is not modified')) return;
       if(e.description?.includes('Too Many Requests')) {
@@ -20,7 +29,10 @@ async function eos(ctx, text, extra={}) {
         await new Promise(r=>setTimeout(r,wait));
         return eos(ctx,text,extra);
       }
-      // fallback: send new
+      if(e.description?.includes('message to edit not found') ||
+         e.description?.includes('MESSAGE_ID_INVALID')) {
+        return ctx.reply(text, extra).catch(()=>{});
+      }
       return ctx.reply(text, extra).catch(()=>{});
     }
   }
@@ -32,4 +44,14 @@ async function eos(ctx, text, extra={}) {
   });
 }
 
-module.exports = { escMd, buildPath, eos };
+// إجابة فورية على callback + تلميح للمستخدم
+async function quickAck(ctx, text='') {
+  return ctx.answerCbQuery(text, { show_alert: false }).catch(()=>{});
+}
+
+// typing indicator غير مؤلم
+async function showTyping(ctx) {
+  return ctx.sendChatAction('typing').catch(()=>{});
+}
+
+module.exports = { escMd, buildPath, eos, formatDate, quickAck, showTyping };

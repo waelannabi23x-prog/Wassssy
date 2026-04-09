@@ -45,6 +45,10 @@ async function showSpecs(ctx) {
 }
 
 async function showYears(ctx,spId,page=0) {
+  if(page===0){
+    const pre=cacheGet('precomp_yrs_'+spId);
+    if(pre) return eos(ctx,pre.text,pre.extra);
+  }
   const ckey='yrs_'+spId;
   let yd=cacheGet(ckey);
   if(!yd) {
@@ -69,6 +73,8 @@ async function showYears(ctx,spId,page=0) {
 }
 
 async function showSemesters(ctx,spId,yrId) {
+  const pre=cacheGet('precomp_sems_'+spId+'_'+yrId);
+  if(pre) return eos(ctx,pre.text,pre.extra);
   const ckey='sems_'+spId+'_'+yrId;
   let sd=cacheGet(ckey);
   if(!sd) {
@@ -246,7 +252,12 @@ async function doReport(ctx, fid, reason, spId, yrId, smId, sbId, catId) {
 
 async function showComments(ctx,fid,spId,yrId,smId,sbId,catId,page=0) {
   const uid = ctx.uid;
-  const [comments, f] = await Promise.all([commentsDb.getComments(fid,50), filesDb.getFile(fid)]);
+  const cmtKey='cmts_'+fid+'_'+page;
+  const cmtCached=cacheGet(cmtKey);
+  const [comments, f] = cmtCached
+    ? [cmtCached.comments, cmtCached.f]
+    : await Promise.all([commentsDb.getComments(fid,50), filesDb.getFile(fid)]);
+  if(!cmtCached) cacheSet(cmtKey,{comments,f},60000);
   const CPS = 5;
   const total = comments.length;
   const list = comments.slice(page*CPS,(page+1)*CPS);
@@ -289,7 +300,12 @@ async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
   } catch(e){ctx.reply('❌ تعذر إرسال الملف. حاول مجدداً.');}
 }
 async function showBundle(ctx,bundleId,spId,yrId,smId,sbId,catId) {
-  const [b, files] = await Promise.all([bundlesDb.getBundle(bundleId), bundlesDb.getBundleFiles(bundleId)]);
+  const bkey='bundle_full_'+bundleId;
+  const bcached=cacheGet(bkey);
+  const [b, files] = bcached
+    ? [bcached.b, bcached.files]
+    : await Promise.all([bundlesDb.getBundle(bundleId), bundlesDb.getBundleFiles(bundleId)]);
+  if(!bcached && b) cacheSet(bkey,{b,files},600000);
   if(!b) return ctx.reply('الحزمة غير موجودة');
   const text = '📦 *'+escMd(b.title)+'*'+(b.description?'\n📝 '+escMd(b.description):'')+
     '\n\n📄 *'+files.length+' ملف*\n'+files.map((f,i)=>(i+1)+'. '+escMd(f.title||f.file_title||'')).join('\n')+

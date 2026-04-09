@@ -1,0 +1,12 @@
+2026-04-09 19:57:27: Error: Bot is not running!
+2026-04-09 19:57:27:     at Telegraf.stop (/data/data/com.termux/files/home/study-bot-backup-20260407_011636/node_modules/telegraf/lib/telegraf.js:218:19)
+2026-04-09 19:57:27:     at process.<anonymous> (/data/data/com.termux/files/home/study-bot-backup-20260407_011636/index.js:490:34)
+2026-04-09 19:57:27:     at Object.onceWrapper (node:events:623:12)
+2026-04-09 19:57:27:     at process.emit (node:events:508:20)
+2026-04-09 19:57:27: Uncaught: Bot is not running!
+2026-04-09 19:58:35: Error: Bot is not running!
+2026-04-09 19:58:35:     at Telegraf.stop (/data/data/com.termux/files/home/study-bot-backup-20260407_011636/node_modules/telegraf/lib/telegraf.js:218:19)
+2026-04-09 19:58:35:     at process.<anonymous> (/data/data/com.termux/files/home/study-bot-backup-20260407_011636/index.js:490:34)
+2026-04-09 19:58:35:     at Object.onceWrapper (node:events:623:12)
+2026-04-09 19:58:35:     at process.emit (node:events:508:20)
+2026-04-09 19:58:35: Uncaught: Bot is not running!
