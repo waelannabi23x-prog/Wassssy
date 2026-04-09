@@ -162,7 +162,7 @@ bot.command('help', ctx => ctx.reply(
 bot.on('callback_query', async ctx => {
   const data = ctx.callbackQuery.data;
   try {
-    ctx.answerCbQuery().catch(()=>{});
+    ctx.answerCbQuery('').catch(()=>{});
     if (data === 'noop') return;
 
     // Browse - الأكثر استخداماً أول
