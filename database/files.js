@@ -69,7 +69,7 @@ const updateDesc = async (id,desc) => {
   cacheClear('prev_static_'+id);
 };
 
-const search = (q,limit=20) => all(J+` WHERE f.is_deleted=0 AND (f.title ILIKE ? OR f.description ILIKE ?) ORDER BY f.downloads DESC LIMIT ?`,['%'+q+'%','%'+q+'%',limit]);
+const search = (q,limit=20) => all(J+' WHERE f.is_deleted=0 AND (f.title ILIKE $1 OR f.description ILIKE $2) ORDER BY f.downloads DESC LIMIT $3',['%'+q+'%','%'+q+'%',limit]);
 const topDownloaded = (n=5) => all(J+' WHERE f.is_deleted=0 ORDER BY f.downloads DESC LIMIT ?',[n]);
 const recentFiles   = (n=5) => all(J+' WHERE f.is_deleted=0 ORDER BY f.uploaded_at DESC LIMIT ?',[n]);
 const totalFiles    = async () => { const r=await get('SELECT COUNT(*) as c FROM files WHERE is_deleted=0'); return r?.c||0; };
