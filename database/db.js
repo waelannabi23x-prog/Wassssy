@@ -63,6 +63,17 @@ function getSqlite() {
 }
 
 const pgSqlCache = new Map();
+const pgPrepared = new Map();
+let _prepIdx = 0;
+
+async function getPrepared(pg, sql) {
+  const converted = toPgCached(sql);
+  if(pgPrepared.has(converted)) return pgPrepared.get(converted);
+  const name = 'stmt_'+(++_prepIdx);
+  try { await pg.query({ name, text: converted }); } catch(e) {}
+  pgPrepared.set(converted, name);
+  return name;
+}
 function toPgCached(sql) {
   if(pgSqlCache.has(sql)) return pgSqlCache.get(sql);
   const converted = toPg(sql);
@@ -98,7 +109,10 @@ async function all(sql, params=[]) {
   if(pg) {
     const converted = toPgCached(sql);
     try {
-      const res = await pg.query(converted, params);
+      const name = pgPrepared.get(converted);
+      const res = name
+        ? await pg.query({ name, text: converted, values: params })
+        : await pg.query(converted, params);
       return res.rows;
     } catch(e) { console.error('DB all error:', e.message, '| SQL:', converted.substring(0,100)); return []; }
   }
