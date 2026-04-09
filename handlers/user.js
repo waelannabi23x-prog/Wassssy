@@ -202,7 +202,7 @@ async function handleSearch(ctx,query){
   // cache للبحث 5 دقائق
   const key='search_'+query.toLowerCase();
   let results=cacheGet(key);
-  if(!results){ results=await filesDb.search(query); cacheSet(key,results,300000); }
+  if(!results){ results=await filesDb.search(query); cacheSet(key,results,900000); }
 
   if(!results.length) return ctx.reply('لا نتائج لـ: '+query,{...build([[btn('بحث جديد','search_prompt')],back('main_menu')])});
   const rows=results.map(f=>{

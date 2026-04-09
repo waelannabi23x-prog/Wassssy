@@ -189,17 +189,13 @@ async function showPreview(ctx,fid,spId,yrId,smId,sbId,catId) {
       interactions.favCount(fid),
     ]);
     staticData = {f, ratingData, commentCount, favCnt};
-    if(f) cacheSet(staticKey, staticData, 120000);
+    if(f) cacheSet(staticKey, staticData, 600000);
   }
   const {f, ratingData, commentCount, favCnt} = staticData;
   if(!f) return ctx.reply(t(uid,'not_found'));
 
-  // البيانات الشخصية بالتوازي
-  const [alreadyReported, fav, userRating] = await Promise.all([
-    reportsDb.hasReported(uid, fid),
-    interactions.isFav(uid,fid),
-    interactions.getUserRating(uid,fid)
-  ]);
+  // البيانات الشخصية في query واحدة
+  const { fav, userRating, alreadyReported } = await interactions.getPreviewPersonal(uid,fid);
 
   const {avg,cnt} = ratingData;
   const text = '📄 *'+escMd(f.title)+'*\n'+

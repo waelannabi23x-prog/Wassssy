@@ -9,9 +9,29 @@ const isFav = async (uid,fid) => {
   const key='fav_'+uid+'_'+fid;
   const cached=cacheGet(key);
   if(cached!==null) return cached;
-  const r=!!(await get('SELECT 1 FROM favorites WHERE user_id=? AND file_id=?',[uid,fid]));
+  const r=!!(await get('SELECT 1 FROM favorites WHERE user_id=$1 AND file_id=$2',[uid,fid]));
   cacheSet(key,r,600000);
   return r;
+};
+
+// جلب كل البيانات الشخصية لـ preview في query واحدة
+const getPreviewPersonal = async (uid,fid) => {
+  const favKey='fav_'+uid+'_'+fid;
+  const ratingKey='urating_'+uid+'_'+fid;
+  const reportKey='report_'+uid+'_'+fid;
+  const cachedFav=cacheGet(favKey);
+  const cachedRating=cacheGet(ratingKey);
+  const cachedReport=cacheGet(reportKey);
+  if(cachedFav!==null && cachedRating!==null && cachedReport!==null)
+    return { fav:cachedFav, userRating:cachedRating, alreadyReported:cachedReport };
+  const [favRow,ratingRow,reportRow]=await Promise.all([
+    cachedFav===null ? get('SELECT 1 FROM favorites WHERE user_id=$1 AND file_id=$2',[uid,fid]) : Promise.resolve(cachedFav?{1:1}:null),
+    cachedRating===null ? get('SELECT rating FROM ratings WHERE user_id=$1 AND file_id=$2',[uid,fid]) : Promise.resolve({rating:cachedRating}),
+    cachedReport===null ? get('SELECT 1 FROM reports WHERE user_id=$1 AND file_id=$2 AND status!=\'dismissed\'',[uid,fid]) : Promise.resolve(cachedReport?{1:1}:null),
+  ]);
+  const fav=!!favRow; const userRating=ratingRow?.rating||0; const alreadyReported=!!reportRow;
+  cacheSet(favKey,fav,600000); cacheSet(ratingKey,userRating,600000); cacheSet(reportKey,alreadyReported,600000);
+  return { fav, userRating, alreadyReported };
 };
 
 const addFav = (uid,fid) => {
@@ -102,7 +122,7 @@ async function getSimilar(fileId,limit=4) {
   const f=await get('SELECT f.id,f.category_id,c.subject_id FROM files f JOIN categories c ON f.category_id=c.id WHERE f.id=?',[fileId]);
   if(!f) return [];
   const results=await all(J+' WHERE f.id!=? AND f.is_deleted=0 AND f.category_id=? ORDER BY f.downloads DESC LIMIT ?',[fileId,f.category_id,limit]);
-  if(results.length>=limit) { cacheSet(ckey,results,600000); return results; }
+  if(results.length>=limit) { cacheSet(ckey,results,3600000); return results; }
   const ids=[parseInt(fileId),...results.map(r=>r.id)];
   const ph=ids.map(()=>'?').join(',');
   const more=await all(
@@ -110,7 +130,7 @@ async function getSimilar(fileId,limit=4) {
     [f.subject_id,...ids,limit-results.length]
   );
   const final=[...results,...more].slice(0,limit);
-  cacheSet(ckey,final,600000);
+  cacheSet(ckey,final,3600000);
   return final;
 }
 
