@@ -200,9 +200,9 @@ async function handleSearch(ctx,query){
   if(!query.length) return ctx.reply('⚠️ كلمة البحث غير صالحة.');
 
   // cache للبحث 5 دقائق
-  const key='search_'+query.toLowerCase();
+  const key='search_'+query.toLowerCase().trim().replace(/\s+/g,' ');
   let results=cacheGet(key);
-  if(!results){ results=await filesDb.search(query); cacheSet(key,results,900000); }
+  if(!results){ results=await filesDb.search(query); cacheSet(key,results,1800000); }
 
   if(!results.length) return ctx.reply('لا نتائج لـ: '+query,{...build([[btn('بحث جديد','search_prompt')],back('main_menu')])});
   const rows=results.map(f=>{
