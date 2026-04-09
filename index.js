@@ -25,7 +25,7 @@ const TOKEN = process.env.BOT_TOKEN;
 const express = require('express');
 const app = express();
 app.use(express.json());
-app.use((req,res,next)=>{ if(req.path.startsWith('/webhook/')){ res.sendStatus(200); next(); } else next(); });
+
 
 global.userStates = {};
 global.maintenanceMode = false;
