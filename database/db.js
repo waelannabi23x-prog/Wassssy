@@ -20,7 +20,11 @@ function getPg() {
       keepAlive: true,
       keepAliveInitialDelayMillis: 10000
     });
-    pgPool.on('error', (err) => console.error('PG pool error:', err.message));
+    pgPool.on('error', (err) => {
+    console.error('PG pool error:', err.message);
+    // reconnect تلقائي
+    setTimeout(()=>{ try{ pgPool.connect().then(c=>c.release()).catch(()=>{}); }catch{} }, 3000);
+  });
     console.log('✅ Using PostgreSQL');
     return pgPool;
   } catch(e) { console.error('PG error:', e.message); return null; }

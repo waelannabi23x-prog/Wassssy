@@ -90,7 +90,22 @@ setInterval(async () => {
 }, 3600000);
 
 const bot = new Telegraf(TOKEN);
+
+// Rate Limiting
+const _rl=new Map();
+function checkRL(uid){
+  const now=Date.now();
+  const d=_rl.get(uid)||{count:0,reset:now+10000};
+  if(now>d.reset){d.count=1;d.reset=now+10000;}
+  else d.count++;
+  _rl.set(uid,d);
+  if(d.count>20){return false;}
+  return true;
+}
+setInterval(()=>{ const now=Date.now(); for(const [k,v] of _rl) if(now>v.reset+5000) _rl.delete(k); },30000);
+
 bot.use(authMiddleware);
+bot.use(async(ctx,next)=>{ if(ctx.from&&!checkRL(ctx.from.id)){ return ctx.answerCbQuery&&ctx.answerCbQuery("⏳ بطيء قليلاً!",{show_alert:false}).catch(()=>{}); } return next(); });
 
 bot.catch((err, ctx) => {
   console.error('Bot error:', err.message);
