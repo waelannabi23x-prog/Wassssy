@@ -23,8 +23,8 @@ const fs = require('fs');
 
 const TOKEN = process.env.BOT_TOKEN;
 const express = require('express');
-try { const compression=require('compression'); app.use(compression()); } catch(e) {}
 const app = express();
+try { const compression=require('compression'); app.use(compression()); } catch(e) {}
 app.use(express.json({ limit: '1mb' }));
 
 
