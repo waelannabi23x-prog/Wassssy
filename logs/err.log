@@ -10,3 +10,6 @@
 2026-04-09 19:58:35:     at Object.onceWrapper (node:events:623:12)
 2026-04-09 19:58:35:     at process.emit (node:events:508:20)
 2026-04-09 19:58:35: Uncaught: Bot is not running!
+2026-04-10 05:37:34: PG pool error: read ECONNABORTED
+2026-04-10 05:37:34: PG pool error: read ECONNABORTED
+2026-04-10 05:37:38: DB all error: getaddrinfo ENOTFOUND junction.proxy.rlwy.net | SQL: SELECT sm.*,mt.name,mt.type,mt.content,mt.file_id FROM scheduled_messages sm LEFT JOIN message_templ

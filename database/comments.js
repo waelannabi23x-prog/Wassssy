@@ -11,13 +11,20 @@ const getComments = (fileId, limit=20) => all(
 
 const addComment = (fileId, userId, text) => {
   cacheClear('cmtcnt_'+fileId);
+  // امسح كاش قائمة التعليقات كلها لهذا الملف
+  const {cacheClearPrefix} = require('../utils/cache');
+  cacheClearPrefix('cmts_'+fileId+'_');
   return run('INSERT INTO comments(file_id,user_id,text) VALUES(?,?,?)',[fileId, userId, text]);
 };
 
 const deleteComment = (id) => run('UPDATE comments SET is_deleted=1 WHERE id=?', [id]);
 const deleteCommentAdmin = async (id) => {
   const c = await get('SELECT file_id FROM comments WHERE id=?',[id]);
-  if(c) cacheClear('cmtcnt_'+c.file_id);
+  if(c) {
+    cacheClear('cmtcnt_'+c.file_id);
+    const {cacheClearPrefix} = require('../utils/cache');
+    cacheClearPrefix('cmts_'+c.file_id+'_');
+  }
   return run('DELETE FROM comments WHERE id=?', [id]);
 };
 const getComment = (id) => get('SELECT * FROM comments WHERE id=?', [id]);
