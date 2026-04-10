@@ -299,22 +299,21 @@ async function handleBulkUpload(ctx){
   if(msg.document){
     fid=msg.document.file_id;
     ftype='document';
-    title=msg.document.file_name||'ملف_'+Date.now();
-    // حذف الامتداد من الاسم
-    title=title.replace(/.[^/.]+$/,'');
+    title=msg.document.file_name||msg.caption||('ملف_'+Date.now());
+    title=title.replace(/.[^/.]+$/,'').trim()||('ملف_'+Date.now());
   } else if(msg.photo){
     fid=msg.photo[msg.photo.length-1].file_id;
     ftype='photo';
-    title='صورة_'+Date.now();
+    title=msg.caption||('صورة_'+Date.now());
   } else if(msg.video){
     fid=msg.video.file_id;
     ftype='document';
-    title=msg.video.file_name||'فيديو_'+Date.now();
-    title=title.replace(/.[^/.]+$/,'');
+    title=msg.video.file_name||msg.caption||('فيديو_'+Date.now());
+    title=title.replace(/.[^/.]+$/,'').trim()||('فيديو_'+Date.now());
   } else if(msg.audio){
     fid=msg.audio.file_id;
     ftype='document';
-    title=msg.audio.title||msg.audio.file_name||'صوت_'+Date.now();
+    title=msg.audio.title||msg.audio.file_name||msg.caption||('صوت_'+Date.now());
   } else {
     return false;
   }
@@ -326,8 +325,8 @@ async function handleBulkUpload(ctx){
     await filesDb.addFile(state.catId,finalTitle,'',fid,ftype,uid);
     state.uploaded = state.uploaded||[];
     state.uploaded.push(finalTitle);
-    // تأكيد سريع
-    await ctx.react('👍').catch(()=>{});
+    // تأكيد سريع بدون react
+    ctx.reply('✅ '+finalTitle).catch(()=>{});
   } catch(e) {
     state.failed = state.failed||[];
     if(e.message==='exists'){

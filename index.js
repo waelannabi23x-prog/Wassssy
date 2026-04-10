@@ -189,7 +189,7 @@ bot.command('done', async ctx => {
     const {cacheClearPrefix} = require('./utils/cache');
     cacheClearPrefix('files_cat_'+state.catId);
     cacheClearPrefix('showfiles_'+state.catId);
-    return ctx.reply(msg,{parse_mode:'Markdown',...build([[btn('📁 عرض الملفات','mg_fls_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId+'_'+state.catId)]])});
+    return ctx.reply(msg,{...build([[btn('عرض الملفات','mg_fls_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId+'_'+state.catId)]])});
   }
 });
 bot.command('leaveall', async ctx => {
