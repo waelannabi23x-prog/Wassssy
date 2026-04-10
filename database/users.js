@@ -2,7 +2,7 @@ const { cacheGet, cacheSet } = require('../utils/cache');
 const { all, get, run } = require('./db');
 
 const spCache = new Map();
-const CACHE_TTL = 600000; // 10 دقائق
+const CACHE_TTL = 1800000; // 30 دقيقة
 
 const updateLastActive = id => run('UPDATE users SET last_active=CURRENT_TIMESTAMP WHERE id=?',[id]);
 const upsert = (id,fn,ln,un) => run(`INSERT INTO users(id,first_name,last_name,username,joined_at,last_active) VALUES(?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET first_name=EXCLUDED.first_name,last_name=EXCLUDED.last_name,username=EXCLUDED.username,last_active=CURRENT_TIMESTAMP`,[id,fn||'',ln||'',un||'']);

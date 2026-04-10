@@ -30,7 +30,7 @@ async function getPathData(spId, yrId, smId, sbId, catId) {
     catId && catId!=='0' ? content.getCategory(catId) : null,
   ]);
   const result = {sp, yr, sm, sb, cat};
-  cacheSet(key, result, 3600000);
+  cacheSet(key, result, 7200000);
   return result;
 }
 
@@ -148,7 +148,7 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
       bundlesDb.getBundles(catId)
     ]);
     staticData={pathData,allFiles,bundles};
-    cacheSet(staticKey,staticData,900000);
+    cacheSet(staticKey,staticData,1800000);
   }
   const {pathData:{sp,yr,sm,sb,cat}, allFiles, bundles} = staticData;
   const total = allFiles.length;
@@ -185,7 +185,7 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
   }
   rows.push(backMenu('sbs_'+spId+'_'+yrId+'_'+smId+'_'+sbId));
   const extra={parse_mode:'Markdown',...build(rows)};
-  cacheSet(userKey,{text,extra},300000);
+  cacheSet(userKey,{text,extra},600000);
 
   // pre-warm preview cache للملفات المعروضة — في الخلفية
   setImmediate(() => {

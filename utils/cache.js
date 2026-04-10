@@ -55,4 +55,7 @@ function cacheStats() {
   return { size: store.size, keys: [...store.keys()].slice(0,20) };
 }
 
-module.exports = { cacheGet, cacheSet, cacheClear, cacheClearPrefix, cacheWarmup, cacheStats };
+function getCacheSize() { return store.size; }
+function getCacheKeys() { return [...store.keys()]; }
+
+module.exports = { cacheGet, cacheSet, cacheClear, cacheClearPrefix, cacheWarmup, cacheStats, getCacheSize, getCacheKeys };

@@ -163,7 +163,7 @@ const getFavBatch = async (uid,fileIds) => {
   const rows=await all('SELECT file_id FROM favorites WHERE user_id=$1 AND file_id IN ('+ph+')',[uid,...fileIds]);
   const set=new Set(rows.map(r=>String(r.file_id)));
   const result=Object.fromEntries(fileIds.map(id=>[id,set.has(String(id))]));
-  cacheSet(ckey,result,300000);
+  cacheSet(ckey,result,600000);
   return result;
 };
 
@@ -175,7 +175,7 @@ const getRatingBatch = async fileIds => {
   const ph=fileIds.map((_,i)=>'$'+(i+1)).join(',');
   const rows=await all('SELECT file_id, ROUND(AVG(rating),1) as avg FROM ratings WHERE file_id IN ('+ph+') GROUP BY file_id',[...fileIds]);
   const result=Object.fromEntries(rows.map(r=>[r.file_id,parseFloat(r.avg||0)]));
-  cacheSet(ckey,result,600000);
+  cacheSet(ckey,result,1800000);
   return result;
 };
 

@@ -1,7 +1,7 @@
 const { all, get, run } = require('./db');
 const { cacheGet, cacheSet, cacheClear, cacheClearPrefix } = require('../utils/cache');
 
-const TTL = 3600000;
+const TTL = 7200000; // ساعتين — المحتوى نادراً يتغير
 
 const getSpecs  = async () => { const k='specs'; const c=cacheGet(k); if(c) return c; const r=await all('SELECT * FROM specialties WHERE is_deleted=0 ORDER BY id'); cacheSet(k,r,TTL); return r; };
 const getSpec   = async id => { const k='spec_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT * FROM specialties WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
