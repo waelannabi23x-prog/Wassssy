@@ -20,19 +20,11 @@ function getPg() {
       keepAlive: true,
       keepAliveInitialDelayMillis: 10000
     });
-    let reconnectDelay = 3000;
     pgPool.on('error', (err) => {
-      console.error('PG pool error:', err.message);
-      // reconnect تلقائي
-      setTimeout(()=>{
-        try{
-          pgPool.connect().then(c=>c.release()).catch(()=>{
-            reconnectDelay *= 2;
-            if(reconnectDelay > 30000) reconnectDelay = 30000;
-          });
-        }catch{}
-      }, reconnectDelay);
-    });
+    console.error('PG pool error:', err.message);
+    // reconnect تلقائي
+    setTimeout(()=>{ try{ pgPool.connect().then(c=>c.release()).catch(()=>{}); }catch{} }, 3000);
+  });
     console.log('✅ Using PostgreSQL');
     return pgPool;
   } catch(e) { console.error('PG error:', e.message); return null; }
@@ -50,21 +42,13 @@ function scheduleSave() {
     saveTimer = null;
     if(!dirty) return;
     dirty = false;
-    try { 
-      fs.writeFile(DB_PATH, Buffer.from(sqlJs.export()), (err) => {
-        if(err) console.error(err);
-      }); 
-    } catch(e) {}
+    try { fs.writeFileSync(DB_PATH, Buffer.from(sqlJs.export())); } catch(e) {}
   }, 500);
 }
 
 function saveDB() {
   if(saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
-  if(sqlJs) try { 
-    fs.writeFile(DB_PATH, Buffer.from(sqlJs.export()), (err) => {
-      if(err) console.error(err);
-    }); 
-  } catch(e) {}
+  if(sqlJs) try { fs.writeFileSync(DB_PATH, Buffer.from(sqlJs.export())); } catch(e) {}
 }
 
 function getSqlite() {
@@ -87,7 +71,6 @@ function getSqlite() {
 const pgSqlCache = new Map();
 const pgPrepared = new Map();
 let _prepIdx = 0;
-let cacheSize = 0;
 
 async function getPrepared(pg, sql) {
   const converted = toPgCached(sql);
@@ -98,20 +81,10 @@ async function getPrepared(pg, sql) {
   return name;
 }
 function toPgCached(sql) {
-  if(pgSqlCache.has(sql)) {
-    const val = pgSqlCache.get(sql);
-    pgSqlCache.delete(sql);
-    pgSqlCache.set(sql, val);
-    return val;
-  }
+  if(pgSqlCache.has(sql)) return pgSqlCache.get(sql);
   const converted = toPg(sql);
+  if(pgSqlCache.size > 500) pgSqlCache.clear();
   pgSqlCache.set(sql, converted);
-  cacheSize++;
-  if(cacheSize > 500) {
-    const keys = Array.from(pgSqlCache.keys());
-    pgSqlCache.delete(keys[0]);
-    cacheSize--;
-  }
   return converted;
 }
 

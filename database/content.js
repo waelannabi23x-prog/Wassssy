@@ -3,16 +3,16 @@ const { cacheGet, cacheSet, cacheClear, cacheClearPrefix } = require('../utils/c
 
 const TTL = 7200000; // ساعتين — المحتوى نادراً يتغير
 
-const getSpecs  = async () => { const k='specs'; const c=cacheGet(k); if(c) return c; const r=await all('SELECT * FROM specialties WHERE is_deleted=0 ORDER BY id'); cacheSet(k,r,TTL); return r; };
-const getSpec   = async id => { const k='spec_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT * FROM specialties WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
-const getYears  = async spId => { const k='years_'+spId; const c=cacheGet(k); if(c) return c; const r=await all('SELECT * FROM years WHERE specialty_id=? AND is_deleted=0 ORDER BY id',[spId]); cacheSet(k,r,TTL); return r; };
-const getYear   = async id => { const k='year_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT * FROM years WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
-const getSemesters = async yrId => { const k='sems_raw_'+yrId; const c=cacheGet(k); if(c) return c; const r=await all('SELECT * FROM semesters WHERE year_id=? AND is_deleted=0 ORDER BY id',[yrId]); cacheSet(k,r,TTL); return r; };
-const getSemester  = async id => { const k='sem_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT * FROM semesters WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
-const getSubjects  = async smId => { const k='subs_raw_'+smId; const c=cacheGet(k); if(c) return c; const r=await all('SELECT * FROM subjects WHERE semester_id=? AND is_deleted=0 ORDER BY id',[smId]); cacheSet(k,r,TTL); return r; };
-const getSubject   = async id => { const k='sub_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT * FROM subjects WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
-const getCategories = async sbId => { const k='cats_raw_'+sbId; const c=cacheGet(k); if(c) return c; const r=await all('SELECT * FROM categories WHERE subject_id=? AND is_deleted=0 ORDER BY id',[sbId]); cacheSet(k,r,TTL); return r; };
-const getCategory   = async id => { const k='cat_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT * FROM categories WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
+const getSpecs  = async () => { const k='specs'; const c=cacheGet(k); if(c) return c; const r=await all('SELECT id,name FROM specialties WHERE is_deleted=0 ORDER BY id'); cacheSet(k,r,TTL); return r; };
+const getSpec   = async id => { const k='spec_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT id,name FROM specialties WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
+const getYears  = async spId => { const k='years_'+spId; const c=cacheGet(k); if(c) return c; const r=await all('SELECT id,name,specialty_id FROM years WHERE specialty_id=? AND is_deleted=0 ORDER BY id',[spId]); cacheSet(k,r,TTL); return r; };
+const getYear   = async id => { const k='year_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT id,name,specialty_id FROM years WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
+const getSemesters = async yrId => { const k='sems_raw_'+yrId; const c=cacheGet(k); if(c) return c; const r=await all('SELECT id,name,year_id FROM semesters WHERE year_id=? AND is_deleted=0 ORDER BY id',[yrId]); cacheSet(k,r,TTL); return r; };
+const getSemester  = async id => { const k='sem_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT id,name,year_id FROM semesters WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
+const getSubjects  = async smId => { const k='subs_raw_'+smId; const c=cacheGet(k); if(c) return c; const r=await all('SELECT id,name,semester_id FROM subjects WHERE semester_id=? AND is_deleted=0 ORDER BY id',[smId]); cacheSet(k,r,TTL); return r; };
+const getSubject   = async id => { const k='sub_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT id,name,semester_id FROM subjects WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
+const getCategories = async sbId => { const k='cats_raw_'+sbId; const c=cacheGet(k); if(c) return c; const r=await all('SELECT id,name,subject_id FROM categories WHERE subject_id=? AND is_deleted=0 ORDER BY id',[sbId]); cacheSet(k,r,TTL); return r; };
+const getCategory   = async id => { const k='cat_'+id; const c=cacheGet(k); if(c) return c; const r=await get('SELECT id,name,subject_id FROM categories WHERE id=?',[id]); if(r) cacheSet(k,r,TTL); return r; };
 
 const invalidateSpec = spId => { cacheClear('specs'); cacheClear('spec_'+spId); cacheClearPrefix('yrs_'+spId); cacheClearPrefix('sems_'+spId); cacheClearPrefix('subs_'+spId); cacheClearPrefix('cats_'+spId); cacheClearPrefix('path_'+spId); };
 const invalidateYear = (spId,yrId) => { cacheClear('years_'+spId); cacheClear('year_'+yrId); cacheClearPrefix('sems_raw_'+yrId); cacheClearPrefix('sems_'+spId+'_'+yrId); cacheClearPrefix('subs_'+spId+'_'+yrId); cacheClearPrefix('path_'); };

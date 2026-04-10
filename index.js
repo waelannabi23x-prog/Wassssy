@@ -33,9 +33,7 @@ const app = express();
 try {
   const compression = require('compression');
   app.use(compression({ level: 6, threshold: 512 }));
-} catch(e) {
-  console.warn('compression not installed, run: npm install compression');
-}
+} catch(e) {}
 app.use(express.json({ limit: '1mb' }));
 
 // ── Global State ──

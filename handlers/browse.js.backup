@@ -35,6 +35,7 @@ async function getPathData(spId, yrId, smId, sbId, catId) {
 }
 
 async function showSpecs(ctx) {
+  const { cacheGet } = require('../utils/cache');
   const pre = cacheGet('precomp_specs');
   if(pre) return eos(ctx, pre.text, pre.extra);
   const specs = await content.getSpecs();
