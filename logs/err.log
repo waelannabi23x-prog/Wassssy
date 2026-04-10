@@ -13,3 +13,4 @@
 2026-04-10 05:37:34: PG pool error: read ECONNABORTED
 2026-04-10 05:37:34: PG pool error: read ECONNABORTED
 2026-04-10 05:37:38: DB all error: getaddrinfo ENOTFOUND junction.proxy.rlwy.net | SQL: SELECT sm.*,mt.name,mt.type,mt.content,mt.file_id FROM scheduled_messages sm LEFT JOIN message_templ
+2026-04-10 09:27:56: Table error: Connection terminated due to connection timeout

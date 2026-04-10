@@ -18,6 +18,7 @@ const filesDb = require('./database/files');
 const contentDb = require('./database/content');
 const bundlesDb = require('./database/bundles');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
+const { eos } = require('./utils/helpers');
 const { cacheWarmup } = require('./utils/cache');
 const { precomputeAll } = require('./utils/precompute');
 const { setLang } = require('./utils/i18n');
@@ -261,7 +262,7 @@ bot.on('callback_query', async ctx => {
     if (data === 'change_sp') {
       const specs = await contentDb.getSpecs();
       const rows = specs.map(s => [kbBtn('🎓 ' + s.name, 'set_sp_' + s.id)]);
-      return ctx.reply('🎓 اختر تخصصك:', { parse_mode: 'Markdown', ...kbBuild(rows) });
+      return eos(ctx, '🎓 *اختر تخصصك:*', { parse_mode: 'Markdown', ...kbBuild(rows) });
     }
 
     // User sections

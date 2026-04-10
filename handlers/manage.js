@@ -119,8 +119,8 @@ async function showAnalytics(ctx){
   const [spDist, topUsers, peakHours, topCats] = await Promise.all([
     all(`SELECT sp.name, COUNT(us.user_id) as cnt FROM user_specialties us LEFT JOIN specialties sp ON us.specialty_id=sp.id GROUP BY sp.name ORDER BY cnt DESC LIMIT 5`),
     all(`SELECT u.first_name, u.username, COUNT(h.id) as cnt FROM history h LEFT JOIN users u ON h.user_id=u.id GROUP BY h.user_id, u.first_name, u.username ORDER BY cnt DESC LIMIT 5`),
-    all(`SELECT date_part('hour', viewed_at::timestamptz) as hour, COUNT(*) as cnt FROM history GROUP BY hour ORDER BY cnt DESC LIMIT 3`),
-    all(`SELECT c.name, COUNT(h.id) as cnt FROM history h LEFT JOIN files f ON h.file_id=f.id LEFT JOIN categories c ON f.category_id=c.id WHERE h.viewed_at >= NOW() - INTERVAL '7 days' GROUP BY c.name ORDER BY cnt DESC LIMIT 3`)
+    all(`SELECT strftime('%H', viewed_at) as hour, COUNT(*) as cnt FROM history GROUP BY hour ORDER BY cnt DESC LIMIT 3`),
+    all(`SELECT c.name, COUNT(h.id) as cnt FROM history h LEFT JOIN files f ON h.file_id=f.id LEFT JOIN categories c ON f.category_id=c.id WHERE h.viewed_at >= datetime('now', '-7 days') GROUP BY c.name ORDER BY cnt DESC LIMIT 3`)
   ]);
   let text='📊 *لوحة الإحصائيات المتقدمة*\n━━━━━━━━━━━━\n';
   text+='👥 المستخدمون: *'+totalUsers+'*\n🟢 نشطون اليوم: *'+activeToday+'*\n📁 الملفات: *'+totalFiles+'*\n⬇️ التحميلات: *'+totalDl+'*\n🎓 التخصصات: *'+specs.length+'*\n';
@@ -584,7 +584,7 @@ async function handleCallback(ctx,data){
     rrows.push(back('mg_menu'));
     return eos(ctx,txt,{parse_mode:'Markdown',...build(rrows)});
   }
-  if(data.startsWith('mg_dismiss_')){const rid=data.replace('mg_dismiss_report_','').replace('mg_dismiss_','');dbRun('UPDATE reports SET status=$1 WHERE id=$2',['dismissed',rid]).catch(()=>{});return handleCallback(ctx,'mg_reports');}
+  if(data.startsWith('mg_dismiss_')){const rid=data.replace('mg_dismiss_report_','').replace('mg_dismiss_','');dbRun('UPDATE reports SET status=? WHERE id=?',['dismissed',rid]).catch(()=>{});return handleCallback(ctx,'mg_reports');}
   if(data==='mg_maint'){
     global.maintenanceMode=!global.maintenanceMode;
     await setSetting('maintenance',global.maintenanceMode?'true':'false');
@@ -676,14 +676,6 @@ async function handleCallback(ctx,data){
     const p=data.replace('mg_dl_fl_','').split('_');
     const f=await filesDb.getFile(p[5]);
     return eos(ctx,'🗑 نقل *'+escMd(f?.title||'الملف')+'* لسلة المحذوفات؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_fl_'+p.join('_')),btn('❌ لا','mg_fls_'+p.slice(0,5).join('_'))]]) });
-  }
-  if(data==='mg_reports'){
-    const rpts=await all('SELECT r.*,f.title as ft,u.first_name as fn FROM reports r LEFT JOIN files f ON r.file_id=f.id LEFT JOIN users u ON r.user_id=u.id ORDER BY r.created_at DESC LIMIT 20');
-    let txt=''+rpts.length+' بلاغ\n\n';
-    if(!rpts.length) txt+='لا توجد بلاغات.';
-    else rpts.forEach((r,i)=>{ txt+=(i+1)+'. '+escMd(r.ft||'?')+' | '+escMd(r.reason||'?')+' | '+(r.fn||r.user_id)+'\n'; });
-    rrows.push(back('mg_menu'));
-    return eos(ctx,txt,{parse_mode:'Markdown',...build(rrows)});
   }
   if(data.startsWith('mg_cdl_fl_')){const p=data.replace('mg_cdl_fl_','').split('_');await filesDb.softDelete(p[5]);return showMgFiles(ctx,p[0],p[1],p[2],p[3],p[4]);}
 }
