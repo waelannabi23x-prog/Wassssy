@@ -178,6 +178,19 @@ bot.command('done', async ctx => {
     global.delState(ctx.uid);
     return ctx.reply('تم حفظ الحزمة بـ ' + (state.fileCount || 0) + ' ملف');
   }
+  if (state?.type === 'mg_bulk_files') {
+    const uploaded = state.uploaded||[];
+    const failed = state.failed||[];
+    global.delState(ctx.uid);
+    let msg = 'تم الرفع: '+uploaded.length+' ملف';
+    if(failed.length) msg += ' | فشل: '+failed.length;
+    if(uploaded.length) msg += '\n' + uploaded.map(t=>'+ '+t).join('\n');
+    if(failed.length) msg += '\n' + failed.map(t=>'x '+t).join('\n');
+    const {cacheClearPrefix} = require('./utils/cache');
+    cacheClearPrefix('files_cat_'+state.catId);
+    cacheClearPrefix('showfiles_'+state.catId);
+    return ctx.reply(msg,{parse_mode:'Markdown',...build([[btn('📁 عرض الملفات','mg_fls_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId+'_'+state.catId)]])});
+  }
 });
 bot.command('leaveall', async ctx => {
   if (!ctx.isOwner) return ctx.reply('🚫 ليس لديك صلاحية.');
@@ -385,6 +398,7 @@ bot.on('message', async (ctx, next) => {
 bot.on('document', async ctx => {
   if (!ctx.isAdmin && !ctx.isOwner) return;
   const state = global.userStates?.[ctx.uid];
+  if (state?.type === 'mg_bulk_files') return manage.handleBulkUpload(ctx);
   if (state?.type === 'mg_tpl_file') {
     const fid = ctx.message.document.file_id;
     global.setState(ctx.uid, { ...state, type: 'mg_tpl_content', fileId: fid });
@@ -410,6 +424,7 @@ bot.on('document', async ctx => {
 bot.on(['photo', 'video', 'audio', 'voice'], async ctx => {
   if (!ctx.isAdmin && !ctx.isOwner) return;
   const state = global.userStates?.[ctx.uid];
+  if (state?.type === 'mg_bulk_files') return manage.handleBulkUpload(ctx);
   if (state?.type === 'mg_file') return manage.handleFileUpload(ctx);
   if (state?.type === 'mg_tpl_content') return manage.handleText(ctx, state);
 });
@@ -421,6 +436,10 @@ bot.on('text', async ctx => {
   const state = global.userStates?.[uid];
   if (!state) return;
   if (state.type === 'mg_file') return manage.handleFileUpload(ctx);
+  if (state.type === 'mg_bulk_prefix' || state.type === 'mg_bulk_files') {
+    if (ctx.message.text?.trim() === '/done') return; // handled by command
+    if (state.type === 'mg_bulk_prefix') return manage.handleText(ctx, state);
+  }
   if (state.type === 'mg_tpl_link') {
     const url = ctx.message.text.trim();
     global.setState(ctx.uid, { ...state, type: 'mg_tpl_content', fileId: url });

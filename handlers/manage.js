@@ -98,7 +98,10 @@ async function showMgFiles(ctx,spId,yrId,smId,sbId,catId,page=0){
     rows.unshift([btn('━━━ الحزم ('+bundles2.length+') ━━━','noop')]);
     bundles2.forEach(b=>{ rows.splice(1,0,[btn('📦 '+b.title,'bundle_'+b.id+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)]); });
   }
-  const uploadRow=[btn('➕ رفع ملف','mg_upl_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)];
+  const uploadRow=[
+    btn('➕ رفع ملف','mg_upl_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId),
+    btn('📤 رفع متعدد','mg_upl_bulk_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)
+  ];
   if(ctx.isOwner) uploadRow.push(btn('📦 حزمة','mg_add_bundle_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId));
   rows.push(uploadRow);
   rows.push(back('mg_cats_'+spId+'_'+yrId+'_'+smId+'_'+sbId));
@@ -286,6 +289,56 @@ async function handleBundleFileUpload(ctx){
   return true;
 }
 
+async function handleBulkUpload(ctx){
+  const uid=ctx.uid;
+  const state=global.userStates?.[uid];
+  if(!state||state.type!=='mg_bulk_files') return false;
+  const msg=ctx.message;
+  let fid,ftype,title='';
+
+  if(msg.document){
+    fid=msg.document.file_id;
+    ftype='document';
+    title=msg.document.file_name||'ملف_'+Date.now();
+    // حذف الامتداد من الاسم
+    title=title.replace(/.[^/.]+$/,'');
+  } else if(msg.photo){
+    fid=msg.photo[msg.photo.length-1].file_id;
+    ftype='photo';
+    title='صورة_'+Date.now();
+  } else if(msg.video){
+    fid=msg.video.file_id;
+    ftype='document';
+    title=msg.video.file_name||'فيديو_'+Date.now();
+    title=title.replace(/.[^/.]+$/,'');
+  } else if(msg.audio){
+    fid=msg.audio.file_id;
+    ftype='document';
+    title=msg.audio.title||msg.audio.file_name||'صوت_'+Date.now();
+  } else {
+    return false;
+  }
+
+  // أضف prefix إذا موجود
+  const finalTitle = state.prefix ? state.prefix+' — '+title : title;
+
+  try {
+    await filesDb.addFile(state.catId,finalTitle,'',fid,ftype,uid);
+    state.uploaded = state.uploaded||[];
+    state.uploaded.push(finalTitle);
+    // تأكيد سريع
+    await ctx.react('👍').catch(()=>{});
+  } catch(e) {
+    state.failed = state.failed||[];
+    if(e.message==='exists'){
+      state.failed.push(finalTitle+' (موجود)');
+    } else {
+      state.failed.push(finalTitle);
+    }
+  }
+  return true;
+}
+
 async function handleFileUpload(ctx){
   if(await handleBundleFileUpload(ctx)) return;
   const uid=ctx.uid; const state=global.userStates?.[uid];
@@ -345,6 +398,10 @@ async function handleText(ctx,state){
         }catch(e){clearState(uid);ctx.reply(e.message==='exists'?'حزمة بهذا الاسم موجودة':'خطأ: '+e.message);}
         break;
       case 'mg_upl_title': setState(uid,{...state,type:'mg_upl_desc',title:text}); ctx.reply('📝 الوصف (أو *skip* للتخطي):',{parse_mode:'Markdown'}); break;
+      case 'mg_bulk_prefix':
+        setState(uid,{...state,type:'mg_bulk_files',prefix:text==='skip'?'':text,uploaded:[],failed:[]});
+        ctx.reply('ارسل الملفات الان. اكتب /done عند الانتهاء.');
+        break;
       case 'mg_upl_desc': setState(uid,{...state,type:'mg_file',desc:text==='skip'?'':text,catId:state.catId}); ctx.reply('📎 أرسل الملف الآن:\n_(أو /cancel)_',{parse_mode:'Markdown'}); break;
       case 'mg_rn_fl': await filesDb.rename(state.id,text); done('✅ تمت إعادة التسمية!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_')); break;
       case 'mg_desc_fl': await filesDb.updateDesc(state.id,text); done('✅ تم تحديث الوصف!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_')); break;
@@ -598,6 +655,13 @@ async function handleCallback(ctx,data){
     setState(uid,{type:'mg_bundle_title',spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});
     return ctx.reply('📦 اسم الحزمة:');
   }
+  if(data.startsWith('mg_upl_bulk_')){
+    const perms5=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);
+    if(!perms5.includes('full')&&!perms5.includes('upload')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});
+    const p=data.replace('mg_upl_bulk_','').split('_');
+    setState(uid,{type:'mg_bulk_prefix',spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});
+    return ctx.reply('رفع متعدد - هل تريد بادئة للاسماء؟ مثال: الفصل 1\nاو اكتب skip للتخطي:');
+  }
   if(data.startsWith('mg_upl_')){
     const perms4=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);
     if(!perms4.includes('full')&&!perms4.includes('upload')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});
@@ -626,6 +690,6 @@ async function handleCallback(ctx,data){
 }
 
 module.exports = {
-  mainMenu, handleCallback, handleText, handleFileUpload,
+  mainMenu, handleCallback, handleText, handleFileUpload, handleBulkUpload,
   showUserProfile, showUsers
 };
