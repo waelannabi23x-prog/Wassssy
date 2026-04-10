@@ -186,6 +186,24 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
   rows.push(backMenu('sbs_'+spId+'_'+yrId+'_'+smId+'_'+sbId));
   const extra={parse_mode:'Markdown',...build(rows)};
   cacheSet(userKey,{text,extra},300000);
+
+  // pre-warm preview cache للملفات المعروضة — في الخلفية
+  setImmediate(() => {
+    list.forEach(f => {
+      const sk='prev_static_'+f.id;
+      if(!cacheGet(sk)){
+        Promise.all([
+          filesDb.getFile(f.id),
+          interactions.getAvgRating(f.id),
+          commentsDb.countComments(f.id),
+          interactions.favCount(f.id),
+        ]).then(([_f,_r,_cc,_fc])=>{
+          if(_f) cacheSet(sk,{f:_f,ratingData:_r,commentCount:_cc,favCnt:_fc},1800000);
+        }).catch(()=>{});
+      }
+    });
+  });
+
   return eos(ctx,text,extra);
 }
 
@@ -296,7 +314,25 @@ async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
     else if(f.file_type==='photo') await ctx.replyWithPhoto(f.file_id,{caption,parse_mode:'Markdown',...kb});
     else await ctx.replyWithDocument(f.file_id,{caption,parse_mode:'Markdown',...kb});
     ctx.deleteMessage().catch(()=>{});
-    if(similar.length){const simRows=similar.map(sf=>[btn('📄 '+sf.title+' · '+sf.sub_name,'preview_'+sf.id+'_0_0_0_0_0')]);simRows.push([btn('🏠 القائمة','main_menu')]);ctx.reply('📎 ملفات قد تهمك:',{...build(simRows)});}
+    if(similar.length){
+      // pre-warm cache للملفات المشابهة — تخزين مسبق قبل ما يضغط عليها
+      similar.forEach(sf => {
+        const sk = 'prev_static_'+sf.id;
+        if(!cacheGet(sk)) {
+          Promise.all([
+            filesDb.getFile(sf.id),
+            interactions.getAvgRating(sf.id),
+            commentsDb.countComments(sf.id),
+            interactions.favCount(sf.id),
+          ]).then(([_f,_r,_cc,_fc]) => {
+            if(_f) cacheSet(sk,{f:_f,ratingData:_r,commentCount:_cc,favCnt:_fc},1800000);
+          }).catch(()=>{});
+        }
+      });
+      const simRows=similar.map(sf=>[btn('📄 '+sf.title+' · '+sf.sub_name,'preview_'+sf.id+'_0_0_0_0_0')]);
+      simRows.push([btn('🏠 القائمة','main_menu')]);
+      ctx.reply('📎 ملفات قد تهمك:',{...build(simRows)});
+    }
   } catch(e){ctx.reply('❌ تعذر إرسال الملف. حاول مجدداً.');}
 }
 async function showBundle(ctx,bundleId,spId,yrId,smId,sbId,catId) {
