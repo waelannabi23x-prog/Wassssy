@@ -686,7 +686,7 @@ bot.on('text', async ctx => {
     return ctx.reply('اكتب نص الرسالة مع الرابط (او skip):');
   }
   if (state.type === 'search') return userH.handleSearch(ctx, ctx.message.text.trim());
-  if (!state && ctx.chat?.type === 'private') {
+  if (ctx.chat?.type === 'private' && !state?.type?.startsWith('mg_')) {
     const handled = await handleAiChat(ctx, ctx.message.text.trim());
     if(handled) return;
   }
