@@ -362,11 +362,14 @@ bot.on('callback_query', async ctx => {
     ctx.answerCbQuery(_isHeavy ? '⏳' : '', { show_alert: false }).catch(() => {});
     if (data === 'noop') return;
 
-    // Group Specialty
+    // Group Specialty (Owner only)
     if (data.startsWith('grp_sp_')) {
-      const parts = data.split('_');
-      const chatId = parts[2];
-      const specId = parts[3];
+      if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', {show_alert:true}).catch(()=>{});
+      // grp_sp_{chatId}_{specId} — chatId قد يكون سالب
+      const raw = data.replace('grp_sp_', '');
+      const lastUs = raw.lastIndexOf('_');
+      const chatId = parseInt(raw.substring(0, lastUs));
+      const specId = parseInt(raw.substring(lastUs + 1));
       await dbRun('INSERT INTO group_chats(chat_id,specialty_id) VALUES(?,?) ON CONFLICT(chat_id) DO UPDATE SET specialty_id=?',[chatId,specId,specId]);
       const specs = await dbAll('SELECT name FROM specialties WHERE id=?',[specId]);
       await ctx.answerCbQuery('✅ تم', {show_alert:false}).catch(()=>{});
