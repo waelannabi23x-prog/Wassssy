@@ -355,14 +355,19 @@ bot.command('dlt', async ctx => {
   const isGroup = ctx.chat?.type !== 'private';
   if(!isGroup) return ctx.reply('هذا الأمر للقروبات فقط');
   ctx.deleteMessage().catch(()=>{});
-  const stored = global._botMsgs?.[ctx.chat.id] || [];
+  // جيب من DB + الذاكرة معاً
+  const dbMsgs = await dbAll('SELECT message_id FROM group_bot_msgs WHERE chat_id=$1 ORDER BY sent_at DESC LIMIT 200',[ctx.chat.id]);
+  const dbIds = dbMsgs.map(r => r.message_id);
+  const memIds = global._botMsgs?.[ctx.chat.id] || [];
+  const allIds = [...new Set([...dbIds, ...memIds])];
   let deleted = 0;
-  console.log('DLT debug — chat:', ctx.chat.id, 'stored:', stored.length, 'ids:', stored);
-  for(const msgId of stored){
-    try{ await ctx.telegram.deleteMessage(ctx.chat.id, msgId); deleted++; }catch(e){ console.log('del err:', msgId, e.message); }
+  for(const msgId of allIds){
+    try{ await ctx.telegram.deleteMessage(ctx.chat.id, msgId); deleted++; }catch(e){}
   }
+  // نظف بعد الحذف
   if(global._botMsgs) global._botMsgs[ctx.chat.id] = [];
-  const m = await ctx.reply('✅ حُذف '+deleted+' رسالة — كان عندي '+stored.length+' محفوظة');
+  dbRun('DELETE FROM group_bot_msgs WHERE chat_id=$1',[ctx.chat.id]).catch(()=>{});
+  const m = await ctx.reply('✅ حُذف '+deleted+' رسالة');
   setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), 3000);
 });
 
@@ -439,6 +444,8 @@ bot.on('callback_query', async ctx => {
           if(!global._botMsgs[ctx.chat.id]) global._botMsgs[ctx.chat.id] = [];
           global._botMsgs[ctx.chat.id].push(sentMsg.message_id);
           if(global._botMsgs[ctx.chat.id].length > 500) global._botMsgs[ctx.chat.id].shift();
+          // حفظ في DB للـ persistence
+          dbRun('INSERT INTO group_bot_msgs(chat_id,message_id) VALUES($1,$2)',[ctx.chat.id, sentMsg.message_id]).catch(()=>{});
         }
         await ctx.answerCbQuery('✅ تم الإرسال').catch(()=>{});
       } catch(e) { await ctx.answerCbQuery('❌ '+e.message,{show_alert:true}).catch(()=>{}); }
