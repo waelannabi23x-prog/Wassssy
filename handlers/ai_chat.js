@@ -65,17 +65,25 @@ async function handleAiChat(ctx, text) {
   const extracted = await extractSearchQuery(text);
   if(!extracted?.query) return false;
 
-  // بحث بالجملة كاملة أولاً
+  // مرحلة 1 — بحث كامل
   let results = await filesDb.search(extracted.query, 8);
-  // إذا ما لقى — بحث بكل كلمة منفردة
-  if(!results.length) {
-    const words = extracted.query.split(/s+/).filter(w=>w.length>=2);
-    const seen = new Map();
-    for(const w of words) {
-      const wr = await filesDb.search(w, 5);
-      for(const r of wr) if(!seen.has(r.id)) seen.set(r.id, r);
+  
+  // مرحلة 2 — بحث بكل كلمة وتقاطع النتائج
+  if(results.length < 3) {
+    const words = extracted.query.split(/\s+/).filter(w=>w.length>=2);
+    if(words.length > 1) {
+      // ابحث بكل كلمة وخذ الملفات المشتركة
+      const sets = await Promise.all(words.map(w => filesDb.search(w, 20)));
+      const intersection = sets[0].filter(f => sets.every(s => s.find(x=>x.id===f.id)));
+      if(intersection.length) results = intersection.slice(0,8);
+      else {
+        // لو ما في تقاطع — خذ union مرتب حسب تكرار الكلمات
+        const score = new Map();
+        for(const s of sets) for(const f of s) score.set(f.id, (score.get(f.id)||0)+1);
+        const all = sets.flat().filter((f,i,a)=>a.findIndex(x=>x.id===f.id)===i);
+        results = all.sort((a,b)=>(score.get(b.id)||0)-(score.get(a.id)||0)).slice(0,8);
+      }
     }
-    results = [...seen.values()].slice(0, 8);
   }
   const reply = await generateReply(text, results);
 
