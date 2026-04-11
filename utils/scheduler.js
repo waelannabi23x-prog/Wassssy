@@ -103,7 +103,7 @@ function scheduleDaily(fn) {
   setTimeout(() => { fn(); setInterval(fn, 86400000); }, msToMidnight);
 }
 
-function startScheduler(bot, ownerIds) {
+async function startScheduler(bot, ownerIds) {
   try {
     await fs.promises.access(BACKUP_DIR);
   } catch (e) {
