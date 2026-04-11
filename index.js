@@ -144,15 +144,17 @@ function isDupeCB(cbId) {
 }
 
 // ── Middlewares ──
-// منع كل الأوامر في القروب إلا /search و /setsp
+// في القروب — امنع فقط الرسائل/الأوامر غير المسموحة
 bot.use(async (ctx, next) => {
   if(ctx.chat?.type !== 'private') {
+    // callback_query تمر دائماً
+    if(ctx.callbackQuery) return next();
+    // رسائل — امنع إلا /search و /setsp
     const text = ctx.message?.text || '';
-    const isSearch = text.startsWith('/search');
-    const isSetSp = text.startsWith('/setsp');
-    if(ctx.message && !isSearch && !isSetSp) {
+    const allowed = text.startsWith('/search') || text.startsWith('/setsp');
+    if(ctx.message && !allowed) {
       ctx.deleteMessage().catch(()=>{});
-      return; // لا next()
+      return;
     }
   }
   return next();
