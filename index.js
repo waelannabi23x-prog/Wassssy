@@ -163,37 +163,83 @@ bot.command(['admin', 'owner', 'manage'], ctx => {
   if (!ctx.isAdmin) return ctx.reply('🚫 ليس لديك صلاحية.');
   manage.mainMenu(ctx);
 });
+// cache مؤقت للبحث في القروب
+const _groupSearchCache = new Map();
+function _getGroupSearchCache(q) {
+  const k = q.toLowerCase().trim();
+  const c = _groupSearchCache.get(k);
+  if(c && Date.now()-c.ts < 300000) return c.data;
+  return null;
+}
+function _setGroupSearchCache(q, data) {
+  const k = q.toLowerCase().trim();
+  _groupSearchCache.set(k, {data, ts:Date.now()});
+  if(_groupSearchCache.size > 100) {
+    const first = _groupSearchCache.keys().next().value;
+    _groupSearchCache.delete(first);
+  }
+}
+
 bot.command('search', async ctx => {
-  const q = ctx.message.text.replace('/search','').replace(/@\w+/,'').trim();
   const isGroup = ctx.chat?.type !== 'private';
+  const raw = ctx.message.text.replace('/search','').replace(/@\w+/g,'').trim();
+
   if(isGroup) {
-    if(!q) {
-      const m = await ctx.reply('استخدم: /search اسم الملف');
-      setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), 5000);
+    if(!raw || raw.length < 2) {
+      const m = await ctx.reply('🔍 /search كلمة البحث\nمثال: /search algo serie');
+      setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), 6000);
       return;
     }
-    const results = await filesDb.search(q, 8);
+
+    // تنظيف الكلمة
+    const q = raw.replace(/[%;\\]/g,'').substring(0,50);
+
+    // كاش البحث — نفس الكلمة في 5 دقائق = لا DB call
+    let results = _getGroupSearchCache(q);
+    if(!results) {
+      results = await filesDb.search(q, 10);
+      _setGroupSearchCache(q, results);
+    }
+
     if(!results.length) {
-      const m = await ctx.reply('لا نتائج لـ: ' + q);
+      const m = await ctx.reply('❌ لا نتائج لـ "'+q+'"\n💡 جرب كلمة أخرى');
       setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), 8000);
       return;
     }
+
+    const isOwnerSearch = ctx.isOwner;
     const me = await ctx.telegram.getMe();
-    const rows = results.map(f => [{
-      text: '📄 '+f.title.substring(0,35)+' · '+f.sub_name,
-      url: 'https://t.me/'+me.username+'?start=file_'+f.id
-    }]);
-    rows.push([{text:'🤖 فتح البوت', url:'https://t.me/'+me.username}]);
-    const m = await ctx.reply(
-      'نتائج "'+q+'" ('+results.length+')\nاضغط للتحميل في الخاص:',
-      {reply_markup:{inline_keyboard:rows}}
-    );
-    setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), 60000);
+
+    // Owner — زر تحميل مباشر في القروب
+    // User — زر يفتح البوت بالخاص
+    const rows = results.map(f => {
+      const label = '📄 '+f.title.substring(0,30)+' · '+f.sub_name;
+      if(isOwnerSearch) {
+        return [{ text: label, callback_data: 'grp_dl_'+f.id }];
+      }
+      return [{ text: label, url: 'https://t.me/'+me.username+'?start=file_'+f.id }];
+    });
+
+    if(!isOwnerSearch) {
+      rows.push([{text:'🤖 فتح البوت للتصفح', url:'https://t.me/'+me.username}]);
+    }
+
+    const header = isOwnerSearch
+      ? '🔍 نتائج "'+q+'" ('+results.length+') — اضغط للإرسال في القروب:'
+      : '🔍 نتائج "'+q+'" ('+results.length+')\nاضغط للتحميل في الخاص 👇';
+
+    const m = await ctx.reply(header, {reply_markup:{inline_keyboard:rows}});
+
+    // احذف رسالة البحث بعد وقت
+    const deleteAfter = isOwnerSearch ? 120000 : 60000;
+    setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), deleteAfter);
     return;
   }
-  if(q) return userH.handleSearch(ctx, q);
+
+  // بحث عادي في الخاص
+  if(raw) return userH.handleSearch(ctx, raw);
   global.setState(ctx.uid, {type:'search'});
-  ctx.reply('اكتب كلمة البحث:');
+  ctx.reply('🔍 اكتب كلمة البحث:');
 });
 bot.command('profile', ctx => userH.showProfile(ctx));
 bot.command('stats', ctx => userH.showStats(ctx));
@@ -260,8 +306,8 @@ bot.on('callback_query', async ctx => {
     if (data === 'noop') return;
 
     // منع التصفح في القروب
-    if(ctx.chat?.type !== 'private' && !data.startsWith('grp_sp_')) {
-      return ctx.answerCbQuery('استخدم البوت في الخاص للتصفح').catch(()=>{});
+    if(ctx.chat?.type !== 'private' && !data.startsWith('grp_')) {
+      return ctx.answerCbQuery('استخدم البوت في الخاص للتصفح 👇').catch(()=>{});
     }
 
     // Browse — الأكثر استخداماً أول
