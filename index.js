@@ -144,6 +144,20 @@ function isDupeCB(cbId) {
 }
 
 // ── Middlewares ──
+// منع كل الأوامر في القروب إلا /search و /setsp
+bot.use(async (ctx, next) => {
+  if(ctx.chat?.type !== 'private') {
+    const text = ctx.message?.text || '';
+    const isSearch = text.startsWith('/search');
+    const isSetSp = text.startsWith('/setsp');
+    if(ctx.message && !isSearch && !isSetSp) {
+      ctx.deleteMessage().catch(()=>{});
+      return; // لا next()
+    }
+  }
+  return next();
+});
+
 bot.use(authMiddleware);
 bot.use(async (ctx, next) => {
   if (ctx.from && !checkRL(ctx.from.id)) {
@@ -207,6 +221,24 @@ async function smartSearch(rawQ, limit=10) {
   }
   return results;
 }
+
+// تغيير تخصص القروب
+bot.command('setsp', async ctx => {
+  const isGroup = ctx.chat?.type !== 'private';
+  if(!isGroup) return ctx.reply('هذا الأمر للقروبات فقط');
+  if(!ctx.isOwner && !ctx.isAdmin) {
+    ctx.deleteMessage().catch(()=>{});
+    return;
+  }
+  ctx.deleteMessage().catch(()=>{});
+  const specs = await dbAll('SELECT id,name FROM specialties WHERE is_deleted=0 ORDER BY id');
+  const rows = specs.map(s=>[{text:'🎓 '+s.name, callback_data:'grp_sp_'+ctx.chat.id+'_'+s.id}]);
+  const current = await dbAll('SELECT specialty_id FROM group_chats WHERE chat_id=?',[ctx.chat.id]);
+  const msg = current[0]?.specialty_id
+    ? 'تغيير تخصص القروب:'
+    : 'اختر تخصص القروب:';
+  ctx.reply(msg, {reply_markup:{inline_keyboard:rows}});
+});
 
 bot.command('search', async ctx => {
   const isGroup = ctx.chat?.type !== 'private';
