@@ -65,7 +65,18 @@ async function handleAiChat(ctx, text) {
   const extracted = await extractSearchQuery(text);
   if(!extracted?.query) return false;
 
-  const results = await filesDb.search(extracted.query, 8);
+  // بحث بالجملة كاملة أولاً
+  let results = await filesDb.search(extracted.query, 8);
+  // إذا ما لقى — بحث بكل كلمة منفردة
+  if(!results.length) {
+    const words = extracted.query.split(/s+/).filter(w=>w.length>=2);
+    const seen = new Map();
+    for(const w of words) {
+      const wr = await filesDb.search(w, 5);
+      for(const r of wr) if(!seen.has(r.id)) seen.set(r.id, r);
+    }
+    results = [...seen.values()].slice(0, 8);
+  }
   const reply = await generateReply(text, results);
 
   if(!results.length) {
