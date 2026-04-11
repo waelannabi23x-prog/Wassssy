@@ -27,7 +27,7 @@ async function startHandler(ctx) {
         const inter = require('../database/interactions');
         inter.addHistory(uid, fid).catch(()=>{});
         filesDb.incDownloads(fid).catch(()=>{});
-      } catch(e) { await ctx.reply('❌ تعذر إرسال الملف.'); }
+      } catch(e) { console.error('START FILE ERROR:', e.message, 'fid:', fid, 'type:', f?.file_type); await ctx.reply('❌ تعذر إرسال الملف: ' + e.message); }
     } else { await ctx.reply('❌ الملف غير موجود.'); }
   }
 
