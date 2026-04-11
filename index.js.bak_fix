@@ -1,5 +1,4 @@
 require("dotenv").config();
-const logger = require('./utils/logger');
 const https = require('https');
 const path = require('path');
 const fs = require('fs');
@@ -46,7 +45,7 @@ async function loadMaintenance() {
   try {
     const val = await getSetting('maintenance');
     global.maintenanceMode = val === 'true';
-    logger.info('🔧 Maintenance mode:', global.maintenanceMode);
+    console.log('🔧 Maintenance mode:', global.maintenanceMode);
   } catch(e) {}
 }
 
@@ -56,8 +55,8 @@ async function loadStates() {
     for (const r of rows) {
       try { global.userStates[r.user_id] = JSON.parse(r.state); } catch {}
     }
-    logger.info('✅ States loaded:', rows.length);
-  } catch(e) { logger.error('States load error:', e.message); }
+    console.log('✅ States loaded:', rows.length);
+  } catch(e) { console.error('States load error:', e.message); }
 }
 
 // ── State Persistence (debounced) ──
@@ -100,7 +99,7 @@ global.delState = async function(uid) {
 // ── State Cleanup (SQLite syntax) ──
 setInterval(async () => {
   try {
-    await dbRun("DELETE FROM user_states WHERE updated_at < NOW() - INTERVAL '1 hour'");
+    await dbRun("DELETE FROM user_states WHERE updated_at < CURRENT_TIMESTAMP - INTERVAL '1 hour'");
     const now = Date.now();
     for (const uid in global.userStates) {
       if (global.userStates[uid]?._ts && now - global.userStates[uid]._ts > 3600000) {
@@ -170,7 +169,7 @@ bot.use(async (ctx, next) => {
 });
 
 bot.catch((err, ctx) => {
-  logger.error('Bot error:', err.message);
+  console.error('Bot error:', err.message);
   ctx.reply?.('⚠️ حدث خطأ. يرجى المحاولة مجدداً.').catch(() => {});
 });
 
@@ -214,12 +213,9 @@ async function smartSearch(rawQ, limit=10) {
   if(words.length > 1) {
     const extras = new Map();
     const wordResults = await Promise.all(words.map(async w => {
-      const wr = _getGSC(w) || await filesDb.search(w, limit);
+      const wr = _getGSC(w) || await filesDb.search(w, limit); return { w, wr };
       _setGSC(w, wr);
-      return { w, wr };
-    }));
-    for(const { w, wr } of wordResults) {
-      for(const r of wr) {
+      })); for(const { w, wr } of wordResults) { _setGSC(w, wr); for(const r of wr) {
         if(!results.find(x=>x.id===r.id)) extras.set(r.id, r);
       }
     }
@@ -297,7 +293,6 @@ bot.command('search', async ctx => {
     if(!global._botMsgs) global._botMsgs = {};
     if(!global._botMsgs[ctx.chat.id]) global._botMsgs[ctx.chat.id] = [];
     global._botMsgs[ctx.chat.id].push(m.message_id);
-    if(global._botMsgs[ctx.chat.id].length > 50) global._botMsgs[ctx.chat.id].shift();
     setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), 60000);
     return;
   }
@@ -403,7 +398,7 @@ bot.on('callback_query', async ctx => {
         await ctx.telegram.editMessageText(chatId, ctx.callbackQuery.message.message_id, null,
           '✅ تخصص القروب: 🎓 ' + spName).catch(()=>{});
       } catch(e) {
-        logger.error('grp_sp error:', e.message);
+        console.error('grp_sp error:', e.message);
         await ctx.answerCbQuery('❌ ' + e.message, {show_alert:true}).catch(()=>{});
       }
       return;
@@ -551,19 +546,11 @@ bot.on('callback_query', async ctx => {
     }
 
   } catch(e) {
-    logger.error('CB error:', e.message, 'data:', data);
+    console.error('CB error:', e.message, 'data:', data);
     ctx.reply('⚠️ خطأ. يرجى المحاولة مجدداً.').catch(() => {});
   }
 });
 const mediaGroups = {};
-setInterval(() => {
-  const now = Date.now();
-  for (const k in mediaGroups) {
-    if (mediaGroups[k]._ts && now - mediaGroups[k]._ts > 10000) {
-      delete mediaGroups[k];
-    }
-  }
-}, 30000);
 bot.on('message', async (ctx, next) => {
   const uid = ctx.uid;
   const state = global.userStates?.[uid];
@@ -688,7 +675,7 @@ bot.on('my_chat_member', async ctx => {
         'مرحباً! أنا بوت الدراسة\n\nاختر تخصص هذا القروب:',
         {reply_markup:{inline_keyboard:rows}}
       );
-    } catch(e) { logger.error('Group join:', e.message); }
+    } catch(e) { console.error('Group join:', e.message); }
   } else if(['left','kicked'].includes(member?.status)) {
     dbRun('DELETE FROM group_chats WHERE chat_id=?',[chat.id]).catch(()=>{});
     dbRun('DELETE FROM group_members WHERE chat_id=?',[chat.id]).catch(()=>{});
@@ -702,7 +689,7 @@ async function launch() {
     await Promise.all([loadMaintenance(), loadStates()]);
     await cacheWarmup();
     await precomputeAll();
-    logger.info('✅ Database ready');
+    console.log('✅ Database ready');
     startScheduler(bot, [OWNER_ID]);
 
     app.get('/', (req, res) => res.send('OK'));
@@ -716,7 +703,7 @@ async function launch() {
   });
 });
     app.use(bot.webhookCallback('/webhook/' + TOKEN));
-    app.listen(PORT, () => logger.info('✅ Express on port ' + PORT));
+    app.listen(PORT, () => console.log('✅ Express on port ' + PORT));
 
     await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, {
       allowed_updates: ['message', 'callback_query', 'my_chat_member'],
@@ -725,35 +712,25 @@ async function launch() {
     });
 
     global.__bot = bot;
-    logger.info('🚀 Study Bot v3.2 — FIXED & OPTIMIZED');
+    console.log('🚀 Study Bot v3.2 — FIXED & OPTIMIZED');
   } catch(e) {
-    logger.error('Launch error:', e.message);
+    console.error('Launch error:', e.message);
     setTimeout(launch, 10000);
   }
 }
 
 launch();
 
-
-// ── BotMsgs Cleanup ──
-setInterval(() => {
-  if(!global._botMsgs) return;
-  const keys = Object.keys(global._botMsgs);
-  if(keys.length > 100) {
-    keys.slice(0, keys.length - 100).forEach(k => delete global._botMsgs[k]);
-  }
-}, 3600000);
-
 process.once('SIGINT', () => { try { bot.stop('SIGINT'); } catch(e) {} });
 process.once('SIGTERM', () => { try { bot.stop('SIGTERM'); } catch(e) {} });
-process.on('uncaughtException', err => logger.error('Uncaught:', err.message));
-process.on('unhandledRejection', err => logger.error('Unhandled:', err?.message || err));
+process.on('uncaughtException', err => console.error('Uncaught:', err.message));
+process.on('unhandledRejection', err => console.error('Unhandled:', err?.message || err));
 
 // ── Memory Monitor ──
 setInterval(() => {
   const mem = process.memoryUsage().heapUsed / 1024 / 1024;
   if (mem > 440) {
-    logger.error('⚠️ Memory critical:', mem.toFixed(0) + 'MB — restarting');
+    console.error('⚠️ Memory critical:', mem.toFixed(0) + 'MB — restarting');
     if (global.gc) global.gc();
     if (mem > 455) process.exit(1);
   }

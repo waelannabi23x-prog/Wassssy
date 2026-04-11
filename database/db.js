@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const DB_PATH = path.join(__dirname, '..', 'study_bot.db');
+const logger = require('../utils/logger');
 
 let pgPool = null;
 function getPg() {
@@ -20,20 +21,13 @@ function getPg() {
       keepAlive: true,
       keepAliveInitialDelayMillis: 10000
     });
-    let reconnectDelay = 3000;
     pgPool.on('error', (err) => {
-      console.error('PG pool error:', err.message);
-      // reconnect تلقائي
-      setTimeout(()=>{
-        try{
-          pgPool.connect().then(c=>c.release()).catch(()=>{
-            reconnectDelay *= 2;
-            if(reconnectDelay > 30000) reconnectDelay = 30000;
-          });
-        }catch{}
-      }, reconnectDelay);
+      logger.error('PG pool error:', err.message);
     });
-    console.log('✅ Using PostgreSQL');
+    pgPool.on('connect', () => {
+      console.log('✅ PG new connection established');
+    });
+    logger.info('✅ Using PostgreSQL');
     return pgPool;
   } catch(e) { console.error('PG error:', e.message); return null; }
 }
@@ -76,10 +70,10 @@ function getSqlite() {
     sqliteDb.pragma('cache_size = 10000');
     sqliteDb.pragma('synchronous = NORMAL');
     sqliteDb.pragma('temp_store = MEMORY');
-    console.log('✅ Using better-sqlite3');
+    logger.info('✅ Using better-sqlite3');
     return sqliteDb;
   } catch(e) {
-    console.log('⚠️ Using sql.js fallback');
+    logger.warn('⚠️ Using sql.js fallback');
     return null;
   }
 }
@@ -137,17 +131,34 @@ function toPg(sql) {
   return sql;
 }
 
+async function withRetry(fn, label='query') {
+  const MAX = 3;
+  for (let i = 0; i < MAX; i++) {
+    try { return await fn(); }
+    catch (e) {
+      const isRetryable = e.message?.includes('timeout') || e.message?.includes('terminated') || e.message?.includes('ECONNRESET');
+      if (!isRetryable || i === MAX - 1) throw e;
+      const wait = 500 * Math.pow(2, i);
+      logger.warn(`⚠️ DB ${label} retry ${i+1}/${MAX} in ${wait}ms — ${e.message}`);
+      await new Promise(r => setTimeout(r, wait));
+    }
+  }
+}
+
 async function all(sql, params=[]) {
   const pg = getPg();
   if(pg) {
     const converted = toPgCached(sql);
-    try {
+    return withRetry(async () => {
       const name = pgPrepared.get(converted);
       const res = name
         ? await pg.query({ name, text: converted, values: params })
         : await pg.query(converted, params);
       return res.rows;
-    } catch(e) { console.error('DB all error:', e.message, '| SQL:', converted.substring(0,100)); return []; }
+    }, 'all').catch(e => {
+      logger.error('DB all FAILED:', e.message, '| SQL:', converted.substring(0,100));
+      return [];
+    });
   }
   try {
     const db = getSqlite();
@@ -158,7 +169,7 @@ async function all(sql, params=[]) {
     while(stmt.step()) rows.push(stmt.getAsObject());
     stmt.free();
     return Promise.resolve(rows);
-  } catch(e) { console.error('DB all error:', e.message); return []; }
+  } catch(e) { logger.error('DB all error:', e.message); return []; }
 }
 
 function get(sql, params=[]) {
@@ -169,15 +180,19 @@ async function run(sql, params=[]) {
   const pg = getPg();
   if(pg) {
     const converted = toPgCached(sql);
-    try { await pg.query(converted, params); return; }
-    catch(e) { console.error('DB run error:', e.message); throw e; }
+    return withRetry(async () => {
+      await pg.query(converted, params);
+    }, 'run').catch(e => {
+      logger.error('DB run FAILED:', e.message);
+      throw e;
+    });
   }
   try {
     const db = getSqlite();
     if(db) { db.prepare(sql).run(...params); return; }
     sqlJs.run(sql, params);
     scheduleSave();
-  } catch(e) { console.error('DB run error:', e.message); throw e; }
+  } catch(e) { logger.error('DB run error:', e.message); throw e; }
 }
 
 async function initSchema() {
@@ -225,7 +240,7 @@ async function initSchema() {
       if(pg) await pg.query(sql.replace(/SERIAL/g,'BIGSERIAL'));
       else if(getSqlite()) getSqlite().exec(sql.replace(/SERIAL/g,'INTEGER').replace(/BIGINT/g,'INTEGER').replace(/BIGSERIAL/g,'INTEGER'));
       else sqlJs.run(sql.replace(/SERIAL/g,'INTEGER').replace(/BIGINT/g,'INTEGER').replace(/BIGSERIAL/g,'INTEGER'));
-    } catch(e) { console.error('Table error:', e.message.substring(0,60)); }
+    } catch(e) { logger.error('Table error:', e.message.substring(0,60)); }
   }
 
   const indexes = [
@@ -285,7 +300,7 @@ async function initSchema() {
       }
     } catch(e) {}
   }
-  console.log('✅ DB schema ready');
+  logger.info('✅ DB schema ready');
 }
 
 async function getSetting(key) {

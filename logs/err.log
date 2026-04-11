@@ -198,3 +198,4 @@
 2026-04-10 23:47:16: Table error: Connection terminated due to connection timeout
 2026-04-11 08:44:13: PG pool error: read ECONNABORTED
 2026-04-11 08:44:13: PG pool error: read ECONNABORTED
+[2026-04-11 10:21:48] [ERROR] test error
