@@ -418,3 +418,16 @@
 2026-04-10 23:53:08: ✅ Express on port 3000
 2026-04-10 23:53:08: 🚀 Study Bot v3.2 — FIXED & OPTIMIZED
 2026-04-11 07:58:45: ✅ Using PostgreSQL
+2026-04-11 07:59:00: ✅ DB schema ready
+2026-04-11 07:59:00: 🔧 Maintenance mode: false
+2026-04-11 07:59:02: ✅ States loaded: 4
+2026-04-11 07:59:09: ✅ Cache warmed up: 57 entries
+2026-04-11 07:59:22: ✅ Precomputed all browse menus
+2026-04-11 07:59:22: ✅ Database ready
+2026-04-11 07:59:22: ✅ Scheduler started
+2026-04-11 07:59:22: ✅ Express on port 3000
+2026-04-11 07:59:22: 🚀 Study Bot v3.2 — FIXED & OPTIMIZED
+2026-04-11 08:08:04: ✅ Using PostgreSQL
+2026-04-11 08:08:19: ✅ DB schema ready
+2026-04-11 08:08:20: 🔧 Maintenance mode: false
+2026-04-11 08:08:21: ✅ States loaded: 3

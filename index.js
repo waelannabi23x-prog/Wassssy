@@ -259,6 +259,11 @@ bot.on('callback_query', async ctx => {
     ctx.answerCbQuery(_isHeavy ? '⏳' : '', { show_alert: false }).catch(() => {});
     if (data === 'noop') return;
 
+    // منع التصفح في القروب
+    if(ctx.chat?.type !== 'private' && !data.startsWith('grp_sp_')) {
+      return ctx.answerCbQuery('استخدم البوت في الخاص للتصفح').catch(()=>{});
+    }
+
     // Browse — الأكثر استخداماً أول
     if (data.startsWith('preview_')) { const p = data.split('_'); return browse.showPreview(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }
     if (data.startsWith('fl_'))      { const p = data.split('_'); return browse.sendFile(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }
