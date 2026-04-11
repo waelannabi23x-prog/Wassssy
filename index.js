@@ -290,6 +290,9 @@ bot.command('search', async ctx => {
       : '🔍 "'+raw+'" — '+results.length+' نتيجة\nاضغط للتحميل في الخاص 👇';
 
     const m = await ctx.reply(header, {reply_markup:{inline_keyboard:rows}});
+    if(!global._botMsgs) global._botMsgs = {};
+    if(!global._botMsgs[ctx.chat.id]) global._botMsgs[ctx.chat.id] = [];
+    global._botMsgs[ctx.chat.id].push(m.message_id);
     setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), 60000);
     return;
   }
@@ -330,6 +333,21 @@ bot.command('leaveall', async ctx => {
   }
   ctx.reply('✅ خرجت من ' + left + ' قروب.');
 });
+bot.command('dlt', async ctx => {
+  if(!ctx.isOwner) return ctx.deleteMessage().catch(()=>{});
+  const isGroup = ctx.chat?.type !== 'private';
+  if(!isGroup) return ctx.reply('هذا الأمر للقروبات فقط');
+  ctx.deleteMessage().catch(()=>{});
+  const stored = global._botMsgs?.[ctx.chat.id] || [];
+  let deleted = 0;
+  for(const msgId of stored){
+    try{ await ctx.telegram.deleteMessage(ctx.chat.id, msgId); deleted++; }catch(e){}
+  }
+  if(global._botMsgs) global._botMsgs[ctx.chat.id] = [];
+  const m = await ctx.reply('✅ حُذف '+deleted+' رسالة');
+  setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), 3000);
+});
+
 bot.command('cancel', ctx => {
   if (global.userStates?.[ctx.uid]) {
     global.delState(ctx.uid);
