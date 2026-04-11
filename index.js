@@ -20,6 +20,7 @@ const contentDb = require('./database/content');
 const bundlesDb = require('./database/bundles');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { eos } = require('./utils/helpers');
+const { handleAiChat } = require('./handlers/ai_chat');
 const { cacheWarmup } = require('./utils/cache');
 const { precomputeAll } = require('./utils/precompute');
 const { setLang } = require('./utils/i18n');
@@ -685,6 +686,10 @@ bot.on('text', async ctx => {
     return ctx.reply('اكتب نص الرسالة مع الرابط (او skip):');
   }
   if (state.type === 'search') return userH.handleSearch(ctx, ctx.message.text.trim());
+  if (!state && ctx.chat?.type === 'private') {
+    const handled = await handleAiChat(ctx, ctx.message.text.trim());
+    if(handled) return;
+  }
   if (state.type === 'add_comment') {
     const text = ctx.message.text?.trim();
     if (!text || text === '/cancel') { await global.delState(ctx.uid); return ctx.reply('❌ تم الإلغاء.'); }
