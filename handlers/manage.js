@@ -113,9 +113,11 @@ async function showAnalytics(ctx){
   const _ckey="analytics_admin";
   const _cc=cacheGet(_ckey);
   if(_cc) return eos(ctx,_cc.text,{parse_mode:"Markdown",...build(_cc.rows)});
-  const [top, recent, totalUsers, activeToday, totalFiles, totalDl, specs] = await Promise.all([
+  const [top, recent, totalUsers, activeToday, totalFiles, totalDl, specs, totalGroups, topGroups] = await Promise.all([
     filesDb.topDownloaded(5), filesDb.recentFiles(5), usersDb.count(),
     usersDb.activeToday(), filesDb.totalFiles(), filesDb.totalDownloads(), content.getSpecs(),
+    all('SELECT COUNT(*) as c FROM group_chats').then(r=>r[0]?.c||0),
+    all('SELECT gc.title, sp.name as sp_name, COUNT(gm.user_id) as members FROM group_chats gc LEFT JOIN specialties sp ON gc.specialty_id=sp.id LEFT JOIN group_members gm ON gc.chat_id=gm.chat_id GROUP BY gc.chat_id, gc.title, sp.name ORDER BY members DESC LIMIT 5')
   ]);
   const [spDist, topUsers, peakHours, topCats] = await Promise.all([
     all(`SELECT sp.name, COUNT(us.user_id) as cnt FROM user_specialties us LEFT JOIN specialties sp ON us.specialty_id=sp.id GROUP BY sp.name ORDER BY cnt DESC LIMIT 5`),
@@ -124,7 +126,10 @@ async function showAnalytics(ctx){
     all(`SELECT c.name, COUNT(h.id) as cnt FROM history h LEFT JOIN files f ON h.file_id=f.id LEFT JOIN categories c ON f.category_id=c.id WHERE h.viewed_at >= datetime('now', '-7 days') GROUP BY c.name ORDER BY cnt DESC LIMIT 3`)
   ]);
   let text='📊 *لوحة الإحصائيات المتقدمة*\n━━━━━━━━━━━━\n';
-  text+='👥 المستخدمون: *'+totalUsers+'*\n🟢 نشطون اليوم: *'+activeToday+'*\n📁 الملفات: *'+totalFiles+'*\n⬇️ التحميلات: *'+totalDl+'*\n🎓 التخصصات: *'+specs.length+'*\n';
+  text+='👥 المستخدمون: *'+totalUsers+'*\n🟢 نشطون اليوم: *'+activeToday+'*\n📁 الملفات: *'+totalFiles+'*\n⬇️ التحميلات: *'+totalDl+'*\n🎓 التخصصات: *'+specs.length+'*\n👥 القروبات: *'+totalGroups+'*\n';
+  text+='\n📣 *أكبر القروبات:*\n';
+  if(topGroups.length) topGroups.forEach((g,i)=>{ text+=(i+1)+'. '+escMd(g.title||'بدون اسم')+' ('+(g.sp_name||'بدون تخصص')+') — *'+g.members+'* عضو\n'; });
+  else text+='_لا قروبات._\n';
   text+='\n🎓 *توزيع التخصصات:*\n';
   if(spDist.length) spDist.forEach((s,i)=>{ text+=(i+1)+'. '+escMd(s.name||'غير محدد')+' — *'+s.cnt+'* مستخدم\n'; });
   else text+='_لا بيانات._\n';
