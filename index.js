@@ -20,6 +20,8 @@ const contentDb = require('./database/content');
 const bundlesDb = require('./database/bundles');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { eos } = require('./utils/helpers');
+const { handleAdd, handleAddFile, handleAddCallback } = require('./handlers/add');
+const { handleAiChat } = require('./handlers/ai_chat');
 const { cacheWarmup } = require('./utils/cache');
 const { precomputeAll } = require('./utils/precompute');
 const { setLang } = require('./utils/i18n');
@@ -351,6 +353,8 @@ bot.command('leaveall', async ctx => {
   }
   ctx.reply('✅ خرجت من ' + left + ' قروب.');
 });
+bot.command('add', async ctx => handleAdd(ctx));
+
 bot.command('dlt', async ctx => {
   if(!ctx.isOwner) return ctx.deleteMessage().catch(()=>{});
   const isGroup = ctx.chat?.type !== 'private';
@@ -406,6 +410,9 @@ bot.on('callback_query', async ctx => {
       ctx.answerCbQuery('', { show_alert: false }).catch(() => {});
     }
     if (data === 'noop') return;
+
+    // Add mode callbacks
+    if (data.startsWith('add_')) return handleAddCallback(ctx, data);
 
     // Group Specialty (Owner only)
     if (data.startsWith('grp_sp_')) {
@@ -635,6 +642,9 @@ bot.on('message', async (ctx, next) => {
 
 // ── Document Handler ──
 bot.on('document', async ctx => {
+  if(ctx.chat?.type !== 'private') {
+    if(await handleAddFile(ctx)) return;
+  }
   if (!ctx.isAdmin && !ctx.isOwner) return;
   const state = global.userStates?.[ctx.uid];
   if (state?.type === 'mg_bulk_files') return manage.handleBulkUpload(ctx);
@@ -685,6 +695,11 @@ bot.on('text', async ctx => {
     return ctx.reply('اكتب نص الرسالة مع الرابط (او skip):');
   }
   if (state.type === 'search') return userH.handleSearch(ctx, ctx.message.text.trim());
+  // AI chat — فقط في الخاص وبدون state
+  if (!state && ctx.chat?.type === 'private') {
+    const handled = await handleAiChat(ctx, ctx.message.text.trim());
+    if(handled) return;
+  }
   if (state.type === 'add_comment') {
     const text = ctx.message.text?.trim();
     if (!text || text === '/cancel') { await global.delState(ctx.uid); return ctx.reply('❌ تم الإلغاء.'); }
