@@ -729,7 +729,7 @@ async function launch() {
     await initSchema();
     await Promise.all([loadMaintenance(), loadStates()]);
     await cacheWarmup();
-    await precomputeAll();
+    precomputeAll().catch(e=>console.error('precompute error:',e.message));
     logger.info('✅ Database ready');
     startScheduler(bot, [OWNER_ID]);
 
