@@ -289,7 +289,7 @@ bot.command('search', async ctx => {
       : '🔍 "'+raw+'" — '+results.length+' نتيجة\nاضغط للتحميل في الخاص 👇';
 
     const m = await ctx.reply(header, {reply_markup:{inline_keyboard:rows}});
-    setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), isOwnerUser?180000:90000);
+    setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), 60000);
     return;
   }
 
