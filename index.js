@@ -163,21 +163,49 @@ bot.command(['admin', 'owner', 'manage'], ctx => {
   if (!ctx.isAdmin) return ctx.reply('🚫 ليس لديك صلاحية.');
   manage.mainMenu(ctx);
 });
-// cache مؤقت للبحث في القروب
-const _groupSearchCache = new Map();
-function _getGroupSearchCache(q) {
+// cache ذكي للبحث في القروب
+const _grpSearchCache = new Map();
+function _getGSC(q) {
   const k = q.toLowerCase().trim();
-  const c = _groupSearchCache.get(k);
+  const c = _grpSearchCache.get(k);
   if(c && Date.now()-c.ts < 300000) return c.data;
   return null;
 }
-function _setGroupSearchCache(q, data) {
+function _setGSC(q, data) {
   const k = q.toLowerCase().trim();
-  _groupSearchCache.set(k, {data, ts:Date.now()});
-  if(_groupSearchCache.size > 100) {
-    const first = _groupSearchCache.keys().next().value;
-    _groupSearchCache.delete(first);
+  _grpSearchCache.set(k, {data, ts:Date.now()});
+  if(_grpSearchCache.size > 200) {
+    _grpSearchCache.delete(_grpSearchCache.keys().next().value);
   }
+}
+
+// بحث ذكي — يقسم الكلمات ويبحث عن كل مجموعة
+async function smartSearch(rawQ, limit=10) {
+  const q = rawQ.replace(/[%;\\]/g,'').trim();
+  
+  // 1 — بحث مباشر أولاً (أسرع)
+  let results = _getGSC(q);
+  if(!results) {
+    results = await filesDb.search(q, limit);
+    _setGSC(q, results);
+  }
+  if(results.length >= 3) return results;
+
+  // 2 — بحث بالكلمات منفردة إذا ما كفى
+  const words = q.split(/\s+/).filter(w => w.length >= 2);
+  if(words.length > 1) {
+    const extras = new Map();
+    for(const w of words) {
+      const wr = _getGSC(w) || await filesDb.search(w, limit);
+      _setGSC(w, wr);
+      for(const r of wr) {
+        if(!results.find(x=>x.id===r.id)) extras.set(r.id, r);
+      }
+    }
+    results = [...results, ...extras.values()].slice(0, limit);
+    _setGSC(q, results);
+  }
+  return results;
 }
 
 bot.command('search', async ctx => {
@@ -185,58 +213,53 @@ bot.command('search', async ctx => {
   const raw = ctx.message.text.replace('/search','').replace(/@\w+/g,'').trim();
 
   if(isGroup) {
+    // احذف رسالة /search من القروب بعد معالجتها
+    ctx.deleteMessage().catch(()=>{});
+
     if(!raw || raw.length < 2) {
-      const m = await ctx.reply('🔍 /search كلمة البحث\nمثال: /search algo serie');
+      const m = await ctx.reply('🔍 مثال: /search algo serie 1');
       setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), 6000);
       return;
     }
 
-    // تنظيف الكلمة
-    const q = raw.replace(/[%;\\]/g,'').substring(0,50);
-
-    // كاش البحث — نفس الكلمة في 5 دقائق = لا DB call
-    let results = _getGroupSearchCache(q);
-    if(!results) {
-      results = await filesDb.search(q, 10);
-      _setGroupSearchCache(q, results);
-    }
+    const results = await smartSearch(raw, 10);
 
     if(!results.length) {
-      const m = await ctx.reply('❌ لا نتائج لـ "'+q+'"\n💡 جرب كلمة أخرى');
+      const m = await ctx.reply('❌ لا نتائج لـ "'+raw+'"\n💡 جرب: /search '+raw.split(' ')[0]);
       setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), 8000);
       return;
     }
 
-    const isOwnerSearch = ctx.isOwner;
-    const me = await ctx.telegram.getMe();
-
-    // Owner — زر تحميل مباشر في القروب
-    // User — زر يفتح البوت بالخاص
-    const rows = results.map(f => {
-      const label = '📄 '+f.title.substring(0,30)+' · '+f.sub_name;
-      if(isOwnerSearch) {
-        return [{ text: label, callback_data: 'grp_dl_'+f.id }];
-      }
-      return [{ text: label, url: 'https://t.me/'+me.username+'?start=file_'+f.id }];
-    });
-
-    if(!isOwnerSearch) {
-      rows.push([{text:'🤖 فتح البوت للتصفح', url:'https://t.me/'+me.username}]);
+    const isOwnerUser = ctx.isOwner;
+    let botUsername = global._cachedBotUsername;
+    if(!botUsername) {
+      const me = await ctx.telegram.getMe();
+      botUsername = me.username;
+      global._cachedBotUsername = botUsername;
     }
 
-    const header = isOwnerSearch
-      ? '🔍 نتائج "'+q+'" ('+results.length+') — اضغط للإرسال في القروب:'
-      : '🔍 نتائج "'+q+'" ('+results.length+')\nاضغط للتحميل في الخاص 👇';
+    const rows = results.map(f => {
+      const label = '📄 '+f.title.substring(0,32)+' · '+f.sub_name;
+      if(isOwnerUser) {
+        return [{ text: label, callback_data: 'grp_dl_'+f.id }];
+      }
+      return [{ text: label, url: 'https://t.me/'+botUsername+'?start=file_'+f.id }];
+    });
+
+    if(!isOwnerUser) {
+      rows.push([{text:'🤖 فتح البوت', url:'https://t.me/'+botUsername}]);
+    }
+
+    const header = isOwnerUser
+      ? '🔍 "'+raw+'" — '+results.length+' نتيجة\nاضغط لإرسال الملف:'
+      : '🔍 "'+raw+'" — '+results.length+' نتيجة\nاضغط للتحميل في الخاص 👇';
 
     const m = await ctx.reply(header, {reply_markup:{inline_keyboard:rows}});
-
-    // احذف رسالة البحث بعد وقت
-    const deleteAfter = isOwnerSearch ? 120000 : 60000;
-    setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), deleteAfter);
+    setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), isOwnerUser?180000:90000);
     return;
   }
 
-  // بحث عادي في الخاص
+  // بحث في الخاص
   if(raw) return userH.handleSearch(ctx, raw);
   global.setState(ctx.uid, {type:'search'});
   ctx.reply('🔍 اكتب كلمة البحث:');
