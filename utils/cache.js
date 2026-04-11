@@ -25,12 +25,25 @@ function cacheClearPrefix(prefix) {
   for(const k of store.keys()) if(k.startsWith(prefix)) cacheClear(k);
 }
 
+// LRU — لو الكاش وصل 2000 entry احذف الاقدم
+const MAX_CACHE = 2000;
+function _evict() {
+  if(store.size <= MAX_CACHE) return;
+  const toDelete = store.size - MAX_CACHE;
+  let i = 0;
+  for(const k of store.keys()) {
+    if(i++ >= toDelete) break;
+    cacheClear(k);
+  }
+}
+const _origSet = cacheSet;
+
 async function cacheWarmup() {
   try {
-    const { all } = require('../database/db');
     const { getSpecs, getYears, getSemesters, getSubjects, getCategories } = require('../database/content');
     const specs = await getSpecs();
     cacheSet('specs', specs, 3600000);
+
     for(const sp of specs) {
       const years = await getYears(sp.id);
       cacheSet('yrs_'+sp.id, {sp, all:years}, 3600000);
@@ -47,6 +60,8 @@ async function cacheWarmup() {
         }
       }
     }
+
+    _evict();
     console.log('✅ Cache warmed up:', store.size, 'entries');
   } catch(e) { console.error('Warmup error:', e.message); }
 }

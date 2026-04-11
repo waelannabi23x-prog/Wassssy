@@ -135,6 +135,11 @@ async function showCategories(ctx,spId,yrId,smId,sbId) {
 
 async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
   const uid=ctx.uid;
+  if(global.dedupRequest) return global.dedupRequest(uid,'sf_'+catId+'_'+page, ()=>_showFiles(ctx,spId,yrId,smId,sbId,catId,page));
+  return _showFiles(ctx,spId,yrId,smId,sbId,catId,page);
+}
+async function _showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
+  const uid=ctx.uid;
   const userKey='showfiles_u_'+uid+'_'+catId+'_'+page;
   const userCached=cacheGet(userKey);
   if(userCached) return eos(ctx,userCached.text,userCached.extra);
@@ -210,6 +215,11 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
 }
 
 async function showPreview(ctx,fid,spId,yrId,smId,sbId,catId) {
+  const uid = ctx.uid;
+  if(global.dedupRequest) return global.dedupRequest(uid,'sp_'+fid, ()=>_showPreview(ctx,fid,spId,yrId,smId,sbId,catId));
+  return _showPreview(ctx,fid,spId,yrId,smId,sbId,catId);
+}
+async function _showPreview(ctx,fid,spId,yrId,smId,sbId,catId) {
   const uid = ctx.uid;
   const staticKey = 'prev_static_'+fid;
   let staticData = cacheGet(staticKey);

@@ -24,9 +24,7 @@ function getPg() {
     pgPool.on('error', (err) => {
       logger.error('PG pool error:', err.message);
     });
-    pgPool.on('connect', () => {
-      console.log('✅ PG new connection established');
-    });
+
     logger.info('✅ Using PostgreSQL');
     return pgPool;
   } catch(e) { console.error('PG error:', e.message); return null; }

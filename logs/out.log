@@ -516,3 +516,36 @@
 [2026-04-11 10:29:12] [INFO] ✅ Express on port 3000
 [2026-04-11 10:29:12] [INFO] 🚀 Study Bot v3.2 — FIXED & OPTIMIZED
 [2026-04-11 10:50:39] [WARN] ⚠️ Using sql.js fallback
+[2026-04-11 11:14:42] [INFO] ✅ Using PostgreSQL
+[2026-04-11 11:14:50] [INFO] ✅ pg_trgm indexes ready
+[2026-04-11 11:14:56] [INFO] ✅ DB schema ready
+[2026-04-11 11:14:57] [INFO] 🔧 Maintenance mode: false
+[2026-04-11 11:14:58] [INFO] ✅ States loaded: 3
+[2026-04-11 11:16:28] [INFO] ✅ Using PostgreSQL
+[2026-04-11 11:16:37] [INFO] ✅ pg_trgm indexes ready
+[2026-04-11 11:16:44] [INFO] ✅ DB schema ready
+[2026-04-11 11:16:44] [INFO] 🔧 Maintenance mode: false
+[2026-04-11 11:16:45] [INFO] ✅ States loaded: 3
+[2026-04-11 11:17:54] [INFO] ✅ Using PostgreSQL
+[2026-04-11 11:18:02] [INFO] ✅ pg_trgm indexes ready
+[2026-04-11 11:18:09] [INFO] ✅ DB schema ready
+[2026-04-11 11:18:09] [INFO] 🔧 Maintenance mode: false
+[2026-04-11 11:18:11] [INFO] ✅ States loaded: 3
+[2026-04-11 11:19:05] [INFO] ✅ Using PostgreSQL
+[2026-04-11 11:19:13] [INFO] ✅ pg_trgm indexes ready
+[2026-04-11 11:19:20] [INFO] ✅ DB schema ready
+[2026-04-11 11:19:20] [INFO] 🔧 Maintenance mode: false
+[2026-04-11 11:19:21] [INFO] ✅ States loaded: 3
+[2026-04-11 11:19:31] [INFO] ✅ Database ready
+[2026-04-11 11:19:31] [INFO] ✅ Scheduler started
+[2026-04-11 11:19:31] [INFO] ✅ Express on port 3000
+[2026-04-11 11:19:32] [INFO] 🚀 Study Bot v3.2 — FIXED & OPTIMIZED
+[2026-04-11 11:20:49] [INFO] ✅ Using PostgreSQL
+[2026-04-11 11:20:58] [INFO] ✅ pg_trgm indexes ready
+[2026-04-11 11:21:04] [INFO] ✅ DB schema ready
+[2026-04-11 11:21:05] [INFO] 🔧 Maintenance mode: false
+[2026-04-11 11:21:06] [INFO] ✅ States loaded: 3
+[2026-04-11 11:21:16] [INFO] ✅ Database ready
+[2026-04-11 11:21:16] [INFO] ✅ Scheduler started
+[2026-04-11 11:21:16] [INFO] ✅ Express on port 3000
+[2026-04-11 11:21:16] [INFO] 🚀 Study Bot v3.2 — FIXED & OPTIMIZED
