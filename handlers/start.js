@@ -17,13 +17,11 @@ async function startHandler(ctx) {
     const filesDb = require('../database/files');
     const f = await filesDb.getFile(fid);
     if(f) {
-      const cap = '📄 *' + escMd(f.title) + '*' +
-        (f.description ? '\n📝 ' + escMd(f.description) : '') +
-        '\n📁 ' + escMd(f.cat_name) + ' | 📖 ' + escMd(f.sub_name);
+      const cap = '📄 ' + f.title + (f.description ? '\n📝 ' + f.description : '') + '\n📁 ' + f.cat_name + ' | 📖 ' + f.sub_name;
       try {
-        if(f.file_type === 'photo') await ctx.replyWithPhoto(f.file_id, {caption:cap, parse_mode:'Markdown'});
-        else if(f.file_type === 'link') await ctx.reply(cap + '\n\n🔗 ' + f.file_id, {parse_mode:'Markdown'});
-        else await ctx.replyWithDocument(f.file_id, {caption:cap, parse_mode:'Markdown'});
+        if(f.file_type === 'photo') await ctx.replyWithPhoto(f.file_id, {caption:cap});
+        else if(f.file_type === 'link') await ctx.reply(cap + '\n\n🔗 ' + f.file_id, {});
+        else await ctx.replyWithDocument(f.file_id, {caption:cap});
         const inter = require('../database/interactions');
         inter.addHistory(uid, fid).catch(()=>{});
         filesDb.incDownloads(fid).catch(()=>{});
