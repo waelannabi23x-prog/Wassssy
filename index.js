@@ -429,9 +429,16 @@ bot.on('callback_query', async ctx => {
       if (!f) return ctx.answerCbQuery('❌ الملف غير موجود').catch(()=>{});
       try {
         const cap = '📄 '+f.title+(f.sub_name?'\n📚 '+f.sub_name:'');
-        if(f.file_type === 'photo') await ctx.telegram.sendPhoto(ctx.chat.id, f.file_id, {caption:cap});
-        else if(f.file_type === 'link') await ctx.telegram.sendMessage(ctx.chat.id, cap+'\n🔗 '+f.file_id);
-        else await ctx.telegram.sendDocument(ctx.chat.id, f.file_id, {caption:cap});
+        let sentMsg;
+        if(f.file_type === 'photo') sentMsg = await ctx.telegram.sendPhoto(ctx.chat.id, f.file_id, {caption:cap});
+        else if(f.file_type === 'link') sentMsg = await ctx.telegram.sendMessage(ctx.chat.id, cap+'\n🔗 '+f.file_id);
+        else sentMsg = await ctx.telegram.sendDocument(ctx.chat.id, f.file_id, {caption:cap});
+        if(sentMsg?.message_id) {
+          if(!global._botMsgs) global._botMsgs = {};
+          if(!global._botMsgs[ctx.chat.id]) global._botMsgs[ctx.chat.id] = [];
+          global._botMsgs[ctx.chat.id].push(sentMsg.message_id);
+          if(global._botMsgs[ctx.chat.id].length > 500) global._botMsgs[ctx.chat.id].shift();
+        }
         await ctx.answerCbQuery('✅ تم الإرسال').catch(()=>{});
       } catch(e) { await ctx.answerCbQuery('❌ '+e.message,{show_alert:true}).catch(()=>{}); }
       return;
