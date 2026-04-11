@@ -236,8 +236,14 @@ async function _showPreview(ctx,fid,spId,yrId,smId,sbId,catId) {
   const {f, ratingData, commentCount, favCnt} = staticData;
   if(!f) return ctx.reply(t(uid,'not_found'));
 
-  // البيانات الشخصية في query واحدة
-  const { fav, userRating, alreadyReported } = await interactions.getPreviewPersonal(uid,fid);
+  // البيانات الشخصية مع cache
+  const personalKey = 'personal_'+uid+'_'+fid;
+  let personal = cacheGet(personalKey);
+  if(!personal) {
+    personal = await interactions.getPreviewPersonal(uid,fid);
+    cacheSet(personalKey, personal, 300000);
+  }
+  const { fav, userRating, alreadyReported } = personal;
 
   const {avg,cnt} = ratingData;
   const text = '📄 *'+escMd(f.title)+'*\n'+
