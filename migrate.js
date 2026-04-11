@@ -10,7 +10,7 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL, ssl: { rejec
 async function migrate() {
   console.log('Loading SQLite...');
   const SQL = await initSqlJs();
-  const db = new SQL.Database(fs.readFileSync(DB_PATH));
+  const db = new SQL.Database(await fs.promises.readFile(DB_PATH));
 
   function all(sql) {
     const stmt = db.prepare(sql);

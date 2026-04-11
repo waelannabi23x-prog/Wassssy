@@ -200,7 +200,12 @@ async function initSchema() {
     if(!db) {
       const initSqlJs = require('sql.js');
       const SQL = await initSqlJs();
-      sqlJs = fs.existsSync(DB_PATH) ? new SQL.Database(fs.readFileSync(DB_PATH)) : new SQL.Database();
+      try {
+        await fs.promises.access(DB_PATH);
+        sqlJs = new SQL.Database(await fs.promises.readFile(DB_PATH));
+      } catch (e) {
+        sqlJs = new SQL.Database();
+      }
       sqlJs.run('PRAGMA journal_mode=WAL');
       sqlJs.run('PRAGMA cache_size=10000');
     }
@@ -304,7 +309,22 @@ async function initSchema() {
         const match = sql.match(/ALTER TABLE (\w+) ADD COLUMN IF NOT EXISTS (\w+) (.+)/);
         if(match) {
           const [,table,col,type] = match;
-          const exists = await pg.query(`SELECT 1 FROM information_schema.columns WHERE table_name=$1 AND column_name=$2`,[table,col]);
+        
+const columnCache = new Set(); // Stores 'table_name:column_name' strings
+
+async function columnExists(table, col) {
+  const cacheKey = `${table}:${col}`;
+  if (columnCache.has(cacheKey)) {
+    return true;
+  }
+
+  const exists = await pg.query(`SELECT 1 FROM information_schema.columns WHERE table_name=$1 AND column_name=$2`, [table, col]);
+  if (exists.rows.length > 0) {
+    columnCache.add(cacheKey);
+    return true;
+  }
+  return false;
+}
           if(!exists.rows.length) await pg.query(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
         }
       } else if(getSqlite()) {

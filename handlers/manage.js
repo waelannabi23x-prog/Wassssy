@@ -437,7 +437,18 @@ async function handleText(ctx,state){
         clearState(uid);
         const spUsers=await usersDb.getUsersBySpecialty(state.spId);
         let spSent=0;
-        for(const id of spUsers){try{await ctx.telegram.sendMessage(id,'🔔 '+text,{parse_mode:'Markdown'});spSent++;}catch{}await new Promise(r=>setTimeout(r,50));}
+        const sendPromises = spUsers.map(async (id) => {
+          try {
+            await ctx.telegram.sendMessage(id, '🔔 ' + text, { parse_mode: 'Markdown' });
+            return true; // Indicate success
+          } catch (e) {
+            console.error(`Failed to send message to ${id}:`, e);
+            return false; // Indicate failure
+          }
+        });
+
+        const results = await Promise.allSettled(sendPromises);
+        spSent = results.filter(result => result.status === 'fulfilled' && result.value).length;
         ctx.reply('✅ تم الإرسال لـ *'+spSent+'* مستخدم',{parse_mode:'Markdown',...build([back('mg_menu')])});
         break;
       }
@@ -461,7 +472,18 @@ async function handleText(ctx,state){
       case 'mg_notify_msg':{
         clearState(uid);
         const nIds=await interactions.getActiveUsers(7); let nSent=0;
-        for(const id of nIds){try{await ctx.telegram.sendMessage(id,'🔔 *إشعار*\n\n'+text,{parse_mode:'Markdown'});nSent++;}catch{}await new Promise(r=>setTimeout(r,50));}
+        const sendPromises = nIds.map(async (id) => {
+          try {
+            await ctx.telegram.sendMessage(id, '🔔 *إشعار*\n\n' + text, { parse_mode: 'Markdown' });
+            return true; // Indicate success
+          } catch (e) {
+            console.error(`Failed to send message to ${id}:`, e);
+            return false; // Indicate failure
+          }
+        });
+
+        const results = await Promise.allSettled(sendPromises);
+        nSent = results.filter(result => result.status === 'fulfilled' && result.value).length;
         ctx.reply('✅ أُرسل الإشعار لـ *'+nSent+'* مستخدم نشط!',{parse_mode:'Markdown',...build([back('mg_menu')])});
         break;
       }

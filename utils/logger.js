@@ -11,9 +11,15 @@ function timestamp() {
 
 function rotate(file) {
   try {
-    if (fs.existsSync(file) && fs.statSync(file).size > MAX_SIZE) {
-      fs.renameSync(file, file + '.bak');
-    }
+      try {
+        await fs.promises.access(file);
+        const stats = await fs.promises.stat(file);
+        if (stats.size > MAX_SIZE) {
+          await fs.promises.rename(file, file + '.bak');
+        }
+      } catch (e) {
+        // file might not exist, ignore
+      }
   } catch(e) {}
 }
 

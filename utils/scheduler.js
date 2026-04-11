@@ -104,7 +104,11 @@ function scheduleDaily(fn) {
 }
 
 function startScheduler(bot, ownerIds) {
-  if(!fs.existsSync(BACKUP_DIR)) fs.mkdirSync(BACKUP_DIR, { recursive:true });
+  try {
+    await fs.promises.access(BACKUP_DIR);
+  } catch (e) {
+    await fs.promises.mkdir(BACKUP_DIR, { recursive: true });
+  }
   setInterval(() => checkScheduledMessages(bot), 60000);
   setTimeout(() => checkScheduledMessages(bot), 5000);
   scheduleDaily(() => sendBackupStats(bot, ownerIds));
