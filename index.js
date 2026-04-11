@@ -401,9 +401,8 @@ bot.on('callback_query', async ctx => {
   if (isDupeCB(cbId)) return;
 
   try {
-    const _isHeavy = ['preview_','fl_','ct_','bundle_','bdl_','sp_','yr_','sm_','sb_','sms_','sbs_','yrs_','latest','new_in_sp','recommended','favorites','history','profile','stats','progress','cmt_','rate_','mg_analytics','mg_content','mg_users','mg_admins','mg_logs','browse','main_menu'].some(p=>data.startsWith(p)||data===p);
     if (!data.startsWith('grp_')) {
-      ctx.answerCbQuery(_isHeavy ? '⏳' : '', { show_alert: false }).catch(() => {});
+      ctx.answerCbQuery('', { show_alert: false }).catch(() => {});
     }
     if (data === 'noop') return;
 
