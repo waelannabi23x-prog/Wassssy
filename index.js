@@ -497,7 +497,10 @@ bot.on('callback_query', async ctx => {
       const fid = parts[0];
       const query = decodeURIComponent(parts[1] || '');
       await filesDb.softDelete(fid);
-      await ctx.answerCbQuery('تم الحذف').catch(() => {});
+      const {cacheClearPrefix} = require('./utils/cache');
+      cacheClearPrefix('search_');
+      if(global._clearSearchCache) global._clearSearchCache();
+      await ctx.answerCbQuery('✅ تم الحذف').catch(() => {});
       return userH.handleSearch(ctx, query);
     }
 
