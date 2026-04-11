@@ -674,7 +674,13 @@ bot.on('text', async ctx => {
   if (ctx.message.text.startsWith('/')) return;
   const uid = ctx.uid;
   const state = global.userStates?.[uid];
-  if (!state) return;
+  if (!state) {
+    if (ctx.chat?.type === 'private') {
+      const handled = await handleAiChat(ctx, ctx.message.text.trim());
+      if(handled) return;
+    }
+    return;
+  }
   if (state.type === 'mg_file') return manage.handleFileUpload(ctx);
   if (state.type === 'mg_bulk_prefix' || state.type === 'mg_bulk_files') {
     if (ctx.message.text?.trim() === '/done') return; // handled by command
