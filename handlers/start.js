@@ -10,7 +10,8 @@ async function startHandler(ctx) {
   const uid = ctx.uid;
   const name = escMd(ctx.from?.first_name || 'Student');
 
-  const payload = ctx.message?.text?.split(' ')[1] || null;
+  const rawText = ctx.message?.text || '';
+  const payload = rawText.includes(' ') ? rawText.split(' ')[1] : ctx.startPayload || null;
   if(payload && payload.startsWith('file_')) {
     const fid = payload.replace('file_', '');
     const filesDb = require('../database/files');
