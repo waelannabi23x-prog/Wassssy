@@ -15,7 +15,7 @@ async function notifyGroupsNewFile(bot, fileInfo) {
   if(!bot || !fileInfo?.specialty_id) return;
   try {
     const groups = await all(
-      'SELECT chat_id, title FROM group_chats WHERE specialty_id=$1 AND notify_new_files=1',
+      'SELECT chat_id, title FROM group_chats WHERE specialty_id=? AND notify_new_files=1',
       [fileInfo.specialty_id]
     );
     if(!groups.length) return;
@@ -23,7 +23,7 @@ async function notifyGroupsNewFile(bot, fileInfo) {
     for(const group of groups) {
       try {
         const members = await all(
-          'SELECT user_id, username, first_name FROM group_members WHERE chat_id=$1 LIMIT 30',
+          'SELECT user_id, username, first_name FROM group_members WHERE chat_id=? LIMIT 30',
           [group.chat_id]
         );
         let msg = '📚 *ملف جديد في تخصصك!*\n\n';

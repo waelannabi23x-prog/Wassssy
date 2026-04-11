@@ -362,6 +362,31 @@ bot.on('callback_query', async ctx => {
     ctx.answerCbQuery(_isHeavy ? '⏳' : '', { show_alert: false }).catch(() => {});
     if (data === 'noop') return;
 
+    // Group Specialty
+    if (data.startsWith('grp_sp_')) {
+      const parts = data.split('_');
+      const chatId = parts[2];
+      const specId = parts[3];
+      await dbRun('INSERT INTO group_chats(chat_id,specialty_id) VALUES(?,?) ON CONFLICT(chat_id) DO UPDATE SET specialty_id=?',[chatId,specId,specId]);
+      const specs = await dbAll('SELECT name FROM specialties WHERE id=?',[specId]);
+      await ctx.answerCbQuery('✅ تم', {show_alert:false}).catch(()=>{});
+      await ctx.editMessageText('✅ تخصص القروب: 🎓 '+(specs[0]?.name||specId)).catch(()=>{});
+      return;
+    }
+
+    // Group Download (Owner)
+    if (data.startsWith('grp_dl_')) {
+      if (!ctx.isOwner) return ctx.answerCbQuery('🚫').catch(()=>{});
+      const fid = data.replace('grp_dl_','');
+      const f = await filesDb.getFile(fid);
+      if (!f) return ctx.answerCbQuery('❌ الملف غير موجود').catch(()=>{});
+      try {
+        await ctx.telegram.sendDocument(ctx.chat.id, f.file_id, {caption:'📄 '+f.title+(f.sub_name?'\n📚 '+f.sub_name:'')});
+        await ctx.answerCbQuery('✅ تم الإرسال').catch(()=>{});
+      } catch(e) { await ctx.answerCbQuery('❌ '+e.message,{show_alert:true}).catch(()=>{}); }
+      return;
+    }
+
     // منع التصفح في القروب
     if(ctx.chat?.type !== 'private' && !data.startsWith('grp_')) {
       return ctx.answerCbQuery('استخدم البوت في الخاص للتصفح 👇').catch(()=>{});
