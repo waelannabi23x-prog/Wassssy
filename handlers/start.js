@@ -9,6 +9,35 @@ const { cacheGet, cacheSet } = require('../utils/cache');
 async function startHandler(ctx) {
   const uid = ctx.uid;
   const name = escMd(ctx.from?.first_name || 'Student');
+
+  // لو جاء من قروب بـ file_xxx
+  const payload = ctx.message?.text?.split(' ')[1] || ctx.startPayload;
+  if(payload?.startsWith('file_')) {
+    const fid = payload.replace('file_', '');
+    const filesDb = require('../database/files');
+    const f = await filesDb.getFile(fid);
+    if(f) {
+      const cap = '📄 *'+escMd(f.title)+'*
+'+(f.description?'📝 '+escMd(f.description)+'
+':'')+'📁 '+escMd(f.cat_name)+' | 📖 '+escMd(f.sub_name);
+      try {
+        if(f.file_type==='photo') await ctx.replyWithPhoto(f.file_id,{caption:cap,parse_mode:'Markdown'});
+        else if(f.file_type==='link') await ctx.reply(cap+'
+
+🔗 '+f.file_id,{parse_mode:'Markdown'});
+        else await ctx.replyWithDocument(f.file_id,{caption:cap,parse_mode:'Markdown'});
+        const interactions = require('../database/interactions');
+        interactions.addHistory(uid, fid).catch(()=>{});
+        filesDb.incDownloads(fid).catch(()=>{});
+      } catch(e) { await ctx.reply('❌ تعذر إرسال الملف.'); }
+    } else {
+      await ctx.reply('❌ الملف غير موجود.');
+    }
+    const hasSp = await usersDb.getSpecialty(uid);
+    if(!hasSp) return askSpecialty(ctx, name);
+    return showMainMenu(ctx, name);
+  }
+
   const hasSp = await usersDb.getSpecialty(uid);
   if (!hasSp) return askSpecialty(ctx, name);
   return showMainMenu(ctx, name);
