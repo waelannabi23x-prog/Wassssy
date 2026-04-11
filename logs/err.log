@@ -199,3 +199,4 @@
 2026-04-11 08:44:13: PG pool error: read ECONNABORTED
 2026-04-11 08:44:13: PG pool error: read ECONNABORTED
 [2026-04-11 10:21:48] [ERROR] test error
+[2026-04-11 10:50:39] [ERROR] DB all error: Cannot read properties of null (reading 'prepare')

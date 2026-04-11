@@ -515,3 +515,4 @@
 [2026-04-11 10:29:12] [INFO] ✅ Database ready
 [2026-04-11 10:29:12] [INFO] ✅ Express on port 3000
 [2026-04-11 10:29:12] [INFO] 🚀 Study Bot v3.2 — FIXED & OPTIMIZED
+[2026-04-11 10:50:39] [WARN] ⚠️ Using sql.js fallback
