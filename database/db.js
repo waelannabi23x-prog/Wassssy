@@ -207,42 +207,42 @@ async function initSchema() {
   }
 
   const tables = [
-    `CREATE TABLE IF NOT EXISTS users (id BIGINT PRIMARY KEY, first_name TEXT, last_name TEXT, username TEXT, is_banned INTEGER DEFAULT 0, joined_at TEXT DEFAULT (CURRENT_TIMESTAMP), last_active TEXT DEFAULT (CURRENT_TIMESTAMP))`,
-    `CREATE TABLE IF NOT EXISTS admins (user_id BIGINT PRIMARY KEY, added_by BIGINT, permissions TEXT DEFAULT 'upload,add_content', specialty_id INTEGER DEFAULT 0, added_at TEXT DEFAULT (CURRENT_TIMESTAMP))`,
+    `CREATE TABLE IF NOT EXISTS users (id BIGINT PRIMARY KEY, first_name TEXT, last_name TEXT, username TEXT, is_banned INTEGER DEFAULT 0, joined_at TIMESTAMP DEFAULT NOW(), last_active TIMESTAMP DEFAULT NOW())`,
+    `CREATE TABLE IF NOT EXISTS admins (user_id BIGINT PRIMARY KEY, added_by BIGINT, permissions TEXT DEFAULT 'upload,add_content', specialty_id INTEGER DEFAULT 0, added_at TIMESTAMP DEFAULT NOW())`,
     `CREATE TABLE IF NOT EXISTS specialties (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, is_deleted INTEGER DEFAULT 0)`,
     `CREATE TABLE IF NOT EXISTS years (id SERIAL PRIMARY KEY, specialty_id INTEGER NOT NULL, name TEXT NOT NULL, is_deleted INTEGER DEFAULT 0)`,
     `CREATE TABLE IF NOT EXISTS semesters (id SERIAL PRIMARY KEY, year_id INTEGER NOT NULL, name TEXT NOT NULL, is_deleted INTEGER DEFAULT 0)`,
     `CREATE TABLE IF NOT EXISTS subjects (id SERIAL PRIMARY KEY, semester_id INTEGER NOT NULL, name TEXT NOT NULL, is_deleted INTEGER DEFAULT 0)`,
     `CREATE TABLE IF NOT EXISTS categories (id SERIAL PRIMARY KEY, subject_id INTEGER NOT NULL, name TEXT NOT NULL, is_deleted INTEGER DEFAULT 0)`,
-    `CREATE TABLE IF NOT EXISTS files (id SERIAL PRIMARY KEY, category_id INTEGER NOT NULL, title TEXT NOT NULL, description TEXT DEFAULT '', file_id TEXT NOT NULL, file_type TEXT DEFAULT 'document', downloads INTEGER DEFAULT 0, uploaded_by BIGINT, is_deleted INTEGER DEFAULT 0, uploaded_at TEXT DEFAULT (CURRENT_TIMESTAMP))`,
+    `CREATE TABLE IF NOT EXISTS files (id SERIAL PRIMARY KEY, category_id INTEGER NOT NULL, title TEXT NOT NULL, description TEXT DEFAULT '', file_id TEXT NOT NULL, file_type TEXT DEFAULT 'document', downloads INTEGER DEFAULT 0, uploaded_by BIGINT, is_deleted INTEGER DEFAULT 0, uploaded_at TIMESTAMP DEFAULT NOW())`,
     `CREATE TABLE IF NOT EXISTS favorites (user_id BIGINT, file_id INTEGER, PRIMARY KEY(user_id, file_id))`,
-    `CREATE TABLE IF NOT EXISTS history (id SERIAL PRIMARY KEY, user_id BIGINT, file_id INTEGER, viewed_at TEXT DEFAULT (CURRENT_TIMESTAMP))`,
-    `CREATE TABLE IF NOT EXISTS logs (id SERIAL PRIMARY KEY, user_id BIGINT, action TEXT, details TEXT, created_at TEXT DEFAULT (CURRENT_TIMESTAMP))`,
+    `CREATE TABLE IF NOT EXISTS history (id SERIAL PRIMARY KEY, user_id BIGINT, file_id INTEGER, viewed_at TIMESTAMP DEFAULT NOW())`,
+    `CREATE TABLE IF NOT EXISTS logs (id SERIAL PRIMARY KEY, user_id BIGINT, action TEXT, details TEXT, created_at TIMESTAMP DEFAULT NOW())`,
     `CREATE TABLE IF NOT EXISTS ratings (user_id BIGINT, file_id INTEGER, rating INTEGER, PRIMARY KEY(user_id, file_id))`,
-    `CREATE TABLE IF NOT EXISTS user_specialties (user_id BIGINT PRIMARY KEY, specialty_id INTEGER, updated_at TEXT DEFAULT (CURRENT_TIMESTAMP))`,
+    `CREATE TABLE IF NOT EXISTS user_specialties (user_id BIGINT PRIMARY KEY, specialty_id INTEGER, updated_at TIMESTAMP DEFAULT NOW())`,
     `CREATE TABLE IF NOT EXISTS settings (key TEXT PRIMARY KEY, value TEXT)`,
-    `CREATE TABLE IF NOT EXISTS bundles (id SERIAL PRIMARY KEY, category_id INTEGER NOT NULL, title TEXT NOT NULL, description TEXT DEFAULT '', downloads INTEGER DEFAULT 0, uploaded_by BIGINT DEFAULT 0, is_deleted INTEGER DEFAULT 0, created_at TEXT DEFAULT (CURRENT_TIMESTAMP))`,
+    `CREATE TABLE IF NOT EXISTS bundles (id SERIAL PRIMARY KEY, category_id INTEGER NOT NULL, title TEXT NOT NULL, description TEXT DEFAULT '', downloads INTEGER DEFAULT 0, uploaded_by BIGINT DEFAULT 0, is_deleted INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT NOW())`,
     `CREATE TABLE IF NOT EXISTS bundle_files (id SERIAL PRIMARY KEY, bundle_id INTEGER NOT NULL, file_id TEXT NOT NULL, file_type TEXT DEFAULT 'document', title TEXT DEFAULT '')`,
-    `CREATE TABLE IF NOT EXISTS message_templates (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, type TEXT DEFAULT 'text', content TEXT DEFAULT '', file_id TEXT DEFAULT '', created_at TEXT DEFAULT (CURRENT_TIMESTAMP))`,
-    `CREATE TABLE IF NOT EXISTS scheduled_messages (id SERIAL PRIMARY KEY, template_id INTEGER, target TEXT DEFAULT 'all', specialty_id INTEGER DEFAULT 0, send_at TEXT, sent INTEGER DEFAULT 0, created_at TEXT DEFAULT (CURRENT_TIMESTAMP))`,
-    `CREATE TABLE IF NOT EXISTS user_states (user_id BIGINT PRIMARY KEY, state TEXT NOT NULL, updated_at TEXT DEFAULT (CURRENT_TIMESTAMP))`,
-    `CREATE TABLE IF NOT EXISTS group_chats (chat_id BIGINT PRIMARY KEY, title TEXT, specialty_id INTEGER DEFAULT 0, notify_new_files INTEGER DEFAULT 1, joined_at TEXT DEFAULT (CURRENT_TIMESTAMP))`,
+    `CREATE TABLE IF NOT EXISTS message_templates (id SERIAL PRIMARY KEY, name TEXT NOT NULL UNIQUE, type TEXT DEFAULT 'text', content TEXT DEFAULT '', file_id TEXT DEFAULT '', created_at TIMESTAMP DEFAULT NOW())`,
+    `CREATE TABLE IF NOT EXISTS scheduled_messages (id SERIAL PRIMARY KEY, template_id INTEGER, target TEXT DEFAULT 'all', specialty_id INTEGER DEFAULT 0, send_at TEXT, sent INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT NOW())`,
+    `CREATE TABLE IF NOT EXISTS user_states (user_id BIGINT PRIMARY KEY, state TEXT NOT NULL, updated_at TIMESTAMP DEFAULT NOW())`,
+    `CREATE TABLE IF NOT EXISTS group_chats (chat_id BIGINT PRIMARY KEY, title TEXT, specialty_id INTEGER DEFAULT 0, notify_new_files INTEGER DEFAULT 1, joined_at TIMESTAMP DEFAULT NOW())`,
     `CREATE TABLE IF NOT EXISTS cache_store (key TEXT PRIMARY KEY, value TEXT, expires_at BIGINT)`,
-    `CREATE TABLE IF NOT EXISTS group_members (chat_id BIGINT, user_id BIGINT, username TEXT, first_name TEXT, updated_at TEXT DEFAULT (CURRENT_TIMESTAMP), PRIMARY KEY(chat_id, user_id))`,
-    `CREATE TABLE IF NOT EXISTS reports (id SERIAL PRIMARY KEY, file_id INTEGER NOT NULL, user_id BIGINT NOT NULL, reason TEXT, status TEXT DEFAULT 'pending', created_at TEXT DEFAULT (CURRENT_TIMESTAMP))`,
-    `CREATE TABLE IF NOT EXISTS comments (id SERIAL PRIMARY KEY, file_id INTEGER NOT NULL, user_id BIGINT NOT NULL, text TEXT NOT NULL, is_deleted INTEGER DEFAULT 0, created_at TEXT DEFAULT (CURRENT_TIMESTAMP))`,
-  ];
+    `CREATE TABLE IF NOT EXISTS group_members (chat_id BIGINT, user_id BIGINT, username TEXT, first_name TEXT, updated_at TIMESTAMP DEFAULT NOW(), PRIMARY KEY(chat_id, user_id))`,
+    `CREATE TABLE IF NOT EXISTS reports (id SERIAL PRIMARY KEY, file_id INTEGER NOT NULL, user_id BIGINT NOT NULL, reason TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMP DEFAULT NOW())`,
+    `CREATE TABLE IF NOT EXISTS comments (id SERIAL PRIMARY KEY, file_id INTEGER NOT NULL, user_id BIGINT NOT NULL, text TEXT NOT NULL, is_deleted INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT NOW())`,
+    ];
 
-  for(const sql of tables) {
+    for(const sql of tables) {
     try {
       if(pg) await pg.query(sql.replace(/SERIAL/g,'BIGSERIAL'));
       else if(getSqlite()) getSqlite().exec(sql.replace(/SERIAL/g,'INTEGER').replace(/BIGINT/g,'INTEGER').replace(/BIGSERIAL/g,'INTEGER'));
       else sqlJs.run(sql.replace(/SERIAL/g,'INTEGER').replace(/BIGINT/g,'INTEGER').replace(/BIGSERIAL/g,'INTEGER'));
     } catch(e) { logger.error('Table error:', e.message.substring(0,60)); }
-  }
+    }
 
-  // pg_trgm للبحث السريع
-  if(pg) {
+    // pg_trgm للبحث السريع
+    if(pg) {
     try {
       await pg.query("CREATE EXTENSION IF NOT EXISTS pg_trgm");
       await pg.query("CREATE INDEX IF NOT EXISTS idx_files_title_trgm ON files USING GIN(title gin_trgm_ops)");
@@ -250,9 +250,9 @@ async function initSchema() {
       await pg.query("CREATE INDEX IF NOT EXISTS idx_subjects_name_trgm ON subjects USING GIN(name gin_trgm_ops)");
       logger.info('✅ pg_trgm indexes ready');
     } catch(e) { logger.warn('⚠️ pg_trgm skipped:', e.message); }
-  }
+    }
 
-  const indexes = [
+    const indexes = [
     'CREATE INDEX IF NOT EXISTS idx_files_category ON files(category_id)',
     'CREATE INDEX IF NOT EXISTS idx_files_deleted ON files(is_deleted)',
     'CREATE INDEX IF NOT EXISTS idx_files_downloads ON files(downloads DESC)',
@@ -272,8 +272,10 @@ async function initSchema() {
     'CREATE INDEX IF NOT EXISTS idx_years_specialty ON years(specialty_id)',
     'CREATE INDEX IF NOT EXISTS idx_logs_created ON logs(created_at)',
     'CREATE INDEX IF NOT EXISTS idx_user_specialties ON user_specialties(specialty_id)',
-  ];
-  for(const idx of indexes) {
+    'CREATE INDEX IF NOT EXISTS idx_user_states_updated_at ON user_states(updated_at DESC)',
+    'CREATE INDEX IF NOT EXISTS idx_scheduled_messages_send_at ON scheduled_messages(send_at)',
+    'CREATE INDEX IF NOT EXISTS idx_cache_store_expires_at ON cache_store(expires_at)',
+    ];  for(const idx of indexes) {
     try {
       if(pg) await pg.query(idx);
       else if(getSqlite()) getSqlite().exec(idx);

@@ -122,7 +122,7 @@ const getActiveUsers = async (days=7) => {
   const key='active_users_'+days;
   const cached=cacheGet(key);
   if(cached) return cached;
-  const rows=await all(`SELECT id FROM users WHERE is_banned=0 AND last_active >= NOW() - INTERVAL '${parseInt(days)} days'`);
+  const rows=await all(`SELECT id FROM users WHERE is_banned=0 AND last_active >= NOW() - (parseInt(days) || ' days')::interval`);
   const ids=rows.map(r=>r.id);
   cacheSet(key,ids,600000);
   return ids;
