@@ -357,11 +357,12 @@ bot.command('dlt', async ctx => {
   ctx.deleteMessage().catch(()=>{});
   const stored = global._botMsgs?.[ctx.chat.id] || [];
   let deleted = 0;
+  console.log('DLT debug — chat:', ctx.chat.id, 'stored:', stored.length, 'ids:', stored);
   for(const msgId of stored){
-    try{ await ctx.telegram.deleteMessage(ctx.chat.id, msgId); deleted++; }catch(e){}
+    try{ await ctx.telegram.deleteMessage(ctx.chat.id, msgId); deleted++; }catch(e){ console.log('del err:', msgId, e.message); }
   }
   if(global._botMsgs) global._botMsgs[ctx.chat.id] = [];
-  const m = await ctx.reply('✅ حُذف '+deleted+' رسالة');
+  const m = await ctx.reply('✅ حُذف '+deleted+' رسالة — كان عندي '+stored.length+' محفوظة');
   setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), 3000);
 });
 
