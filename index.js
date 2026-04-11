@@ -163,7 +163,7 @@ bot.use(async (ctx, next) => {
     if(ctx.callbackQuery) return next();
     // رسائل — امنع إلا /search و /setsp
     const text = ctx.message?.text || '';
-    const allowed = text.startsWith('/search') || text.startsWith('/setsp');
+    const allowed = text.startsWith('/search') || text.startsWith('/setsp') || text.startsWith('/dlt');
     if(ctx.message && !allowed) {
       ctx.deleteMessage().catch(()=>{});
       return;
