@@ -155,11 +155,14 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
   const pathStr = buildPath([sp?.name,yr?.name,sm?.name,sb?.name,cat?.name]);
   let text = pathStr+'\n━━━━━━━━━━━━\n'+(total?'📄 *'+total+' ملف*':t(uid,'no_files'));
   const fileIds = list.map(f=>f.id);
-  // جلب فقط فاوريت ورتينج بدون قراءة الكاش مرتين
-  const [favMap, ratingMap] = await Promise.all([
-    interactions.getFavBatch(uid, fileIds),
-    interactions.getRatingBatch(fileIds)
-  ]);
+  // ratings = static (نفس لكل الناس) | favs = personal
+  const ratingKey='ratingbatch_static_'+catId+'_'+page;
+  let ratingMap=cacheGet(ratingKey);
+  if(!ratingMap) {
+    ratingMap=await interactions.getRatingBatch(fileIds);
+    cacheSet(ratingKey,ratingMap,3600000);
+  }
+  const favMap = await interactions.getFavBatch(uid, fileIds);
   const rows = list.map(f=>{
     const fav = favMap[f.id]||false;
     const avg = ratingMap[f.id]||0;
@@ -184,7 +187,7 @@ async function showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
   }
   rows.push(backMenu('sbs_'+spId+'_'+yrId+'_'+smId+'_'+sbId));
   const extra={parse_mode:'Markdown',...build(rows)};
-  cacheSet(userKey,{text,extra},600000);
+  cacheSet(userKey,{text,extra},3600000);
 
   // pre-warm preview cache للملفات المعروضة — في الخلفية
   setImmediate(() => {
