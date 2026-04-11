@@ -46,6 +46,7 @@ const incDownloads = async id => {
 };
 
 const softDelete = async id => {
+  if(global._clearSearchCache) global._clearSearchCache();
   const f=await get('SELECT category_id FROM files WHERE id=?',[id]);
   await run('UPDATE files SET is_deleted=1 WHERE id=?',[id]);
   cacheClear('file_'+id);

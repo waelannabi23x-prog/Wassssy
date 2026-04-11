@@ -181,6 +181,7 @@ bot.command(['admin', 'owner', 'manage'], ctx => {
 });
 // cache ذكي للبحث في القروب
 const _grpSearchCache = new Map();
+global._clearSearchCache = () => _grpSearchCache.clear();
 function _getGSC(q) {
   const k = q.toLowerCase().trim();
   const c = _grpSearchCache.get(k);
