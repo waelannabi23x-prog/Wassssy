@@ -365,15 +365,21 @@ bot.on('callback_query', async ctx => {
     // Group Specialty (Owner only)
     if (data.startsWith('grp_sp_')) {
       if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', {show_alert:true}).catch(()=>{});
-      // grp_sp_{chatId}_{specId} — chatId قد يكون سالب
       const raw = data.replace('grp_sp_', '');
       const lastUs = raw.lastIndexOf('_');
       const chatId = parseInt(raw.substring(0, lastUs));
       const specId = parseInt(raw.substring(lastUs + 1));
-      await dbRun('INSERT INTO group_chats(chat_id,specialty_id) VALUES(?,?) ON CONFLICT(chat_id) DO UPDATE SET specialty_id=?',[chatId,specId,specId]);
-      const specs = await dbAll('SELECT name FROM specialties WHERE id=?',[specId]);
-      await ctx.answerCbQuery('✅ تم', {show_alert:false}).catch(()=>{});
-      await ctx.editMessageText('✅ تخصص القروب: 🎓 '+(specs[0]?.name||specId)).catch(()=>{});
+      try {
+        await dbRun('INSERT INTO group_chats(chat_id,specialty_id) VALUES(?,?) ON CONFLICT(chat_id) DO UPDATE SET specialty_id=?',[chatId,specId,specId]);
+        const specs = await dbAll('SELECT name FROM specialties WHERE id=?',[specId]);
+        const spName = specs[0]?.name || String(specId);
+        await ctx.answerCbQuery('✅ ' + spName, {show_alert:false}).catch(()=>{});
+        await ctx.telegram.editMessageText(chatId, ctx.callbackQuery.message.message_id, null,
+          '✅ تخصص القروب: 🎓 ' + spName).catch(()=>{});
+      } catch(e) {
+        console.error('grp_sp error:', e.message);
+        await ctx.answerCbQuery('❌ ' + e.message, {show_alert:true}).catch(()=>{});
+      }
       return;
     }
 

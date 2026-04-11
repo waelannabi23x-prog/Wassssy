@@ -31,7 +31,7 @@ async function mainMenu(ctx){
     rows.push([btn('👑 الإداريون','mg_admins')]);
     rows.push([btn('💾 نسخ احتياطي','mg_backup'),btn(global.maintenanceMode?'🟢 إيقاف الصيانة':'🔴 وضع الصيانة','mg_maint')]);
     rows.push([btn('♻️ استعادة','mg_restore'),btn('🗑 سلة المحذوفات','mg_trash')]);
-    rows.push([btn('🔔 إشعار للمستخدمين','mg_notify')]);
+    rows.push([btn('🔔 إشعار للمستخدمين','mg_notify'),btn('📣 إشعار القروبات','mg_notify_groups')]);
   rows.push([btn('🚩 البلاغات','mg_reports')]);
     rows.push([btn('📨 نظام الرسائل','mg_msgs')]);
     rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp')]);
@@ -441,6 +441,23 @@ async function handleText(ctx,state){
         ctx.reply('✅ تم الإرسال لـ *'+spSent+'* مستخدم',{parse_mode:'Markdown',...build([back('mg_menu')])});
         break;
       }
+      case 'mg_notify_groups_msg':{
+        clearState(uid);
+        const spId=state.spId;
+        const groups = spId==='0'
+          ? await all('SELECT chat_id,title FROM group_chats')
+          : await all('SELECT chat_id,title FROM group_chats WHERE specialty_id=?',[spId]);
+        let gSent=0, gFail=0;
+        for(const g of groups){
+          try{
+            await ctx.telegram.sendMessage(g.chat_id,'📣 *إشعار*\n\n'+text,{parse_mode:'Markdown'});
+            gSent++;
+          }catch(e){ gFail++; }
+          await new Promise(r=>setTimeout(r,100));
+        }
+        ctx.reply('✅ أُرسل لـ *'+gSent+'* قروب'+(gFail?' | ❌ فشل: '+gFail:''),{parse_mode:'Markdown',...build([back('mg_menu')])});
+        break;
+      }
       case 'mg_notify_msg':{
         clearState(uid);
         const nIds=await interactions.getActiveUsers(7); let nSent=0;
@@ -519,6 +536,19 @@ async function handleCallback(ctx,data){
     return eos(ctx,'🎓 اختر التخصص لإرسال الإشعار:',{parse_mode:'Markdown',...build(rows)});
   }
   if(data.startsWith('mg_notify_sp_')&&!data.startsWith('mg_notify_sp_msg')){const spId=data.replace('mg_notify_sp_','');setState(uid,{type:'mg_notify_sp_msg',spId});return ctx.reply('📝 رسالة الإشعار:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
+  if(data==='mg_notify_groups'){
+    const specs=await content.getSpecs();
+    const rows=specs.map(s=>[btn('🎓 '+s.name,'mg_ng_sp_'+s.id)]);
+    rows.push([btn('📣 كل القروبات','mg_ng_sp_0')]);
+    rows.push([back('mg_menu')]);
+    return eos(ctx,'📣 *إشعار القروبات*\n\nاختر التخصص:',{parse_mode:'Markdown',...build(rows)});
+  }
+  if(data.startsWith('mg_ng_sp_')){
+    const spId=data.replace('mg_ng_sp_','');
+    setState(uid,{type:'mg_notify_groups_msg',spId});
+    const label=spId==='0'?'كل القروبات':'قروبات التخصص';
+    return ctx.reply('📝 اكتب رسالة الإشعار لـ '+label+':\n_(أو /cancel)_',{parse_mode:'Markdown'});
+  }
   if(data==='mg_msgs') return showMsgsMenu(ctx);
   if(data==='mg_templates') return showTemplates(ctx);
   if(data==='mg_add_template'){setState(uid,{type:'mg_tpl_name'});return ctx.reply('📝 *قالب جديد*\n\nأرسل اسم القالب:',{parse_mode:'Markdown',...build([[btn('❌ إلغاء','mg_templates')]])});}
