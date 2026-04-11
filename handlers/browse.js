@@ -167,7 +167,12 @@ async function _showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
     ratingMap=await interactions.getRatingBatch(fileIds);
     cacheSet(ratingKey,ratingMap,3600000);
   }
-  const favMap = await interactions.getFavBatch(uid, fileIds);
+  const favKey='favbatch_'+uid+'_'+catId+'_'+page;
+  let favMap=cacheGet(favKey);
+  if(!favMap) {
+    favMap=await interactions.getFavBatch(uid, fileIds);
+    cacheSet(favKey,favMap,300000);
+  }
   const rows = list.map(f=>{
     const fav = favMap[f.id]||false;
     const avg = ratingMap[f.id]||0;
