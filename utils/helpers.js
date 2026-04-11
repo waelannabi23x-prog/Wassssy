@@ -18,9 +18,6 @@ async function eos(ctx, text, extra={}) {
   const msg = ctx.callbackQuery?.message;
   if(msg) {
     try {
-      const sameText = msg.text === text;
-      const sameKb = JSON.stringify(msg.reply_markup) === JSON.stringify(extra.reply_markup);
-      if(sameText && sameKb) return; // لا تغيير = لا طلب
       return await ctx.editMessageText(text, extra);
     } catch(e) {
       if(e.description?.includes('message is not modified')) return;
