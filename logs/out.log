@@ -558,3 +558,5 @@
 [2026-04-11 15:37:31] [INFO] ✅ Scheduler started
 [2026-04-11 15:37:31] [INFO] ✅ Express on port 3000
 [2026-04-11 15:37:31] [INFO] 🚀 Study Bot v3.2 — FIXED & OPTIMIZED
+[2026-04-11 16:12:14] [INFO] ✅ Using PostgreSQL
+[2026-04-11 16:12:23] [INFO] ✅ pg_trgm indexes ready

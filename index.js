@@ -360,6 +360,7 @@ bot.command('dlt', async ctx => {
   const dbIds = dbMsgs.map(r => r.message_id);
   const memIds = global._botMsgs?.[ctx.chat.id] || [];
   const allIds = [...new Set([...dbIds, ...memIds])];
+  console.log('DLT — chat_id:', ctx.chat.id, 'db:', dbIds.length, 'mem:', memIds.length, 'total:', allIds.length);
   let deleted = 0;
   for(const msgId of allIds){
     try{ await ctx.telegram.deleteMessage(ctx.chat.id, msgId); deleted++; }catch(e){}
