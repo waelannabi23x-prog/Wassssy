@@ -213,6 +213,7 @@ async function smartSearch(rawQ, limit=10) {
   const words = q.split(/\s+/).filter(w => w.length >= 2);
   if(words.length > 1) {
     const extras = new Map();
+    const existingIds = new Set(results.map(x => x.id));
     const wordResults = await Promise.all(words.map(async w => {
       const wr = _getGSC(w) || await filesDb.search(w, limit);
       _setGSC(w, wr);
@@ -220,7 +221,7 @@ async function smartSearch(rawQ, limit=10) {
     }));
     for(const { w, wr } of wordResults) {
       for(const r of wr) {
-        if(!results.find(x=>x.id===r.id)) extras.set(r.id, r);
+        if(!existingIds.has(r.id)) { extras.set(r.id, r); existingIds.add(r.id); }
       }
     }
     results = [...results, ...extras.values()].slice(0, limit);

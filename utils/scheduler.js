@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const { all, run } = require('../database/db');
 const messagesDb = require('../database/messages');
+const logger = require('./logger');
 
 const BACKUP_DIR = path.join(__dirname, '../backups');
 let isRunning = false;
@@ -60,9 +61,9 @@ async function checkScheduledMessages(bot) {
       }
 
       await messagesDb.markSent(msg.id);
-      console.log(`📨 Broadcast "${msg.name}" — ✅${sent} ❌${failed}`);
+      logger.info(`📨 Broadcast "${msg.name}" — ✅${sent} ❌${failed}`);
     }
-  } catch(e) { console.error('Scheduler error:', e.message); }
+  } catch(e) { logger.error('Scheduler error:', e.message); }
   isRunning = false;
 }
 
@@ -81,17 +82,17 @@ async function sendBackupStats(bot, ownerIds) {
     for(const oid of ownerIds) {
       bot.telegram.sendMessage(oid, msg, { parse_mode:'Markdown' }).catch(()=>{});
     }
-  } catch(e) { console.error('Backup stats error:', e.message); }
+  } catch(e) { logger.error('Backup stats error:', e.message); }
 }
 
 async function dailyCleanup() {
   try {
     await run(`DELETE FROM files WHERE is_deleted=1 AND uploaded_at < NOW() - INTERVAL '30 days'`);
     await run(`DELETE FROM logs WHERE created_at < NOW() - INTERVAL '30 days'`);
-    await run(`DELETE FROM history WHERE id NOT IN (SELECT id FROM history ORDER BY viewed_at DESC LIMIT 100000)`);
+    await run(`DELETE FROM history WHERE viewed_at < NOW() - INTERVAL '90 days'`);
     await run(`DELETE FROM cache_store WHERE expires_at < $1`, [Date.now()]);
-    console.log('✅ Daily cleanup done');
-  } catch(e) { console.error('Cleanup error:', e.message); }
+    logger.info('✅ Daily cleanup done');
+  } catch(e) { logger.error('Cleanup error:', e.message); }
 }
 
 function scheduleDaily(fn) {
@@ -108,7 +109,7 @@ function startScheduler(bot, ownerIds) {
   setTimeout(() => checkScheduledMessages(bot), 5000);
   scheduleDaily(() => sendBackupStats(bot, ownerIds));
   scheduleDaily(dailyCleanup);
-  console.log('✅ Scheduler started');
+  logger.info('✅ Scheduler started');
 }
 
 module.exports = { startScheduler };

@@ -353,7 +353,12 @@ async function showBundle(ctx,bundleId,spId,yrId,smId,sbId,catId) {
 }
 
 async function sendBundle(ctx,bundleId,spId,yrId,smId,sbId,catId) {
-  const [b, files] = await Promise.all([bundlesDb.getBundle(bundleId), bundlesDb.getBundleFiles(bundleId)]);
+  const bkey='bundle_full_'+bundleId;
+  const bcached=cacheGet(bkey);
+  const [b, files] = bcached
+    ? [bcached.b, bcached.files]
+    : await Promise.all([bundlesDb.getBundle(bundleId), bundlesDb.getBundleFiles(bundleId)]);
+  if(!bcached && b) cacheSet(bkey,{b,files},600000);
   if(!files.length) return ctx.reply('الحزمة فارغة');
   bundlesDb.incBundleDownloads(bundleId).catch(()=>{});
   await ctx.reply('📦 *'+escMd(b.title)+'* — جاري الإرسال...',{parse_mode:'Markdown'});
