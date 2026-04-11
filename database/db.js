@@ -243,6 +243,17 @@ async function initSchema() {
     } catch(e) { logger.error('Table error:', e.message.substring(0,60)); }
   }
 
+  // pg_trgm للبحث السريع
+  if(pg) {
+    try {
+      await pg.query("CREATE EXTENSION IF NOT EXISTS pg_trgm");
+      await pg.query("CREATE INDEX IF NOT EXISTS idx_files_title_trgm ON files USING GIN(title gin_trgm_ops)");
+      await pg.query("CREATE INDEX IF NOT EXISTS idx_files_desc_trgm ON files USING GIN(description gin_trgm_ops)");
+      await pg.query("CREATE INDEX IF NOT EXISTS idx_subjects_name_trgm ON subjects USING GIN(name gin_trgm_ops)");
+      logger.info('✅ pg_trgm indexes ready');
+    } catch(e) { logger.warn('⚠️ pg_trgm skipped:', e.message); }
+  }
+
   const indexes = [
     'CREATE INDEX IF NOT EXISTS idx_files_category ON files(category_id)',
     'CREATE INDEX IF NOT EXISTS idx_files_deleted ON files(is_deleted)',
