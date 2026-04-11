@@ -535,6 +535,19 @@ async function handleCallback(ctx,data){
     rows.push(back('mg_menu'));
     return eos(ctx,'🎓 اختر التخصص لإرسال الإشعار:',{parse_mode:'Markdown',...build(rows)});
   }
+  if(data==='mg_notify_groups'){
+    const specs=await content.getSpecs();
+    const rows=specs.map(s=>[btn('🎓 '+s.name,'mg_ng_sp_'+s.id)]);
+    rows.push([btn('📣 كل القروبات','mg_ng_sp_0')]);
+    rows.push([back('mg_menu')]);
+    return eos(ctx,'📣 *إشعار القروبات*\n\nاختر التخصص:',{parse_mode:'Markdown',...build(rows)});
+  }
+  if(data.startsWith('mg_ng_sp_')){
+    const spId=data.replace('mg_ng_sp_','');
+    setState(uid,{type:'mg_notify_groups_msg',spId});
+    const label=spId==='0'?'كل القروبات':'قروبات التخصص';
+    return ctx.reply('📝 اكتب رسالة الإشعار لـ '+label+':\n_(أو /cancel)_',{parse_mode:'Markdown'});
+  }
   if(data.startsWith('mg_notify_sp_')&&!data.startsWith('mg_notify_sp_msg')){const spId=data.replace('mg_notify_sp_','');setState(uid,{type:'mg_notify_sp_msg',spId});return ctx.reply('📝 رسالة الإشعار:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
   if(data==='mg_notify_groups'){
     const specs=await content.getSpecs();
