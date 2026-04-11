@@ -11,6 +11,7 @@ const {isOwner}=require('../middlewares/auth');
 const path=require('path');
 const bundlesDb=require('../database/bundles');
 const { cacheGet, cacheSet, cacheClear, cacheClearPrefix } = require('../utils/cache');
+const { notifyGroupsNewFile } = require('../utils/groupNotify');
 const messagesDb=require('../database/messages');
 const {all, run: dbRun, getSetting, setSetting, DB_PATH}=require('../database/db');
 
@@ -353,9 +354,10 @@ async function handleFileUpload(ctx){
   else if(isLink){fid=msgText;ftype='link';}
   else return ctx.reply('ارسل ملف او رابط. او /cancel');
   try{
-    await filesDb.addFile(state.catId,state.title,state.desc||'',fid,ftype,uid,ftype==='link'?msgText:'');
+    const newFile = await filesDb.addFile(state.catId,state.title,state.desc||'',fid,ftype,uid,ftype==='link'?msgText:'');
     await interactions.addLog(uid,'upload',state.title);
     clearState(uid);
+    if(newFile && global.__bot) notifyGroupsNewFile(global.__bot, newFile).catch(()=>{});
     ctx.reply('✅ *'+escMd(state.title)+'* رُفع بنجاح!',{parse_mode:'Markdown',...build([[btn('➕ رفع آخر','mg_upl_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId+'_'+state.catId)],[btn('📁 عرض الملفات','mg_fls_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId+'_'+state.catId)]])});
   }catch(e){clearState(uid);ctx.reply(e.message==='exists'?'❌ يوجد ملف بهذا الاسم بالفعل!':'❌ فشل الرفع: '+e.message);}
 }

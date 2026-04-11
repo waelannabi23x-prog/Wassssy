@@ -163,11 +163,37 @@ bot.command(['admin', 'owner', 'manage'], ctx => {
   if (!ctx.isAdmin) return ctx.reply('🚫 ليس لديك صلاحية.');
   manage.mainMenu(ctx);
 });
-bot.command('search', ctx => {
-  const q = ctx.message.text.replace('/search', '').trim();
-  if (q) return userH.handleSearch(ctx, q);
-  global.setState(ctx.uid, { type: 'search' });
-  ctx.reply('🔍 اكتب كلمة البحث:');
+bot.command('search', async ctx => {
+  const q = ctx.message.text.replace('/search','').replace(/@\w+/,'').trim();
+  const isGroup = ctx.chat?.type !== 'private';
+  if(isGroup) {
+    if(!q) {
+      const m = await ctx.reply('استخدم: /search اسم الملف');
+      setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), 5000);
+      return;
+    }
+    const results = await filesDb.search(q, 8);
+    if(!results.length) {
+      const m = await ctx.reply('لا نتائج لـ: ' + q);
+      setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), 8000);
+      return;
+    }
+    const me = await ctx.telegram.getMe();
+    const rows = results.map(f => [{
+      text: '📄 '+f.title.substring(0,35)+' · '+f.sub_name,
+      url: 'https://t.me/'+me.username+'?start=file_'+f.id
+    }]);
+    rows.push([{text:'🤖 فتح البوت', url:'https://t.me/'+me.username}]);
+    const m = await ctx.reply(
+      'نتائج "'+q+'" ('+results.length+')\nاضغط للتحميل في الخاص:',
+      {reply_markup:{inline_keyboard:rows}}
+    );
+    setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), 60000);
+    return;
+  }
+  if(q) return userH.handleSearch(ctx, q);
+  global.setState(ctx.uid, {type:'search'});
+  ctx.reply('اكتب كلمة البحث:');
 });
 bot.command('profile', ctx => userH.showProfile(ctx));
 bot.command('stats', ctx => userH.showStats(ctx));
@@ -360,10 +386,14 @@ bot.on('message', async (ctx, next) => {
   const uid = ctx.uid;
   const state = global.userStates?.[uid];
 
-  // Auto-leave non-private chats
-  if (ctx.chat?.type !== 'private') {
-    try { await ctx.telegram.leaveChat(ctx.chat.id); } catch(e) {}
-    return;
+  if(ctx.chat?.type !== 'private') {
+    if(ctx.from && !ctx.from.is_bot) {
+      dbRun(
+        'INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at) VALUES(?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(chat_id,user_id) DO UPDATE SET username=EXCLUDED.username,first_name=EXCLUDED.first_name,updated_at=CURRENT_TIMESTAMP',
+        [ctx.chat.id, ctx.from.id, ctx.from.username||'', ctx.from.first_name||'']
+      ).catch(()=>{});
+    }
+    return next();
   }
 
   if (state?.type !== 'mg_bundle_files') return next();
@@ -459,15 +489,27 @@ bot.on('text', async ctx => {
 
 // ── Auto-leave Groups ──
 bot.on('my_chat_member', async ctx => {
-  const chat = ctx.myChatMember.chat;
-  if (chat.type !== 'private') {
+  const chat = ctx.myChatMember?.chat;
+  const member = ctx.myChatMember?.new_chat_member;
+  if(!chat || chat.type === 'private') return;
+  const botId = (await ctx.telegram.getMe()).id;
+  if(member?.user?.id !== botId) return;
+  if(['member','administrator'].includes(member?.status)) {
     try {
       await dbRun(
-        'INSERT INTO group_chats(chat_id,title) VALUES(?,?) ON CONFLICT(chat_id) DO NOTHING',
-        [chat.id, chat.title || '']
+        'INSERT INTO group_chats(chat_id,title) VALUES(?,?) ON CONFLICT(chat_id) DO UPDATE SET title=EXCLUDED.title',
+        [chat.id, chat.title||'']
       );
-      await ctx.telegram.leaveChat(chat.id);
-    } catch(e) {}
+      const specs = await dbAll('SELECT id,name FROM specialties WHERE is_deleted=0 ORDER BY id');
+      const rows = specs.map(s=>[{text:'🎓 '+s.name, callback_data:'grp_sp_'+chat.id+'_'+s.id}]);
+      await ctx.telegram.sendMessage(chat.id,
+        'مرحباً! أنا بوت الدراسة\n\nاختر تخصص هذا القروب:',
+        {reply_markup:{inline_keyboard:rows}}
+      );
+    } catch(e) { console.error('Group join:', e.message); }
+  } else if(['left','kicked'].includes(member?.status)) {
+    dbRun('DELETE FROM group_chats WHERE chat_id=?',[chat.id]).catch(()=>{});
+    dbRun('DELETE FROM group_members WHERE chat_id=?',[chat.id]).catch(()=>{});
   }
 });
 
@@ -500,6 +542,7 @@ async function launch() {
       max_connections: 40
     });
 
+    global.__bot = bot;
     console.log('🚀 Study Bot v3.2 — FIXED & OPTIMIZED');
   } catch(e) {
     console.error('Launch error:', e.message);

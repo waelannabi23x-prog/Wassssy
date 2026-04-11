@@ -195,3 +195,4 @@
 2026-04-10 22:37:09: DB all error: Connection terminated due to connection timeout | SQL: SELECT f.*,c.name as cat_name,s.name as sub_name FROM files f JOIN categories c ON f.category_id=c.i
 2026-04-10 22:37:09: DB all error: Connection terminated due to connection timeout | SQL: SELECT * FROM bundles WHERE category_id=$1 AND is_deleted=0 ORDER BY created_at DESC
 2026-04-10 22:37:22: Launch error: request to https://api.telegram.org/bot8633599060:[REDACTED]/setWebhook failed, reason: read ECONNRESET
+2026-04-10 23:47:16: Table error: Connection terminated due to connection timeout
