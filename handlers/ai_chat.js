@@ -62,10 +62,8 @@ async function handleAiChat(ctx, text) {
   if(ctx.chat?.type !== 'private') return false;
 
   // فقط الجمل الطويلة أو اللي فيها علامة سؤال
-  const isQuestion = text.includes('?') || text.includes('؟') ||
-    text.includes('هل') || text.includes('عندك') || text.includes('فيه') ||
-    text.includes('أبحث') || text.includes('نحتاج') || text.length > 15;
-  if(!isQuestion) return false;
+  // أي نص أكثر من 3 حروف يعالجه AI
+  if(text.length < 3) return false;
 
   // typing indicator
   ctx.telegram.sendChatAction(ctx.chat.id, 'typing').catch(()=>{});
