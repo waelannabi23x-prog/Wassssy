@@ -392,7 +392,10 @@ bot.on('callback_query', async ctx => {
       const f = await filesDb.getFile(fid);
       if (!f) return ctx.answerCbQuery('❌ الملف غير موجود').catch(()=>{});
       try {
-        await ctx.telegram.sendDocument(ctx.chat.id, f.file_id, {caption:'📄 '+f.title+(f.sub_name?'\n📚 '+f.sub_name:'')});
+        const cap = '📄 '+f.title+(f.sub_name?'\n📚 '+f.sub_name:'');
+        if(f.file_type === 'photo') await ctx.telegram.sendPhoto(ctx.chat.id, f.file_id, {caption:cap});
+        else if(f.file_type === 'link') await ctx.telegram.sendMessage(ctx.chat.id, cap+'\n🔗 '+f.file_id);
+        else await ctx.telegram.sendDocument(ctx.chat.id, f.file_id, {caption:cap});
         await ctx.answerCbQuery('✅ تم الإرسال').catch(()=>{});
       } catch(e) { await ctx.answerCbQuery('❌ '+e.message,{show_alert:true}).catch(()=>{}); }
       return;
