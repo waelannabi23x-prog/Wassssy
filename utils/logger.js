@@ -9,7 +9,7 @@ function timestamp() {
   return new Date().toISOString().replace('T', ' ').substring(0, 19);
 }
 
-function rotate(file) {
+async function rotate(file) {
   try {
       try {
         await fs.promises.access(file);
