@@ -3,27 +3,21 @@ const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const filesDb = require('../database/files');
 const { build, btn } = require('../utils/keyboard');
 const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
-const GROQ_MODEL = 'llama-3.1-8b-instant';
+const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
 // استخرج كلمات البحث من سؤال المستخدم
 async function extractSearchQuery(userMsg) {
-  const prompt = `Extract search keywords from this student question about university files.
-Question: "${userMsg}"
-Return ONLY a JSON: {"query": "keywords to search", "is_question": true/false}
-Examples:
-- "هل عندك حل serie algo 2" → {"query": "serie algo 2", "is_question": true}
-- "algo serie 3" → {"query": "algo serie 3", "is_question": false}
-- "أبحث عن cours analyse 1" → {"query": "cours analyse 1", "is_question": true}
-No explanation, just JSON.`;
-  try {
-    const res = await groq.chat.completions.create({
-      model: GROQ_MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 50,
-      temperature: 0.1
-    });
-    return JSON.parse(res.choices[0].message.content.trim());
-  } catch(e) { return { query: userMsg, is_question: false }; }
+  // ترجمة دارجة/عربي مباشرة بدون AI
+  let q = userMsg
+    .replace(/الغوا|الغوارزميات|algorithmique/gi, 'algo')
+    .replace(/سيري|سلسلة/gi, 'serie')
+    .replace(/كور|محاضرة/gi, 'cours')
+    .replace(/حل|solution/gi, 'solution')
+    .replace(/امتحان|اختبار/gi, 'exam')
+    .replace(/[؟?،,]/g, '')
+    .replace(/هل|عندك|يوجد|فيه|أبحث|نحتاج|بغيت|عطيني|ماذا|فل|في/gi, '')
+    .replace(/\s+/g, ' ').trim();
+  return { query: q };
 }
 
 // صيغ رد ذكي بناءً على النتائج
