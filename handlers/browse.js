@@ -1,4 +1,4 @@
-const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');');
+const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
 const { handleSummarize } = require('./summarize');
 const { cacheGet, cacheSet } = require('../utils/cache');
 const reportsDb = require('../database/reports');
