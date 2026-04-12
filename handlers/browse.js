@@ -1,4 +1,5 @@
-const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
+const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');');
+const { handleSummarize } = require('./summarize');
 const { cacheGet, cacheSet } = require('../utils/cache');
 const reportsDb = require('../database/reports');
 
@@ -257,7 +258,7 @@ async function _showPreview(ctx,fid,spId,yrId,smId,sbId,catId) {
   const backCb = catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
   const ratingBtns = [1,2,3,4,5].map(i=>btn(i<=userRating?'⭐':'☆','rate_'+fid+'_'+i+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId));
   const rows = [
-    [btn('⬇️ تحميل الملف','fl_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)],
+    [btn('⬇️ تحميل الملف','fl_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId),(f.file_type==='document'?btn('📝 ملخص','sum_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId):null)].filter(Boolean),
     [btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid), btn('💬 تعليقات ('+commentCount+')','cmt_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)],
     ratingBtns,
     [btn(alreadyReported?'🚩 تم التبليغ':'⚠️ تبليغ عن مشكلة', alreadyReported?'noop':'report_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)],
