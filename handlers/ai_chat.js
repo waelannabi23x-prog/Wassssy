@@ -103,7 +103,7 @@ async function handleAiChat(ctx, text) {
     const reply = await groqChat([
       { role: 'system', content: SYSTEM + fileContext },
       ...getHistory(uid)
-    ], 600, 0.65);
+    ], 1200, 0.65);
 
     addMessage(uid, 'assistant', reply);
 
