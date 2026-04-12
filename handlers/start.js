@@ -89,6 +89,10 @@ async function showMainMenu(ctx, name) {
   return eos(ctx, welcome, { parse_mode: 'Markdown', ...build(rows) });
 }
 
+startHandler.clearAiMode = async (uid) => {
+  const state = global.userStates?.[uid];
+  if(state?.type === 'ai_mode') await global.delState(uid);
+};
 module.exports = startHandler;
 module.exports.showMainMenu = showMainMenu;
 module.exports.askSpecialty = askSpecialty;

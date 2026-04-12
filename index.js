@@ -189,7 +189,10 @@ bot.catch((err, ctx) => {
 });
 
 // ── Commands ──
-bot.command('start', startHandler);
+bot.command('start', async ctx => {
+  if(startHandler.clearAiMode) await startHandler.clearAiMode(ctx.uid);
+  return startHandler(ctx);
+});
 bot.command(['admin', 'owner', 'manage'], ctx => {
   if (!ctx.isAdmin) return ctx.reply('🚫 ليس لديك صلاحية.');
   manage.mainMenu(ctx);
@@ -373,6 +376,11 @@ bot.command('dlt', async ctx => {
   dbRun('DELETE FROM group_bot_msgs WHERE chat_id=$1',[ctx.chat.id]).catch(()=>{});
   const m = await ctx.reply('✅ حُذف '+deleted+' رسالة');
   setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), 3000);
+});
+
+bot.command('ai', async ctx => {
+  await global.setState(ctx.uid, { type: 'ai_mode' });
+  ctx.reply('🤖 وضع المساعد الذكي مفعل!\n\nاكتب أي سؤال وسأجاوبك.\nاكتب /start للرجوع للقائمة الرئيسية.');
 });
 
 bot.command('reset', ctx => {
@@ -681,17 +689,16 @@ bot.on('text', async ctx => {
   if (ctx.message.text.startsWith('/')) return;
   const uid = ctx.uid;
   const state = global.userStates?.[uid];
-  if (!state) {
-    if (ctx.chat?.type === 'private') {
-      // owner AI commands
-      if(ctx.isOwner) {
-        const handled = await handleOwnerAI(ctx, ctx.message.text.trim(), null, null);
-        if(handled) return;
-      }
-      const handled = await handleAiChat(ctx, ctx.message.text.trim());
-      if(handled) return;
+  if (!state) return;
+  
+  // وضع AI
+  if (state?.type === 'ai_mode' && ctx.chat?.type === 'private') {
+    if(ctx.isOwner) {
+      const ownerHandled = await handleOwnerAI(ctx, ctx.message.text.trim(), null, null);
+      if(ownerHandled) return;
     }
-    return;
+    const handled = await handleAiChat(ctx, ctx.message.text.trim());
+    if(handled) return;
   }
   if (state.type === 'mg_file') return manage.handleFileUpload(ctx);
   if (state.type === 'mg_bulk_prefix' || state.type === 'mg_bulk_files') {
