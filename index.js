@@ -20,7 +20,7 @@ const contentDb = require('./database/content');
 const bundlesDb = require('./database/bundles');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { eos } = require('./utils/helpers');
-const { handleAiChat } = require('./handlers/ai_chat');
+const { handleAiChat, resetChat } = require('./handlers/ai_chat');
 const { cacheWarmup } = require('./utils/cache');
 const { precomputeAll } = require('./utils/precompute');
 const { setLang } = require('./utils/i18n');
@@ -372,6 +372,11 @@ bot.command('dlt', async ctx => {
   dbRun('DELETE FROM group_bot_msgs WHERE chat_id=$1',[ctx.chat.id]).catch(()=>{});
   const m = await ctx.reply('✅ حُذف '+deleted+' رسالة');
   setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}), 3000);
+});
+
+bot.command('reset', ctx => {
+  resetChat(ctx.uid);
+  ctx.reply('🔄 تم مسح سياق المحادثة. ابدأ من جديد!');
 });
 
 bot.command('cancel', ctx => {

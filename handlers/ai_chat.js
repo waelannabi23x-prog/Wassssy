@@ -5,102 +5,123 @@ const { build, btn } = require('../utils/keyboard');
 const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
 
-// استخرج كلمات البحث من سؤال المستخدم
-async function extractSearchQuery(userMsg) {
-  // ترجمة دارجة/عربي مباشرة بدون AI
-  let q = userMsg
-    .replace(/الغوا|الغوارزميات|algorithmique/gi, 'algo')
-    .replace(/سيري|سلسلة/gi, 'serie')
-    .replace(/كور|محاضرة/gi, 'cours')
-    .replace(/حل|solution/gi, 'solution')
-    .replace(/امتحان|اختبار/gi, 'exam')
-    .replace(/[؟?،,]/g, '')
-    .replace(/هل|عندك|يوجد|فيه|أبحث|نحتاج|بغيت|عطيني|ماذا|فل|في/gi, '')
-    .replace(/\s+/g, ' ').trim();
-  return { query: q };
+// حفظ سياق المحادثة لكل مستخدم (آخر 6 رسائل)
+const _convHistory = new Map();
+function getHistory(uid) {
+  return _convHistory.get(uid) || [];
+}
+function addToHistory(uid, role, content) {
+  const hist = getHistory(uid);
+  hist.push({ role, content });
+  if(hist.length > 6) hist.splice(0, hist.length - 6);
+  _convHistory.set(uid, hist);
+}
+function clearHistory(uid) {
+  _convHistory.delete(uid);
 }
 
-// صيغ رد ذكي بناءً على النتائج
-async function generateReply(userMsg, results) {
-  if(!results.length) {
-    const prompt = `Student asked: "${userMsg}"
-No files found. Reply in the same language as the question (Arabic/French/Darija) in 1 sentence saying sorry not found and suggest they try different keywords. Be friendly and short.`;
-    try {
-      const res = await groq.chat.completions.create({
-        model: GROQ_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        max_tokens: 80,
-        temperature: 0.7
-      });
-      return res.choices[0].message.content.trim();
-    } catch(e) { return 'ما لقيت نتائج. جرب كلمات أخرى.'; }
-  }
+// هل السؤال يحتاج بحث في DB؟
+async function needsFileSearch(msg) {
+  const fileKeywords = /ملف|كتاب|cours|serie|td|tp|exam|solution|chapter|محاضرة|سلسلة|امتحان|حل|pdf/i;
+  return fileKeywords.test(msg);
+}
 
-  const fileList = results.slice(0,5).map((f,i) => `${i+1}. ${f.title} (${f.sub_name})`).join('\n');
-  const prompt = `Student asked: "${userMsg}"
-Found ${results.length} files:
-${fileList}
-Reply in the same language as the question (Arabic/French/Darija) in 1-2 sentences confirming you found the files. Be friendly and short. Don't list the files again.`;
-  try {
-    const res = await groq.chat.completions.create({
-      model: GROQ_MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 100,
-      temperature: 0.7
-    });
-    return res.choices[0].message.content.trim();
-  } catch(e) { return `وجدت ${results.length} نتيجة 👇`; }
+async function searchFiles(query) {
+  const q = query
+    .replace(/الغوا|algorithmique/gi, 'algo')
+    .replace(/سيري|سلسلة/gi, 'serie')
+    .replace(/كور|محاضرة/gi, 'cours')
+    .replace(/امتحان/gi, 'exam')
+    .replace(/هل|عندك|يوجد|فيه|أبحث|بغيت|عطيني|ماذا|فل|في|هناك/gi, '')
+    .replace(/\s+/g, ' ').trim();
+  
+  let results = await filesDb.search(q, 6);
+  if(!results.length) {
+    const words = q.split(/\s+/).filter(w=>w.length>=2);
+    const seen = new Map();
+    for(const w of words) {
+      const wr = await filesDb.search(w, 5);
+      for(const r of wr) if(!seen.has(r.id)) seen.set(r.id, r);
+    }
+    results = [...seen.values()].slice(0, 6);
+  }
+  return results;
 }
 
 async function handleAiChat(ctx, text) {
   if(ctx.chat?.type !== 'private') return false;
+  if(text.length < 2) return false;
 
-  // فقط الجمل الطويلة أو اللي فيها علامة سؤال
-  // أي نص أكثر من 3 حروف يعالجه AI
-  if(text.length < 3) return false;
-
-  // typing indicator
+  const uid = ctx.uid;
   ctx.telegram.sendChatAction(ctx.chat.id, 'typing').catch(()=>{});
 
-  const extracted = await extractSearchQuery(text);
-  if(!extracted?.query) return false;
+  // هل يحتاج بحث في DB؟
+  const searchNeeded = await needsFileSearch(text);
+  let fileContext = '';
+  let fileResults = [];
 
-  // مرحلة 1 — بحث كامل
-  let results = await filesDb.search(extracted.query, 8);
-  
-  // مرحلة 2 — بحث بكل كلمة وتقاطع النتائج
-  if(results.length < 3) {
-    const words = extracted.query.split(/\s+/).filter(w=>w.length>=2);
-    if(words.length > 1) {
-      // ابحث بكل كلمة وخذ الملفات المشتركة
-      const sets = await Promise.all(words.map(w => filesDb.search(w, 20)));
-      const intersection = sets[0].filter(f => sets.every(s => s.find(x=>x.id===f.id)));
-      if(intersection.length) results = intersection.slice(0,8);
-      else {
-        // لو ما في تقاطع — خذ union مرتب حسب تكرار الكلمات
-        const score = new Map();
-        for(const s of sets) for(const f of s) score.set(f.id, (score.get(f.id)||0)+1);
-        const all = sets.flat().filter((f,i,a)=>a.findIndex(x=>x.id===f.id)===i);
-        results = all.sort((a,b)=>(score.get(b.id)||0)-(score.get(a.id)||0)).slice(0,8);
-      }
+  if(searchNeeded) {
+    fileResults = await searchFiles(text);
+    if(fileResults.length) {
+      fileContext = '\n\nملفات متاحة في البوت:\n' + 
+        fileResults.map((f,i) => `${i+1}. ${f.title} (${f.sub_name})`).join('\n');
     }
   }
-  const reply = await generateReply(text, results);
 
-  if(!results.length) {
-    await ctx.reply(reply, {
-      ...build([[btn('🔍 بحث يدوي', 'search_prompt'), btn('🏠', 'main_menu')]])
+  // بناء الرسالة للـ AI
+  const systemPrompt = `أنت مساعد دراسي ذكي اسمك EduMaster في بوت تيليغرام تعليمي جزائري.
+تساعد الطلاب الجزائريين في جميع التخصصات الجامعية.
+قواعد مهمة:
+- تجاوب بنفس لغة الطالب (عربي/فرنسي/دارجة/إنجليزي)
+- إذا سألك عن ملف وعندك نتائج — أخبره إن الملفات متاحة
+- إذا سألك سؤال دراسي — اشرح بشكل واضح ومبسط
+- إذا طلب تصحيح كود — صحح وفسر الخطأ
+- كن ودياً ومشجعاً
+- الردود تكون مختصرة ومفيدة (مش طويلة جداً)
+- إذا السؤال خارج نطاق الدراسة — قل بلطف إنك متخصص في المواد الدراسية${fileContext}`;
+
+  addToHistory(uid, 'user', text);
+
+  try {
+    const messages = [
+      { role: 'system', content: systemPrompt },
+      ...getHistory(uid)
+    ];
+
+    const res = await groq.chat.completions.create({
+      model: GROQ_MODEL,
+      messages,
+      max_tokens: 600,
+      temperature: 0.7
     });
+
+    const reply = res.choices[0].message.content.trim();
+    addToHistory(uid, 'assistant', reply);
+
+    // إذا فيه ملفات — أضف أزرار
+    if(fileResults.length) {
+      const rows = fileResults.map(f => [
+        btn('📄 '+f.title.substring(0,30)+' · '+f.sub_name, 'preview_'+f.id+'_0_0_0_0_0')
+      ]);
+      rows.push([btn('🔍 بحث جديد','search_prompt'), btn('🏠','main_menu')]);
+      await ctx.reply(reply, { parse_mode: 'Markdown', ...build(rows) }).catch(async ()=>{
+        await ctx.reply(reply, build(rows));
+      });
+    } else {
+      await ctx.reply(reply, { parse_mode: 'Markdown' }).catch(async ()=>{
+        await ctx.reply(reply);
+      });
+    }
     return true;
+  } catch(e) {
+    console.error('AI chat error:', e.message);
+    return false;
   }
-
-  const rows = results.slice(0,6).map(f => [
-    btn('📄 '+f.title.substring(0,30)+' · '+f.sub_name, 'preview_'+f.id+'_0_0_0_0_0')
-  ]);
-  rows.push([btn('🔍 بحث جديد', 'search_prompt'), btn('🏠', 'main_menu')]);
-
-  await ctx.reply(reply, { parse_mode: 'Markdown', ...build(rows) });
-  return true;
 }
 
-module.exports = { handleAiChat };
+// مسح سياق المحادثة
+function resetChat(uid) {
+  clearHistory(uid);
+}
+
+module.exports = { handleAiChat, resetChat };
