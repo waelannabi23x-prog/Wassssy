@@ -61,7 +61,7 @@ ACADEMIC KNOWLEDGE:
 
 RESPONSE RULES:
 1. Adapt your response length to the question complexity — simple questions get short answers, medical/technical/detailed questions get FULL comprehensive answers like a real expert would give. Never cut corners on important academic content.
-2. NEVER use *, **, _, __, #, or any markdown — plain text only
+2. ABSOLUTELY NEVER use *, **, _, __, #, or any markdown symbols. This is critical — the chat renders plain text only. Use numbers and indentation instead of bullets.
 3. For code: write it cleanly without markdown backticks
 4. For math: use simple notation (x^2, sqrt(), integral)
 5. If unsure about something: say so honestly and briefly
