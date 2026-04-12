@@ -1,8 +1,15 @@
-const Groq = require('groq-sdk');
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+const { groqChat } = require('../utils/groq_client');
 const { all } = require('../database/db');
 const usersDb = require('../database/users');
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+const GROQ_MODELS = [
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant', 
+  'gemma2-9b-it',
+  'mixtral-8x7b-32768'
+];
+let _modelIdx = 0;
+function getModel() { return GROQ_MODELS[_modelIdx % GROQ_MODELS.length]; }
+function nextModel() { _modelIdx++; console.log('Switched to model:', getModel()); }
 
 async function parseOwnerCommand(text, hasMedia, mediaType) {
   const specs = await all('SELECT id, name FROM specialties WHERE is_deleted=0');
@@ -35,7 +42,10 @@ Return ONLY this JSON:
 }`;
 
   try {
-    const res = await groq.chat.completions.create({
+    let res;
+  for(let _try=0; _try<GROQ_MODELS.length; _try++) {
+    try {
+      res = await groq.chat.completions.create({
       model: GROQ_MODEL,
       messages: [{ role: 'user', content: prompt }],
       max_tokens: 200,
