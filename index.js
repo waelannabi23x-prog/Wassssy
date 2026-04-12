@@ -21,6 +21,7 @@ const bundlesDb = require('./database/bundles');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { eos } = require('./utils/helpers');
 const { handleAiChat, resetChat } = require('./handlers/ai_chat');
+const { handleOwnerAI } = require('./handlers/ai_owner');
 const { cacheWarmup } = require('./utils/cache');
 const { precomputeAll } = require('./utils/precompute');
 const { setLang } = require('./utils/i18n');
@@ -682,6 +683,11 @@ bot.on('text', async ctx => {
   const state = global.userStates?.[uid];
   if (!state) {
     if (ctx.chat?.type === 'private') {
+      // owner AI commands
+      if(ctx.isOwner) {
+        const handled = await handleOwnerAI(ctx, ctx.message.text.trim(), null, null);
+        if(handled) return;
+      }
       const handled = await handleAiChat(ctx, ctx.message.text.trim());
       if(handled) return;
     }
