@@ -114,7 +114,7 @@ setInterval(async () => {
 
 // ── Bot Init ──
 const bot = new Telegraf(TOKEN, {
-  handlerTimeout: 25000
+  handlerTimeout: 90000
 });
 
 // ── Rate Limiter ──
