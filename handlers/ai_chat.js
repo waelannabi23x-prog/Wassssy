@@ -104,11 +104,11 @@ async function handleAiChat(ctx, text) {
         btn('📄 '+f.title.substring(0,30)+' · '+f.sub_name, 'preview_'+f.id+'_0_0_0_0_0')
       ]);
       rows.push([btn('🔍 بحث جديد','search_prompt'), btn('🏠','main_menu')]);
-      await ctx.reply(reply, { parse_mode: 'Markdown', ...build(rows) }).catch(async ()=>{
-        await ctx.reply(reply, build(rows));
+      await ctx.reply(reply, build(rows)).catch(async ()=>{
+        await ctx.reply(reply);
       });
     } else {
-      await ctx.reply(reply, { parse_mode: 'Markdown' }).catch(async ()=>{
+      await ctx.reply(reply).catch(async ()=>{
         await ctx.reply(reply);
       });
     }
