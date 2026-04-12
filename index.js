@@ -21,7 +21,6 @@ const bundlesDb = require('./database/bundles');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { eos } = require('./utils/helpers');
 const { handleAiChat } = require('./handlers/ai_chat');
-const { handleSummarize } = require('./handlers/summarize');
 const { cacheWarmup } = require('./utils/cache');
 const { precomputeAll } = require('./utils/precompute');
 const { setLang } = require('./utils/i18n');
@@ -409,15 +408,6 @@ bot.on('callback_query', async ctx => {
     }
     if (data === 'noop') return;
 
-    // ملخص AI
-    if (data.startsWith('sum_')) {
-      const p = data.replace('sum_','').split('_');
-      const fid = p[0];
-      const f = await filesDb.getFile(fid);
-      if(!f) return ctx.answerCbQuery('❌ الملف غير موجود').catch(()=>{});
-      ctx.answerCbQuery('📝 جاري التلخيص...').catch(()=>{});
-      return handleSummarize(ctx, f.file_id, f.file_type, f.title);
-    }
 
     // Group Specialty (Owner only)
     if (data.startsWith('grp_sp_')) {
