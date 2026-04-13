@@ -711,10 +711,6 @@ bot.on('text', async ctx => {
     return ctx.reply('اكتب نص الرسالة مع الرابط (او skip):');
   }
   if (state.type === 'search') return userH.handleSearch(ctx, ctx.message.text.trim());
-  if (ctx.chat?.type === 'private' && !state?.type?.startsWith('mg_')) {
-    const handled = await handleAiChat(ctx, ctx.message.text.trim());
-    if(handled) return;
-  }
   if (state.type === 'add_comment') {
     const text = ctx.message.text?.trim();
     if (!text || text === '/cancel') { await global.delState(ctx.uid); return ctx.reply('❌ تم الإلغاء.'); }
