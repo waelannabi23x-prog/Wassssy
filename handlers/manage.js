@@ -576,7 +576,6 @@ async function handleCallback(ctx,data){
     return ctx.reply('📝 اكتب رسالة الإشعار لـ '+label+':\n_(أو /cancel)_',{parse_mode:'Markdown'});
   }
   if(data.startsWith('mg_notify_sp_')&&!data.startsWith('mg_notify_sp_msg')){const spId=data.replace('mg_notify_sp_','');setState(uid,{type:'mg_notify_sp_msg',spId});return ctx.reply('📝 رسالة الإشعار:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
-  }
   if(data==='mg_msgs') return showMsgsMenu(ctx);
   if(data==='mg_templates') return showTemplates(ctx);
   if(data==='mg_add_template'){setState(uid,{type:'mg_tpl_name'});return ctx.reply('📝 *قالب جديد*\n\nأرسل اسم القالب:',{parse_mode:'Markdown',...build([[btn('❌ إلغاء','mg_templates')]])});}
