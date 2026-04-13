@@ -12,7 +12,7 @@ Has media: ${hasMedia} (type: ${mediaType || 'none'})
 Return: {"action":"broadcast"|"notify_specialty"|"notify_groups"|"schedule"|"unknown","target_specialty":null,"message":"text","schedule_time":null,"send_now":true,"confidence":0.9}`;
   try {
     const raw = await groqChat([{ role: 'user', content: prompt }], 150, 0.1);
-    return JSON.parse(raw.replace(/```json|```/g,'').trim());
+    const match = raw.match(/{[\s\S]*}/); return match ? JSON.parse(match[0]) : fallbackParse(text, hasMedia);
   } catch(e) {
     return fallbackParse(text, hasMedia);
   }

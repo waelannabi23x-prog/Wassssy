@@ -81,6 +81,20 @@ FILE SYSTEM KNOWLEDGE:
 async function handleAiChat(ctx, text) {
   if(!text || text.length < 2) return false;
   const uid = ctx.uid;
+  
+  // جلب تخصص المستخدم
+  let userSpecialty = '';
+  try {
+    const { all } = require('../database/db');
+    const sp = await all('SELECT sp.name, y.name as yr FROM user_specialties us LEFT JOIN specialties sp ON us.specialty_id=sp.id LEFT JOIN years y ON y.specialty_id=sp.id WHERE us.user_id=$1 LIMIT 1',[uid]);
+    if(sp[0]?.name) userSpecialty = sp[0].name;
+  } catch(e) {}
+  // Safety — رفض الطلبات غير الدراسية
+  const nonAcademic = /اكتب قصيدة|اكتب أغنية|write a poem|generate image|صور لي|مين أحسن لاعب|كرة القدم|سياسة|politique(?!.*cours)/i;
+  if(nonAcademic.test(text) && !text.includes('?')) {
+    await ctx.reply('أنا مساعد دراسي متخصص — يمكنني مساعدتك في المواد الدراسية والأسئلة الأكاديمية فقط 🎓');
+    return true;
+  }
   ctx.telegram.sendChatAction(ctx.chat.id, 'typing').catch(()=>{});
 
   let fileResults = [];
@@ -100,8 +114,11 @@ async function handleAiChat(ctx, text) {
   addMessage(uid, 'user', text);
 
   try {
+    const specialtyCtx = userSpecialty ? `
+
+STUDENT PROFILE: This student studies ${userSpecialty}. Tailor your responses to their specialty when relevant.` : '';
     const reply = await groqChat([
-      { role: 'system', content: SYSTEM + fileContext },
+      { role: 'system', content: SYSTEM + specialtyCtx + fileContext },
       ...getHistory(uid)
     ], 1200, 0.65);
 
