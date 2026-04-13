@@ -563,13 +563,11 @@ async function handleCallback(ctx,data){
     return eos(ctx,'🎓 اختر التخصص لإرسال الإشعار:',{parse_mode:'Markdown',...build(rows)});
   }
   if(data==='mg_notify_groups'){
-    console.log('mg_notify_groups triggered');
     const specs=await content.getSpecs();
-    console.log('specs:', specs?.length);
     const rows=specs.map(s=>[btn('🎓 '+s.name,'mg_ng_sp_'+s.id)]);
     rows.push([btn('📣 كل القروبات','mg_ng_sp_0')]);
     rows.push([back('mg_menu')]);
-    return eos(ctx,'📣 *إشعار القروبات*\n\nاختر التخصص:',{parse_mode:'Markdown',...build(rows)});
+    return ctx.reply('📣 إشعار القروبات\n\nاختر التخصص:',{...build(rows)}).catch(e=>ctx.reply('❌ '+e.message));
   }
   if(data.startsWith('mg_ng_sp_')){
     const spId=data.replace('mg_ng_sp_','');
