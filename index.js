@@ -102,7 +102,7 @@ global.delState = async function(uid) {
 // ── State Cleanup (SQLite syntax) ──
 setInterval(async () => {
   try {
-    await dbRun("DELETE FROM user_states WHERE updated_at < NOW() - INTERVAL '1 hour'");
+    await dbRun("DELETE FROM user_states WHERE updated_at < NOW() - INTERVAL '1 hour'::interval");
     await dbRun("DELETE FROM group_members WHERE updated_at < NOW() - INTERVAL '7 days'");
     const now = Date.now();
     for (const uid in global.userStates) {
