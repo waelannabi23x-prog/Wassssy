@@ -566,7 +566,7 @@ async function handleCallback(ctx,data){
     const specs=await content.getSpecs();
     const rows=specs.map(s=>[btn('🎓 '+s.name,'mg_ng_sp_'+s.id)]);
     rows.push([btn('📣 كل القروبات','mg_ng_sp_0')]);
-    rows.push([back('mg_menu')]);
+    rows.push([btn('◀️ رجوع','mg_menu')]);
     return ctx.reply('📣 إشعار القروبات\n\nاختر التخصص:',{...build(rows)}).catch(e=>ctx.reply('❌ '+e.message));
   }
   if(data.startsWith('mg_ng_sp_')){
