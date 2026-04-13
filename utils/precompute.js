@@ -67,7 +67,7 @@ async function precomputeAll() {
                 pathData:{sp,yr,sm,sb,cat},
                 allFiles,
                 bundles
-              }, 900000);
+              }, 3600000);
             } catch(e) {}
           }));
         }));

@@ -158,7 +158,7 @@ async function _showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
       bundlesDb.getBundles(catId)
     ]);
     staticData={pathData,allFiles,bundles};
-    cacheSet(staticKey,staticData,1800000);
+    cacheSet(staticKey,staticData,3600000);
   }
   const {pathData:{sp,yr,sm,sb,cat}, allFiles, bundles} = staticData;
   const total = allFiles.length;
@@ -239,7 +239,7 @@ async function _showPreview(ctx,fid,spId,yrId,smId,sbId,catId) {
       interactions.favCount(fid),
     ]);
     staticData = {f, ratingData, commentCount, favCnt};
-    if(f) cacheSet(staticKey, staticData, 1800000);
+    if(f) cacheSet(staticKey, staticData, 3600000);
   }
   const {f, ratingData, commentCount, favCnt} = staticData;
   if(!f) return ctx.reply(t(uid,'not_found'));
