@@ -563,6 +563,7 @@ async function handleCallback(ctx,data){
     return eos(ctx,'🎓 اختر التخصص لإرسال الإشعار:',{parse_mode:'Markdown',...build(rows)});
   }
   if(data==='mg_notify_groups'){
+    console.log('mg_notify_groups triggered');
     const specs=await content.getSpecs();
     const rows=specs.map(s=>[btn('🎓 '+s.name,'mg_ng_sp_'+s.id)]);
     rows.push([btn('📣 كل القروبات','mg_ng_sp_0')]);
