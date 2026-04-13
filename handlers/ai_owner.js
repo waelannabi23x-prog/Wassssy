@@ -85,7 +85,7 @@ async function executeOwnerCommand(ctx, cmd, mediaFileId, mediaType) {
 
 async function handleOwnerAI(ctx, text, mediaFileId, mediaType) {
   if(!ctx.isOwner) return false;
-  const triggers = /ارسل|ابعث|بعث|اشعر|جدول|send|broadcast|notify|للجميع|للكل|للقروب|لتخصص/i;
+  const triggers = /^(ارسل|ابعث|بعث|جدول الساعة|send to|broadcast|ابعث للجميع|ارسل للجميع|ابعث للقروب|ابعث لتخصص)/i;
   if(!triggers.test(text) && !mediaFileId) return false;
   ctx.telegram.sendChatAction(ctx.chat.id, 'typing').catch(()=>{});
   const cmd = await parseOwnerCommand(text, !!mediaFileId, mediaType);
