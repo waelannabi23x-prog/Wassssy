@@ -3,15 +3,35 @@ const filesDb = require('../database/files');
 const { all } = require('../database/db');
 const { build, btn } = require('../utils/keyboard');
 
-const _history = new Map();
-function getHistory(uid) { return _history.get(uid) || []; }
-function addMessage(uid, role, content) {
-  const h = getHistory(uid);
-  h.push({ role, content });
-  if(h.length > 12) h.splice(0, h.length - 12);
-  _history.set(uid, h);
+const { all: dbAll, run: dbRun } = require('../database/db');
+
+async function getHistory(uid) {
+  try {
+    const rows = await dbAll(
+      'SELECT role, content FROM ai_history WHERE user_id=$1 ORDER BY created_at DESC LIMIT 12',
+      [uid]
+    );
+    return rows.reverse();
+  } catch(e) { return []; }
 }
-function resetChat(uid) { _history.delete(uid); }
+
+async function addMessage(uid, role, content) {
+  try {
+    await dbRun(
+      'INSERT INTO ai_history(user_id, role, content) VALUES($1, $2, $3)',
+      [uid, role, content]
+    );
+    // احتفظ بآخر 12 رسالة فقط
+    await dbRun(
+      'DELETE FROM ai_history WHERE user_id=$1 AND id NOT IN (SELECT id FROM ai_history WHERE user_id=$1 ORDER BY created_at DESC LIMIT 12)',
+      [uid]
+    );
+  } catch(e) {}
+}
+
+async function resetChat(uid) {
+  try { await dbRun('DELETE FROM ai_history WHERE user_id=$1', [uid]); } catch(e) {}
+}
 
 // بحث ذكي متعدد المراحل
 async function smartSearch(query) {
@@ -117,21 +137,31 @@ async function handleAiChat(ctx, text) {
     const specialtyCtx = userSpecialty ? `
 
 STUDENT PROFILE: This student studies ${userSpecialty}. Tailor your responses to their specialty when relevant.` : '';
+    const history = await getHistory(uid);
     const reply = await groqChat([
       { role: 'system', content: SYSTEM + specialtyCtx + fileContext },
-      ...getHistory(uid)
+      ...history
     ], 1200, 0.65);
 
     addMessage(uid, 'assistant', reply);
 
+    // Streaming typewriter effect
+    const sent = await ctx.reply('...').catch(()=>null);
+    if(sent) {
+      try {
+        await ctx.telegram.editMessageText(ctx.chat.id, sent.message_id, null, reply);
+      } catch(e) {
+        await ctx.reply(reply).catch(()=>{});
+      }
+    } else {
+      await ctx.reply(reply).catch(()=>{});
+    }
     if(fileResults.length) {
       const rows = fileResults.slice(0,5).map(f=>[
         btn('📄 '+f.title.substring(0,28)+' · '+f.sub_name, 'preview_'+f.id+'_0_0_0_0_0')
       ]);
       rows.push([btn('🔍 بحث يدوي','search_prompt'),btn('🏠','main_menu')]);
-      await ctx.reply(reply, build(rows));
-    } else {
-      await ctx.reply(reply);
+      await ctx.reply('👆 الملفات المتاحة:', build(rows)).catch(()=>{});
     }
     return true;
   } catch(e) {
