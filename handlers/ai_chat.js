@@ -1,58 +1,49 @@
 const { groqChat } = require('../utils/groq_client');
-const { getBotKnowledge } = require('../utils/ai_knowledge');
 const filesDb = require('../database/files');
-const { all } = require('../database/db');
-const { build, btn } = require('../utils/keyboard');
-
 const { all: dbAll, run: dbRun } = require('../database/db');
+const { getBotKnowledge } = require('../utils/ai_knowledge');
+const { build, btn } = require('../utils/keyboard');
 
 async function getHistory(uid) {
   try {
-    const rows = await dbAll(
-      'SELECT role, content FROM ai_history WHERE user_id=$1 ORDER BY created_at DESC LIMIT 12',
-      [uid]
-    );
+    const rows = await dbAll('SELECT role, content FROM ai_history WHERE user_id=$1 ORDER BY created_at DESC LIMIT 8',[uid]);
     return rows.reverse();
   } catch(e) { return []; }
 }
 
 async function addMessage(uid, role, content) {
   try {
-    await dbRun(
-      'INSERT INTO ai_history(user_id, role, content) VALUES($1, $2, $3)',
-      [uid, role, content]
-    );
-    // احتفظ بآخر 12 رسالة فقط
-    await dbRun(
-      'DELETE FROM ai_history WHERE user_id=$1 AND id NOT IN (SELECT id FROM ai_history WHERE user_id=$1 ORDER BY created_at DESC LIMIT 12)',
-      [uid]
-    );
+    await dbRun('INSERT INTO ai_history(user_id, role, content) VALUES($1, $2, $3)',[uid, role, content.substring(0,2000)]);
+    await dbRun('DELETE FROM ai_history WHERE user_id=$1 AND id NOT IN (SELECT id FROM ai_history WHERE user_id=$1 ORDER BY created_at DESC LIMIT 8)',[uid]);
   } catch(e) {}
 }
 
 async function resetChat(uid) {
-  try { await dbRun('DELETE FROM ai_history WHERE user_id=$1', [uid]); } catch(e) {}
+  try { await dbRun('DELETE FROM ai_history WHERE user_id=$1',[uid]); } catch(e) {}
 }
 
-// بحث ذكي متعدد المراحل
 async function smartSearch(query) {
   const cleaned = query
     .replace(/الغوا|الغوارزميات|algorithmique|algorithme/gi,'algo')
-    .replace(/سيري|سلسلة تمارين/gi,'serie')
-    .replace(/كور|محاضرة/gi,'cours')
+    .replace(/سيري|سلسلة|exercices/gi,'serie')
+    .replace(/كور|محاضرة|cours magistral/gi,'cours')
     .replace(/امتحان|اختبار|examen/gi,'exam')
-    .replace(/حل|correction|corrigé/gi,'solution')
-    .replace(/هل|عندك|كاين|فيه|واش|وش|عندكم|يوجد|بغيت|عطيني|اعطيني/gi,'')
+    .replace(/حل|correction|corrigé|solution/gi,'solution')
+    .replace(/هل|عندك|كاين|فيه|واش|وش|عندكم|يوجد|بغيت|عطيني|اعطيني|اريد|أريد|جيبلي/gi,'')
     .replace(/\s+/g,' ').trim();
 
   if(!cleaned || cleaned.length < 2) return [];
 
+  // مرحلة 1 — بحث مباشر
   let results = await filesDb.search(cleaned, 8);
   if(results.length >= 3) return results;
 
+  // مرحلة 2 — بحث بكل كلمة + تقاطع
   const words = cleaned.split(/\s+/).filter(w=>w.length>=2);
   if(words.length > 1) {
     const sets = await Promise.all(words.map(w=>filesDb.search(w,15)));
+    const intersection = sets[0].filter(f=>sets.every(s=>s.find(x=>x.id===f.id)));
+    if(intersection.length) return intersection.slice(0,8);
     const score = new Map();
     for(const s of sets) for(const f of s) score.set(f.id,(score.get(f.id)||0)+1);
     const all_r = sets.flat().filter((f,i,a)=>a.findIndex(x=>x.id===f.id)===i);
@@ -61,117 +52,82 @@ async function smartSearch(query) {
   return results;
 }
 
-function isFileRequest(text) {
-  return /\b(cours|serie|td|tp|exam|examen|solution|corrigé|chapter|chapitre|pdf|ملف|محاضرة|سلسلة|امتحان|حل|تمارين|كاين|عندك|واش فيه|وش عندك|هل عندك|هل يوجد|عندكم)\b/i.test(text);
+// استخرج كلمات البحث من الـ AI
+async function extractSearchTerms(text, knowledge) {
+  const prompt = `You are a file search assistant. Extract search keywords from this request.
+Bot content overview:
+${knowledge.substring(0, 500)}
+
+User request: "${text}"
+
+Return ONLY JSON: {"terms": ["keyword1", "keyword2"], "subject": "subject name or null"}
+Examples:
+- "عندك سيري الغوا 2" → {"terms": ["serie", "algo 2"], "subject": "Algo 2"}
+- "cours analyse 1 chapitre 3" → {"terms": ["cours", "analyse 1"], "subject": "Analyse 1"}
+- "بغيت امتحانات proba" → {"terms": ["exam", "proba"], "subject": "Proba"}`;
+  try {
+    const raw = await groqChat([{role:'user',content:prompt}], 100, 0.1);
+    const match = raw.match(/\{[\s\S]*\}/);
+    return match ? JSON.parse(match[0]) : {terms: [text], subject: null};
+  } catch(e) {
+    return {terms: [text], subject: null};
+  }
 }
-
-const SYSTEM = `You are EduMaster — an expert academic assistant embedded in a Telegram bot for Algerian university students.
-
-IDENTITY & CONTEXT:
-- You serve students from ALL university specialties: CS, Medicine, Mathematics, Physics, Chemistry, Law, Economics, Literature, etc.
-- You are deployed inside an educational file-sharing bot
-- Students communicate in Algerian Darija, French, Arabic, or mixed languages
-- Always respond in the EXACT same language/mix the student uses
-
-ACADEMIC KNOWLEDGE:
-- Computer Science: algorithms, data structures (linked lists, trees, graphs, stacks, queues), OOP, OS, networks, databases, programming (C, Java, Python, etc.)
-- Mathematics: analysis, algebra, probability, statistics, linear algebra
-- Physics & Chemistry: all university-level topics
-- Medicine: anatomy, biochemistry, pharmacology, etc.
-- ALWAYS interpret technical terms in their ACADEMIC context first (e.g., "file" = file d'attente/queue, "liste" = linked list, "arbre" = tree data structure)
-
-RESPONSE RULES:
-1. Adapt your response length to the question complexity — simple questions get short answers, medical/technical/detailed questions get FULL comprehensive answers like a real expert would give. Never cut corners on important academic content.
-2. ABSOLUTELY NEVER use *, **, _, __, #, or any markdown symbols. This is critical — the chat renders plain text only. Use numbers and indentation instead of bullets.
-3. For code: write it cleanly without markdown backticks
-4. For math: use simple notation (x^2, sqrt(), integral)
-5. If unsure about something: say so honestly and briefly
-6. Never hallucinate facts — if you don't know, say so
-7. Be warm and encouraging like a smart study buddy
-
-CONVERSATION MEMORY:
-- Remember what was discussed earlier in this conversation
-- If the student refers to "it" or "this" or continues a previous topic, understand the context
-- Build on previous answers naturally
-
-FILE SYSTEM KNOWLEDGE:
-- This bot contains university files (cours, TD, séries, exams, solutions)
-- When files are found, mention them enthusiastically but briefly
-- When no files found, be honest and suggest alternative search terms`;
 
 async function handleAiChat(ctx, text) {
   if(!text || text.length < 2) return false;
   const uid = ctx.uid;
-  
-  // جلب تخصص المستخدم
-  let userSpecialty = '';
-  try {
-    const { all } = require('../database/db');
-    const sp = await all('SELECT sp.name, y.name as yr FROM user_specialties us LEFT JOIN specialties sp ON us.specialty_id=sp.id LEFT JOIN years y ON y.specialty_id=sp.id WHERE us.user_id=$1 LIMIT 1',[uid]);
-    if(sp[0]?.name) userSpecialty = sp[0].name;
-  } catch(e) {}
-  // Safety — رفض الطلبات غير الدراسية
-  const nonAcademic = /اكتب قصيدة|اكتب أغنية|write a poem|generate image|صور لي|مين أحسن لاعب|كرة القدم|سياسة|politique(?!.*cours)/i;
-  if(nonAcademic.test(text) && !text.includes('?')) {
-    await ctx.reply('أنا مساعد دراسي متخصص — يمكنني مساعدتك في المواد الدراسية والأسئلة الأكاديمية فقط 🎓');
-    return true;
-  }
   ctx.telegram.sendChatAction(ctx.chat.id, 'typing').catch(()=>{});
 
-  let fileResults = [];
-  let fileContext = '';
+  const knowledge = await getBotKnowledge();
 
-  if(isFileRequest(text)) {
-    fileResults = await smartSearch(text);
-    if(fileResults.length) {
-      fileContext = `\n\nFILES FOUND IN BOT (${fileResults.length} results):\n` +
-        fileResults.map((f,i)=>`${i+1}. "${f.title}" — ${f.sub_name} [${f.cat_name}]`).join('\n') +
-        '\nMention these files are available and the student can access them via the buttons below.';
-    } else {
-      fileContext = '\n\nNO FILES FOUND for this search. Tell the student honestly in their language, suggest they try different keywords or browse manually.';
-    }
+  // استخرج كلمات البحث
+  const extracted = await extractSearchTerms(text, knowledge);
+  const searchQuery = extracted.terms.join(' ');
+
+  // بحث ذكي
+  let results = await smartSearch(searchQuery);
+
+  // إذا ما لقى — جرب بالمادة مباشرة
+  if(!results.length && extracted.subject) {
+    results = await smartSearch(extracted.subject);
   }
 
   addMessage(uid, 'user', text);
 
-  try {
-    const knowledge = await getBotKnowledge();
-    const knowledgeCtx = knowledge ? `\n\n=== WHAT THIS BOT CONTAINS ===\n${knowledge}\nIMPORTANT: When students ask what files are available, what subjects exist, or what you have — answer from this knowledge base accurately. This is YOUR unique advantage over other AI assistants.` : '';
-    const specialtyCtx = userSpecialty ? `
+  if(results.length) {
+    // رد بسيط + أزرار
+    const reply = results.length === 1
+      ? `وجدت ملف واحد لـ "${searchQuery}":`
+      : `وجدت ${results.length} ملف لـ "${searchQuery}":`;
 
-STUDENT PROFILE: This student studies ${userSpecialty}. Tailor your responses to their specialty when relevant.` : '';
-    const history = await getHistory(uid);
-    const reply = await groqChat([
-      { role: 'system', content: SYSTEM + specialtyCtx + knowledgeCtx + fileContext },
-      ...history
-    ], 1200, 0.65);
-
+    const rows = results.slice(0,6).map(f=>[
+      btn('📄 '+f.title.substring(0,30)+' · '+f.sub_name, 'preview_'+f.id+'_0_0_0_0_0')
+    ]);
+    rows.push([btn('🔍 بحث يدوي','search_prompt'), btn('🏠','main_menu')]);
     addMessage(uid, 'assistant', reply);
-
-    // Streaming typewriter effect
-    const sent = await ctx.reply('...').catch(()=>null);
-    if(sent) {
-      try {
-        await ctx.telegram.editMessageText(ctx.chat.id, sent.message_id, null, reply);
-      } catch(e) {
-        await ctx.reply(reply).catch(()=>{});
-      }
-    } else {
-      await ctx.reply(reply).catch(()=>{});
+    await ctx.reply(reply, build(rows));
+  } else {
+    // ما لقى — جواب ذكي
+    const systemMsg = `You are a file search assistant for an Algerian university bot. 
+A student searched for files but nothing was found.
+Bot content: ${knowledge.substring(0,800)}
+Student searched for: "${text}"
+Reply in the same language as the student (Darija/French/Arabic).
+In 1-2 lines: say what's not found, suggest what IS available that's close.
+Be direct and helpful. No markdown.`;
+    try {
+      const reply = await groqChat([
+        {role:'system', content: systemMsg},
+        ...await getHistory(uid)
+      ], 200, 0.5);
+      addMessage(uid, 'assistant', reply);
+      await ctx.reply(reply, build([[btn('🔍 بحث يدوي','search_prompt'), btn('🏠','main_menu')]]));
+    } catch(e) {
+      await ctx.reply('ما لقيت نتائج. جرب /search أو تصفح المحتوى.');
     }
-    if(fileResults.length) {
-      const rows = fileResults.slice(0,5).map(f=>[
-        btn('📄 '+f.title.substring(0,28)+' · '+f.sub_name, 'preview_'+f.id+'_0_0_0_0_0')
-      ]);
-      rows.push([btn('🔍 بحث يدوي','search_prompt'),btn('🏠','main_menu')]);
-      await ctx.reply('👆 الملفات المتاحة:', build(rows)).catch(()=>{});
-    }
-    return true;
-  } catch(e) {
-    console.error('AI error:', e.message);
-    await ctx.reply('حدث خطأ مؤقت، حاول مرة أخرى.').catch(()=>{});
-    return true;
   }
+  return true;
 }
 
 module.exports = { handleAiChat, resetChat };

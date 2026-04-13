@@ -104,7 +104,13 @@ async function showSubjects(ctx,spId,yrId,smId,page=0) {
   const total = all.length;
   const subs = all.slice(page*PS,(page+1)*PS);
   if(!subs.length) return eos(ctx,buildPath([escMd(sp?.name),escMd(yr?.name),escMd(sm?.name)])+'\n\n📭 لا توجد مواد.',build([backMenu('sm_'+spId+'_'+yrId+'_'+smId)]));
-  const rows = subs.map(s=>[btn('📖 '+s.name,'sb_'+spId+'_'+yrId+'_'+smId+'_'+s.id)]);
+  // عمودين
+  const rows = [];
+  for(let i=0; i<subs.length; i+=2) {
+    const row = [btn('📖 '+subs[i].name,'sb_'+spId+'_'+yrId+'_'+smId+'_'+subs[i].id)];
+    if(subs[i+1]) row.push(btn('📖 '+subs[i+1].name,'sb_'+spId+'_'+yrId+'_'+smId+'_'+subs[i+1].id));
+    rows.push(row);
+  }
   if(total>PS){
     const nav=[];
     if(page>0) nav.push(btn('⬅️','sb_page_'+spId+'_'+yrId+'_'+smId+'_'+(page-1)));
