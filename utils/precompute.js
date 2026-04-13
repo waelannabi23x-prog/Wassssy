@@ -45,7 +45,7 @@ async function precomputeAll() {
         const subs = await content.getSubjects(sm.id);
         cacheSet('precomp_subs_'+sp.id+'_'+yr.id+'_'+sm.id, {
           text: buildPath([escMd(sp.name),escMd(yr.name),escMd(sm.name)])+'\n\n📖 *اختر المادة:*',
-          extra: {parse_mode:'Markdown',...build([...subs.map(s=>[btn('📖 '+s.name,'sb_'+sp.id+'_'+yr.id+'_'+sm.id+'_'+s.id)]),backMenu('sms_'+sp.id+'_'+yr.id+'_'+sm.id)])}
+          extra: {parse_mode:'Markdown',...build([...(() => { const rows=[]; for(let i=0;i<subs.length;i+=2){ const row=[btn('📖 '+subs[i].name,'sb_'+sp.id+'_'+yr.id+'_'+sm.id+'_'+subs[i].id)]; if(subs[i+1]) row.push(btn('📖 '+subs[i+1].name,'sb_'+sp.id+'_'+yr.id+'_'+sm.id+'_'+subs[i+1].id)); rows.push(row); } return rows; })(),backMenu('sms_'+sp.id+'_'+yr.id+'_'+sm.id)])}
         }, 3600000);
 
         await pLimit(subs.map(sb => async () => {
