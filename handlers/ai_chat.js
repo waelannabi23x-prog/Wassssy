@@ -1,4 +1,5 @@
 const { groqChat } = require('../utils/groq_client');
+const { getBotKnowledge } = require('../utils/ai_knowledge');
 const filesDb = require('../database/files');
 const { all } = require('../database/db');
 const { build, btn } = require('../utils/keyboard');
@@ -134,12 +135,14 @@ async function handleAiChat(ctx, text) {
   addMessage(uid, 'user', text);
 
   try {
+    const knowledge = await getBotKnowledge();
+    const knowledgeCtx = knowledge ? `\n\n=== WHAT THIS BOT CONTAINS ===\n${knowledge}\nIMPORTANT: When students ask what files are available, what subjects exist, or what you have — answer from this knowledge base accurately. This is YOUR unique advantage over other AI assistants.` : '';
     const specialtyCtx = userSpecialty ? `
 
 STUDENT PROFILE: This student studies ${userSpecialty}. Tailor your responses to their specialty when relevant.` : '';
     const history = await getHistory(uid);
     const reply = await groqChat([
-      { role: 'system', content: SYSTEM + specialtyCtx + fileContext },
+      { role: 'system', content: SYSTEM + specialtyCtx + knowledgeCtx + fileContext },
       ...history
     ], 1200, 0.65);
 
