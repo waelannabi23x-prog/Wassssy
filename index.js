@@ -71,19 +71,24 @@ function _scheduleStateFlush() {
     _stateTimer = null;
     const uids = [..._stateDirty];
     _stateDirty.clear();
+    const toUpsert = [];
+    const toDelete = [];
     for (const uid of uids) {
       const state = global.userStates[uid];
-      try {
-        if (state) {
-          await dbRun(
-            'INSERT INTO user_states(user_id,state,updated_at) VALUES(?,?,CURRENT_TIMESTAMP) ON CONFLICT(user_id) DO UPDATE SET state=EXCLUDED.state,updated_at=CURRENT_TIMESTAMP',
-            [uid, JSON.stringify(state)]
-          );
-        } else {
-          await dbRun('DELETE FROM user_states WHERE user_id=?', [uid]);
-        }
-      } catch(e) {}
+      if (state) toUpsert.push([uid, JSON.stringify(state)]);
+      else toDelete.push(uid);
     }
+    try {
+      for (const [uid, state] of toUpsert) {
+        await dbRun(
+          'INSERT INTO user_states(user_id,state,updated_at) VALUES($1,$2,CURRENT_TIMESTAMP) ON CONFLICT(user_id) DO UPDATE SET state=EXCLUDED.state,updated_at=CURRENT_TIMESTAMP',
+          [uid, state]
+        );
+      }
+      for (const uid of toDelete) {
+        await dbRun('DELETE FROM user_states WHERE user_id=$1', [uid]);
+      }
+    } catch(e) {}
   }, 2000);
 }
 
@@ -102,7 +107,7 @@ global.delState = async function(uid) {
 // ── State Cleanup (SQLite syntax) ──
 setInterval(async () => {
   try {
-    await dbRun("DELETE FROM user_states WHERE updated_at < NOW() - INTERVAL '1 hour'::interval");
+    await dbRun("DELETE FROM user_states WHERE updated_at < NOW() - INTERVAL '1 hour'");
     await dbRun("DELETE FROM group_members WHERE updated_at < NOW() - INTERVAL '7 days'");
     const now = Date.now();
     for (const uid in global.userStates) {
@@ -258,7 +263,7 @@ bot.command('setsp', async ctx => {
   ctx.deleteMessage().catch(()=>{});
   const specs = await dbAll('SELECT id,name FROM specialties WHERE is_deleted=0 ORDER BY id');
   const rows = specs.map(s=>[{text:'🎓 '+s.name, callback_data:'grp_sp_'+ctx.chat.id+'_'+s.id}]);
-  const current = await dbAll('SELECT specialty_id FROM group_chats WHERE chat_id=?',[ctx.chat.id]);
+  const current = await dbAll('SELECT specialty_id FROM group_chats WHERE chat_id=$1',[ctx.chat.id]);
   const msg = current[0]?.specialty_id
     ? 'تغيير تخصص القروب:'
     : 'اختر تخصص القروب:';
@@ -431,8 +436,8 @@ bot.on('callback_query', async ctx => {
       const chatId = parseInt(raw.substring(0, lastUs));
       const specId = parseInt(raw.substring(lastUs + 1));
       try {
-        await dbRun('INSERT INTO group_chats(chat_id,specialty_id) VALUES(?,?) ON CONFLICT(chat_id) DO UPDATE SET specialty_id=?',[chatId,specId,specId]);
-        const specs = await dbAll('SELECT name FROM specialties WHERE id=?',[specId]);
+        await dbRun('INSERT INTO group_chats(chat_id,specialty_id) VALUES($1,$2) ON CONFLICT(chat_id) DO UPDATE SET specialty_id=$2',[chatId,specId]);
+        const specs = await dbAll('SELECT name FROM specialties WHERE id=$1',[specId]);
         const spName = specs[0]?.name || String(specId);
         await ctx.answerCbQuery('✅ ' + spName, {show_alert:false}).catch(()=>{});
         await ctx.telegram.editMessageText(chatId, ctx.callbackQuery.message.message_id, null,
@@ -615,7 +620,7 @@ bot.on('message', async (ctx, next) => {
   if(ctx.chat?.type !== 'private') {
     if(ctx.from && !ctx.from.is_bot) {
       dbRun(
-        'INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at) VALUES(?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(chat_id,user_id) DO UPDATE SET username=EXCLUDED.username,first_name=EXCLUDED.first_name,updated_at=CURRENT_TIMESTAMP',
+        'INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at) VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP) ON CONFLICT(chat_id,user_id) DO UPDATE SET username=EXCLUDED.username,first_name=EXCLUDED.first_name,updated_at=CURRENT_TIMESTAMP',
         [ctx.chat.id, ctx.from.id, ctx.from.username||'', ctx.from.first_name||'']
       ).catch(()=>{});
     }
@@ -728,12 +733,13 @@ bot.on('my_chat_member', async ctx => {
   const chat = ctx.myChatMember?.chat;
   const member = ctx.myChatMember?.new_chat_member;
   if(!chat || chat.type === 'private') return;
-  const botId = (await ctx.telegram.getMe()).id;
+  if(!global._cachedBotId) global._cachedBotId = (await ctx.telegram.getMe()).id;
+  const botId = global._cachedBotId;
   if(member?.user?.id !== botId) return;
   if(['member','administrator'].includes(member?.status)) {
     try {
       await dbRun(
-        'INSERT INTO group_chats(chat_id,title) VALUES(?,?) ON CONFLICT(chat_id) DO UPDATE SET title=EXCLUDED.title',
+        'INSERT INTO group_chats(chat_id,title) VALUES($1,$2) ON CONFLICT(chat_id) DO UPDATE SET title=EXCLUDED.title',
         [chat.id, chat.title||'']
       );
       const specs = await dbAll('SELECT id,name FROM specialties WHERE is_deleted=0 ORDER BY id');
@@ -744,8 +750,8 @@ bot.on('my_chat_member', async ctx => {
       );
     } catch(e) { logger.error('Group join:', e.message); }
   } else if(['left','kicked'].includes(member?.status)) {
-    dbRun('DELETE FROM group_chats WHERE chat_id=?',[chat.id]).catch(()=>{});
-    dbRun('DELETE FROM group_members WHERE chat_id=?',[chat.id]).catch(()=>{});
+    dbRun('DELETE FROM group_chats WHERE chat_id=$1',[chat.id]).catch(()=>{});
+    dbRun('DELETE FROM group_members WHERE chat_id=$1',[chat.id]).catch(()=>{});
   }
 });
 
@@ -788,6 +794,13 @@ async function launch() {
 
 launch();
 
+
+// ── Cache Store Cleanup ──
+setInterval(async () => {
+  try {
+    await dbRun('DELETE FROM cache_store WHERE expires_at < $1', [Date.now()]);
+  } catch(e) {}
+}, 3600000);
 
 // ── BotMsgs Cleanup ──
 setInterval(() => {

@@ -36,7 +36,12 @@ function _evict() {
     cacheClear(k);
   }
 }
-const _origSet = cacheSet;
+// evict بعد كل set
+const _origCacheSet = cacheSet;
+function cacheSet(key, val, ttl=300000) {
+  _origCacheSet(key, val, ttl);
+  _evict();
+}
 
 async function cacheWarmup() {
   try {

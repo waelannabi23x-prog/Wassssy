@@ -148,10 +148,8 @@ async function all(sql, params=[]) {
   if(pg) {
     const converted = toPgCached(sql);
     return withRetry(async () => {
-      const name = pgPrepared.get(converted);
-      const res = name
-        ? await pg.query({ name, text: converted, values: params })
-        : await pg.query(converted, params);
+      const name = await getPrepared(pg, sql);
+      const res = await pg.query({ name, text: converted, values: params });
       return res.rows;
     }, 'all').catch(e => {
       logger.error('DB all FAILED:', e.message, '| SQL:', converted.substring(0,100));
@@ -312,21 +310,7 @@ async function initSchema() {
         if(match) {
           const [,table,col,type] = match;
         
-const columnCache = new Set(); // Stores 'table_name:column_name' strings
-
-async function columnExists(table, col) {
-  const cacheKey = `${table}:${col}`;
-  if (columnCache.has(cacheKey)) {
-    return true;
-  }
-
-  const exists = await pg.query(`SELECT 1 FROM information_schema.columns WHERE table_name=$1 AND column_name=$2`, [table, col]);
-  if (exists.rows.length > 0) {
-    columnCache.add(cacheKey);
-    return true;
-  }
-  return false;
-}
+          const exists = await pg.query(`SELECT 1 FROM information_schema.columns WHERE table_name=$1 AND column_name=$2`, [table, col]);
           if(!exists.rows.length) await pg.query(`ALTER TABLE ${table} ADD COLUMN ${col} ${type}`);
         }
       } else if(getSqlite()) {

@@ -44,7 +44,7 @@ async function showNewInSpecialty(ctx){
        JOIN subjects s ON c.subject_id=s.id
        JOIN semesters sm ON s.semester_id=sm.id
        JOIN years y ON sm.year_id=y.id
-       WHERE y.specialty_id=? AND f.is_deleted=0
+       WHERE y.specialty_id=$1 AND f.is_deleted=0
        ORDER BY f.uploaded_at DESC LIMIT 15`,[spId]);
     cacheSet(key,list,120000);
   }
@@ -110,14 +110,14 @@ async function showProgress(ctx) {
   const subjects=await all(`
     SELECT s.name as sub_name,
            COUNT(DISTINCT f.id) as total,
-           COUNT(DISTINCT CASE WHEN h.user_id=? THEN h.file_id END) as seen
+           COUNT(DISTINCT CASE WHEN h.user_id=$1 THEN h.file_id END) as seen
     FROM subjects s
     JOIN semesters sm ON s.semester_id=sm.id
     JOIN years y ON sm.year_id=y.id
     JOIN categories c ON c.subject_id=s.id
     JOIN files f ON f.category_id=c.id AND f.is_deleted=0
-    LEFT JOIN history h ON h.file_id=f.id AND h.user_id=?
-    WHERE y.specialty_id=? AND s.is_deleted=0
+    LEFT JOIN history h ON h.file_id=f.id AND h.user_id=$1
+    WHERE y.specialty_id=$3 AND s.is_deleted=0
     GROUP BY s.id, s.name
     ORDER BY seen DESC, total DESC
   `,[uid,uid,spId]);
@@ -159,7 +159,7 @@ async function showProfile(ctx){
   const [user, dlCount, favCount, spRow, lastFile] = await Promise.all([
     usersDb.getById(uid),
     interactions.getUserDownloadCount(uid),
-    get('SELECT COUNT(*) as c FROM favorites WHERE user_id=?',[uid]).then(r=>r?.c||0),
+    get('SELECT COUNT(*) as c FROM favorites WHERE user_id=$1',[uid]).then(r=>r?.c||0),
     usersDb.getSpecialty(uid),
     interactions.getLastFile(uid)
   ]);

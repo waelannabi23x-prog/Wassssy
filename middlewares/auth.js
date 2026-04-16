@@ -11,7 +11,7 @@ async function getAdminInfo(uid) {
   const now = Date.now();
   const cached = _adminCache.get(uid);
   if(cached && now - cached.ts < ADMIN_TTL) return cached.data;
-  const row = await get('SELECT * FROM admins WHERE user_id=?', [uid]);
+  const row = await get('SELECT * FROM admins WHERE user_id=$1', [uid]);
   const data = row
     ? { isAdmin: true, perms: (row.permissions||'').split(',').map(p=>p.trim()) }
     : { isAdmin: false, perms: [] };
@@ -53,7 +53,7 @@ async function authMiddleware(ctx, next) {
   // تحديث بيانات المستخدم — fire and forget
   const f = ctx.from;
   run(
-    'INSERT INTO users(id,first_name,last_name,username,last_active) VALUES(?,?,?,?,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET first_name=EXCLUDED.first_name,last_name=EXCLUDED.last_name,username=EXCLUDED.username,last_active=CURRENT_TIMESTAMP',
+    'INSERT INTO users(id,first_name,last_name,username,last_active) VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET first_name=EXCLUDED.first_name,last_name=EXCLUDED.last_name,username=EXCLUDED.username,last_active=CURRENT_TIMESTAMP',
     [uid, f.first_name||'', f.last_name||'', f.username||'']
   ).catch(()=>{});
 
@@ -71,7 +71,7 @@ async function authMiddleware(ctx, next) {
   if(!ctx.isOwner && !ctx.isAdmin) {
     let banned = getBanCache(uid);
     if(banned === undefined) {
-      const u = await get('SELECT is_banned FROM users WHERE id=?', [uid]);
+      const u = await get('SELECT is_banned FROM users WHERE id=$1', [uid]);
       banned = u?.is_banned ? 1 : 0;
       setBanCache(uid, banned);
     }

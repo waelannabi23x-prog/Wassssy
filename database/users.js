@@ -4,33 +4,33 @@ const { all, get, run } = require('./db');
 const spCache = new Map();
 const CACHE_TTL = 1800000; // 30 دقيقة
 
-const updateLastActive = id => run('UPDATE users SET last_active=CURRENT_TIMESTAMP WHERE id=?',[id]);
-const upsert = (id,fn,ln,un) => run(`INSERT INTO users(id,first_name,last_name,username,joined_at,last_active) VALUES(?,?,?,?,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET first_name=EXCLUDED.first_name,last_name=EXCLUDED.last_name,username=EXCLUDED.username,last_active=CURRENT_TIMESTAMP`,[id,fn||'',ln||'',un||'']);
+const updateLastActive = id => run('UPDATE users SET last_active=CURRENT_TIMESTAMP WHERE id=$1',[id]);
+const upsert = (id,fn,ln,un) => run(`INSERT INTO users(id,first_name,last_name,username,joined_at,last_active) VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP) ON CONFLICT(id) DO UPDATE SET first_name=EXCLUDED.first_name,last_name=EXCLUDED.last_name,username=EXCLUDED.username,last_active=CURRENT_TIMESTAMP`,[id,fn||'',ln||'',un||'']);
 
-const getAll = (page=0,limit=20) => all('SELECT * FROM users ORDER BY last_active DESC LIMIT ? OFFSET ?',[limit,page*limit]);
+const getAll = (page=0,limit=20) => all('SELECT * FROM users ORDER BY last_active DESC LIMIT $1 OFFSET $2',[limit,page*limit]);
 const count = async () => (await get('SELECT COUNT(*) as c FROM users'))?.c||0;
-const activeToday = async () => (await get(`SELECT COUNT(*) as c FROM users WHERE last_active >= NOW() - '1 day'::interval`))?.c||0;
+const activeToday = async () => (await get(`SELECT COUNT(*) as c FROM users WHERE last_active >= NOW() - INTERVAL '1 day'`))?.c||0;
 const allIds = async () => (await all('SELECT id FROM users WHERE is_banned=0')).map(r=>r.id);
-const ban = id => run('UPDATE users SET is_banned=1 WHERE id=?',[id]);
-const unban = id => run('UPDATE users SET is_banned=0 WHERE id=?',[id]);
-const isBanned = async id => !!(await get('SELECT is_banned FROM users WHERE id=?',[id]))?.is_banned;
-const getById = id => get('SELECT * FROM users WHERE id=?',[id]);
-const searchUsers = q => { const w='%'+q+'%'; return all('SELECT * FROM users WHERE first_name ILIKE ? OR username ILIKE ? OR CAST(id AS TEXT) LIKE ? LIMIT 20',[w,w,w]); };
+const ban = id => run('UPDATE users SET is_banned=1 WHERE id=$1',[id]);
+const unban = id => run('UPDATE users SET is_banned=0 WHERE id=$1',[id]);
+const isBanned = async id => !!(await get('SELECT is_banned FROM users WHERE id=$1',[id]))?.is_banned;
+const getById = id => get('SELECT * FROM users WHERE id=$1',[id]);
+const searchUsers = q => { const w='%'+q+'%'; return all('SELECT * FROM users WHERE first_name ILIKE $1 OR username ILIKE $2 OR CAST(id AS TEXT) LIKE $3 LIMIT 20',[w,w,w]); };
 
 const setSpecialty = (uid,spId) => {
   spCache.set(uid,{val:{specialty_id:spId},exp:Date.now()+CACHE_TTL});
-  return run('INSERT INTO user_specialties(user_id,specialty_id) VALUES(?,?) ON CONFLICT(user_id) DO UPDATE SET specialty_id=EXCLUDED.specialty_id',[uid,spId]);
+  return run('INSERT INTO user_specialties(user_id,specialty_id) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET specialty_id=EXCLUDED.specialty_id',[uid,spId]);
 };
 
 const getSpecialty = async uid => {
   const cached=spCache.get(uid);
   if(cached && Date.now()<cached.exp) return cached.val;
-  const result=await get('SELECT specialty_id FROM user_specialties WHERE user_id=?',[uid]);
+  const result=await get('SELECT specialty_id FROM user_specialties WHERE user_id=$1',[uid]);
   spCache.set(uid,{val:result,exp:Date.now()+CACHE_TTL});
   return result;
 };
 
-const getUsersBySpecialty = async spId => (await all('SELECT user_id as id FROM user_specialties WHERE specialty_id=?',[spId])).map(r=>r.id);
+const getUsersBySpecialty = async spId => (await all('SELECT user_id as id FROM user_specialties WHERE specialty_id=$1',[spId])).map(r=>r.id);
 
 // تنظيف cache كل 10 دقائق
 setInterval(()=>{ const now=Date.now(); for(const [k,v] of spCache) if(now>v.exp) spCache.delete(k); },600000);
