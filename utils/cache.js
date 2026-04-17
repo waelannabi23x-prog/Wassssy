@@ -14,6 +14,7 @@ function cacheSet(key, val, ttl=300000) {
   const t = setTimeout(() => { store.delete(key); timers.delete(key); }, ttl);
   if(t.unref) t.unref();
   timers.set(key, t);
+  _evict();
 }
 
 function cacheClear(key) {
@@ -36,12 +37,7 @@ function _evict() {
     cacheClear(k);
   }
 }
-// evict بعد كل set
-const _origCacheSet = cacheSet;
-function cacheSet(key, val, ttl=300000) {
-  _origCacheSet(key, val, ttl);
-  _evict();
-}
+// evict handled inline in cacheSet
 
 async function cacheWarmup() {
   try {
