@@ -76,12 +76,17 @@ async function showFavorites(ctx){
 
 async function toggleFav(ctx,fid,remove=false){
   const uid=ctx.uid;
+  const {cacheClearPrefix}=require('../utils/cache');
   const isFaved=await interactions.isFav(uid,fid);
   if(remove||isFaved){
-    interactions.removeFav(uid,fid).catch(()=>{});
+    await interactions.removeFav(uid,fid).catch(()=>{});
+    cacheClearPrefix('personal_'+uid+'_'+fid);
+    cacheClearPrefix('favbatch_'+uid+'_');
     try{await ctx.editMessageReplyMarkup({inline_keyboard:ctx.callbackQuery.message.reply_markup.inline_keyboard.map(row=>row.map(b=>b.callback_data===('fav_'+fid)||b.callback_data===('unfav_'+fid)?{...b,text:'☆ حفظ',callback_data:'fav_'+fid}:b))});}catch(e){}
   } else {
-    interactions.addFav(uid,fid).catch(()=>{});
+    await interactions.addFav(uid,fid).catch(()=>{});
+    cacheClearPrefix('personal_'+uid+'_'+fid);
+    cacheClearPrefix('favbatch_'+uid+'_');
     try{await ctx.editMessageReplyMarkup({inline_keyboard:ctx.callbackQuery.message.reply_markup.inline_keyboard.map(row=>row.map(b=>b.callback_data===('fav_'+fid)||b.callback_data===('unfav_'+fid)?{...b,text:'⭐ محفوظ',callback_data:'unfav_'+fid}:b))});}catch(e){}
   }
 }
@@ -110,17 +115,17 @@ async function showProgress(ctx) {
   const subjects=await all(`
     SELECT s.name as sub_name,
            COUNT(DISTINCT f.id) as total,
-           COUNT(DISTINCT CASE WHEN h.user_id=$2 THEN h.file_id END) as seen
+           COUNT(DISTINCT CASE WHEN h.user_id=$1 THEN h.file_id END) as seen
     FROM subjects s
     JOIN semesters sm ON s.semester_id=sm.id
     JOIN years y ON sm.year_id=y.id
     JOIN categories c ON c.subject_id=s.id
     JOIN files f ON f.category_id=c.id AND f.is_deleted=0
     LEFT JOIN history h ON h.file_id=f.id AND h.user_id=$1
-    WHERE y.specialty_id=$3 AND s.is_deleted=0
+    WHERE y.specialty_id=$2 AND s.is_deleted=0
     GROUP BY s.id, s.name
     ORDER BY seen DESC, total DESC
-  `,[uid,uid,spId]);
+  `,[uid,spId]);
 
   if(!subjects.length) return eos(ctx,'📭 لا يوجد محتوى في تخصصك بعد.',{parse_mode:'Markdown',...build([back('main_menu')])});
 

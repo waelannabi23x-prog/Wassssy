@@ -104,7 +104,7 @@ global.delState = async function(uid) {
   _scheduleStateFlush();
 };
 
-// ── State Cleanup (SQLite syntax) ──
+// ── State Cleanup ──
 setInterval(async () => {
   try {
     await dbRun("DELETE FROM user_states WHERE updated_at < NOW() - INTERVAL '1 hour'");
@@ -183,7 +183,9 @@ bot.use(async (ctx, next) => {
 bot.use(authMiddleware);
 bot.use(async (ctx, next) => {
   if (ctx.from && !checkRL(ctx.from.id)) {
-    return ctx.answerCbQuery?.("⏳ بطيء قليلاً!", { show_alert: false }).catch(() => {});
+    if (ctx.callbackQuery) return ctx.answerCbQuery("⏳ بطيء قليلاً!", { show_alert: false }).catch(() => {});
+    if (ctx.message) return ctx.reply("⏳ بطيء قليلاً! انتظر ثانية.").catch(() => {});
+    return;
   }
   return next();
 });
@@ -722,6 +724,9 @@ bot.on('text', async ctx => {
     if (text.length > 500) return ctx.reply('⚠️ التعليق طويل جداً. الحد 500 حرف.');
     await commentsDb.addComment(state.fid, ctx.uid, text);
     await global.delState(ctx.uid);
+    const {cacheClear}=require('./utils/cache');
+    cacheClear('cmts_'+state.fid+'_0');
+    cacheClear('cmts_'+state.fid+'_1');
     await ctx.reply('✅ تم إضافة تعليقك!');
     return browse.showComments(ctx, state.fid, state.spId, state.yrId, state.smId, state.sbId, state.catId);
   }

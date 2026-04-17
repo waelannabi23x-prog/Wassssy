@@ -653,3 +653,96 @@
 [2026-04-16 01:01:18] [INFO] ✅ Express on port 3000
 [2026-04-16 01:01:18] [INFO] ✅ Scheduler started
 [2026-04-16 01:01:19] [INFO] 🚀 Study Bot v3.2 — FIXED & OPTIMIZED
+2026-04-17 10:53:26: ✅ Using PostgreSQL
+[2026-04-17 09:53:26] [INFO] ✅ Using PostgreSQL
+[2026-04-17 09:53:36] [INFO] ✅ pg_trgm indexes ready
+2026-04-17 10:53:36: ✅ pg_trgm indexes ready
+2026-04-17 10:53:43: ✅ DB schema ready
+[2026-04-17 09:53:43] [INFO] ✅ DB schema ready
+2026-04-17 10:53:45: 🔧 Maintenance mode: false
+2026-04-17 10:53:45: ✅ States loaded: 10
+[2026-04-17 09:53:45] [INFO] 🔧 Maintenance mode: false
+[2026-04-17 09:53:45] [INFO] ✅ States loaded: 10
+2026-04-17 10:54:21: ✅ Cache warmed up: 61 entries
+2026-04-17 10:54:21: ✅ Database ready
+2026-04-17 10:54:21: ✅ Express on port 3000
+[2026-04-17 09:54:21] [INFO] ✅ Database ready
+2026-04-17 10:54:21: ✅ Scheduler started
+[2026-04-17 09:54:21] [INFO] ✅ Express on port 3000
+[2026-04-17 09:54:21] [INFO] ✅ Scheduler started
+2026-04-17 10:54:23: 🚀 Study Bot v3.2 — FIXED & OPTIMIZED
+[2026-04-17 09:54:23] [INFO] 🚀 Study Bot v3.2 — FIXED & OPTIMIZED
+[2026-04-17 09:54:30] [WARN] ⚠️ DB all retry 1/3 in 500ms — Connection terminated due to connection timeout
+[2026-04-17 09:54:30] [WARN] ⚠️ DB all retry 1/3 in 500ms — Connection terminated due to connection timeout
+[2026-04-17 09:54:30] [WARN] ⚠️ DB all retry 1/3 in 500ms — Connection terminated due to connection timeout
+[2026-04-17 09:54:30] [WARN] ⚠️ DB all retry 1/3 in 500ms — Connection terminated due to connection timeout
+[2026-04-17 09:54:30] [WARN] ⚠️ DB all retry 1/3 in 500ms — Connection terminated due to connection timeout
+[2026-04-17 09:54:30] [WARN] ⚠️ DB all retry 1/3 in 500ms — Connection terminated due to connection timeout
+[2026-04-17 09:54:30] [WARN] ⚠️ DB all retry 1/3 in 500ms — Connection terminated due to connection timeout
+[2026-04-17 09:54:30] [WARN] ⚠️ DB all retry 1/3 in 500ms — Connection terminated due to connection timeout
+[2026-04-17 09:54:30] [WARN] ⚠️ DB all retry 1/3 in 500ms — Connection terminated due to connection timeout
+[2026-04-17 09:54:30] [WARN] ⚠️ DB all retry 1/3 in 500ms — Connection terminated due to connection timeout
+[2026-04-17 09:54:30] [WARN] ⚠️ DB all retry 1/3 in 500ms — Connection terminated due to connection timeout
+[2026-04-17 09:54:30] [WARN] ⚠️ DB all retry 1/3 in 500ms — Connection terminated due to connection timeout
+[2026-04-17 09:54:30] [WARN] ⚠️ DB all retry 1/3 in 500ms — Connection terminated due to connection timeout
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:31] [WARN] ⚠️ DB all retry 1/3 in 500ms — Connection terminated due to connection timeout
+[2026-04-17 09:54:35] [WARN] ⚠️ DB all retry 2/3 in 1000ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:35] [WARN] ⚠️ DB all retry 2/3 in 1000ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:36] [WARN] ⚠️ DB all retry 1/3 in 500ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:36] [WARN] ⚠️ DB all retry 2/3 in 1000ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:36] [WARN] ⚠️ DB all retry 2/3 in 1000ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:36] [WARN] ⚠️ DB all retry 2/3 in 1000ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:36] [WARN] ⚠️ DB all retry 2/3 in 1000ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:36] [WARN] ⚠️ DB all retry 2/3 in 1000ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:36] [WARN] ⚠️ DB all retry 2/3 in 1000ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:36] [WARN] ⚠️ DB all retry 2/3 in 1000ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:36] [WARN] ⚠️ DB all retry 2/3 in 1000ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:36] [WARN] ⚠️ DB all retry 2/3 in 1000ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:36] [WARN] ⚠️ DB all retry 2/3 in 1000ms — timeout exceeded when trying to connect
+[2026-04-17 09:54:36] [WARN] ⚠️ DB all retry 2/3 in 1000ms — timeout exceeded when trying to connect
+2026-04-17 10:54:42: ✅ Precomputed all browse menus
+2026-04-17 11:05:19: ✅ Using PostgreSQL
+[2026-04-17 10:05:19] [INFO] ✅ Using PostgreSQL
+2026-04-17 11:05:28: ✅ pg_trgm indexes ready
+[2026-04-17 10:05:28] [INFO] ✅ pg_trgm indexes ready
+2026-04-17 11:05:35: ✅ DB schema ready
+[2026-04-17 10:05:35] [INFO] ✅ DB schema ready
+2026-04-17 11:05:36: 🔧 Maintenance mode: false
+[2026-04-17 10:05:36] [INFO] 🔧 Maintenance mode: false
+2026-04-17 11:05:37: ✅ States loaded: 10
+[2026-04-17 10:05:37] [INFO] ✅ States loaded: 10
+2026-04-17 11:05:44: ✅ Cache warmed up: 61 entries
+2026-04-17 11:05:44: ✅ Database ready
+2026-04-17 11:05:44: ✅ Express on port 3000
+[2026-04-17 10:05:44] [INFO] ✅ Database ready
+2026-04-17 11:05:44: ✅ Scheduler started
+[2026-04-17 10:05:44] [INFO] ✅ Express on port 3000
+[2026-04-17 10:05:44] [INFO] ✅ Scheduler started
+2026-04-17 11:05:44: 🚀 Study Bot v3.2 — FIXED & OPTIMIZED
+[2026-04-17 10:05:44] [INFO] 🚀 Study Bot v3.2 — FIXED & OPTIMIZED
+2026-04-17 11:05:47: ✅ Precomputed all browse menus

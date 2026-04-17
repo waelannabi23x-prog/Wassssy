@@ -119,7 +119,7 @@ async function handleAiChat(ctx, text) {
       btn('📄 '+f.title.substring(0,30)+' · '+f.sub_name, 'preview_'+f.id+'_0_0_0_0_0')
     ]);
     rows.push([btn('🔍 بحث يدوي','search_prompt'), btn('🏠','main_menu')]);
-    addMessage(uid, 'assistant', reply);
+    await addMessage(uid, 'assistant', reply);
     await ctx.reply(reply, build(rows));
   } else {
     // ما لقى — جواب ذكي
@@ -135,7 +135,7 @@ Be direct and helpful. No markdown.`;
         {role:'system', content: systemMsg},
         ...await getHistory(uid)
       ], 200, 0.5);
-      addMessage(uid, 'assistant', reply);
+      await addMessage(uid, 'assistant', reply);
       await ctx.reply(reply, build([[btn('🔍 بحث يدوي','search_prompt'), btn('🏠','main_menu')]]));
     } catch(e) {
       await ctx.reply('ما لقيت نتائج. جرب /search أو تصفح المحتوى.');

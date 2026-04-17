@@ -203,7 +203,7 @@ async function _showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
   }
   rows.push(backMenu('sbs_'+spId+'_'+yrId+'_'+smId+'_'+sbId));
   const extra={parse_mode:'Markdown',...build(rows)};
-  cacheSet(userKey,{text,extra},3600000);
+  cacheSet(userKey,{text,extra},300000);
 
   // pre-warm بالتوازي مع الرد — بدون انتظار
   Promise.all(list.map(f => {
@@ -325,6 +325,7 @@ async function showComments(ctx,fid,spId,yrId,smId,sbId,catId,page=0) {
 
 async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
   const uid=ctx.uid;
+  ctx.answerCbQuery('').catch(()=>{});
   ctx.sendChatAction('upload_document').catch(()=>{});
   const [f,similar,fav]=await Promise.all([filesDb.getFile(fid),interactions.getSimilar(fid,4),interactions.isFav(uid,fid)]);
   if(!f) return ctx.reply(t(uid,'not_found'));
