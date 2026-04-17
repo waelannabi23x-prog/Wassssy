@@ -762,3 +762,10 @@
 [2026-04-17 11:52:32] [INFO] ✅ Express on port 3000
 [2026-04-17 11:52:32] [INFO] ✅ Scheduler started
 [2026-04-17 11:52:33] [INFO] 🚀 Study Bot v4.0 — Enterprise Architecture
+[2026-04-17 12:48:47] [INFO] ✅ Using PostgreSQL
+[2026-04-17 12:49:04] [INFO] ✅ pg_trgm indexes ready
+[2026-04-17 12:49:11] [INFO] ✅ DB schema ready
+[2026-04-17 12:49:20] [INFO] ✅ Database ready
+[2026-04-17 12:49:20] [INFO] ✅ Express on port 3000
+[2026-04-17 12:49:20] [INFO] ✅ Scheduler started
+[2026-04-17 12:49:20] [INFO] 🚀 Study Bot v4.0 — Enterprise Architecture

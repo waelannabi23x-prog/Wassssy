@@ -442,8 +442,6 @@ async function handleText(ctx,state){
         const sm=await ctx.reply('📢 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total_bc,{parse_mode:'Markdown'});
         const bcRes = await concurrentBroadcast(ctx.telegram, ctx.chat.id, sm.message_id, ids, '📢 *إعلان*\n\n'+text, {parse_mode:'Markdown'});
         sent = bcRes.sent; failed = bcRes.failed;
-          }
-        }
         ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ *اكتمل البث!*\n`[██████████] 100%`\n✅ '+sent+' | ❌ '+failed+' | 📊 '+Math.round(sent/total_bc*100)+'%',{...build([back('mg_menu')]),parse_mode:'Markdown'}).catch(()=>{});
         break;
       }
