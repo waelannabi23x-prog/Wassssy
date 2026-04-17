@@ -76,8 +76,8 @@ async function handleGrpSp(ctx, data) {
   const chatId = parseInt(raw.substring(0, lastUs));
   const specId = parseInt(raw.substring(lastUs + 1));
   try {
-    await dbRun('INSERT INTO group_chats(chat_id,specialty_id) VALUES(?,?) ON CONFLICT(chat_id) DO UPDATE SET specialty_id=?',[chatId,specId,specId]);
-    const specs = await dbAll('SELECT name FROM specialties WHERE id=?',[specId]);
+    await dbRun('INSERT INTO group_chats(chat_id,specialty_id) VALUES($1,$2) ON CONFLICT(chat_id) DO UPDATE SET specialty_id=$3',[chatId,specId,specId]);
+    const specs = await dbAll('SELECT name FROM specialties $1',[specId]);
     const spName = specs[0]?.name || String(specId);
     await ctx.answerCbQuery('✅ ' + spName, {show_alert:false}).catch(()=>{});
     await ctx.telegram.editMessageText(chatId, ctx.callbackQuery.message.message_id, null, '✅ تخصص القروب: 🎓 ' + spName).catch(()=>{});

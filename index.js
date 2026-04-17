@@ -460,7 +460,6 @@ bot.on('my_chat_member', async ctx => {
 async function launch() {
   try {
     await initSchema();
-    try { await require('./database/db').run(fixQuery); } catch(e) { console.log('View fixed'); }
     await Promise.all([loadMaintenance(), loadStates()]);
     await cacheWarmup();
     logger.info('✅ Database ready');
@@ -498,10 +497,10 @@ setInterval(async () => {
 
 setInterval(() => { const now = Date.now(); for (const uid in global.userStates) { if (global.userStates[uid]?._ts && now - global.userStates[uid]._ts > 3600000) global.delState(uid); } }, 3600000);
 
-process.once('SIGINT', () => { try { bot.stop('SIGINT'); } catch(e) {} });
-process.once('SIGTERM', () => { try { bot.stop('SIGTERM'); } catch(e) {} });
+process.once('SIGINT', async () => { try { if(global._stateTimer) clearTimeout(global._stateTimer); const {flushGroupMembers}=require('./index'); flushGroupMembers(); const db=require('./database/db'); if(db.saveDB) db.saveDB(); if(db.getPg) { const p=db.getPg(); if(p) await p.end(); } bot.stop('SIGINT'); } catch(e) {} });
+process.once('SIGTERM', async () => { try { if(global._stateTimer) clearTimeout(global._stateTimer); const {flushGroupMembers}=require('./index'); flushGroupMembers(); const db=require('./database/db'); if(db.saveDB) db.saveDB(); if(db.getPg) { const p=db.getPg(); if(p) await p.end(); } bot.stop('SIGTERM'); } catch(e) {} });
 process.on('uncaughtException', err => logger.error('Uncaught:', err.message));
 process.on('unhandledRejection', err => logger.error('Unhandled:', err?.message || err));
 
 // ── Memory Monitor ──
-setInterval(() => { const mem = process.memoryUsage().heapUsed / 1024 / 1024; if (mem > 440) { logger.error('⚠️ Memory critical:', mem.toFixed(0) + 'MB'); if (global.gc) global.gc(); if (mem > 480) process.exit(1); } }, 60000);
+setInterval(() => { const mem = process.memoryUsage().heapUsed / 1024 / 1024; if (mem > 440) { logger.error('⚠️ Memory critical:', mem.toFixed(0) + 'MB'); if (global.gc) global.gc(); if (mem > 480) { logger.error("Restarting due to memory..."); process.emit("SIGTERM"); } } }, 60000);
