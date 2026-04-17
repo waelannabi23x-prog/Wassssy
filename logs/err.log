@@ -67,3 +67,7 @@
 2026-04-17 10:54:36: ⚠️ DB all retry 2/3 in 1000ms — timeout exceeded when trying to connect
 2026-04-17 10:54:36: ⚠️ DB all retry 2/3 in 1000ms — timeout exceeded when trying to connect
 [2026-04-17 12:48:52] [ERROR] Table error: Connection terminated due to connection timeout
+[2026-04-17 13:42:56] [ERROR] Table error: Connection terminated due to connection timeout
+[2026-04-17 13:43:01] [ERROR] Table error: Connection terminated due to connection timeout
+[2026-04-17 13:43:06] [ERROR] Table error: Connection terminated due to connection timeout
+[2026-04-17 13:43:11] [ERROR] Table error: Connection terminated due to connection timeout
