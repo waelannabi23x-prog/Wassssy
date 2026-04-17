@@ -33,9 +33,6 @@ async function concurrentBroadcast(bot, chatId, msgId, ids, txt, opt = {}) {
 if(!global.userStates) global.userStates={};
 const setState=(uid,s)=>{ global.userStates[uid]=s; if(global.setState) global.setState(uid,s); };
 const clearState=uid=>{ delete global.userStates[uid]; if(global.delState) global.delState(uid); };
-const PS=10;
-const esc=t=>(t||"").replace(/[*_`\[\]()~>#+=|{}.!\-]/g,"\\$&");
-
 async function mainMenu(ctx){
   const uid=ctx.uid;
   const [specs0, files0] = await Promise.all([content.getSpecs(), filesDb.totalFiles()]);
