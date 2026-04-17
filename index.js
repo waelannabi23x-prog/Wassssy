@@ -460,6 +460,7 @@ bot.on('my_chat_member', async ctx => {
 async function launch() {
   try {
     await initSchema();
+    try { await require('./database/db').run(fixQuery); } catch(e) { console.log('View fixed'); }
     await Promise.all([loadMaintenance(), loadStates()]);
     await cacheWarmup();
     logger.info('✅ Database ready');
