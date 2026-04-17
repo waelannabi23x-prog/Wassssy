@@ -24,6 +24,7 @@ const { handleAiChat, resetChat } = require('./handlers/ai_chat');
 const { handleOwnerAI } = require('./handlers/ai_owner');
 const { cacheWarmup } = require('./utils/cache');
 const { setLang } = require('./utils/i18n');
+const { startSmartWarmup } = require('./utils/smartWarmup');
 const { smartSearch } = require('./handlers/group'); // 🛡️ إزالة التكرار - مصدر وحيد للبحث
 
 const TOKEN = process.env.BOT_TOKEN;
@@ -469,6 +470,7 @@ async function launch() {
     app.listen(PORT, () => logger.info('✅ Express on port ' + PORT));
     await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, { allowed_updates: ['message', 'callback_query', 'my_chat_member'], drop_pending_updates: true, max_connections: 40 });
     global.__bot = bot;
+    startSmartWarmup();
     logger.info('🚀 Study Bot v4.0 — Enterprise Architecture');
   } catch(e) { logger.error('Launch error:', e.message); setTimeout(launch, 10000); }
 }
