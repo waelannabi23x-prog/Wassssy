@@ -38,7 +38,11 @@ exports.trySmartUpload = async (ctx) => {
   let parts = cleanCaption.split(/[|,]/).map(p=>p.trim()).filter(p=>p);
   
   if(parts.length < 5) {
-    return ctx.reply("⚠️ صيغة غير مكتملة (يجب 5 أقسام مفصولة بـ |).\n\n🇩🇩 عربي:\nتخصص: LMD | سنة: 2 | فصل: 1 | مادة: الغوا | قسم: سيري\n\n🇫🇷 فرنسي:\nspec: LMD | année: 2 | semestre: 1 | matière: Algo | catégorie: Serie\n\n🇬🇧 إنجليزي:\nspec: LMD | year: 2 | sem: 1 | mat: Algo | cat: Serie");
+    let NL=String.fromCharCode(10);
+    return ctx.reply("⚠️ صيغة غير مكتملة (5 أقسام بـ |)."+NL+NL+
+    "🇩🇩: تخصص: LMD | سنة: 2 | فصل: 1 | مادة: الغوا | قسم: سيري"+NL+NL+
+    "🇫🇷: spec: Info | année: 2 | semestre: 1 | matière: Algo | catégorie: Cours"+NL+NL+
+    "🇬🇧: spec: Info | year: 2 | sem: 1 | mat: Algo | cat: Cours");
   }
 
   let fileId, fileType, fileName = "";
