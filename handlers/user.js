@@ -110,7 +110,7 @@ async function showProgress(ctx) {
   const subjects=await all(`
     SELECT s.name as sub_name,
            COUNT(DISTINCT f.id) as total,
-           COUNT(DISTINCT CASE WHEN h.user_id=$1 THEN h.file_id END) as seen
+           COUNT(DISTINCT CASE WHEN h.user_id=$2 THEN h.file_id END) as seen
     FROM subjects s
     JOIN semesters sm ON s.semester_id=sm.id
     JOIN years y ON sm.year_id=y.id
