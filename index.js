@@ -21,6 +21,7 @@ const bundlesDb = require('./database/bundles');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { eos } = require('./utils/helpers');
 const { handleAiChat, resetChat } = require('./handlers/ai_chat');
+const tools = require('./handlers/owner_tools');
 const { handleOwnerAI } = require('./handlers/ai_owner');
 const { cacheWarmup } = require('./utils/cache');
 const { setLang } = require('./utils/i18n');
@@ -226,6 +227,8 @@ bot.command('done', async ctx => {
     return ctx.reply(msg, {...kbBuild([[kbBtn('عرض الملفات','mg_fls_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId+'_'+state.catId)]])});
   }
 });
+bot.command('mygroups', tools.listGroups);
+bot.command('leavegroup', tools.leaveGroup);
 bot.command('leaveall', async ctx => { if (!ctx.isOwner) return ctx.reply('🚫 ليس لديك صلاحية.'); const chats = await dbAll('SELECT chat_id FROM group_chats'); let left = 0; for (const ch of chats) { try { await ctx.telegram.leaveChat(ch.chat_id); left++; } catch(e) {} } return ctx.reply('✅ خرجت من ' + left + ' قروب.'); });
 bot.command('dlt', async ctx => {
   if(!ctx.isOwner) return ctx.deleteMessage().catch(()=>{});
@@ -240,6 +243,7 @@ bot.command('dlt', async ctx => {
 });
 bot.command('ai', async ctx => { await global.setState(ctx.uid, { type: 'ai_mode' }); return ctx.reply('🤖 وضع المساعد الذكي مفعل!\n\nاكتب أي سؤال وسأجاوبك.\nاكتب /start للرجوع للقائمة الرئيسية.'); });
 bot.command('reset', ctx => { resetChat(ctx.uid); return ctx.reply('🔄 تم مسح سياق المحادثة.'); });
+bot.command('promote', tools.batchPromote);
 bot.command('cancel', ctx => { if (global.userStates?.[ctx.uid]) { global.delState(ctx.uid); return ctx.reply('❌ تم الإلغاء.'); } });
 bot.command('users', async ctx => { if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫 ليس لديك صلاحية.'); if (ctx.isAdmin && !ctx.isOwner) { const perms = await adminsDb.getPerms(ctx.uid); if (!perms.includes('full') && !perms.includes('view_users')) return ctx.reply('🚫 ليس لديك صلاحية.'); } return manage.showUsers(ctx); });
 bot.command('help', ctx => ctx.reply('📚 *أوامر البوت*\n\n/start — القائمة الرئيسية\n/search — البحث\n/profile — ملفك الشخصي\n/stats — الإحصائيات\n/cancel — إلغاء العملية الحالية\n\n👑 للمشرفين:\n/admin — لوحة الإدارة', { parse_mode: 'Markdown' }));
@@ -388,6 +392,7 @@ bot.on('message', async (ctx, next) => {
 bot.on('document', async ctx => {
   if (!ctx.isAdmin && !ctx.isOwner) return;
   const state = global.userStates?.[ctx.uid];
+  if (await tools.trySmartUpload(ctx)) return;
   if (state?.type === 'mg_bulk_files') return manage.handleBulkUpload(ctx);
   if (state?.type === 'mg_tpl_file') { global.setState(ctx.uid, { ...state, type: 'mg_tpl_content', fileId: ctx.message.document.file_id }); return ctx.reply('اكتب نص الرسالة مع الملف (او skip):'); }
   if (state?.type === 'mg_awaiting_restore' && ctx.isOwner) {
