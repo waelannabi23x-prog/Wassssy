@@ -1,147 +1,109 @@
 const { groqChat } = require('../utils/groq_client');
 const filesDb = require('../database/files');
-const { all: dbAll, run: dbRun } = require('../database/db');
-const { getBotKnowledge } = require('../utils/ai_knowledge');
-const { build, btn } = require('../utils/keyboard');
+const { cacheGet, cacheSet } = require('../utils/cache');
 
-async function getHistory(uid) {
+// ═══════════════════════════════════════════════════════
+// 🧠 Enterprise AI Engine V2 - المساعد الجامعي الذكي
+// ═══════════════════════════════════════════════════════
+
+const SYSTEM_PERSONA = `أنت "أكاديمي"، مساعد جامعي ذكي ومتفوق لبوت منصة جامعية جزائرية.
+شخصيتك:
+- تتحدث بلهجة جزائرية دارجة ممزوجة بالعربية الفصحى المبسطة (إذا تكلم المستخدم بالدارجة، رد بالدارجة. إذا بالفرنسية، رد بالفرنسية).
+- مختصر، دقيق، ومفيد. لا تهلل ولا تطل كلاماً بلا فائدة.
+- إذا سألك الطالب عن شيء تقني أو أكاديمي، اشرح له كأنك تشرح لزميلك في الساحة (مثال: الـ Stack هو هيكل بيانات الأخير يدخل أول يخرج آخر LIFO).
+- لا تستخدم Markdown الثقيل (لا تضع عناوين كبيرة أو نقاط كثيرة)، اكتب بشكل عادي ونظيف.
+- إذا لم تعرف الإجابة أو المعلومة غير متوفرة، قل بصراحة "ما عندي هاد المعلومة حالياً، جرب تسأل الأساتذة أو راجع الكورس".
+- ممنوع تقديم معلومات خاطئة أو تتوقع.`;
+
+async function smartSearchForAI(query, limit = 3) {
+  const q = query.replace(/[%;\\]/g, '').trim();
+  if (q.length < 2) return [];
   try {
-    const rows = await dbAll('SELECT role, content FROM ai_history WHERE user_id=$1 ORDER BY created_at DESC LIMIT 8',[uid]);
-    return rows.reverse();
-  } catch(e) { return []; }
-}
-
-async function addMessage(uid, role, content) {
-  try {
-    await dbRun('INSERT INTO ai_history(user_id, role, content) VALUES($1, $2, $3)',[uid, role, content.substring(0,2000)]);
-    await dbRun('DELETE FROM ai_history WHERE user_id=$1 AND id NOT IN (SELECT id FROM ai_history WHERE user_id=$1 ORDER BY created_at DESC LIMIT 8)',[uid]);
-  } catch(e) {}
-}
-
-async function resetChat(uid) {
-  try { await dbRun('DELETE FROM ai_history WHERE user_id=$1',[uid]); } catch(e) {}
-}
-
-async function smartSearch(query) {
-  // Normalize query for better matching
-  let cleaned = query
-    .toLowerCase()
-    .replace(/[àáâãäå]/g, "a")
-    .replace(/[èéêë]/g, "e")
-    .replace(/[ìíîï]/g, "i")
-    .replace(/[òóôõö]/g, "o")
-    .replace(/[ùúûü]/g, "u")
-    .replace(/سيري|سلسلة|exercices|exercises/gi, 'serie')
-    .replace(/كور|محاضرة|cours magistral|cours/gi, 'cours')
-    .replace(/امتحان|اختبار|examen|exam/gi, 'exam')
-    .replace(/حل|correction|corrigé|solution/gi, 'solution')
-    .replace(/تلخيص|ملخص|resume|summary/gi, 'resume')
-    .trim();
-
-  if(!cleaned || cleaned.length < 2) return [];
-
-  // 1. Fuzzy search with trigrams (leveraging the new search in files.js)
-  let results = await filesDb.search(cleaned, 12);
-  if(results.length >= 2) return results;
-
-  // 2. Multi-word intersection fallback
-  const words = cleaned.split(/\s+/).filter(w => w.length >= 3);
-  if(words.length > 1) {
-    const multiSearch = await filesDb.search(words.join(' '), 10);
-    if(multiSearch.length) return multiSearch;
-  }
-  
-  return results;
-}
-
-// Extract search keywords from the AI
-async function extractSearchTerms(text, knowledge) {
-  const prompt = `You are an expert academic file locator for Algerian University students.
-Extract the most relevant search keywords from the user's request.
-Context:
-- Types: cours, serie, exam, solution, resume.
-- User might use Darija (e.g., "بغيت", "كاين"), French, or Arabic.
-
-Knowledge base summary:
-${knowledge.substring(0, 1000)}
-
-User request: "${text}"
-
-Return ONLY JSON: {"terms": ["keyword1", "keyword2"], "subject": "Canonical Subject Name if found", "type": "file type if specified"}
-Examples:
-- "سيري الغوا 2" -> {"terms": ["serie", "algo 2"], "subject": "Algorithmique 2", "type": "serie"}
-- "cours analyse" -> {"terms": ["cours", "analyse"], "subject": "Analyse 1", "type": "cours"}`;
-
-  try {
-    const raw = await groqChat([{role:'user', content:prompt}], 150, 0.1);
-    const match = raw.match(/\{[\s\S]*\}/);
-    if (!match) throw new Error('No JSON');
-    const parsed = JSON.parse(match[0]);
+    const results = await filesDb.search(q, limit);
+    if (results.length >= 2) return results;
     
-    // If subject was found but terms are poor, use subject as a term
-    if (parsed.subject && (!parsed.terms || parsed.terms.length === 0)) {
-        parsed.terms = [parsed.subject];
+    const words = q.split(/\s+/).filter(w => w.length >= 3);
+    if (words.length > 1) {
+      const extras = new Map();
+      const existingIds = new Set(results.map(x => x.id));
+      const wordResults = await Promise.all(words.map(w => filesDb.search(w, limit)));
+      for (const wr of wordResults) {
+        for (const r of wr) { if (!existingIds.has(r.id)) { extras.set(r.id, r); existingIds.add(r.id); } }
+      }
+      return [...results, ...extras.values()].slice(0, limit);
     }
-    return parsed;
-  } catch(e) {
-    return {terms: [text], subject: null};
-  }
+    return results;
+  } catch (e) { return []; }
+}
+
+function classifyIntent(text) {
+  const t = text.toLowerCase();
+  if (/عندك|يوجد|بحث|بحث لي|شوف لي|أريد ملف|عايز ملف|حاب تاخذ|حاب تبعث/.test(t)) return 'FILE_SEARCH';
+  if (/اشرح|شرحلي|وش يعني|ما هو|ماذا يعني|قانون|تعريف|مفهوم|فرق بين/.test(t)) return 'CONCEPT_EXPLAIN';
+  if (/حل|صلحلي|كيفاش نحسب|نحسب|طريقة|خطوات|تمرين|exercice|série|td/.test(t)) return 'PROBLEM_SOLVING';
+  return 'GENERAL_CHAT';
 }
 
 async function handleAiChat(ctx, text) {
-  if(!text || text.length < 2) return false;
   const uid = ctx.uid;
-  ctx.telegram.sendChatAction(ctx.chat.id, 'typing').catch(()=>{});
+  ctx.sendChatAction('typing').catch(() => {});
 
-  const knowledge = await getBotKnowledge();
+  const intent = classifyIntent(text);
 
-  // استخرج كلمات البحث
-  const extracted = await extractSearchTerms(text, knowledge);
-  const searchQuery = extracted.terms.join(' ');
-
-  // بحث ذكي
-  let results = await smartSearch(searchQuery);
-
-  // إذا ما لقى — جرب بالمادة مباشرة
-  if(!results.length && extracted.subject) {
-    results = await smartSearch(extracted.subject);
-  }
-
-  addMessage(uid, 'user', text);
-
-  if(results.length) {
-    // رد بسيط + أزرار
-    const reply = results.length === 1
-      ? `وجدت ملف واحد لـ "${searchQuery}":`
-      : `وجدت ${results.length} ملف لـ "${searchQuery}":`;
-
-    const rows = results.slice(0,6).map(f=>[
-      btn('📄 '+f.title.substring(0,30)+' · '+f.sub_name, 'preview_'+f.id+'_0_0_0_0_0')
-    ]);
-    rows.push([btn('🔍 بحث يدوي','search_prompt'), btn('🏠','main_menu')]);
-    await addMessage(uid, 'assistant', reply);
-    await ctx.reply(reply, build(rows));
-  } else {
-    // ما لقى — جواب ذكي
-    const systemMsg = `You are a file search assistant for an Algerian university bot. 
-A student searched for files but nothing was found.
-Bot content: ${knowledge.substring(0,800)}
-Student searched for: "${text}"
-Reply in the same language as the student (Darija/French/Arabic).
-In 1-2 lines: say what's not found, suggest what IS available that's close.
-Be direct and helpful. No markdown.`;
-    try {
-      const reply = await groqChat([
-        {role:'system', content: systemMsg},
-        ...await getHistory(uid)
-      ], 200, 0.5);
-      await addMessage(uid, 'assistant', reply);
-      await ctx.reply(reply, build([[btn('🔍 بحث يدوي','search_prompt'), btn('🏠','main_menu')]]));
-    } catch(e) {
-      await ctx.reply('ما لقيت نتائج. جرب /search أو تصفح المحتوى.');
+  // 1. بحث الملفات (إذا كان القصد ملف)
+  if (intent === 'FILE_SEARCH') {
+    const files = await smartSearchForAI(text, 5);
+    if (files.length > 0) {
+      const rows = files.slice(0, 5).map(f => [
+        { text: '📄 ' + f.title.substring(0, 35) + ' · ' + f.sub_name, callback_data: 'preview_' + f.id + '_0_0_0_0_0' }
+      ]);
+      rows.push([{ text: '🔍 بحث يدوي', callback_data: 'search_prompt' }, { text: '🏠', callback_data: 'main_menu' }]);
+      const fileListStr = files.map(f => '- ' + f.title + ' (' + f.sub_name + ')').join('\n');
+      
+      await ctx.reply('🔍 لقيت هاذو الملفات اللي تبحث عليهم:\n\n' + fileListStr + '\n\nاضغط على اللي تبيه:', {
+        reply_markup: { inline_keyboard: rows }
+      });
+      return true;
     }
   }
-  return true;
+
+  // 2. RAG (إحضار سياق الملفات المتعلقة لتغذية الذكاء الاصطناعي)
+  let ragContext = '';
+  if (intent === 'CONCEPT_EXPLAIN' || intent === 'PROBLEM_SOLVING') {
+    const relevantFiles = await smartSearchForAI(text, 2);
+    if (relevantFiles.length > 0) {
+      ragContext = `\n[ملاحظة: عندك ملفات متعلقة بالموضوع في المنصة: ${relevantFiles.map(f => f.title).join(', ')}]`;
+    }
+  }
+
+  // 3. توليد الرد الذكي
+  try {
+    const messages = [
+      { role: 'system', content: SYSTEM_PERSONA + ragContext },
+      { role: 'user', content: text }
+    ];
+
+    const reply = await groqChat(messages, 400, 0.7);
+    
+    // زرائد سريعة للتفاعل
+    const rows = [
+      [{ text: '📄 بحث عن ملف', callback_data: 'search_prompt' }, { text: '🏠 القائمة', callback_data: 'main_menu' }]
+    ];
+
+    await ctx.reply(reply, {
+      reply_markup: { inline_keyboard: rows }
+    });
+    return true;
+  } catch (e) {
+    await ctx.reply('⚠️ حصل خلية في السيرفر، جرب من جديد.', {
+      reply_markup: { inline_keyboard: [[{ text: '🏠 القائمة', callback_data: 'main_menu' }]] }
+    });
+    return true;
+  }
+}
+
+async function resetChat(uid) {
+  // في المستقبل يمكن إضافة مسح سياق الـ AI هنا
 }
 
 module.exports = { handleAiChat, resetChat };
