@@ -332,6 +332,22 @@ async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
   interactions.addHistory(uid,fid).catch(()=>{});
   interactions.addLog(uid,'download',f.title);
   interactions.invalidateLastFile(uid);
+  // pre-warm يبدأ فوراً بالتوازي مع إرسال الملف
+  if(similar.length) {
+    similar.forEach(sf => {
+      const sk = 'prev_static_'+sf.id;
+      if(!cacheGet(sk)) {
+        Promise.all([
+          filesDb.getFile(sf.id),
+          interactions.getAvgRating(sf.id),
+          commentsDb.countComments(sf.id),
+          interactions.favCount(sf.id),
+        ]).then(([_f,_r,_cc,_fc]) => {
+          if(_f) cacheSet(sk,{f:_f,ratingData:_r,commentCount:_cc,favCnt:_fc},1800000);
+        }).catch(()=>{});
+      }
+    });
+  }
   const caption='📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 '+escMd(f.description)+'\n':'')+'📁 '+escMd(f.cat_name)+' | 📖 '+escMd(f.sub_name);
   const backCb=catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
   const kb=build([[btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid)],[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]]);
@@ -341,20 +357,6 @@ async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
     else await ctx.replyWithDocument(f.file_id,{caption,parse_mode:'Markdown',...kb});
     ctx.deleteMessage().catch(()=>{});
     if(similar.length){
-      // pre-warm cache للملفات المشابهة — تخزين مسبق قبل ما يضغط عليها
-      similar.forEach(sf => {
-        const sk = 'prev_static_'+sf.id;
-        if(!cacheGet(sk)) {
-          Promise.all([
-            filesDb.getFile(sf.id),
-            interactions.getAvgRating(sf.id),
-            commentsDb.countComments(sf.id),
-            interactions.favCount(sf.id),
-          ]).then(([_f,_r,_cc,_fc]) => {
-            if(_f) cacheSet(sk,{f:_f,ratingData:_r,commentCount:_cc,favCnt:_fc},1800000);
-          }).catch(()=>{});
-        }
-      });
       const simRows=similar.map(sf=>[btn('📄 '+sf.title+' · '+sf.sub_name,'preview_'+sf.id+'_0_0_0_0_0')]);
       simRows.push([btn('🏠 القائمة','main_menu')]);
       ctx.reply('📎 ملفات قد تهمك:',{...build(simRows)});
