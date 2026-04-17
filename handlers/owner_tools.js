@@ -31,14 +31,14 @@ exports.trySmartUpload = async (ctx) => {
   if(!ctx.isOwner) return false;
   const msg = ctx.message;
   const caption = (msg.text || msg.caption || "").trim();
-  if(!caption.match(/تخصص:|سنة:|فصل:|مادة:|قسم:/i)) return false;
+  if(!caption.match(/تخصص:|سنة:|فصل:|مادة:|قسم:|spec:|year:|sem:|mat:|cat:|spé|année|semestre|matière|catégorie/i) return false;
 
   ctx.reply("🔍 جاري تحليل المسار...").catch(()=>{});
   let cleanCaption = caption.replace(/تخصص:|سنة:|فصل:|مادة:|قسم:/gi, "").trim();
   let parts = cleanCaption.split(/[|,]/).map(p=>p.trim()).filter(p=>p);
   
   if(parts.length < 5) {
-    return ctx.reply("⚠️ صيغة غير مكتملة.\n\nالمثال الصحيح:\nتخصص: LMD | سنة: 2eme | فصل: 1 | مادة: Algo | قسم: Serie");
+    return ctx.reply("⚠️ صيغة غير مكتملة (يجب 5 أقسام مفصولة بـ |).\n\n🇩🇩 عربي:\nتخصص: LMD | سنة: 2 | فصل: 1 | مادة: الغوا | قسم: سيري\n\n🇫🇷 فرنسي:\nspec: LMD | année: 2 | semestre: 1 | matière: Algo | catégorie: Serie\n\n🇬🇧 إنجليزي:\nspec: LMD | year: 2 | sem: 1 | mat: Algo | cat: Serie");
   }
 
   let fileId, fileType, fileName = "";
