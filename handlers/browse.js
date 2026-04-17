@@ -183,8 +183,9 @@ async function _showFiles(ctx,spId,yrId,smId,sbId,catId,page=0) {
     const fav = favMap[f.id]||false;
     const avg = ratingMap[f.id]||0;
     const star = avg>=4?'⭐':avg>=2?'🌟':'📄';
+    const typeIcon = f.file_type==='link' ? '🔗' : f.file_type==='photo' ? '🖼️' : '📄';
     return [
-      btn(star+' '+f.title+(avg>0?' '+avg+'★':''),'preview_'+f.id+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId),
+      btn(typeIcon+' '+f.title+(avg>0?' ('+avg+'★)':''),'preview_'+f.id+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId),
       btn(fav?'⭐':'☆','fav_'+f.id)
     ];
   });

@@ -259,6 +259,7 @@ const exactCbRoutes = new Map([
   ['stats', (ctx) => userH.showStats(ctx)],
   ['progress', (ctx) => userH.showProgress(ctx)],
   ['search_prompt', (ctx) => { global.setState(ctx.uid, { type: 'search' }); return ctx.reply('🔍 اكتب كلمة البحث:'); }],
+  ['ai_prompt', (ctx) => { global.setState(ctx.uid, { type: 'ai_mode' }); return ctx.reply('🤖 المساعد الذكي مفعل!\n\nاكتب سؤالك وسأجاوبك:'); }],
 ]);
 
 const prefixCbRoutes = [

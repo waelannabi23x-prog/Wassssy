@@ -777,3 +777,5 @@
 [2026-04-17 13:36:43] [INFO] ✅ Scheduler started
 [2026-04-17 13:36:43] [INFO] 🚀 Study Bot v4.0 — Enterprise Architecture
 [2026-04-17 13:42:51] [INFO] ✅ Using PostgreSQL
+[2026-04-17 15:17:46] [INFO] ✅ Using PostgreSQL
+[2026-04-17 15:17:54] [INFO] ✅ pg_trgm indexes ready

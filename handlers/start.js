@@ -76,9 +76,10 @@ async function showMainMenu(ctx, name) {
   welcome += '📚 منصتك الأكاديمية — اختر ما تريد:';
 
   const rows = [
-    [btn('📚  تصفح المحتوى', 'browse')],
-    [btn('🔍 بحث', 'search_prompt'), btn('🆕 الأحدث', 'latest')],
-    [btn('⭐ المفضلة', 'favorites'), btn('📂 سجلي', 'history')],
+    [btn('📚 تصفح المحتوى', 'browse')],
+    [btn('🔍 بحث سريع', 'search_prompt'), btn('🆕 أحدث الملفات', 'latest')],
+    [btn('⭐ مفضلاتي', 'favorites'), btn('📂 آخر ما شاهدت', 'history')],
+    [btn('🤖 المساعد الذكي', 'ai_prompt')],
     [btn('👤 ملفي', 'profile'), btn('📊 إحصائيات', 'stats')],
     [btn(sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', 'change_sp')],
   ];
