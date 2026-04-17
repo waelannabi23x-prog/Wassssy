@@ -8,7 +8,7 @@ const { cacheGet, cacheSet } = require('../utils/cache');
 
 async function startHandler(ctx) {
   const uid = ctx.uid;
-  const name = escMd(ctx.from?.first_name || 'Student');
+  const name = ctx.from?.first_name || 'Student';
 
   const rawText = ctx.message?.text || '';
   const payload = rawText.includes(' ') ? rawText.split(' ')[1] : ctx.startPayload || null;
@@ -50,7 +50,7 @@ async function askSpecialty(ctx, name) {
 
 async function showMainMenu(ctx, name) {
   const uid = ctx.uid;
-  if (!name) name = escMd(ctx.from?.first_name || 'Student');
+  if (!name) name = ctx.from?.first_name || 'Student';
 
   const menuKey = 'menu_data_' + uid;
   let menuData = cacheGet(menuKey);
