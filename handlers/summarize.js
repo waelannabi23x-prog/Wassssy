@@ -22,6 +22,8 @@ async function handleSummarize(ctx, fileId, fileType, title) {
     const link = await ctx.telegram.getFileLink(fileId);
     const buffer = await fetchBuffer(link.href);
     
+    // 🛡️ حماية الذاكرة: رفض الملفات الأكبر من 5 ميجا
+    if (buffer.length > 5 * 1024 * 1024) { if(thinking) ctx.deleteMessage(thinking.message_id).catch(()=>{}); return ctx.reply('⚠️ الملف كبير جداً (أكثر من 5MB) للتلخيص.'); }
     let text = null;
     try {
       const pdfParse = require('pdf-parse');

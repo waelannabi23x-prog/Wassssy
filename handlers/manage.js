@@ -15,6 +15,21 @@ const { notifyGroupsNewFile } = require('../utils/groupNotify');
 const messagesDb=require('../database/messages');
 const {all, run: dbRun, getSetting, setSetting, DB_PATH}=require('../database/db');
 
+// 🚀 Enterprise Concurrent Broadcaster
+async function concurrentBroadcast(bot, chatId, msgId, ids, txt, opt = {}) {
+  let s=0, f=0; const t=ids.length, B=30;
+  const ui = async () => {
+    const p=Math.round((s+f)/t*100), b='█'.repeat(Math.round(p/10))+'░'.repeat(10-Math.round(p/10));
+    bot.telegram.editMessageText(chatId, msgId, null, '📢 *جاري الإرسال...*\x60['+b+'] '+p+'%\x60\n✅ '+s+' | ❌ '+f+' | ⏳ '+(t-s-f), {parse_mode:'Markdown'}).catch(()=>{});
+  };
+  for(let i=0;i<t;i+=B){
+    const r=await Promise.allSettled(ids.slice(i,i+B).map(id=>bot.telegram.sendMessage(id,txt,opt).then(()=>true).catch(()=>false)));
+    r.forEach(x=>{if(x.status==='fulfilled'&&x.value)s++;else f++;}); await ui();
+    if(i+B<t) await new Promise(r=>setTimeout(r,50));
+  }
+  return {sent:s, failed:f};
+}
+
 if(!global.userStates) global.userStates={};
 const setState=(uid,s)=>{ global.userStates[uid]=s; if(global.setState) global.setState(uid,s); };
 const clearState=uid=>{ delete global.userStates[uid]; if(global.delState) global.delState(uid); };
@@ -425,14 +440,8 @@ async function handleText(ctx,state){
         const ids=await usersDb.allIds(); let sent=0,failed=0;
         const total_bc=ids.length;
         const sm=await ctx.reply('📢 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total_bc,{parse_mode:'Markdown'});
-        for(let i=0;i<ids.length;i++){
-          try{await ctx.telegram.sendMessage(ids[i],'📢 *إعلان*\n\n'+text,{parse_mode:'Markdown'});sent++;}catch{failed++;}
-          await new Promise(r=>setTimeout(r,50));
-          if(i%10===0||i===ids.length-1){
-            const pct=Math.round((i+1)/total_bc*100);
-            const filled=Math.round(pct/10);
-            const bar='█'.repeat(filled)+'░'.repeat(10-filled);
-            ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'📢 *جاري الإرسال...*\n`['+bar+'] '+pct+'%`\n✅ '+sent+' | ❌ '+failed+' | ⏳ '+(total_bc-i-1),{parse_mode:'Markdown'}).catch(()=>{});
+        const bcRes = await concurrentBroadcast(ctx.telegram, ctx.chat.id, sm.message_id, ids, '📢 *إعلان*\n\n'+text, {parse_mode:'Markdown'});
+        sent = bcRes.sent; failed = bcRes.failed;
           }
         }
         ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ *اكتمل البث!*\n`[██████████] 100%`\n✅ '+sent+' | ❌ '+failed+' | 📊 '+Math.round(sent/total_bc*100)+'%',{...build([back('mg_menu')]),parse_mode:'Markdown'}).catch(()=>{});
@@ -614,22 +623,8 @@ async function handleCallback(ctx,data){
     let sent=0,failed=0;
     const total=ids.length;
     const sm=await ctx.reply('📤 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total,{parse_mode:'Markdown'});
-    for(let i=0;i<ids.length;i++){
-      try{
-        if(tpl.type==='text') await ctx.telegram.sendMessage(ids[i],tpl.content,{parse_mode:'Markdown'});
-        else if(tpl.type==='photo') await ctx.telegram.sendPhoto(ids[i],tpl.file_id,{caption:tpl.content,parse_mode:'Markdown'});
-        else if(tpl.type==='document') await ctx.telegram.sendDocument(ids[i],tpl.file_id,{caption:tpl.content,parse_mode:'Markdown'});
-        else if(tpl.type==='video') await ctx.telegram.sendVideo(ids[i],tpl.file_id,{caption:tpl.content,parse_mode:'Markdown'});
-        else if(tpl.type==='link') await ctx.telegram.sendMessage(ids[i],tpl.content);
-        sent++;
-      }catch{failed++;}
-      await new Promise(r=>setTimeout(r,i%10===9?1000:50));
-      if(i%10===0||i===ids.length-1){
-        const pct=Math.round((i+1)/total*100);
-        const bar='█'.repeat(Math.round(pct/10))+'░'.repeat(10-Math.round(pct/10));
-        ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'📤 *جاري الإرسال...*\n`['+bar+'] '+pct+'%`\n✅ '+sent+' | ❌ '+failed+' | ⏳ '+(total-i-1),{parse_mode:'Markdown'}).catch(()=>{});
-      }
-    }
+          async function st(id){ const o={parse_mode:'Markdown'}; if(tpl.type==='text')return ctx.telegram.sendMessage(id,tpl.content,o).then(()=>1).catch(()=>0); if(tpl.type==='photo')return ctx.telegram.sendPhoto(id,tpl.file_id,{caption:tpl.content,...o}).then(()=>1).catch(()=>0); if(tpl.type==='document')return ctx.telegram.sendDocument(id,tpl.file_id,{caption:tpl.content,...o}).then(()=>1).catch(()=>0); if(tpl.type==='video')return ctx.telegram.sendVideo(id,tpl.file_id,{caption:tpl.content,...o}).then(()=>1).catch(()=>0); if(tpl.type==='link')return ctx.telegram.sendMessage(id,tpl.content).then(()=>1).catch(()=>0); return 0; }
+          for(let i=0;i<ids.length;i+=30){ const r=await Promise.allSettled(ids.slice(i,i+30).map(st)); r.forEach(x=>{if(x.status==='fulfilled'&&x.value)sent++;else failed++;}); const p=Math.round((sent+failed)/total*100); const b='█'.repeat(Math.round(p/10))+'░'.repeat(10-Math.round(p/10)); ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'📤 *جاري الإرسال...*\x60['+b+'] '+p+'%\x60\n✅ '+sent+' | ❌ '+failed+' | ⏳ '+(total-sent-failed),{parse_mode:'Markdown'}).catch(()=>{}); if(i+30<total)await new Promise(r=>setTimeout(r,50)); }
     return ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ *اكتمل الإرسال!*\n`[██████████] 100%`\n✅ '+sent+' | ❌ '+failed,{parse_mode:'Markdown',...build([back('mg_templates')])}).catch(()=>{});
   }
   if(data==='mg_scheduled') return showScheduled(ctx);

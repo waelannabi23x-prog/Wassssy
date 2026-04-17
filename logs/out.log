@@ -746,3 +746,19 @@
 2026-04-17 11:05:44: 🚀 Study Bot v3.2 — FIXED & OPTIMIZED
 [2026-04-17 10:05:44] [INFO] 🚀 Study Bot v3.2 — FIXED & OPTIMIZED
 2026-04-17 11:05:47: ✅ Precomputed all browse menus
+[2026-04-17 11:32:08] [INFO] ✅ Using PostgreSQL
+[2026-04-17 11:32:19] [INFO] ✅ pg_trgm indexes ready
+[2026-04-17 11:32:27] [INFO] ✅ DB schema ready
+[2026-04-17 11:32:27] [INFO] 🔧 Maintenance mode: false
+[2026-04-17 11:32:29] [INFO] ✅ States loaded: 9
+[2026-04-17 11:32:35] [INFO] ✅ Database ready
+[2026-04-17 11:32:36] [INFO] ✅ Express on port 3000
+[2026-04-17 11:32:36] [INFO] ✅ Scheduler started
+[2026-04-17 11:32:36] [INFO] 🚀 Study Bot v3.2 — FIXED & OPTIMIZED
+[2026-04-17 11:52:05] [INFO] ✅ Using PostgreSQL
+[2026-04-17 11:52:15] [INFO] ✅ pg_trgm indexes ready
+[2026-04-17 11:52:24] [INFO] ✅ DB schema ready
+[2026-04-17 11:52:32] [INFO] ✅ Database ready
+[2026-04-17 11:52:32] [INFO] ✅ Express on port 3000
+[2026-04-17 11:52:32] [INFO] ✅ Scheduler started
+[2026-04-17 11:52:33] [INFO] 🚀 Study Bot v4.0 — Enterprise Architecture
