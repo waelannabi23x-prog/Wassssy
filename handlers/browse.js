@@ -380,7 +380,7 @@ async function showBundle(ctx,bundleId,spId,yrId,smId,sbId,catId){
   const text = '📦 *'+escMd(b.title)+'*'+(b.description?'\n📝 '+escMd(b.description):'')+
     '\n\n📁 *'+files.length+' ملف*\n'+typeStr+'\n\n⬇️ تحميل: *'+b.downloads+'*';
   const backCb = catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
-  const rows = [[btn('⬇️ تحميل الكل','bdl_'+bundleId+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)]];
+  if(ctx.isAdmin) rows.push([btn('➕ إضافة ملفات','mg_add_bundle_files_'+bundleId+'_'+catId+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId)]);
   if(ctx.isAdmin) rows.push([btn('✏️ تعديل','mg_rn_bundle_'+bundleId+'_'+catId+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId),btn('🗑 حذف','mg_dl_bundle_'+bundleId+'_'+catId+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId)]);
   rows.push([btn('◀️ رجوع',backCb)]);
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});

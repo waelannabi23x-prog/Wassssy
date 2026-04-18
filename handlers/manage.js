@@ -295,23 +295,25 @@ async function handleBundleFileUpload(ctx){
   if(!state||state.type!=='mg_bundle_files') return false;
   const msg=ctx.message; let fid=null,ftype=null,title='';
 
-  // ═══ الأولوية 1: ملفات مرفوعة ═══
-  if(msg.document){
-    fid=msg.document.file_id; ftype='document';
-    title=msg.document.file_name||'📄 ملف';
-  } else if(msg.photo){
-    fid=msg.photo[msg.photo.length-1].file_id; ftype='photo';
-    title='🖼️ صورة';
-  } else if(msg.video){
-    fid=msg.video.file_id; ftype='video';
-    title=msg.video.file_name||'🎥 فيديو';
-  } else if(msg.audio){
-    fid=msg.audio.file_id; ftype='audio';
-    title=msg.audio.title||'🎵 صوت';
-  } else if(msg.voice){
-    fid=msg.voice.file_id; ftype='voice';
-    title='🎤 تسجيل صوتي';
+  if(msg.document){fid=msg.document.file_id;ftype='document';title=msg.document.file_name||'📄 ملف';}
+  else if(msg.photo){fid=msg.photo[msg.photo.length-1].file_id;ftype='photo';title='🖼️ صورة';}
+  else if(msg.video){fid=msg.video.file_id;ftype='video';title=msg.video.file_name||'🎥 فيديو';}
+  else if(msg.audio){fid=msg.audio.file_id;ftype='audio';title=msg.audio.title||'🎵 صوت';}
+  else if(msg.voice){fid=msg.voice.file_id;ftype='voice';title='🎤 تسجيل صوتي';}
+
+  if(!fid){
+    const txt=(msg.text||'').trim();
+    const fwdText=(msg.forward_origin?.type==='user'&&msg.forward_origin.text)?msg.forward_origin.text.join(' '):'';
+    const fullText=(txt+' '+fwdText).trim();
+    const urlMatch=fullText.match(/https?:\/\/[^\s]+/)||fullText.match(/www\.[^\s]+/);
+    if(urlMatch){fid=urlMatch[0];ftype='link';title='🔗 '+urlMatch[0].substring(0,35)+(urlMatch[0].length>35?'...':'');}
   }
+
+  if(!fid) return false;
+  await bundlesDb.addBundleFile(state.bundleId,fid,ftype,title);
+  state.fileCount=(state.fileCount||0)+1;
+  const icons={link:'🔗',photo:'🖼️',video:'🎥',audio:'🎵',voice:'🎤',document:'📄'};
+  await ctx.reply((icons[ftype]||'📄')+' ملف '+state.fileCount+' تم الحفظ. ابعث المزيد أو /done.');
 
   // ═══ الأولوية 2: روابط (فقط إذا ما في ملف مرفوع) ═══
   if(!fid){
@@ -327,7 +329,6 @@ async function handleBundleFileUpload(ctx){
 
   await bundlesDb.addBundleFile(state.bundleId,fid,ftype,title);
   state.fileCount=(state.fileCount||0)+1;
-  const icons={link:'🔗',photo:'🖼️',video:'🎥',audio:'🎵',voice:'🎤',document:'📄'};
   await ctx.reply((icons[ftype]||'📄')+' ملف '+state.fileCount+' تم الحفظ. ابعث المزيد أو /done.');
   return true;
 }
@@ -719,6 +720,8 @@ async function handleCallback(ctx,data){
   if(data.startsWith('mg_rn_cat_')){const p=data.replace('mg_rn_cat_','').split('_');setState(uid,{type:'mg_rn_cat',id:p[4],spId:p[0],yrId:p[1],smId:p[2],sbId:p[3]});return ctx.reply('✏️ الاسم الجديد:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
   if(data.startsWith('mg_dl_cat_')){const p=data.replace('mg_dl_cat_','').split('_');const cat=await content.getCategory(p[4]);return eos(ctx,'🗑 حذف الفئة *'+escMd(cat?.name||'')+'*؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_cat_'+p[0]+'_'+p[1]+'_'+p[2]+'_'+p[3]+'_'+p[4]),btn('❌ لا','mg_cats_'+p[0]+'_'+p[1]+'_'+p[2]+'_'+p[3])]])});}
   if(data.startsWith('mg_cdl_cat_')){const p=data.replace('mg_cdl_cat_','').split('_');await content.deleteCategory(p[4]);return showCategories(ctx,p[0],p[1],p[2],p[3]);}
+  if(data.startsWith('mg_add_bundle_files_')){const p=data.replace('mg_add_bundle_files_','').split('_');global.setState(ctx.uid,{type:'mg_bundle_files',bundleId:p[0],catId:p[1],spId:p[2],yrId:p[3],smId:p[4],sbId:p[5],fileCount:0});return ctx.reply('➕ أبعث ملفات للحزمة. ابعث /done للانتهاء');}
+  if(data.startsWith('mg_add_bundle_files_')){const p=data.replace('mg_add_bundle_files_','').split('_');global.setState(ctx.uid,{type:'mg_bundle_files',bundleId:p[0],catId:p[1],spId:p[2],yrId:p[3],smId:p[4],sbId:p[5],fileCount:0});return ctx.reply('➕ أبعث ملفات للحزمة. ابعث /done للانتهاء');}
   if(data.startsWith('mg_dl_bundle_')){const p=data.replace('mg_dl_bundle_','').split('_');await bundlesDb.deleteBundle(p[0]);await ctx.answerCbQuery('✅ تم الحذف').catch(()=>{});return browse.showFiles(ctx,p[2],p[3],p[4],p[5],p[1]);}
   if(data.startsWith('mg_rn_bundle_')){const p=data.replace('mg_rn_bundle_','').split('_');setState(uid,{type:'mg_rename_bundle',bundleId:p[0],catId:p[1],spId:p[2],yrId:p[3],smId:p[4],sbId:p[5]});return ctx.reply('✏️ الاسم الجديد للحزمة:');}
   if(data.startsWith('mg_add_bundle_')){
