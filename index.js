@@ -84,8 +84,8 @@ app.get('/health', (_r, res) => {
 // StateMgr replaced by utils/store
 // store handles states
 
-global.setState = (u, v) => store.setState(u, v);
-global.delState = (u) => store.delState(u);
+global.setState = (u, v) => StateMgr.set(u, v);
+global.delState = (u) => StateMgr.delState(u);
 
 const RL = {
   _m: new Map(),
@@ -176,7 +176,7 @@ bot.use(async (ctx, next) => {
   return next();
 });
 bot.use(async (ctx, next) => {
-  if (store.maintenance && ctx.chat?.type === 'private' && !ctx.isOwner) return ctx.reply(global.maintenanceMsg).catch(() => {});
+  if (global.maintenanceMode && ctx.chat?.type === 'private' && !ctx.isOwner) return ctx.reply(global.maintenanceMsg).catch(() => {});
   return next();
 });
 bot.catch((err, ctx) => {
