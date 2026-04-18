@@ -368,7 +368,7 @@ bot.on('callback_query', async ctx => {
   const data = ctx.callbackQuery?.data, cbId = ctx.callbackQuery?.id;
   if (!data || CBDedup.isDupe(cbId) || data.length > 64) return;
   try {
-    if (!data.startsWith('grp_')) await ctx.answerCbQuery('').catch(() => {});
+    // no blanket answerCbQuery — saves 100ms per click
     if (ctx.chat?.type !== 'private' && !data.startsWith('grp_')) return ctx.answerCbQuery('👉 استخدم البوت في الخاص').catch(() => {});
     if (exactR.has(data)) return exactR.get(data)(ctx);
     for (const r of prefR) { if (data.startsWith(r.p)) return r.fn(ctx, data); }

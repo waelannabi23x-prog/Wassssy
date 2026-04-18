@@ -4,8 +4,8 @@ const { cacheGet, cacheSet, cacheClear, cacheClearPrefix } = require('../utils/c
 
 const J = 'SELECT f.*,c.name as cat_name,s.name as sub_name FROM files f JOIN categories c ON f.category_id=c.id JOIN subjects s ON c.subject_id=s.id';
 
-const getFile = async id => { var k='file_'+id; var c=cacheGet(k); if(c) return c; var r=await get(J+' WHERE f.id=$1 AND f.is_deleted=0',[id]); if(r) cacheSet(k,r,600000); return r; };
-const getFiles = async catId => { var k='files_cat_'+catId; var c=cacheGet(k); if(c) return c; var r=await all(J+' WHERE f.category_id=$1 AND f.is_deleted=0 ORDER BY f.uploaded_at DESC',[catId]); cacheSet(k,r,600000); return r; };
+const getFile = async id => { var k='file_'+id; var cv=cacheGet(k); if(cv) return cv; var r=await get(J+' WHERE f.id=$1 AND f.is_deleted=0',[id]); if(r) cacheSet(k,r,600000); return r; };
+const getFiles = async catId => { var k='files_cat_'+catId; var cv=cacheGet(k); if(cv) return cv; var r=await all(J+' WHERE f.category_id=$1 AND f.is_deleted=0 ORDER BY f.uploaded_at DESC',[catId]); cacheSet(k,r,600000); return r; };
 
 const invalidateFilesCache = catId => { cacheClearPrefix('files_cat_'+catId); cacheClearPrefix('showfiles_'); };
 
@@ -15,10 +15,7 @@ const addFile = async (catId,title,desc,fileId,fileType,uploadedBy) => {
   await run('INSERT INTO files(category_id,title,description,file_id,file_type,uploaded_by) VALUES($1,$2,$3,$4,$5,$6)',[catId,title,desc,fileId,fileType,uploadedBy]);
   invalidateFilesCache(catId);
   if(global._clearSearchCache) global._clearSearchCache();
-  var newFile = await get(
-    'SELECT f.*,c.name as cat_name,s.name as sub_name FROM files f JOIN categories c ON f.category_id=c.id JOIN subjects s ON c.subject_id=s.id WHERE f.category_id=$1 AND f.title=$2 AND f.is_deleted=0 ORDER BY f.id DESC LIMIT 1',
-    [catId,title]
-  );
+  var newFile = await get(J+' WHERE f.category_id=$1 AND f.title=$2 AND f.is_deleted=0 ORDER BY f.id DESC LIMIT 1',[catId,title]);
   return newFile;
 };
 
@@ -29,6 +26,7 @@ const rename = async (id,title) => { if(global._clearSearchCache) global._clearS
 const updateDesc = async (id,desc) => { await run('UPDATE files SET description=$1 WHERE id=$2',[desc,id]); cacheClear('file_'+id); };
 const updateDescMd = updateDesc;
 
+// بحث سريع — ملفين فقط بدون JOINات ثقيلة
 const search = (q, limit) => {
   limit = limit || 20;
   var w = '%' + q + '%';
