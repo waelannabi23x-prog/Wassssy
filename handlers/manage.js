@@ -174,9 +174,10 @@ async function showLogs(ctx){
   if(logs.length) logs.forEach(l=>{ text+='• '+(l.first_name||'ID:'+l.user_id)+': '+l.action+(l.details?' — '+l.details:'')+'\n'; });
   else text+='_لا توجد سجلات._';
   return eos(ctx,text,{parse_mode:'Markdown',...build([back('mg_menu')])});
+  console.log("users text length:", text.length, "rows:", rows.length, "list:", list?.length);
 }
 
-async function showUsers(ctx,page=0){
+async function showUsers(ctx,page=0){ console.log("showUsers called, page:", page);
   const _uk='admin_users_'+page;
   const _uc=cacheGet(_uk);
   const [list, total] = _uc ? [_uc.list,_uc.total] : await Promise.all([usersDb.getAll(page,PS), usersDb.count()]).then(([l,t])=>{cacheSet(_uk,{list:l,total:t},30000);return[l,t];});

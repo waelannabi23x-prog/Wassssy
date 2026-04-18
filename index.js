@@ -487,7 +487,7 @@ setInterval(async () => {
     await Promise.all([
       dbRun("DELETE FROM user_states WHERE updated_at < NOW() - INTERVAL '1 hour'"),
       dbRun("DELETE FROM group_members WHERE updated_at < NOW() - INTERVAL '7 days'"),
-      dbRun("DELETE FROM cache_store WHERE expires_at < $1", [Date.now()])
+      dbRun("DELETE FROM cache_store WHERE expires_at::bigint < $1::bigint", [Date.now()])
     ]);
     if(!global._botMsgs) return;
     const keys = Object.keys(global._botMsgs);

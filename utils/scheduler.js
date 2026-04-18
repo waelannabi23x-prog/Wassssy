@@ -90,7 +90,7 @@ async function dailyCleanup() {
     await run(`DELETE FROM files WHERE is_deleted=1 AND uploaded_at < NOW() - INTERVAL '30 days'`);
     await run(`DELETE FROM logs WHERE created_at < NOW() - INTERVAL '30 days'`);
     await run(`DELETE FROM history WHERE viewed_at < NOW() - INTERVAL '90 days'`);
-    await run(`DELETE FROM cache_store WHERE expires_at < $1`, [Date.now()]);
+    await run(`DELETE FROM cache_store WHERE expires_at::bigint < $1::bigint`, [Date.now()]);
     logger.info('✅ Daily cleanup done');
   } catch(e) { logger.error('Cleanup error:', e.message); }
 }
