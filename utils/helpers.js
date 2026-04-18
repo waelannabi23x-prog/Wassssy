@@ -20,17 +20,13 @@ async function eos(ctx, text, extra = {}) {
       return await ctx.editMessageText(text, extra);
     } catch (e) {
       if (e.description?.includes('message is not modified')) return;
-      console.error('eos edit failed:', e.message, e.description?.substring(0, 100));
-      try {
-        return await ctx.reply(text, extra);
-      } catch (e2) {
-        console.error('eos reply failed:', e2.message, e2.description?.substring(0, 100));
+      if (e.description?.includes('no text in the message')) {
+        try { return await ctx.editMessageCaption(text, extra); } catch(_) {}
       }
+      try { return await ctx.reply(text, extra); } catch(_) {}
     }
   }
-  return ctx.reply(text, extra).catch(e => {
-    console.error('eos final failed:', e.message);
-  });
+  return ctx.reply(text, extra).catch(() => {});
 }
 
 async function quickAck(ctx, text = '') {
