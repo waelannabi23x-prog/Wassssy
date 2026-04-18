@@ -21,7 +21,7 @@ const contentDb = require('./database/content');
 const bundlesDb = require('./database/bundles');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { eos } = require('./utils/helpers');
-// store removed
+
 const { loadAllStates } = require('./utils/redis');
 const { cacheWarmup, cacheClear, cacheClearPrefix } = require('./utils/cache');
 const { setLang } = require('./utils/i18n');
@@ -49,6 +49,18 @@ const CFG = {
   stateTTL: 3600000, cleanupMs: 3600000,
   botMsgsPerChat: 100, maxChatsTracked: 150,
 };
+const StateMgr = {
+  _s: {},
+  get(u) { return this._s[u] || null; },
+  async set(u, v) { v._ts = Date.now(); this._s[u] = v; try { await redisSetState(u, v); } catch(_){} },
+  async del(u) { delete this._s[u]; try { await redisDelState(u); } catch(_){} },
+  gc() { var n = Date.now(); var c = 0; for (var u in this._s) { if (this._s[u]._ts && n - this._s[u]._ts > CFG.stateTTL) { this.del(u); c++; } } return c; },
+  get size() { return Object.keys(this._s).length; },
+};
+global.userStates = StateMgr._s;
+global.setState = (u, v) => StateMgr.set(u, v);
+global.delState = (u) => StateMgr.delState(u);
+
 
 const app = express();
 app.use(compression({ level: 6, threshold: 512 }));
@@ -71,7 +83,7 @@ app.get('/health', (_r, res) => {
 
 // StateMgr replaced by utils/store
 // store handles states
-global.userStates = StateMgr._s;
+
 global.setState = (u, v) => store.setState(u, v);
 global.delState = (u) => store.delState(u);
 
