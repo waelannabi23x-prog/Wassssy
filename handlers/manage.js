@@ -1,3 +1,4 @@
+const escMd2 = require('../utils/helpers').escMd;
 const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
 const content=require('../database/content');
 const filesDb=require('../database/files');
