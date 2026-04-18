@@ -366,7 +366,9 @@ bot.on('document', async ctx => {
   if (!ctx.isAdmin && !ctx.isOwner) return;
   const state = global.userStates?.[ctx.uid];
   if (await tools.trySmartUpload(ctx)) return;
+  if (state?.type === 'mg_bundle_files') return manage.handleBundleFileUpload(ctx);
   if (state?.type === 'mg_bulk_files') return manage.handleBulkUpload(ctx);
+  if (state?.type === 'mg_bundle_files') return manage.handleBundleFileUpload(ctx);
   if (state?.type === 'mg_tpl_file') { global.setState(ctx.uid, { ...state, type: 'mg_tpl_content', fileId: ctx.message.document.file_id }); return ctx.reply('اكتب نص الرسالة مع الملف (او skip):'); }
   if (state?.type === 'mg_awaiting_restore' && ctx.isOwner) {
     global.delState(ctx.uid);
@@ -380,6 +382,7 @@ bot.on(['photo', 'video', 'audio', 'voice'], async ctx => {
   if (!ctx.isAdmin && !ctx.isOwner) return;
   const state = global.userStates?.[ctx.uid];
   if (state?.type === 'mg_bulk_files') return manage.handleBulkUpload(ctx);
+  if (state?.type === 'mg_bundle_files') return manage.handleBundleFileUpload(ctx);
   if (state?.type === 'mg_file') return manage.handleFileUpload(ctx);
   if (state?.type === 'mg_tpl_content') return manage.handleText(ctx, state);
 });
