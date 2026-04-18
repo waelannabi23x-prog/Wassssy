@@ -13,7 +13,7 @@ const isBanned = async id => !!(await get('SELECT is_banned FROM users WHERE id=
 const getById = id => get('SELECT * FROM users WHERE id=$1',[id]);
 const searchUsers = q => { const w='%'+q+'%'; return all('SELECT * FROM users WHERE first_name ILIKE $1 OR username ILIKE $2 OR CAST(id AS TEXT) LIKE $3 LIMIT 20',[w,w,w]); };
 const setSpecialty = (uid,spId) => { cacheClear('usp_'+uid); return run('INSERT INTO user_specialties(user_id,specialty_id) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET specialty_id=EXCLUDED.specialty_id',[uid,spId]); };
-const getSpecialty = async uid => { const c = cacheGet('usp_'+uid); if(c !== undefined) return c; const r = await get('SELECT specialty_id FROM user_specialties WHERE user_id=$1',[uid]); cacheSet('usp_'+uid,r,1800000); return r; };
+const getSpecialty = async uid => { const c = cacheGet('usp_'+uid); if(c) return c; const r = await get('SELECT specialty_id FROM user_specialties WHERE user_id=$1',[uid]); if(r) cacheSet('usp_'+uid,r,1800000); return r; };
 const getUsersBySpecialty = async spId => (await all('SELECT user_id as id FROM user_specialties WHERE specialty_id=$1',[spId])).map(r=>r.id);
 
 module.exports = { upsert,updateLastActive,getAll,count,activeToday,allIds,ban,unban,isBanned,getById,searchUsers,setSpecialty,getSpecialty,getUsersBySpecialty };
