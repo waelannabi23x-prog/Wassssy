@@ -81,8 +81,6 @@ app.get('/health', (_r, res) => {
   });
 });
 
-// StateMgr replaced by utils/store
-// store handles states
 
 global.setState = (u, v) => StateMgr.set(u, v);
 

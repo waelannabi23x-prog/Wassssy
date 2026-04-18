@@ -1,141 +1,83 @@
-const Groq = require('groq-sdk');
-const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
-const { all, run } = require('../database/db');
+'use strict';
+var safeInt = function(v) { var n = parseInt(v); return isNaN(n) ? 0 : n; };
+const { groqChat } = require('../utils/groq_client');
+const { all } = require('../database/db');
 const filesDb = require('../database/files');
 const { build, btn } = require('../utils/keyboard');
 const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
 
-const GROQ_MODEL = 'llama-3.1-8b-instant';
-
 async function classifyFile(filename, subjects, categories) {
-  const subList = subjects.map(s => s.name).join(', ');
-  const catList = [...new Set(categories.map(c => c.name))].join(', ');
-  const prompt = `You are a university file classifier. Given a filename, suggest the most likely subject and category.
-Filename: "${filename}"
-Available subjects: ${subList}
-Available categories: ${catList}
-Respond ONLY with valid JSON like: {"subject":"Algo 1","category":"Cours","confidence":0.9}
-No explanation, no markdown, just JSON.`;
-  try {
-    const res = await groq.chat.completions.create({
-      model: GROQ_MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      max_tokens: 60,
-      temperature: 0.1
-    });
-    const text = res.choices[0].message.content.trim();
-    return JSON.parse(text);
-  } catch(e) {
-    return null;
+  var subList = subjects.map(function(s) { return s.name; }).join(', ');
+  var catList = [];
+  var seen = {};
+  for (var i = 0; i < categories.length; i++) {
+    if (!seen[categories[i].name]) { seen[categories[i].name] = true; catList.push(categories[i].name); }
   }
+  catList = catList.join(', ');
+  var prompt = 'You are a university file classifier. Given filename suggest subject and category.\nFilename: "' + filename + '"\nSubjects: ' + subList + '\nCategories: ' + catList + '\nRespond ONLY with JSON: {"subject":"Name","category":"Name","confidence":0.9}';
+  try {
+    var reply = await groqChat([{ role: 'user', content: prompt }], 60, 0.1);
+    return JSON.parse(reply);
+  } catch(e) { return null; }
 }
 
 async function handleAdd(ctx) {
-  if(!ctx.isOwner) return ctx.deleteMessage().catch(()=>{});
-  const isGroup = ctx.chat?.type !== 'private';
-  if(!isGroup) return ctx.reply('هذا الأمر للقروبات فقط');
-  ctx.deleteMessage().catch(()=>{});
+  if (!ctx.isOwner) return ctx.deleteMessage().catch(function(){});
+  if (ctx.chat?.type === 'private') return ctx.reply('هذا الأمر للقروبات فقط');
+  ctx.deleteMessage().catch(function(){});
   await global.setState(ctx.uid, { type: 'add_mode', chatId: ctx.chat.id });
-  const m = await ctx.reply('📥 *وضع الإضافة*\n\nفوّرد الملفات وسأصنفها تلقائياً\nاكتب /done للإنهاء', { parse_mode: 'Markdown' });
-  setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(()=>{}), 10000);
+  ctx.reply('📥 وضع الإضافة — فوّرد الملفات\n/done للإنهاء').catch(function(){});
 }
 
 async function handleAddFile(ctx) {
-  const state = global.userStates?.[ctx.uid];
-  if(!state || state.type !== 'add_mode') return false;
-  const msg = ctx.message;
-  let fid, ftype, filename = '';
-  if(msg.document)    { fid = msg.document.file_id; ftype = 'document'; filename = msg.document.file_name || ''; }
-  else if(msg.photo)  { fid = msg.photo[msg.photo.length-1].file_id; ftype = 'photo'; filename = 'photo'; }
-  else if(msg.video)  { fid = msg.video.file_id; ftype = 'document'; filename = msg.video.file_name || 'video'; }
+  var state = global.userStates && global.userStates[ctx.uid];
+  if (!state || state.type !== 'add_mode') return false;
+  var msg = ctx.message;
+  var fid, ftype, filename = '';
+  if (msg.document) { fid = msg.document.file_id; ftype = 'document'; filename = msg.document.file_name || ''; }
+  else if (msg.photo) { fid = msg.photo[msg.photo.length - 1].file_id; ftype = 'photo'; filename = 'photo'; }
+  else if (msg.video) { fid = msg.video.file_id; ftype = 'document'; filename = 'video'; }
   else return false;
-
-  const title = filename.replace(/\.[^/.]+$/, '') || 'ملف';
-
-  // جلب المواد والفئات
-  const subjects = await all('SELECT id, name FROM subjects WHERE is_deleted=0');
-  const categories = await all('SELECT id, name FROM categories');
-
-  // AI تصنيف
-  const thinking = await ctx.reply('🤖 جاري التصنيف...').catch(()=>null);
-  const ai = await classifyFile(filename, subjects, categories);
-  if(thinking) ctx.telegram.deleteMessage(ctx.chat.id, thinking.message_id).catch(()=>{});
-
-  // ابحث عن المادة المقترحة
-  const suggestedSub = ai ? subjects.find(s => s.name.toLowerCase() === ai.subject?.toLowerCase()) : null;
-  const suggestedCat = ai ? categories.find(c => c.name.toLowerCase() === ai.category?.toLowerCase()) : null;
-
-  // حفظ في state
+  var title = filename.replace(/\.[^/.]+$/, '') || 'ملف';
+  var subjects = await all('SELECT id, name FROM subjects WHERE is_deleted=0');
+  var categories = await all('SELECT id, name FROM categories');
+  var ai = await classifyFile(filename, subjects, categories);
+  var suggestedSub = ai ? subjects.find(function(s) { return s.name.toLowerCase() === (ai.subject || '').toLowerCase(); }) : null;
+  var suggestedCat = ai ? categories.find(function(c) { return c.name.toLowerCase() === (ai.category || '').toLowerCase(); }) : null;
   await global.setState(ctx.uid, {
-    ...state,
-    type: 'add_confirm',
-    fid, ftype, title,
-    suggestedSubId: suggestedSub?.id,
-    suggestedCatId: suggestedCat?.id,
-    aiSub: ai?.subject || '؟',
-    aiCat: ai?.category || '؟',
-    confidence: ai?.confidence || 0
+    type: 'add_confirm', fid: fid, ftype: ftype, title: title,
+    suggestedSubId: suggestedSub ? suggestedSub.id : null,
+    suggestedCatId: suggestedCat ? suggestedCat.id : null,
+    aiSub: ai ? ai.subject : '؟', aiCat: ai ? ai.category : '؟'
   });
-
-  // أزرار المواد
-  const subRows = subjects.map(s => [btn(
-    (s.id == suggestedSub?.id ? '✅ ' : '') + s.name,
-    'add_sub_' + s.id
-  )]);
-  subRows.push([btn('❌ إلغاء', 'add_cancel')]);
-
-  const conf = ai ? Math.round((ai.confidence||0)*100)+'%' : 'غير متاح';
-  await ctx.reply(
-    `📄 *${escMd(title)}*\n\n🤖 AI يقترح:\n📚 المادة: *${escMd(ai?.subject||'؟')}* (${conf})\n📁 الفئة: *${escMd(ai?.category||'؟')}*\n\nاختر المادة:`,
-    { parse_mode: 'Markdown', ...build(subRows) }
-  );
+  var conf = ai ? Math.round((ai.confidence || 0) * 100) + '%' : 'غير متاح';
+  var rows = subjects.map(function(s) { return [btn((s.id === (suggestedSub && suggestedSub.id) ? '✅ ' : '') + s.name, 'add_sub_' + s.id)]; });
+  rows.push([btn('❌ إلغاء', 'add_cancel')]);
+  ctx.reply('📄 *' + escMd(title) + '*\n\n🤖 AI: 📚 *' + escMd(ai ? ai.subject : '؟') + '* (' + conf + ')\n📁 *' + escMd(ai ? ai.category : '؟') + '*\n\nاختر المادة:', { parse_mode: 'Markdown', ...build(rows) }).catch(function(){});
   return true;
 }
 
 async function handleAddCallback(ctx, data) {
-  const state = global.userStates?.[ctx.uid];
-
-  if(data === 'add_cancel') {
-    await global.delState(ctx.uid);
-    return ctx.editMessageText('❌ تم الإلغاء').catch(()=>{});
+  var state = global.userStates && global.userStates[ctx.uid];
+  if (data === 'add_cancel') { await global.delState(ctx.uid); return ctx.editMessageText('❌ تم الإلغاء').catch(function(){}); }
+  if (data.startsWith('add_sub_')) {
+    var subId = safeInt(data.replace('add_sub_', ''));
+    var sub = await all('SELECT id, name FROM subjects WHERE id=$1', [subId]);
+    var cats = await all('SELECT c.id, c.name FROM categories c WHERE c.subject_id=$1', [subId]);
+    await global.setState(ctx.uid, { type: 'add_confirm', fid: state.fid, ftype: state.ftype, title: state.title, suggestedCatId: state.suggestedCatId, chosenSubId: subId, chosenSubName: sub[0] ? sub[0].name : '' });
+    var rows = cats.map(function(c) { return [btn((c.id === state.suggestedCatId ? '✅ ' : '') + c.name, 'add_cat_' + c.id)]; });
+    rows.push([btn('❌ إلغاء', 'add_cancel')]);
+    return ctx.editMessageText('📚 *' + escMd(sub[0] ? sub[0].name : '') + '*\n\nاختر الفئة:', { parse_mode: 'Markdown', ...build(rows) }).catch(function(){});
   }
-
-  if(data.startsWith('add_sub_')) {
-    const subId = data.replace('add_sub_', '');
-    const sub = await all('SELECT id, name FROM subjects WHERE id=?', [subId]);
-    // جلب الفئات لهذه المادة
-    const cats = await all(
-      'SELECT c.id, c.name FROM categories c JOIN subjects s ON c.subject_id=s.id WHERE s.id=?',
-      [subId]
-    );
-    await global.setState(ctx.uid, { ...state, type: 'add_confirm', chosenSubId: subId, chosenSubName: sub[0]?.name });
-    const catRows = cats.map(c => [btn(
-      (c.id == state.suggestedCatId ? '✅ ' : '') + c.name,
-      'add_cat_' + c.id
-    )]);
-    catRows.push([btn('❌ إلغاء', 'add_cancel')]);
-    return ctx.editMessageText(
-      `📚 المادة: *${escMd(sub[0]?.name)}*\n\nاختر الفئة:`,
-      { parse_mode: 'Markdown', ...build(catRows) }
-    ).catch(()=>{});
-  }
-
-  if(data.startsWith('add_cat_')) {
-    const catId = data.replace('add_cat_', '');
-    const cat = await all('SELECT id, name FROM categories WHERE id=?', [catId]);
+  if (data.startsWith('add_cat_')) {
+    var catId = safeInt(data.replace('add_cat_', ''));
+    var cat = await all('SELECT id, name FROM categories WHERE id=$1', [catId]);
     try {
       await filesDb.addFile(catId, state.title, '', state.fid, state.ftype, ctx.uid);
       await global.delState(ctx.uid);
-      await ctx.editMessageText(
-        `✅ *${escMd(state.title)}*\n📚 ${escMd(state.chosenSubName)} → 📁 ${escMd(cat[0]?.name)}\n\nتم الحفظ!`,
-        { parse_mode: 'Markdown' }
-      ).catch(()=>{});
-      // رجع لوضع add_mode
+      ctx.editMessageText('✅ *' + escMd(state.title) + '*\n📚 ' + escMd(state.chosenSubName) + ' → 📁 ' + escMd(cat[0] ? cat[0].name : ''), { parse_mode: 'Markdown' }).catch(function(){});
       await global.setState(ctx.uid, { type: 'add_mode', chatId: state.chatId });
-    } catch(e) {
-      await ctx.editMessageText('❌ ' + (e.message === 'exists' ? 'الملف موجود مسبقاً' : e.message)).catch(()=>{});
-    }
-    return;
+    } catch(e) { ctx.editMessageText('❌ ' + (e.message === 'exists' ? 'موجود مسبقاً' : e.message)).catch(function(){}); }
   }
 }
 
