@@ -468,6 +468,14 @@ async function launch() {
   logger.info('🚀 Study Bot v5.0 — Enterprise Edition');
   try {
     await initSchema(); logger.info('✅ DB ready');
+
+    try {
+      const db = require('./database/db');
+      await db.run("CREATE TABLE IF NOT EXISTS group_notify_log(id SERIAL PRIMARY KEY,file_id INTEGER NOT NULL,chat_id BIGINT NOT NULL,sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,UNIQUE(file_id,chat_id))");
+      await db.run("CREATE INDEX IF NOT EXISTS idx_gnl_file ON group_notify_log(file_id)");
+      logger.info('✅ Extra tables ready');
+    } catch(e) { logger.warn('Extra tables:', e.message); }
+
     await Promise.all([loadMaintenance(), loadAllStates().catch(() => {})]);
     logger.info('✅ Config loaded');
     await cacheWarmup(); logger.info('✅ Cache warm');
@@ -475,7 +483,13 @@ async function launch() {
     GrpBuf.start(); MGColl.start(); logger.info('✅ Services started');
     app.use(bot.webhookCallback('/webhook/' + TOKEN));
     app.listen(PORT, () => logger.info('✅ Express :' + PORT));
+    if (WEBHOOK_URL) {
     await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, { allowed_updates: ['message', 'callback_query', 'my_chat_member'], drop_pending_updates: true, max_connections: 40 });
+    logger.info('✅ Webhook: ' + WEBHOOK_URL);
+  } else {
+    logger.warn('⚠️ No WEBHOOK_URL - using polling');
+    bot.launch({ drop_pending_updates: true });
+  }
     global.__bot = bot; startSmartWarmup();
     logger.info('🚀 Ready');
   } catch(e) { logger.error('[Launch]', e.message); setTimeout(launch, 10000); }
