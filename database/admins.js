@@ -42,4 +42,5 @@ const getPerms = async uid => {
 const updatePerms = (uid,perms) => { cacheClear('admp_'+uid); return run('UPDATE admins SET permissions=$1 WHERE user_id=$2',[perms,uid]); };
 const clearCache = uid => { cacheClear('ia_'+uid); cacheClear('admp_'+uid); cacheClear('sp_'+uid); };
 
+const hasPerm = async (uid,perm) => { if(isOwner(uid)) return true; const p = await getPerms(uid); return p.includes("full")||p.includes(perm); };
 module.exports = { getAll,add,remove,isAdmin,getPerms,updatePerms,hasPerm,setSpecialty,getAdminSpecialty,clearCache };
