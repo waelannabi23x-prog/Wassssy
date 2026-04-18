@@ -1,5 +1,3 @@
-const escMd2 = require('../utils/helpers').escMd;
-const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
 const content=require('../database/content');
 const filesDb=require('../database/files');
 const adminsDb=require('../database/admins');
@@ -7,7 +5,7 @@ const usersDb=require('../database/users');
 const interactions=require('../database/interactions');
 const browse=require('./browse');
 const {build,btn,back,backMenu}=require('../utils/keyboard');
-const {eos,buildPath,escMd as esc}=require('../utils/helpers');
+const {eos,buildPath,escMd}=require('../utils/helpers');
 const {isOwner}=require('../middlewares/auth');
 const path=require('path');
 const bundlesDb=require('../database/bundles');
@@ -175,7 +173,7 @@ async function showLogs(ctx){
   else text+='_لا توجد سجلات._';
   return eos(ctx,text,{parse_mode:'Markdown',...build([back('mg_menu')])});
 }
-
+async function showUsers(ctx,page=0){
   const _uk='admin_users_'+page;
   const _uc=cacheGet(_uk);
   const [list, total] = _uc ? [_uc.list,_uc.total] : await Promise.all([usersDb.getAll(page,PS), usersDb.count()]).then(([l,t])=>{cacheSet(_uk,{list:l,total:t},30000);return[l,t];});
@@ -183,7 +181,7 @@ async function showLogs(ctx){
   list.forEach((u,i)=>{
     const j=u.joined_at?new Date(u.joined_at).toLocaleDateString("en-GB"):"?";
     const a=u.last_active?new Date(u.last_active).toLocaleDateString("en-GB"):"?";
-    text+=(page*PS+i+1)+". "+escMd2(u.first_name)+(u.username?" @"+escMd2(u.username):" ID:"+u.id)+(u.is_banned?" 🚫":"")+"\n   📅 "+j+" | 🕐 "+a+"\n";
+    text+=(page*PS+i+1)+". "+escMd(u.first_name)+(u.username?" @"+escMd(u.username):" ID:"+u.id)+(u.is_banned?" 🚫":"")+"\n   📅 "+j+" | 🕐 "+a+"\n";
   });
   const rows=list.map(u=>[
     btn('👤 '+(u.first_name||u.id),'mg_profile_'+u.id),
@@ -423,7 +421,7 @@ async function handleText(ctx,state){
         break;
       case 'mg_upl_desc': setState(uid,{...state,type:'mg_file',desc:text==='skip'?'':text,catId:state.catId}); ctx.reply('📎 أرسل الملف الآن:\n_(أو /cancel)_',{parse_mode:'Markdown'}); break;
       case 'mg_rn_fl': await filesDb.rename(state.id,text); done('✅ تمت إعادة التسمية!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_')); break;
-      case 'mg_desc_fl': await filesDb.updateDescMd2(state.id,text); done('✅ تم تحديث الوصف!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_')); break;
+      case 'mg_desc_fl': await filesDb.updateDescMd(state.id,text); done('✅ تم تحديث الوصف!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_')); break;
       case 'mg_admin_search':{
         clearState(uid);
         const [fr,ur]=await Promise.all([filesDb.search(text),usersDb.searchUsers(text)]);
