@@ -1,4 +1,5 @@
 const { all, get, run } = require('./db');
+const { isOwner } = require('../middlewares/auth');
 const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
 
 const getAll = () => all('SELECT a.*,u.first_name,u.username FROM admins a LEFT JOIN users u ON a.user_id=u.id');
@@ -39,7 +40,6 @@ const getPerms = async uid => {
 };
 
 const updatePerms = (uid,perms) => { cacheClear('admp_'+uid); return run('UPDATE admins SET permissions=$1 WHERE user_id=$2',[perms,uid]); };
-const hasPerm = async (uid,perm) => { if(require('../middlewares/auth').isOwner(uid)) return true; const p = await getPerms(uid); return p.includes('full')||p.includes(perm); };
 const clearCache = uid => { cacheClear('ia_'+uid); cacheClear('admp_'+uid); cacheClear('sp_'+uid); };
 
 module.exports = { getAll,add,remove,isAdmin,getPerms,updatePerms,hasPerm,setSpecialty,getAdminSpecialty,clearCache };

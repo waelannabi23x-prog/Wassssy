@@ -336,6 +336,7 @@ const prefixCbRoutes = [
 bot.on('callback_query', async ctx => {
   const data = ctx.callbackQuery?.data, cbId = ctx.callbackQuery?.id;
   if (!data || isDupeCB(cbId)) return;
+  if (data.length > 64) return;
 
   try {
     if (!data.startsWith('grp_')) ctx.answerCbQuery('', { show_alert: false }).catch(() => {});

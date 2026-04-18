@@ -2,13 +2,13 @@ const { all, get, run } = require('./db');
 
 // Templates
 const getTemplates = () => all('SELECT * FROM message_templates ORDER BY created_at DESC');
-const getTemplate = id => get('SELECT * FROM message_templates WHERE id=?',[id]);
+const getTemplate = id => get('SELECT * FROM message_templates WHERE id=$1',[id]);
 const addTemplate = async (name,type,content,fileId='') => {
-  if(await get('SELECT 1 FROM message_templates WHERE name=?',[name])) throw new Error('exists');
-  await run('INSERT INTO message_templates(name,type,content,file_id) VALUES(?,?,?,?)',[name,type,content,fileId]);
+  if(await get('SELECT 1 FROM message_templates WHERE name=$1',[name])) throw new Error('exists');
+  await run('INSERT INTO message_templates(name,type,content,file_id) VALUES($1,$2,$3,$4)',[name,type,content,fileId]);
 };
-const updateTemplate = (id,name,type,content,fileId) => run('UPDATE message_templates SET name=?,type=?,content=?,file_id=? WHERE id=?',[name,type,content,fileId,id]);
-const deleteTemplate = id => run('DELETE FROM message_templates WHERE id=?',[id]);
+const updateTemplate = (id,name,type,content,fileId) => run('UPDATE message_templates SET name=?,type=?,content=?,file_id=? WHERE id=$1',[name,type,content,fileId,id]);
+const deleteTemplate = id => run('DELETE FROM message_templates WHERE id=$1',[id]);
 
 // Scheduled
 const getScheduled = () => all('SELECT sm.*,mt.name,mt.type,mt.content,mt.file_id FROM scheduled_messages sm LEFT JOIN message_templates mt ON sm.template_id=mt.id WHERE sm.sent=0 ORDER BY sm.send_at ASC');
@@ -26,8 +26,8 @@ const normalizeDate = (input) => {
   if(m3) return input.replace(m3[4], m3[4].padStart(5,'0'))+':00';
   return input;
 };
-const addScheduled = (templateId,target,specialtyId,sendAt) => run('INSERT INTO scheduled_messages(template_id,target,specialty_id,send_at) VALUES(?,?,?,?)',[templateId,target,specialtyId||0,normalizeDate(sendAt)]);
-const markSent = id => run('UPDATE scheduled_messages SET sent=1 WHERE id=?',[id]);
-const deleteScheduled = id => run('DELETE FROM scheduled_messages WHERE id=?',[id]);
+const addScheduled = (templateId,target,specialtyId,sendAt) => run('INSERT INTO scheduled_messages(template_id,target,specialty_id,send_at) VALUES($1,$2,$3,$4)',[templateId,target,specialtyId||0,normalizeDate(sendAt)]);
+const markSent = id => run('UPDATE scheduled_messages SET sent=1 WHERE id=$1',[id]);
+const deleteScheduled = id => run('DELETE FROM scheduled_messages WHERE id=$1',[id]);
 
 module.exports = { getTemplates,getTemplate,addTemplate,updateTemplate,deleteTemplate,getScheduled,getPending,addScheduled,markSent,deleteScheduled };

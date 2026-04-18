@@ -1,11 +1,11 @@
 const { all, get, run } = require('./db');
-const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
+const { cacheGet, cacheSet, cacheClear, cacheClearPrefix } = require('../utils/cache');
 
 const getComments = (fileId, limit=20) => all(
   `SELECT c.*, u.first_name, u.username FROM comments c
    LEFT JOIN users u ON c.user_id=u.id
-   WHERE c.file_id=? AND c.is_deleted=0
-   ORDER BY c.created_at DESC LIMIT ?`,
+   WHERE c.file_id=$1 AND c.is_deleted=0
+   ORDER BY c.created_at DESC LIMIT $1`,
   [fileId, limit]
 );
 
@@ -17,17 +17,17 @@ const addComment = (fileId, userId, text) => {
   return run('INSERT INTO comments(file_id,user_id,text) VALUES(?,?,?)',[fileId, userId, text]);
 };
 
-const deleteComment = (id) => run('UPDATE comments SET is_deleted=1 WHERE id=?', [id]);
+const deleteComment = (id) => run('UPDATE comments SET is_deleted=1 WHERE id=$1', [id]);
 const deleteCommentAdmin = async (id) => {
-  const c = await get('SELECT file_id FROM comments WHERE id=?',[id]);
+  const c = await get('SELECT file_id FROM comments WHERE id=$1',[id]);
   if(c) {
     cacheClear('cmtcnt_'+c.file_id);
     const {cacheClearPrefix} = require('../utils/cache');
     cacheClearPrefix('cmts_'+c.file_id+'_');
   }
-  return run('DELETE FROM comments WHERE id=?', [id]);
+  return run('DELETE FROM comments WHERE id=$1', [id]);
 };
-const getComment = (id) => get('SELECT * FROM comments WHERE id=?', [id]);
+const getComment = (id) => get('SELECT * FROM comments WHERE id=$1', [id]);
 
 const countComments = async (fileId) => {
   const key = 'cmtcnt_'+fileId;
@@ -38,6 +38,6 @@ const countComments = async (fileId) => {
   return r;
 };
 
-const getUserComments = (userId) => all('SELECT c.*, f.title as file_title FROM comments c LEFT JOIN files f ON c.file_id=f.id WHERE c.user_id=? AND c.is_deleted=0 ORDER BY c.created_at DESC LIMIT 10', [userId]);
+const getUserComments = (userId) => all('SELECT c.*, f.title as file_title FROM comments c LEFT JOIN files f ON c.file_id=f.id WHERE c.user_id=$1 AND c.is_deleted=0 ORDER BY c.created_at DESC LIMIT 10', [userId]);
 
 module.exports = { getComments, addComment, deleteComment, deleteCommentAdmin, getComment, countComments, getUserComments };
