@@ -490,7 +490,7 @@ async function launch() {
     logger.warn('⚠️ No WEBHOOK_URL - using polling');
     bot.launch({ drop_pending_updates: true });
   }
-    global.__bot = bot; startSmartWarmup();
+    global.__bot = bot; // startSmartWarmup(); // disabled: cacheWarmup sufficient
     logger.info('🚀 Ready');
   } catch(e) { logger.error('[Launch]', e.message); setTimeout(launch, 10000); }
 }

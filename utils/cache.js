@@ -74,4 +74,6 @@ async function cacheWarmup() {
 }
 
 function cacheStats() { return { size: store.size }; }
-module.exports = { cacheGet: cacheGet, cacheSet: cacheSet, cacheClear: cacheClear, cacheClearPrefix: cacheClearPrefix, cacheWarmup: cacheWarmup, cacheStats: cacheStats };
+function getCacheSize() { return store.size; }
+function getCacheKeys() { return Array.from(store.keys()); }
+module.exports = { cacheGet: cacheGet, cacheSet: cacheSet, cacheClear: cacheClear, cacheClearPrefix: cacheClearPrefix, cacheWarmup: cacheWarmup, cacheStats: cacheStats, getCacheSize: getCacheSize, getCacheKeys: getCacheKeys };
