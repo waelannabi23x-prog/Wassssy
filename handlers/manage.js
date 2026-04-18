@@ -295,7 +295,12 @@ async function handleBundleFileUpload(ctx){
   if(!state||state.type!=='mg_bundle_files') return false;
   const msg=ctx.message; let fid,ftype,title='';
   const text=(msg.text||msg.caption||'').trim();
-  if(text&&(text.startsWith('http')||text.startsWith('www'))){fid=text;ftype='link';title='🔗 رابط';}
+  // التحقق من الرابط: نص عادي + entities + forwarded
+  const hasUrlEntity = msg.entities?.some(e=>e.type==='url'||e.type==='text_link');
+  const textLink = hasUrlEntity ? msg.text?.substring(msg.entities[0].offset, msg.entities[0].offset+msg.entities[0].length) : null;
+  const captionLink = msg.caption_entities?.some(e=>e.type==='url'||e.type==='text_link') ? msg.caption?.substring(msg.caption_entities[0].offset, msg.caption_entities[0].offset+msg.caption_entities[0].length) : null;
+  const link = textLink || captionLink || (text.match(/https?:\/\/[^\s]+/)||[])[0] || (text.match(/www\.[^\s]+/)||[])[0];
+  if(link){fid=link;ftype='link';title='🔗 '+link.substring(0,40)+(link.length>40?'...':'');}
   else if(msg.document){fid=msg.document.file_id;ftype='document';title=msg.document.file_name||'';}
   else if(msg.photo){fid=msg.photo[msg.photo.length-1].file_id;ftype='photo';title='🖼️ صورة';}
   else if(msg.video){fid=msg.video.file_id;ftype='video';title=msg.video.file_name||'🎥 فيديو';}
