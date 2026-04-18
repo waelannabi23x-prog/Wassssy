@@ -13,37 +13,23 @@ function formatDate(dateStr) {
   } catch (e) { return 'غير معروف'; }
 }
 
-const MAX_RETRIES = 3;
-
 async function eos(ctx, text, extra = {}) {
   const msg = ctx.callbackQuery?.message;
   if (msg) {
-    let retries = 0;
-    while (retries < MAX_RETRIES) {
+    try {
+      return await ctx.editMessageText(text, extra);
+    } catch (e) {
+      if (e.description?.includes('message is not modified')) return;
+      console.error('eos edit failed:', e.message, e.description?.substring(0, 100));
       try {
-        return await ctx.editMessageText(text, extra);
-      } catch (e) {
-        if (e.description?.includes('message is not modified')) return;
-        if (e.description?.includes('Too Many Requests')) {
-          retries++;
-          if (retries >= MAX_RETRIES) return ctx.reply(text, extra).catch(() => {});
-          const wait = (e.parameters?.retry_after || 3) * 1000;
-          await new Promise(r => setTimeout(r, wait));
-          continue;
-        }
-        if (e.description?.includes('message to edit not found') ||
-            e.description?.includes('MESSAGE_ID_INVALID')) {
-          return ctx.reply(text, extra).catch(() => {});
-        }
-        return ctx.reply(text, extra).catch(() => {});
+        return await ctx.reply(text, extra);
+      } catch (e2) {
+        console.error('eos reply failed:', e2.message, e2.description?.substring(0, 100));
       }
     }
   }
   return ctx.reply(text, extra).catch(e => {
-    if (e.description?.includes('Too Many Requests')) {
-      const wait = (e.parameters?.retry_after || 3) * 1000;
-      return new Promise(r => setTimeout(r, wait)).then(() => ctx.reply(text, extra));
-    }
+    console.error('eos final failed:', e.message);
   });
 }
 
