@@ -7,7 +7,7 @@ const usersDb=require('../database/users');
 const interactions=require('../database/interactions');
 const browse=require('./browse');
 const {build,btn,back,backMenu}=require('../utils/keyboard');
-const {eos,buildPath}=require('../utils/helpers');
+const {eos,buildPath,escMd as esc}=require('../utils/helpers');
 const {isOwner}=require('../middlewares/auth');
 const path=require('path');
 const bundlesDb=require('../database/bundles');
@@ -35,7 +35,6 @@ if(!global.userStates) global.userStates={};
 const setState=(uid,s)=>{ global.userStates[uid]=s; if(global.setState) global.setState(uid,s); };
 const clearState=uid=>{ delete global.userStates[uid]; if(global.delState) global.delState(uid); };
 const PS=10;
-const esc=t=>(t||"").replace(/[*_\`[]()~>#+=|{}.!-]/g,"\\$&");
 async function mainMenu(ctx){
   const uid=ctx.uid;
   const [specs0, files0] = await Promise.all([content.getSpecs(), filesDb.totalFiles()]);
@@ -175,10 +174,8 @@ async function showLogs(ctx){
   if(logs.length) logs.forEach(l=>{ text+='• '+(l.first_name||'ID:'+l.user_id)+': '+l.action+(l.details?' — '+l.details:'')+'\n'; });
   else text+='_لا توجد سجلات._';
   return eos(ctx,text,{parse_mode:'Markdown',...build([back('mg_menu')])});
-  console.log("users text length:", text.length, "rows:", rows.length, "list:", list?.length);
 }
 
-async function showUsers(ctx,page=0){ console.log("showUsers called, page:", page);
   const _uk='admin_users_'+page;
   const _uc=cacheGet(_uk);
   const [list, total] = _uc ? [_uc.list,_uc.total] : await Promise.all([usersDb.getAll(page,PS), usersDb.count()]).then(([l,t])=>{cacheSet(_uk,{list:l,total:t},30000);return[l,t];});

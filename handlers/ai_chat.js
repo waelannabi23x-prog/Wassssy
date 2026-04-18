@@ -1,18 +1,38 @@
 const { groqChat } = require('../utils/groq_client');
 const filesDb = require('../database/files');
-const { cacheGet, cacheSet } = require('../utils/cache');
 
 // ═══════════════════════════════════════════════════════
-// 🧠 Enterprise AI Engine V2 - المساعد الجامعي الذكي
+// 🛡️ AI Rate Limiter — 5 رسائل بالدقيقة لكل مستخدم
 // ═══════════════════════════════════════════════════════
+const _aiRl = new Map();
+const AI_MAX = 5;
+const AI_WINDOW = 60000;
 
+function checkAiLimit(uid) {
+  const now = Date.now();
+  let times = _aiRl.get(uid);
+  if (!times) { times = []; _aiRl.set(uid, times); }
+  while (times.length && now - times[0] > AI_WINDOW) times.shift();
+  if (times.length >= AI_MAX) return false;
+  times.push(now);
+  return true;
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of _aiRl) {
+    while (v.length && now - v[0] > AI_WINDOW) v.shift();
+    if (!v.length) _aiRl.delete(k);
+  }
+}, 300000);
+
+// ═══════════════════════════════════════════════════════
 const SYSTEM_PERSONA = `أنت "أكاديمي"، مساعد جامعي ذكي ومتفوق لبوت منصة جامعية جزائرية.
 شخصيتك:
 - تتحدث بلهجة جزائرية دارجة ممزوجة بالعربية الفصحى المبسطة (إذا تكلم المستخدم بالدارجة، رد بالدارجة. إذا بالفرنسية، رد بالفرنسية).
 - مختصر، دقيق، ومفيد. لا تهلل ولا تطل كلاماً بلا فائدة.
-- إذا سألك الطالب عن شيء تقني أو أكاديمي، اشرح له كأنك تشرح لزميلك في الساحة (مثال: الـ Stack هو هيكل بيانات الأخير يدخل أول يخرج آخر LIFO).
-- لا تستخدم Markdown الثقيل (لا تضع عناوين كبيرة أو نقاط كثيرة)، اكتب بشكل عادي ونظيف.
-- إذا لم تعرف الإجابة أو المعلومة غير متوفرة، قل بصراحة "ما عندي هاد المعلومة حالياً، جرب تسأل الأساتذة أو راجع الكورس".
+- إذا سألك الطالب عن شيء تقني أو أكاديمي، اشرح له كأنك تشرح لزميلك في الساحة.
+- لا تستخدم Markdown الثقيل، اكتب بشكل عادي ونظيف.
+- إذا لم تعرف الإجابة، قل بصراحة "ما عندي هاد المعلومة حالياً".
 - ممنوع تقديم معلومات خاطئة أو تتوقع.`;
 
 async function smartSearchForAI(query, limit = 3) {
@@ -21,7 +41,6 @@ async function smartSearchForAI(query, limit = 3) {
   try {
     const results = await filesDb.search(q, limit);
     if (results.length >= 2) return results;
-    
     const words = q.split(/\s+/).filter(w => w.length >= 3);
     if (words.length > 1) {
       const extras = new Map();
@@ -46,11 +65,17 @@ function classifyIntent(text) {
 
 async function handleAiChat(ctx, text) {
   const uid = ctx.uid;
-  ctx.sendChatAction('typing').catch(() => {});
 
+  if (!checkAiLimit(uid)) {
+    return ctx.reply('⏳ أنت سريع جداً! انتظر دقيقة ثم حاول.', {
+      reply_markup: { inline_keyboard: [[{ text: '🏠 القائمة', callback_data: 'main_menu' }]] }
+    });
+  }
+
+  if (text.trim().length < 2) return false;
+  ctx.sendChatAction('typing').catch(() => {});
   const intent = classifyIntent(text);
 
-  // 1. بحث الملفات (إذا كان القصد ملف)
   if (intent === 'FILE_SEARCH') {
     const files = await smartSearchForAI(text, 5);
     if (files.length > 0) {
@@ -59,51 +84,41 @@ async function handleAiChat(ctx, text) {
       ]);
       rows.push([{ text: '🔍 بحث يدوي', callback_data: 'search_prompt' }, { text: '🏠', callback_data: 'main_menu' }]);
       const fileListStr = files.map(f => '- ' + f.title + ' (' + f.sub_name + ')').join('\n');
-      
-      await ctx.reply('🔍 لقيت هاذو الملفات اللي تبحث عليهم:\n\n' + fileListStr + '\n\nاضغط على اللي تبيه:', {
+      await ctx.reply('🔍 لقيت هاذو الملفات:\n\n' + fileListStr + '\n\nاضغط على اللي تبيه:', {
         reply_markup: { inline_keyboard: rows }
       });
       return true;
     }
   }
 
-  // 2. RAG (إحضار سياق الملفات المتعلقة لتغذية الذكاء الاصطناعي)
   let ragContext = '';
   if (intent === 'CONCEPT_EXPLAIN' || intent === 'PROBLEM_SOLVING') {
     const relevantFiles = await smartSearchForAI(text, 2);
     if (relevantFiles.length > 0) {
-      ragContext = `\n[ملاحظة: عندك ملفات متعلقة بالموضوع في المنصة: ${relevantFiles.map(f => f.title).join(', ')}]`;
+      ragContext = '\n[ملاحظة: عندك ملفات متعلقة: ' + relevantFiles.map(f => f.title).join(', ') + ']';
     }
   }
 
-  // 3. توليد الرد الذكي
   try {
-    const messages = [
+    const reply = await groqChat([
       { role: 'system', content: SYSTEM_PERSONA + ragContext },
       { role: 'user', content: text }
-    ];
-
-    const reply = await groqChat(messages, 400, 0.7);
-    
-    // زرائد سريعة للتفاعل
-    const rows = [
-      [{ text: '📄 بحث عن ملف', callback_data: 'search_prompt' }, { text: '🏠 القائمة', callback_data: 'main_menu' }]
-    ];
-
+    ], 400, 0.7);
     await ctx.reply(reply, {
-      reply_markup: { inline_keyboard: rows }
+      reply_markup: { inline_keyboard: [[
+        { text: '📄 بحث عن ملف', callback_data: 'search_prompt' },
+        { text: '🏠 القائمة', callback_data: 'main_menu' }
+      ]] }
     });
     return true;
   } catch (e) {
-    await ctx.reply('⚠️ حصل خلية في السيرفر، جرب من جديد.', {
+    await ctx.reply('⚠️ حصل مشكلة، جرب من جديد.', {
       reply_markup: { inline_keyboard: [[{ text: '🏠 القائمة', callback_data: 'main_menu' }]] }
     });
     return true;
   }
 }
 
-async function resetChat(uid) {
-  // في المستقبل يمكن إضافة مسح سياق الـ AI هنا
-}
+async function resetChat(uid) {}
 
 module.exports = { handleAiChat, resetChat };
