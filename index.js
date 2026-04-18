@@ -507,8 +507,8 @@ process.on('unhandledRejection', e => logger.error('[Rejection]', e?.message || 
 const _cln = setInterval(async () => {
   try {
     await Promise.all([
-      dbRun("DELETE FROM user_states WHERE updated_at < NOW() - INTERVAL '1 hour'").catch(() => {}),
-      dbRun("DELETE FROM group_members WHERE updated_at < NOW() - INTERVAL '7 days'").catch(() => {}),
+      dbRun("DELETE FROM user_states WHERE updated_at::timestamp < NOW() - INTERVAL '1 hour'").catch(() => {}),
+      dbRun("DELETE FROM group_members WHERE updated_at::timestamp < NOW() - INTERVAL '7 days'").catch(() => {}),
       dbRun("DELETE FROM cache_store WHERE expires_at::bigint < $1::bigint", [Date.now()]).catch(() => {}),
     ]);
     StateMgr.gc(); RL.gc(); GrpMsgs.prune();

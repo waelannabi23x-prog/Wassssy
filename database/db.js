@@ -70,6 +70,8 @@ function toPgCached(sql) {
   return r;
 }
 
+// toPg: يحوّل صيغة SQLite لـ PostgreSQL
+// مهم: لا نحذف ::type لأن PG يحتاجها للتحويل الصريح
 function toPg(sql) {
   if (!sql || typeof sql !== "string") return sql || "";
   let i = 0;
@@ -85,34 +87,17 @@ function toPg(sql) {
       return 'INSERT INTO ' + t1 + '(' + t2 + ') VALUES(' + t3 + ') ON CONFLICT(' + cols[0] + ') DO UPDATE SET ' + cols.slice(1).map(function(c) { return c + '=EXCLUDED.' + c; }).join(',');
     })
     .replace(/LIKE \?/gi, 'ILIKE ?')
-    .replace(/::timestamp/gi, "")
-    .replace(/::interval/gi, "")
-    .replace(/::smallint/gi, "")
-    .replace(/::integer/gi, "")
-    .replace(/::bigint/gi, "")
-    .replace(/::numeric/gi, "")
-    .replace(/::float/gi, "")
-    .replace(/::real/gi, "")
-    .replace(/::double\s+precision/gi, "")
-    .replace(/::boolean/gi, "")
-    .replace(/::text/gi, "")
-    .replace(/::character\s+varying\([^)]+\)/gi, "")
-    .replace(/::character\([^)]+\)/gi, "")
-    .replace(/::date/gi, "")
-    .replace(/::time/gi, "")
-    .replace(/::json/gi, "")
-    .replace(/::jsonb/gi, "")
-    .replace(/::uuid/gi, "")
+    // نحافظ على ::type للـ PG — لا نحذفها!
     .replace(/__BIGSERIAL__/gi, "BIGSERIAL")
     .replace(/BIGSERIAL/gi, "__BIGSERIAL__")
     .replace(/SERIAL/gi, "INTEGER")
     .replace(/__BIGSERIAL__/gi, "BIGSERIAL")
-    .replace(/BIGINT/gi, "BIGINT")
-    .replace(/CURRENT_TIMESTAMP\s*-\s*INTERVAL\s*'(\d+)\s*(\w+)'/g, "CURRENT_TIMESTAMP - INTERVAL '$1 $2'")
     .replace(/\?/g, function() { return '$' + (++i); });
   return sql;
 }
 
+// toSqlite: يحوّل صيغة PostgreSQL لـ SQLite
+// هنا نحذف ::type لأن SQLite لا يدعمها
 function toSqlite(sql) {
   if (!sql || typeof sql !== "string") return sql || "";
   return sql
@@ -123,6 +108,7 @@ function toSqlite(sql) {
     .replace(/similarity\(([^,]+),\s*([^)]+)\)/gi, "1.0")
     .replace(/::timestamp/gi, "")
     .replace(/::interval/gi, "")
+    .replace(/::smallint/gi, "")
     .replace(/::integer/gi, "")
     .replace(/::bigint/gi, "")
     .replace(/::numeric/gi, "")
@@ -307,6 +293,7 @@ async function initSchema() {
 
   if (!pg && !getSqlite() && sqlJs) saveDB();
 
+  // إضافة أعمدة مفقودة
   var alterCols = [
     ["files", "is_deleted", "INTEGER DEFAULT 0"],
     ["files", "description", "TEXT DEFAULT ''"],
@@ -331,6 +318,36 @@ async function initSchema() {
         if (target) { try { (target.exec || target.run.bind(target))("ALTER TABLE " + tbl + " ADD COLUMN " + col + " " + typ); } catch (e) {} }
       }
     } catch (e) {}
+  }
+
+  // إصلاح أنواع الأعمدة TIMESTAMP في PostgreSQL
+  if (pg) {
+    var tsCols = [
+      ["users", "joined_at"], ["users", "last_active"],
+      ["admins", "added_at"],
+      ["files", "uploaded_at"],
+      ["history", "viewed_at"],
+      ["logs", "created_at"],
+      ["user_specialties", "updated_at"],
+      ["bundles", "created_at"],
+      ["message_templates", "created_at"],
+      ["scheduled_messages", "created_at"],
+      ["user_states", "updated_at"],
+      ["ai_history", "created_at"],
+      ["group_chats", "joined_at"],
+      ["group_bot_msgs", "sent_at"],
+      ["group_members", "updated_at"],
+      ["reports", "created_at"],
+      ["comments", "created_at"],
+      ["group_notify_log", "sent_at"],
+    ];
+    for (var tc = 0; tc < tsCols.length; tc++) {
+      var tTbl = tsCols[tc][0], tCol = tsCols[tc][1];
+      try {
+        await pg.query("ALTER TABLE " + tTbl + " ALTER COLUMN " + tCol + " TYPE TIMESTAMP USING " + tCol + "::timestamp");
+      } catch (e) { /* عمود غير موجود أو النوع صحيح — تجاهل */ }
+    }
+    logger.info('✅ Timestamp columns verified');
   }
 
   logger.info('✅ DB schema ready');

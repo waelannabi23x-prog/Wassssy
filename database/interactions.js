@@ -44,7 +44,7 @@ async function getSimilar(fileId,limit=4) {
 
 const addLog = (uid,action,details) => run('INSERT INTO logs(user_id,action,details) VALUES($1,$2,$3)',[uid,action,details||'']).catch(()=>{});
 const getLogs = (n=20) => all('SELECT l.*,u.first_name FROM logs l LEFT JOIN users u ON l.user_id=u.id ORDER BY l.created_at DESC LIMIT $1',[n]);
-const getActiveUsers = async (days=7) => { const k='active_users_'+days; const c=cacheGet(k); if(c) return c; const rows=await all(`SELECT id FROM users WHERE is_banned=0 AND last_active >= NOW() - ($1::integer * INTERVAL '1 day')`,[days]); const ids=rows.map(r=>r.id); cacheSet(k,ids,600000); return ids; };
+const getActiveUsers = async (days=7) => { const k='active_users_'+days; const c=cacheGet(k); if(c) return c; const rows=await all(`SELECT id FROM users WHERE is_banned=0 AND last_active::timestamp >= NOW() - ($1::integer * INTERVAL '1 day')`,[days]); const ids=rows.map(r=>r.id); cacheSet(k,ids,600000); return ids; };
 
 const addRating = (uid,fid,rating) => { cacheClear('urating_'+uid+'_'+fid); cacheClear('avg_'+fid); cacheClear('prev_static_'+fid); return run('INSERT INTO ratings(user_id,file_id,rating) VALUES($1,$2,$3) ON CONFLICT(user_id,file_id) DO UPDATE SET rating=EXCLUDED.rating',[uid,fid,rating]); };
 const getUserRating = async (uid,fid) => { const k='urating_'+uid+'_'+fid; const c=cacheGet(k); if(c!==null) return c; const r=(await get('SELECT rating FROM ratings WHERE user_id=$1 AND file_id=$2',[uid,fid]))?.rating||0; cacheSet(k,r,1800000); return r; };
