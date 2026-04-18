@@ -486,7 +486,22 @@ async function launch() {
     startScheduler(bot, [OWNER_ID]);
     GrpBuf.start(); MGColl.start(); logger.info('✅ Services started');
     app.use(bot.webhookCallback('/webhook/' + TOKEN));
-    app.listen(PORT, () => logger.info('✅ Express :' + PORT));
+    app.get('/health', async (_r, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    var mu = process.memoryUsage();
+    var ok = true;
+    var checks = {};
+    // DB check
+    try { var r = await dbAll('SELECT 1'); checks.db = r.length ? 'ok' : 'empty'; } catch(e) { ok = false; checks.db = 'error: ' + e.message.substring(0, 50); }
+    // Cache check
+    try { var cs = require('./utils/cache'); checks.cache = cs.getCacheSize ? 'ok' : 'error'; } catch(e) { checks.cache = 'error'; }
+    // Memory check
+    var heapMB = Math.round(mu.heapUsed / 1048576);
+    checks.memory = heapMB < 450 ? 'ok' : 'high';
+    if (heapMB > 450) ok = false;
+    res.json({ status: ok ? 'ok' : 'degraded', uptime: Math.floor(process.uptime()), heap: heapMB + 'MB', rss: Math.round(mu.rss / 1048576) + 'MB', checks: checks, region: process.env.RAILWAY_REGION || 'local', ts: Date.now() });
+  });
+app.listen(PORT, () => logger.info('✅ Express :' + PORT));
     if (WEBHOOK_URL) {
     await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, { allowed_updates: ['message', 'callback_query', 'my_chat_member'], drop_pending_updates: true, max_connections: 40 });
     logger.info('✅ Webhook: ' + WEBHOOK_URL);

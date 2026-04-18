@@ -1,4 +1,4 @@
-const escMd = t => (t || '').replace(/[*_`\[\]()~>#+=|{}.!\-]/g, '\\$&');
+.replace(/[*_`\[\]()~>#+=|{}.!\-]/g, '\\$&');
 const { build, btn } = require('../utils/keyboard');
 const { eos } = require('../utils/helpers');
 const interactions = require('../database/interactions');

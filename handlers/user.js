@@ -1,4 +1,4 @@
-const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
+.replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
 const filesDb=require('../database/files');
 const {all, get}=require('../database/db');
 const interactions=require('../database/interactions');

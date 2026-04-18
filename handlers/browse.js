@@ -268,7 +268,7 @@ async function showComments(ctx, fid, spId, yrId, smId, sbId, catId, page) {
 async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
   fid = safeInt(fid);
   var uid = ctx.uid;
-  ctx.answerCbQuery('').catch(function(){});
+    // ack removed for speed
   ctx.sendChatAction('upload_document').catch(function(){});
   var results = await Promise.all([filesDb.getFile(fid), interactions.getSimilar(fid, 4), interactions.isFav(uid, fid)]);
   var f = results[0], similar = results[1], fav = results[2];

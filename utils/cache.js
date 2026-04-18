@@ -6,62 +6,69 @@ function cacheGet(key) {
   var entry = store.get(key);
   if (!entry) return null;
   if (entry.exp && Date.now() > entry.exp) { store.delete(key); return null; }
-  store.delete(key);
-  store.set(key, entry);
+  entry.lastAccess = Date.now();
   return entry.val;
 }
 
 function cacheSet(key, val, ttl) {
   ttl = ttl || 300000;
-  if (store.has(key)) store.delete(key);
-  while (store.size >= MAX) store.delete(store.keys().next().value);
-  store.set(key, { val: val, exp: Date.now() + ttl });
+  store.set(key, { val: val, exp: Date.now() + ttl, lastAccess: Date.now() });
+  if (store.size > MAX + 500) _evictLRU();
 }
 
 function cacheClear(key) { store.delete(key); }
 
 function cacheClearPrefix(prefix) {
   var toRemove = [];
-  for (var key of store.keys()) {
-    if (key.startsWith(prefix)) toRemove.push(key);
+  for (var k of store.keys()) {
+    if (k.startsWith(prefix)) toRemove.push(k);
   }
   for (var i = 0; i < toRemove.length; i++) store.delete(toRemove[i]);
 }
 
-function cacheWarmup() {
-  var content = require('../database/content');
-  return content.getSpecs().then(function(specs) {
+function _evictLRU() {
+  if (store.size <= MAX) return;
+  // ترتيب حسب آخر استخدام — أحذف الأقل استخدام
+  var entries = Array.from(store.entries()).sort(function(a, b) { return a[1].lastAccess - b[1].lastAccess; });
+  var toRemove = entries.length - MAX;
+  for (var i = 0; i < toRemove; i++) store.delete(entries[i][0]);
+}
+
+async function cacheWarmup() {
+  try {
+    var content = require('../database/content');
+    var specs = await content.getSpecs();
     if (!specs || !specs.length) return;
-    var chain = Promise.resolve();
-    specs.forEach(function(sp) {
-      if (!sp || !sp.id) return;
-      chain = chain.then(function() { return content.getYears(sp.id); }).then(function(years) {
-        if (!years) return;
-        var chain2 = Promise.resolve();
-        years.forEach(function(yr) {
-          if (!yr || !yr.id) return;
-          chain2 = chain2.then(function() { return content.getSemesters(yr.id); }).then(function(sems) {
-            if (!sems) return;
-            var chain3 = Promise.resolve();
-            sems.forEach(function(sm) {
-              if (!sm || !sm.id) return;
-              chain3 = chain3.then(function() { return content.getSubjects(sm.id); }).then(function(subs) {
-                if (!subs) return;
-                var chain4 = Promise.resolve();
-                subs.forEach(function(sb) {
-                  if (sb && sb.id) chain4 = chain4.then(function() { return content.getCategories(sb.id).catch(function(){}); });
-                });
-                return chain4;
-              }).catch(function(){});
-            });
-            return chain3;
-          }).catch(function(){});
-        });
-        return chain2;
-      }).catch(function(){});
-    });
-    return chain;
-  }).catch(function(){});
+    for (var si = 0; si < specs.length; si++) {
+      var sp = specs[si];
+      if (!sp || !sp.id) continue;
+      try {
+        var years = await content.getYears(sp.id);
+        if (!years) continue;
+        for (var yi = 0; yi < years.length; yi++) {
+          var yr = years[yi];
+          if (!yr || !yr.id) continue;
+          try {
+            var sems = await content.getSemesters(yr.id);
+            if (!sems) continue;
+            for (var smi = 0; smi < sems.length; smi++) {
+              var sm = sems[smi];
+              if (!sm || !sm.id) continue;
+              try {
+                var subs = await content.getSubjects(sm.id);
+                if (!subs) continue;
+                for (var sbi = 0; sbi < subs.length; sbi++) {
+                  var sb = subs[sbi];
+                  if (sb && sb.id) try { await content.getCategories(sb.id); } catch(_) {}
+                }
+              } catch(_) {}
+            }
+          } catch(_) {}
+        }
+      } catch(_) {}
+    }
+    _evictLRU();
+  } catch(_) {}
 }
 
 function cacheStats() { return { size: store.size }; }
