@@ -1,9 +1,12 @@
-const { escMd, buildPath, eos } = require('../utils/helpers');
+'use strict';
+const escMd = t => (t || '').replace(/[*_`\[\]()~>#+=|{}.!\-]/g, '\\$&');
 const { build, btn } = require('../utils/keyboard');
+const { eos } = require('../utils/helpers');
 const interactions = require('../database/interactions');
 const usersDb = require('../database/users');
 const content = require('../database/content');
 const { cacheGet, cacheSet } = require('../utils/cache');
+var safeInt = function(v) { var n = parseInt(v); return isNaN(v) ? 0 : n; };
 
 async function startHandler(ctx) {
   var uid = ctx.uid;
@@ -11,7 +14,6 @@ async function startHandler(ctx) {
   var rawText = ctx.message ? ctx.message.text || '' : '';
   var payload = rawText.includes(' ') ? rawText.split(' ')[1] : ctx.startPayload || null;
   if (payload && payload.startsWith('file_')) {
-    var safeInt = function(v) { var n = parseInt(v); return isNaN(n) ? 0 : n; };
     var fid = safeInt(payload.replace('file_', ''));
     if (fid > 0) {
       var filesDb = require('../database/files');
@@ -24,7 +26,7 @@ async function startHandler(ctx) {
           else await ctx.replyWithDocument(f.file_id, { caption: cap });
           interactions.addHistory(uid, fid).catch(function(){});
           filesDb.incDownloads(fid).catch(function(){});
-        } catch(e) { await ctx.reply('❌ تعذر إرسال الملف'); }
+        } catch (e) { await ctx.reply('❌ تعذر إرسال الملف'); }
       }
     }
   }
