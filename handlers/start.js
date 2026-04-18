@@ -1,69 +1,66 @@
-.replace(/[*_`\[\]()~>#+=|{}.!\-]/g, '\\$&');
+const { escMd, buildPath, eos } = require('../utils/helpers');
 const { build, btn } = require('../utils/keyboard');
-const { eos } = require('../utils/helpers');
 const interactions = require('../database/interactions');
 const usersDb = require('../database/users');
 const content = require('../database/content');
 const { cacheGet, cacheSet } = require('../utils/cache');
 
 async function startHandler(ctx) {
-  const uid = ctx.uid;
-  const name = ctx.from?.first_name || 'Student';
-  const rawText = ctx.message?.text || '';
-  const payload = rawText.includes(' ') ? rawText.split(' ')[1] : ctx.startPayload || null;
-  if(payload && payload.startsWith('file_')) {
-    const fid = payload.replace('file_', '');
-    const filesDb = require('../database/files');
-    const f = await filesDb.getFile(fid);
-    if(f) {
-      const cap = '📄 ' + f.title + (f.description ? '\n📝 ' + f.description : '') + '\n📁 ' + f.cat_name + ' | 📖 ' + f.sub_name;
-      try {
-        if(f.file_type === 'photo') await ctx.replyWithPhoto(f.file_id, {caption:cap});
-        else if(f.file_type === 'link') await ctx.reply(cap + '\n\n🔗 ' + f.file_id, {});
-        else await ctx.replyWithDocument(f.file_id, {caption:cap});
-        interactions.addHistory(uid, fid).catch(()=>{});
-        filesDb.incDownloads(fid).catch(()=>{});
-      } catch(e) { console.error('START FILE ERROR:', e.message); await ctx.reply('❌ تعذر إرسال الملف: ' + e.message); }
-    } else { await ctx.reply('❌ الملف غير موجود.'); }
+  var uid = ctx.uid;
+  var name = ctx.from ? ctx.from.first_name || 'Student' : 'Student';
+  var rawText = ctx.message ? ctx.message.text || '' : '';
+  var payload = rawText.includes(' ') ? rawText.split(' ')[1] : ctx.startPayload || null;
+  if (payload && payload.startsWith('file_')) {
+    var safeInt = function(v) { var n = parseInt(v); return isNaN(n) ? 0 : n; };
+    var fid = safeInt(payload.replace('file_', ''));
+    if (fid > 0) {
+      var filesDb = require('../database/files');
+      var f = await filesDb.getFile(fid);
+      if (f) {
+        var cap = '📄 ' + f.title + (f.description ? '\n📝 ' + f.description : '') + '\n📁 ' + f.cat_name + ' | 📖 ' + f.sub_name;
+        try {
+          if (f.file_type === 'photo') await ctx.replyWithPhoto(f.file_id, { caption: cap });
+          else if (f.file_type === 'link') await ctx.reply(cap + '\n\n🔗 ' + f.file_id);
+          else await ctx.replyWithDocument(f.file_id, { caption: cap });
+          interactions.addHistory(uid, fid).catch(function(){});
+          filesDb.incDownloads(fid).catch(function(){});
+        } catch(e) { await ctx.reply('❌ تعذر إرسال الملف'); }
+      }
+    }
   }
-  const hasSp = await usersDb.getSpecialty(uid);
+  var hasSp = await usersDb.getSpecialty(uid);
   if (!hasSp) return askSpecialty(ctx, name);
   return showMainMenu(ctx, name);
 }
 
 async function askSpecialty(ctx, name) {
-  const specs = await content.getSpecs();
+  var specs = await content.getSpecs();
   if (!specs.length) return showMainMenu(ctx, name);
-  const rows = specs.map(s => [btn('🎓 ' + s.name, 'set_sp_' + s.id)]);
+  var rows = specs.map(function(s) { return [btn('🎓 ' + s.name, 'set_sp_' + s.id)]; });
   rows.push([btn('⏭ تخطي لأختار لاحقاً', 'skip_sp')]);
-  return eos(ctx,
-    '👋 *أهلاً ' + name + '!*\n\n📚 منصتك الأكاديمية على تيليغرام\n━━━━━━━━━━━━━━━━\n🎓 *اختر تخصصك للبدء:*',
-    { parse_mode: 'Markdown', ...build(rows) }
-  );
+  return eos(ctx, '👋 *أهلاً ' + name + '!*\n\n📚 منصتك الأكاديمية على تيليغرام\n━━━━━━━━━━━━━━━━\n🎓 *اختر تخصصك للبدء:*', { parse_mode: 'Markdown', ...build(rows) });
 }
 
 async function showMainMenu(ctx, name) {
-  const uid = ctx.uid;
-  if (!name) name = ctx.from?.first_name || 'Student';
-  const menuKey = 'menu_data_' + uid;
-  let menuData = cacheGet(menuKey);
+  var uid = ctx.uid;
+  if (!name) name = ctx.from ? ctx.from.first_name || 'Student' : 'Student';
+  var menuKey = 'menu_data_' + uid;
+  var menuData = cacheGet(menuKey);
   if (!menuData) {
-    const [last, spRow] = await Promise.all([
-      interactions.getLastFile(uid),
-      usersDb.getSpecialty(uid)
-    ]);
-    const _spId = spRow?.specialty_id;
-    const sp = _spId && _spId != 0 ? await content.getSpec(_spId) : null;
-    menuData = { last, spRow, sp };
+    var results = await Promise.all([interactions.getLastFile(uid), usersDb.getSpecialty(uid)]);
+    var last = results[0], spRow = results[1];
+    var _spId = spRow ? spRow.specialty_id : null;
+    var sp = _spId && _spId != 0 ? await content.getSpec(_spId) : null;
+    menuData = { last: last, sp: sp };
     cacheSet(menuKey, menuData, 60000);
   }
-  const { last, sp } = menuData;
-  const hour = new Date().getHours();
-  const timeGreet = hour < 12 ? '🌅 صباح النور' : hour < 17 ? '☀️ مساء الخير' : '🌙 مساء الخير';
-  let welcome = timeGreet + '، *' + name + '!*\n';
+  var last = menuData.last, sp = menuData.sp;
+  var hour = new Date().getHours();
+  var timeGreet = hour < 12 ? '🌅 صباح النور' : hour < 17 ? '☀️ مساء الخير' : '🌙 مساء الخير';
+  var welcome = timeGreet + '، *' + name + '!*\n';
   if (sp) welcome += '🎓 *' + escMd(sp.name) + '*\n';
   welcome += '━━━━━━━━━━━━━━━━\n📚 منصتك الأكاديمية — اختر ما تريد:';
-  const rows = [
+  var rows = [
     [btn('📚 تصفح المحتوى', 'browse')],
     [btn('🔍 بحث سريع', 'search_prompt'), btn('🆕 أحدث الملفات', 'latest')],
     [btn('⭐ مفضلاتي', 'favorites'), btn('📂 آخر ما شاهدت', 'history')],
@@ -71,15 +68,16 @@ async function showMainMenu(ctx, name) {
     [btn('👤 ملفي', 'profile'), btn('📊 إحصائيات', 'stats')],
     [btn(sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', 'change_sp')],
   ];
-  if (last?.title) rows.push([btn('▶️ استكمال: ' + last.title.substring(0, 25), 'preview_' + last.id + '_0_0_0_0_0')]);
+  if (last && last.title) rows.push([btn('▶️ استكمال: ' + last.title.substring(0, 25), 'preview_' + last.id + '_0_0_0_0_0')]);
   if (ctx.isAdmin) rows.push([btn('🛠 لوحة الإدارة', 'mg_menu')]);
   return eos(ctx, welcome, { parse_mode: 'Markdown', ...build(rows) });
 }
 
-startHandler.clearAiMode = async (uid) => {
-  const state = global.userStates?.[uid];
-  if(state?.type === 'ai_mode') await global.delState(uid);
+startHandler.clearAiMode = async function(uid) {
+  var state = global.userStates && global.userStates[uid];
+  if (state && state.type === 'ai_mode') await global.delState(uid);
 };
+
 module.exports = startHandler;
 module.exports.showMainMenu = showMainMenu;
 module.exports.askSpecialty = askSpecialty;
