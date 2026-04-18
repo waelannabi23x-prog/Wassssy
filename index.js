@@ -49,51 +49,23 @@ async function loadMaintenance() {
 
 async function loadStates() {
   try {
-    const rows = await dbAll('SELECT user_id, state FROM user_states');
-    for (const r of rows) try { global.userStates[r.user_id] = JSON.parse(r.state); } catch {}
+    const { loadAllStates } = require('./utils/redis');
+    await loadAllStates();
   } catch(e) {}
 }
 
-// ── State Persistence (Enterprise Multi-Row Batching) ──
-const _stateDirty = new Set();
-let _stateTimer = null;
+// ── State Persistence (Redis + Memory + DB Fallback) ──
+const { setState: redisSetState, delState: redisDelState } = require('./utils/redis');
 
-function _scheduleStateFlush() {
-  if (_stateTimer) return;
-  _stateTimer = setTimeout(async () => {
-    _stateTimer = null;
-    if (!_stateDirty.size) return;
-    const uids = [..._stateDirty];
-    _stateDirty.clear();
-    
-    const toUpsert = [], toDelete = [];
-    for (const uid of uids) {
-      const state = global.userStates[uid];
-      if (state) toUpsert.push([uid, JSON.stringify(state)]);
-      else toDelete.push(uid);
-    }
-    
-    try {
-      // 🛡️ حذف الآخرين باستعلام واحد
-      if (toDelete.length) {
-        const ph = toDelete.map((_, i) => `$${i + 1}`).join(',');
-        await dbRun(`DELETE FROM user_states WHERE user_id IN (${ph})`, toDelete);
-      }
-      // 🛡️ إدخال/تحديث الكل باستعلام واحد (PostgreSQL Multi-row)
-      if (toUpsert.length) {
-        const ph = toUpsert.map((_, i) => `($${i*2+1}, $${i*2+2}, CURRENT_TIMESTAMP)`).join(',');
-        await dbRun(
-          `INSERT INTO user_states(user_id, state, updated_at) VALUES ${ph} 
-           ON CONFLICT(user_id) DO UPDATE SET state=EXCLUDED.state, updated_at=CURRENT_TIMESTAMP`,
-          toUpsert.flat()
-        );
-      }
-    } catch(e) {}
-  }, 2000);
-}
+global.setState = async (uid, state) => {
+  global.userStates[uid] = state;
+  await redisSetState(uid, state);
+};
 
-global.setState = (uid, state) => { global.userStates[uid] = state; _stateDirty.add(uid); _scheduleStateFlush(); };
-global.delState = (uid) => { delete global.userStates[uid]; _stateDirty.add(uid); _scheduleStateFlush(); };
+global.delState = async (uid) => {
+  delete global.userStates[uid];
+  await redisDelState(uid);
+};
 
 // ── Group Members Smart Buffering (تخفيف الضغط عن DB بنسبة 99%) ──
 const _grpMemBuffer = new Map();
