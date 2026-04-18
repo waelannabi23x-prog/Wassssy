@@ -419,6 +419,7 @@ bot.on('text', async ctx => {
   if (!state) return;
 
   if (state.type === 'ai_mode' && ctx.chat?.type === 'private') {
+    if (ctx.message.text.length > 1000) return ctx.reply('⚠️ الرسالة طويلة جداً.');
     if(ctx.isOwner && await handleOwnerAI(ctx, ctx.message.text.trim(), null, null)) return;
     if(await handleAiChat(ctx, ctx.message.text.trim())) return;
   }

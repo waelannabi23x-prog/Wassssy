@@ -2,38 +2,41 @@ const fs = require('fs');
 const path = require('path');
 
 const ERR_LOG = path.join(__dirname, '../logs/err.log');
-const OUT_LOG = path.join(__dirname, '../logs/out.log');
-const MAX_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_SIZE = 5 * 1024 * 1024;
 
-function timestamp() {
-  return new Date().toISOString().replace('T', ' ').substring(0, 19);
-}
-
-async function rotate(file) {
+let lastRotate = 0;
+function maybeRotate(file) {
+  const now = Date.now();
+  if (now - lastRotate < 60000) return;
+  lastRotate = now;
   try {
-      try {
-        await fs.promises.access(file);
-        const stats = await fs.promises.stat(file);
-        if (stats.size > MAX_SIZE) {
-          await fs.promises.rename(file, file + '.bak');
-        }
-      } catch (e) {
-        // file might not exist, ignore
-      }
+    fs.access(file, (err) => {
+      if (err) return;
+      fs.stat(file, (err, stats) => {
+        if (err || stats.size <= MAX_SIZE) return;
+        fs.rename(file, file + '.bak', () => {});
+      });
+    });
   } catch(e) {}
 }
 
+function ts() {
+  return new Date().toISOString().replace('T', ' ').substring(0, 19);
+}
+
 function write(file, level, args) {
-  rotate(file);
-  const line = `[${timestamp()}] [${level}] ${args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ')}\n`;
+  maybeRotate(file);
+  const line = '[' + ts() + '] [' + level + '] ' + args.map(a => typeof a === 'object' ? JSON.stringify(a) : a).join(' ') + '\n';
   fs.appendFile(file, line, () => {});
 }
 
+const isProd = process.env.NODE_ENV === 'production';
+
 const logger = {
-  info:  (...args) => { console.log(...args);   write(OUT_LOG, 'INFO',  args); },
-  warn:  (...args) => { console.warn(...args);  write(OUT_LOG, 'WARN',  args); },
+  info:  (...args) => { if (!isProd) console.log(...args); write(ERR_LOG, 'INFO',  args); },
+  warn:  (...args) => { console.warn(...args);  write(ERR_LOG, 'WARN',  args); },
   error: (...args) => { console.error(...args); write(ERR_LOG, 'ERROR', args); },
-  db:    (...args) => { write(OUT_LOG, 'DB', args); },
+  db:    (...args) => { write(ERR_LOG, 'DB', args); },
 };
 
 module.exports = logger;

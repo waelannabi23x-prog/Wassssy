@@ -1,3 +1,4 @@
+const { cacheGet, cacheSet } = require('./cache');
 const langs = new Map();
 
 const messages = {
@@ -13,8 +14,14 @@ const messages = {
   }
 };
 
-function getLang(uid) { return langs.get(uid) || 'ar'; }
-function setLang(uid, lang) { langs.set(uid, lang); }
+function getLang(uid) {
+  const c = cacheGet('lang_'+uid);
+  return c || 'ar';
+}
+function setLang(uid, lang) {
+  langs.set(uid, lang);
+  cacheSet('lang_'+uid, lang, 86400000);
+}
 function t(uid, key) {
   const lang = getLang(uid);
   return (messages[lang] || messages.ar)[key] || key;

@@ -78,17 +78,8 @@ function getSqlite() {
 
 const pgSqlCache = new Map();
 const pgPrepared = new Map();
-let _prepIdx = 0;
 let cacheSize = 0;
 
-async function getPrepared(pg, sql) {
-  const converted = toPgCached(sql);
-  if(pgPrepared.has(converted)) return pgPrepared.get(converted);
-  const name = 'stmt_'+(++_prepIdx);
-  try { await pg.query({ name, text: converted }); } catch(e) {}
-  pgPrepared.set(converted, name);
-  return name;
-}
 function toPgCached(sql) {
   if(pgSqlCache.has(sql)) {
     const val = pgSqlCache.get(sql);

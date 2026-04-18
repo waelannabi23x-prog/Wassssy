@@ -33,7 +33,7 @@ const addFile = async (catId,title,desc,fileId,fileType,uploadedBy,extra='') => 
   await run('INSERT INTO files(category_id,title,description,file_id,file_type,uploaded_by) VALUES($1,$2,$3,$4,$5,$6)',[catId,title,desc,fileId,fileType,uploadedBy]);
   invalidateFilesCache(catId);
   const newFile = await get(
-    'SELECT f.*,c.name as cat_name,s.name as sub_name,y.specialty_id FROM files f JOIN categories c ON f.category_id=c.id JOIN subjects s ON c.subject_id=s.id JOIN semesters sm ON s.semester_id=sm.id JOIN years y ON sm.year_id=y.id WHERE f.category_id=? AND f.title=? AND f.is_deleted=0 ORDER BY f.id DESC LIMIT 1',
+    'SELECT f.*,c.name as cat_name,s.name as sub_name,y.specialty_id FROM files f JOIN categories c ON f.category_id=c.id JOIN subjects s ON c.subject_id=s.id JOIN semesters sm ON s.semester_id=sm.id JOIN years y ON sm.year_id=y.id WHERE f.category_id=$1 AND f.title=$2 AND f.is_deleted=0 ORDER BY f.id DESC LIMIT 1',
     [catId,title]
   );
   return newFile;
