@@ -68,18 +68,6 @@ app.use(express.json({ limit: '1mb' }));
 app.set('trust proxy', 1);
 
 app.get('/', (_r, res) => res.send('OK'));
-app.get('/health', (_r, res) => {
-  const mu = process.memoryUsage();
-  res.setHeader('Cache-Control', 'no-store');
-  res.json({
-    status: 'ok',
-    uptime: Math.floor(process.uptime()),
-    heap: Math.round(mu.heapUsed / 1048576) + 'MB',
-    rss: Math.round(mu.rss / 1048576) + 'MB',
-    region: process.env.RAILWAY_REGION || 'local',
-    ts: Date.now(),
-  });
-});
 
 
 global.setState = (u, v) => StateMgr.set(u, v);
