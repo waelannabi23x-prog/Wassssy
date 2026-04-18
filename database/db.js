@@ -3,7 +3,6 @@ const path = require('path');
 const DB_PATH = path.join(__dirname, '..', 'study_bot.db');
 const logger = require('../utils/logger');
 
-// معقم Parameters: يحول '123' لـ 123 عشان PG BIGINT ما يرفضها
 function sanitizeParams(params) {
   for (var i = 0; i < params.length; i++) {
     if (typeof params[i] === 'string' && /^\d+$/.test(params[i])) {
@@ -11,6 +10,13 @@ function sanitizeParams(params) {
     }
   }
   return params;
+}
+
+function forceNum(params) {
+  return params.map(function(p) {
+    if (typeof p === 'string') { var n = parseInt(p); return isNaN(n) ? 0 : n; }
+    return p;
+  });
 }
 
 let pgPool = null;
@@ -43,10 +49,8 @@ function scheduleSave() {
   dirty = true;
   if (saveTimer) return;
   saveTimer = setTimeout(function() {
-    saveTimer = null;
-    if (!dirty) return;
-    dirty = false;
-    try { fs.writeFile(DB_PATH, Buffer.from(sqlJs.export()), function(err) { if (err) logger.error('Save:', err.message); }); } catch (e) { logger.error('Save:', e.message); }
+    saveTimer = null; if (!dirty) return; dirty = false;
+    try { fs.writeFile(DB_PATH, Buffer.from(sqlJs.export()), function(err) { if (err) logger.error('Save:', err.message); }); } catch (e) {}
   }, 500);
   if (saveTimer.unref) saveTimer.unref();
 }
@@ -55,7 +59,7 @@ function saveDB() {
   if (saveTimer) { clearTimeout(saveTimer); saveTimer = null; }
   dirty = false;
   if (sqliteDb) { try { sqliteDb.pragma('journal_mode = WAL'); } catch(_) {} return; }
-  if (sqlJs) try { fs.writeFile(DB_PATH, Buffer.from(sqlJs.export()), function(err) { if (err) logger.error('SaveDB:', err.message); }); } catch (e) { logger.error('SaveDB:', e.message); }
+  if (sqlJs) try { fs.writeFile(DB_PATH, Buffer.from(sqlJs.export()), function(err) { if (err) logger.error('SaveDB:', err.message); }); } catch (e) {}
 }
 
 function getSqlite() {
@@ -135,14 +139,24 @@ async function withRetry(fn, label) {
   }
 }
 
+function pgQuery(sql, params) {
+  var sp = sanitizeParams(params.slice());
+  return pgPool.query(toPgCached(sql), sp).catch(function(e) {
+    if (e.message && e.message.includes('invalid input syntax for type bigint')) {
+      return pgPool.query(toPgCached(sql), forceNum(params));
+    }
+    throw e;
+  });
+}
+
 async function all(sql, params) {
   params = params || [];
   var pg = getPg();
   if (pg) {
     return withRetry(function() {
-      return pg.query(toPgCached(sql), sanitizeParams(params)).then(function(r) { return r.rows; });
+      return pgQuery(sql, params).then(function(r) { return r.rows; });
     }, 'all').catch(function(e) {
-      logger.error('DB all:', e.message.substring(0, 100));
+      logger.error('DB all:', e.message.substring(0, 80));
       return [];
     });
   }
@@ -154,7 +168,7 @@ async function all(sql, params) {
       var rows = []; while (stmt.step()) rows.push(stmt.getAsObject()); stmt.free();
       return rows;
     }
-  } catch (e) { logger.error('DB all:', e.message.substring(0, 100)); return []; }
+  } catch (e) { return []; }
   return [];
 }
 
@@ -167,9 +181,9 @@ async function run(sql, params) {
   var pg = getPg();
   if (pg) {
     return withRetry(function() {
-      return pg.query(toPgCached(sql), sanitizeParams(params));
+      return pgQuery(sql, params);
     }, 'run').catch(function(e) {
-      logger.error('DB run:', e.message.substring(0, 100));
+      logger.error('DB run:', e.message.substring(0, 80));
       throw e;
     });
   }
@@ -177,7 +191,7 @@ async function run(sql, params) {
     var db = getSqlite();
     if (db) { db.prepare(toSqlite(sql)).run.apply(db, params); return; }
     if (sqlJs) { sqlJs.run(toSqlite(sql), params); scheduleSave(); }
-  } catch (e) { logger.error('DB run:', e.message.substring(0, 100)); throw e; }
+  } catch (e) { throw e; }
 }
 
 async function initSchema() {
@@ -241,7 +255,6 @@ async function initSchema() {
     "CREATE INDEX IF NOT EXISTS idx_files_downloads ON files(downloads DESC)",
     "CREATE INDEX IF NOT EXISTS idx_files_uploaded ON files(uploaded_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_history_user ON history(user_id)",
-    "CREATE INDEX IF NOT EXISTS idx_history_file ON history(file_id)",
     "CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id)",
     "CREATE INDEX IF NOT EXISTS idx_users_active ON users(last_active)",
     "CREATE INDEX IF NOT EXISTS idx_ratings_file ON ratings(file_id)",
@@ -264,7 +277,6 @@ async function initSchema() {
 
   if (!pg && !getSqlite() && sqlJs) saveDB();
 
-  // Timestamp columns fix for PG
   if (pg) {
     var tsCols = [
       ["users","joined_at"],["users","last_active"],["admins","added_at"],
