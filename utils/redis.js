@@ -6,17 +6,15 @@ let client = null;
 function getRedis() {
   if (client) return client;
   const url = process.env.REDIS_URL;
-  if (!url) {
-    logger.warn('⚠️ No REDIS_URL, using memory fallback');
-    return null;
-  }
+  if (!url) return null;
   try {
     client = new Redis(url, {
       maxRetriesPerRequest: 3,
       retryStrategy(times) {
-        const delay = Math.min(times * 200, 2000);
+        const delay = Math.min(times * 500, 3000);
         return delay;
       },
+      tls: {},
       lazyConnect: true,
     });
 
@@ -36,9 +34,6 @@ function getRedis() {
   }
 }
 
-// ═══════════════════════════════════════════════════════
-// 🛡️ State Manager (Redis + Memory Fallback)
-// ═══════════════════════════════════════════════════════
 const memoryStates = new Map();
 
 async function getState(uid) {
@@ -72,7 +67,6 @@ async function delState(uid) {
   _scheduleFlush(uid, null);
 }
 
-// DB Flush (نفس النظام القديم لكن مع Redis)
 const _dirty = new Set();
 let _timer = null;
 
@@ -87,8 +81,8 @@ function _scheduleFlush(uid, state) {
 
     const toUpsert = [], toDelete = [];
     for (const uid of uids) {
-      const state = memoryStates.get(uid);
-      if (state) toUpsert.push([uid, JSON.stringify(state)]);
+      const s = memoryStates.get(uid);
+      if (s) toUpsert.push([uid, JSON.stringify(s)]);
       else toDelete.push(uid);
     }
 
@@ -115,41 +109,10 @@ async function loadAllStates() {
     const { all } = require('../database/db');
     const rows = await all('SELECT user_id, state FROM user_states');
     for (const r of rows) {
-      try {
-        const parsed = JSON.parse(r.state);
-        memoryStates.set(r.user_id, parsed);
-      } catch (e) {}
+      try { memoryStates.set(r.user_id, JSON.parse(r.state)); } catch (e) {}
     }
     logger.info('✅ Loaded ' + memoryStates.size + ' states from DB');
   } catch (e) {}
 }
 
-// ═══════════════════════════════════════════════════════
-// 🛡️ Generic Cache (Redis + Memory Fallback)
-// ═══════════════════════════════════════════════════════
-async function rcGet(key) {
-  const r = getRedis();
-  if (r) {
-    try {
-      const data = await r.get('c_' + key);
-      if (data) return JSON.parse(data);
-    } catch (e) {}
-  }
-  return null;
-}
-
-async function rcSet(key, val, ttl = 300) {
-  const r = getRedis();
-  if (r) {
-    try { await r.set('c_' + key, JSON.stringify(val), 'EX', ttl); } catch (e) {}
-  }
-}
-
-async function rcDel(key) {
-  const r = getRedis();
-  if (r) {
-    try { await r.del('c_' + key); } catch (e) {}
-  }
-}
-
-module.exports = { getRedis, getState, setState, delState, loadAllStates, rcGet, rcSet, rcDel };
+module.exports = { getRedis, getState, setState, delState, loadAllStates };

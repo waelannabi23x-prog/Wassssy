@@ -71,3 +71,10 @@
 [2026-04-17 13:43:01] [ERROR] Table error: Connection terminated due to connection timeout
 [2026-04-17 13:43:06] [ERROR] Table error: Connection terminated due to connection timeout
 [2026-04-17 13:43:11] [ERROR] Table error: Connection terminated due to connection timeout
+[2026-04-18 07:54:37] [INFO] ✅ Redis ready
+[2026-04-18 07:54:37] [INFO] ✅ Redis connected
+[2026-04-18 07:54:37] [INFO] ✅ Redis connected
+[2026-04-18 07:54:38] [INFO] ✅ Redis connected
+[2026-04-18 07:54:39] [INFO] ✅ Redis connected
+[2026-04-18 07:55:41] [INFO] ✅ Redis ready
+[2026-04-18 07:55:41] [INFO] ✅ Redis connected
