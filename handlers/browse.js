@@ -365,7 +365,7 @@ async function sendFile(ctx,fid,spId,yrId,smId,sbId,catId) {
     }
   } catch(e){ctx.reply('❌ تعذر إرسال الملف. حاول مجدداً.');}
 }
-async function showBundle(ctx,bundleId,spId,yrId,smId,sbId,catId) {
+async function showBundle(ctx,bundleId,spId,yrId,smId,sbId,catId){
   const bkey='bundle_full_'+bundleId;
   const bcached=cacheGet(bkey);
   const [b, files] = bcached
@@ -373,9 +373,12 @@ async function showBundle(ctx,bundleId,spId,yrId,smId,sbId,catId) {
     : await Promise.all([bundlesDb.getBundle(bundleId), bundlesDb.getBundleFiles(bundleId)]);
   if(!bcached && b) cacheSet(bkey,{b,files},600000);
   if(!b) return ctx.reply('الحزمة غير موجودة');
+  const typeIcons = {photo:'🖼️',document:'📄',video:'🎥',audio:'🎵',voice:'🎤',link:'🔗'};
+  const typeCounts = {};
+  files.forEach(f => { typeCounts[f.real_type] = (typeCounts[f.real_type]||0)+1; });
+  const typeStr = Object.entries(typeCounts).map(([t,c]) => (typeIcons[t]||'📄')+' '+c).join(' | ');
   const text = '📦 *'+escMd(b.title)+'*'+(b.description?'\n📝 '+escMd(b.description):'')+
-    '\n\n📄 *'+files.length+' ملف*\n'+files.map((f,i)=>(i+1)+'. '+escMd(f.title||f.file_title||'')).join('\n')+
-    '\n\n⬇️ تحميل: *'+b.downloads+'*';
+    '\n\n📁 *'+files.length+' ملف*\n'+typeStr+'\n\n⬇️ تحميل: *'+b.downloads+'*';
   const backCb = catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
   const rows = [[btn('⬇️ تحميل الكل','bdl_'+bundleId+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)]];
   if(ctx.isAdmin) rows.push([btn('✏️ تعديل','mg_rn_bundle_'+bundleId+'_'+catId+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId),btn('🗑 حذف','mg_dl_bundle_'+bundleId+'_'+catId+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId)]);
@@ -383,7 +386,7 @@ async function showBundle(ctx,bundleId,spId,yrId,smId,sbId,catId) {
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
 
-async function sendBundle(ctx,bundleId,spId,yrId,smId,sbId,catId) {
+async function sendBundle(ctx,bundleId,spId,yrId,smId,sbId,catId){
   const bkey='bundle_full_'+bundleId;
   const bcached=cacheGet(bkey);
   const [b, files] = bcached
@@ -393,12 +396,30 @@ async function sendBundle(ctx,bundleId,spId,yrId,smId,sbId,catId) {
   if(!files.length) return ctx.reply('الحزمة فارغة');
   bundlesDb.incBundleDownloads(bundleId).catch(()=>{});
   await ctx.reply('📦 *'+escMd(b.title)+'* — جاري الإرسال...',{parse_mode:'Markdown'});
-  const mediaGroup = files.filter(f=>f.real_type!=='link').map(f=>({type:f.real_type==='photo'?'photo':'document',media:f.file_id,caption:f.file_title||f.title||''}));
-  if(mediaGroup.length) await ctx.replyWithMediaGroup(mediaGroup).catch(()=>{});
-  const links = files.filter(f=>f.real_type==='link');
-  if(links.length) await ctx.reply(links.map(f=>(f.file_title||f.title)+': '+f.file_id).join('\n'));
-  const backCb = catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
+  const photos=files.filter(f=>f.real_type==='photo');
+  const docs=files.filter(f=>f.real_type==='document');
+  const videos=files.filter(f=>f.real_type==='video');
+  const audios=files.filter(f=>f.real_type==='audio'||f.real_type==='voice');
+  const links=files.filter(f=>f.real_type==='link');
+  if(photos.length){
+    try {
+      await ctx.replyWithMediaGroup(photos.map(f=>({type:'photo',media:f.file_id,caption:f.file_title||f.title||''})));
+    } catch(e) {
+      for(const f of photos) await ctx.replyWithPhoto(f.file_id,{caption:f.file_title||''}).catch(()=>{});
+    }
+  }
+  for(const v of videos) await ctx.replyWithVideo(v.file_id,{caption:v.file_title||''}).catch(()=>{});
+  for(const d of docs) await ctx.replyWithDocument(d.file_id,{caption:d.file_title||''}).catch(()=>{});
+  for(const a of audios){
+    if(a.real_type==='voice') await ctx.replyWithVoice(a.file_id).catch(()=>{});
+    else await ctx.replyWithAudio(a.file_id,{caption:a.file_title||''}).catch(()=>{});
+  }
+  if(links.length){
+    let linkMsg='🔗 *الروابط:*\n\n';
+    links.forEach((l,i)=>{ linkMsg+=(i+1)+'. '+(l.file_title||l.title||'')+'\n'+l.file_id+'\n\n'; });
+    await ctx.reply(linkMsg,{parse_mode:'Markdown'});
+  }
+  const backCb=catId!=='0'?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
   await ctx.reply('✅ اكتمل الإرسال!',{...build([[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]])});
 }
-
 module.exports={showSpecs,showYears,showSemesters,showSubjects,showCategories,showFiles,showPreview,showReportMenu,doReport,sendFile,showBundle,sendBundle,showComments};
