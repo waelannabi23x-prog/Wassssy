@@ -1,7 +1,10 @@
+'use strict';
+
 const Redis = require('ioredis');
 const logger = require('./logger');
 
 let client = null;
+const _memStates = new Map();
 
 function getRedis() {
   if (client) return client;
@@ -10,97 +13,47 @@ function getRedis() {
   try {
     client = new Redis(url, {
       maxRetriesPerRequest: 3,
-      retryStrategy(times) {
-        const delay = Math.min(times * 500, 3000);
-        return delay;
-      },
+      retryStrategy(t) { return Math.min(t * 500, 3000); },
       tls: {},
       lazyConnect: true,
     });
-
-    client.on('error', (err) => {
-      if (err.message?.includes('ECONNREFUSED') || err.message?.includes('getaddrinfo')) {
-        logger.error('Redis connection lost:', err.message);
-      }
-    });
-
+    client.on('error', e => { if (e.message?.includes('ECONNREFUSED') || e.message?.includes('getaddrinfo')) logger.error('Redis:', e.message); });
     client.on('connect', () => logger.info('✅ Redis connected'));
-
-    logger.info('✅ Redis ready');
     return client;
-  } catch (e) {
-    logger.error('Redis init failed:', e.message);
-    return null;
-  }
-}
-
-const memoryStates = new Map();
-
-async function getState(uid) {
-  const r = getRedis();
-  if (r) {
-    try {
-      const data = await r.get('state_' + uid);
-      if (data) return JSON.parse(data);
-    } catch (e) {}
-  }
-  return memoryStates.get(uid) || null;
+  } catch (e) { logger.error('Redis init:', e.message); return null; }
 }
 
 async function setState(uid, state) {
-  memoryStates.set(uid, state);
+  _memStates.set(uid, state);
   const r = getRedis();
-  if (r) {
-    try {
-      await r.set('state_' + uid, JSON.stringify(state), 'EX', 3600);
-    } catch (e) {}
-  }
-  _scheduleFlush(uid, state);
+  if (r) try { await r.set('state_' + uid, JSON.stringify(state), 'EX', 3600); } catch (_) {}
+  scheduleFlush();
 }
 
 async function delState(uid) {
-  memoryStates.delete(uid);
+  _memStates.delete(uid);
   const r = getRedis();
-  if (r) {
-    try { await r.del('state_' + uid); } catch (e) {}
-  }
-  _scheduleFlush(uid, null);
+  if (r) try { await r.del('state_' + uid); } catch (_) {}
+  scheduleFlush();
 }
 
 const _dirty = new Set();
-let _timer = null;
+let _flushT = null;
 
-function _scheduleFlush(uid, state) {
-  _dirty.add(uid);
-  if (_timer) return;
-  _timer = setTimeout(async () => {
-    _timer = null;
+function scheduleFlush() {
+  if (_flushT) return;
+  _flushT = setTimeout(async () => {
+    _flushT = null;
     if (!_dirty.size) return;
-    const uids = [..._dirty];
+    const snap = new Set(_dirty);
     _dirty.clear();
-
-    const toUpsert = [], toDelete = [];
-    for (const uid of uids) {
-      const s = memoryStates.get(uid);
-      if (s) toUpsert.push([uid, JSON.stringify(s)]);
-      else toDelete.push(uid);
-    }
-
     try {
       const { run } = require('../database/db');
-      if (toDelete.length) {
-        const ph = toDelete.map((_, i) => '$' + (i + 1)).join(',');
-        await run('DELETE FROM user_states WHERE user_id IN (' + ph + ')', toDelete);
-      }
-      if (toUpsert.length) {
-        const ph = toUpsert.map((_, i) => '($' + (i*2+1) + ', $' + (i*2+2) + ', CURRENT_TIMESTAMP)').join(',');
-        await run(
-          'INSERT INTO user_states(user_id, state, updated_at) VALUES ' + ph +
-          ' ON CONFLICT(user_id) DO UPDATE SET state=EXCLUDED.state, updated_at=CURRENT_TIMESTAMP',
-          toUpsert.flat()
-        );
-      }
-    } catch (e) {}
+      const del = [], up = [];
+      for (const uid of snap) { const s = _memStates.get(uid); if (s) up.push([uid, JSON.stringify(s)]); else del.push(uid); }
+      if (del.length) { const ph = del.map((_, i) => '$' + (i + 1)).join(','); await run('DELETE FROM user_states WHERE user_id IN (' + ph + ')', del); }
+      if (up.length) { const ph = up.map((_, i) => '($' + (i * 2 + 1) + ',$' + (i * 2 + 2) + ',CURRENT_TIMESTAMP)').join(','); await run('INSERT INTO user_states(user_id,state,updated_at) VALUES ' + ph + ' ON CONFLICT(user_id) DO UPDATE SET state=EXCLUDED.state,updated_at=CURRENT_TIMESTAMP', up.flat()); }
+    } catch (_) {}
   }, 2000);
 }
 
@@ -108,11 +61,9 @@ async function loadAllStates() {
   try {
     const { all } = require('../database/db');
     const rows = await all('SELECT user_id, state FROM user_states');
-    for (const r of rows) {
-      try { memoryStates.set(r.user_id, JSON.parse(r.state)); } catch (e) {}
-    }
-    logger.info('✅ Loaded ' + memoryStates.size + ' states from DB');
-  } catch (e) {}
+    for (const r of rows) { try { _memStates.set(r.user_id, JSON.parse(r.state)); } catch (_) {} }
+    logger.info('✅ Loaded ' + _memStates.size + ' states');
+  } catch (_) {}
 }
 
-module.exports = { getRedis, getState, setState, delState, loadAllStates };
+module.exports = { getRedis, setState, delState, loadAllStates };

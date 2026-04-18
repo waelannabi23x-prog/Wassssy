@@ -1,9 +1,10 @@
-const { cacheGet, cacheSet } = require('./cache');
-const messages = {
-  ar: { no_files: '_لا توجد ملفات في هذا القسم._', not_found: '❌ الملف غير موجود.', error: '⚠️ حدث خطأ.' },
-  en: { no_files: '_No files in this section._', not_found: '❌ File not found.', error: '⚠️ An error occurred.' }
+'use strict';
+const _langs = new Map();
+const _dict = {
+  ar: { no_files: 'لا توجد ملفات.', not_found: 'الملف غير موجود.' },
+  en: { no_files: 'No files found.', not_found: 'File not found.' },
 };
-function getLang(uid) { return cacheGet('lang_'+uid) || 'ar'; }
-function setLang(uid, lang) { cacheSet('lang_'+uid, lang, 86400000); }
-function t(uid, key) { const lang = getLang(uid); return (messages[lang] || messages.ar)[key] || key; }
-module.exports = { t, getLang, setLang };
+function getLang(uid) { return _langs.get(uid) || 'ar'; }
+function setLang(uid, lang) { _langs.set(uid, lang === 'en' ? 'en' : 'ar'); }
+function t(uid, key) { const lang = getLang(uid); return _dict[lang]?.[key] || _dict.ar[key] || key; }
+module.exports = { getLang, setLang, t };

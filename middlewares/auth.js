@@ -1,80 +1,64 @@
+'use strict';
+
 const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
 const { get, run } = require('../database/db');
 
 const OWNER_ID = parseInt(process.env.OWNER_ID || '5534474259');
 const isOwner = uid => parseInt(uid) === OWNER_ID;
 
-// ═══════════════════════════════════════════════════════
-// 🛡️ Smart User Buffer (تخفيف الضغط عن DB بنسبة 99%)
-// ═══════════════════════════════════════════════════════
-const _userBuffer = new Map();
+const _userBuf = new Map();
 
 function bufferUser(uid, firstName, lastName, username) {
-  _userBuffer.set(uid, { id: uid, first_name: firstName||'', last_name: lastName||'', username: username||'' });
-  if (_userBuffer.size >= 500) flushUserBuffer();
+  _userBuf.set(uid, { id: uid, first_name: firstName || '', last_name: lastName || '', username: username || '' });
+  if (_userBuf.size >= 500) flushUsers();
 }
 
-async function flushUserBuffer() {
-  if (!_userBuffer.size) return;
-  const entries = [..._userBuffer.values()];
-  _userBuffer.clear();
+async function flushUsers() {
+  if (!_userBuf.size) return;
+  const entries = [..._userBuf.values()];
+  _userBuf.clear();
   if (!entries.length) return;
-
-  const rows = entries.map((_, i) => `($${i*4+1}, $${i*4+2}, $${i*4+3}, $${i*4+4}, CURRENT_TIMESTAMP)`).join(',');
+  const ph = entries.map((_, i) => `($${i * 4 + 1},$${i * 4 + 2},$${i * 4 + 3},$${i * 4 + 4},CURRENT_TIMESTAMP)`).join(',');
   const params = entries.flatMap(e => [e.id, e.first_name, e.last_name, e.username]);
-
   try {
     await run(
-      `INSERT INTO users(id, first_name, last_name, username, last_active) VALUES ${rows}
-       ON CONFLICT(id) DO UPDATE SET
-       first_name=EXCLUDED.first_name,
-       last_name=EXCLUDED.last_name,
-       username=EXCLUDED.username,
-       last_active=CURRENT_TIMESTAMP`,
+      `INSERT INTO users(id,first_name,last_name,username,last_active) VALUES ${ph}
+       ON CONFLICT(id) DO UPDATE SET first_name=EXCLUDED.first_name,last_name=EXCLUDED.last_name,username=EXCLUDED.username,last_active=CURRENT_TIMESTAMP`,
       params
     );
-  } catch(e) {}
+  } catch (_) {}
 }
 
-setInterval(flushUserBuffer, 10000);
+const _bufT = setInterval(flushUsers, 10000);
+_bufT.unref();
 
-// ═══════════════════════════════════════════════════════
-const _adminCache = new Map();
-const ADMIN_TTL = 300000;
+const _admCache = new Map();
+const ADM_TTL = 300000;
 
 async function getAdminInfo(uid) {
   const now = Date.now();
-  const cached = _adminCache.get(uid);
-  if(cached && now - cached.ts < ADMIN_TTL) return cached.data;
+  const c = _admCache.get(uid);
+  if (c && now - c.ts < ADM_TTL) return c.data;
   const row = await get('SELECT * FROM admins WHERE user_id=$1', [uid]);
   const data = row
-    ? { isAdmin: true, perms: (row.permissions||'').split(',').map(p=>p.trim()) }
+    ? { isAdmin: true, perms: (row.permissions || '').split(',').map(p => p.trim()) }
     : { isAdmin: false, perms: [] };
-  _adminCache.set(uid, { data, ts: now });
+  _admCache.set(uid, { data, ts: now });
   return data;
 }
 
-global.invalidateAdmin = uid => _adminCache.delete(uid);
+global.invalidateAdmin = uid => _admCache.delete(uid);
+global.invalidateBan = uid => cacheClear('ban_' + uid);
 
-// ═══════════════════════════════════════════════════════
-// 🛡️ Ban Cache (مركزي الآن)
-// ═══════════════════════════════════════════════════════
-function getBanCache(uid) { return cacheGet('ban_'+uid); }
-function setBanCache(uid, val) { cacheSet('ban_'+uid, val, 300000); }
-global.invalidateBan = uid => cacheClear('ban_'+uid);
-
-// ═══════════════════════════════════════════════════════
 async function authMiddleware(ctx, next) {
   const uid = ctx.from?.id;
-  if(!uid) return next();
+  if (!uid) return next();
 
   ctx.uid = uid;
   ctx.isOwner = isOwner(uid);
+  bufferUser(uid, ctx.from.first_name, ctx.from.last_name, ctx.from.username);
 
-  const f = ctx.from;
-  bufferUser(uid, f.first_name, f.last_name, f.username);
-
-  if(ctx.isOwner) {
+  if (ctx.isOwner) {
     ctx.isAdmin = true;
     ctx.adminPerms = ['full'];
   } else {
@@ -83,20 +67,20 @@ async function authMiddleware(ctx, next) {
     ctx.adminPerms = info.perms;
   }
 
-  if(!ctx.isOwner && !ctx.isAdmin) {
-    let banned = getBanCache(uid);
-    if(banned === undefined) {
+  if (!ctx.isOwner && !ctx.isAdmin) {
+    let banned = cacheGet('ban_' + uid);
+    if (banned === undefined) {
       const u = await get('SELECT is_banned FROM users WHERE id=$1', [uid]);
       banned = u?.is_banned ? 1 : 0;
-      setBanCache(uid, banned);
+      cacheSet('ban_' + uid, banned, 300000);
     }
-    if(banned === 1) {
-      return ctx.reply('🚫 أنت محظور من استخدام البوت.').catch(()=>{});
+    if (banned === 1) {
+      return ctx.reply('🚫 أنت محظور من استخدام البوت.').catch(() => {});
     }
   }
 
-  if(global.maintenanceMode && !ctx.isOwner && !ctx.isAdmin) {
-    return ctx.reply('🔧 ' + global.maintenanceMsg).catch(()=>{});
+  if (global.maintenanceMode && !ctx.isOwner && !ctx.isAdmin) {
+    return ctx.reply('🔧 البوت تحت الصيانة. يرجى الانتظار!').catch(() => {});
   }
 
   return next();

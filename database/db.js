@@ -345,4 +345,4 @@ async function setSetting(key, value) {
   await run('INSERT INTO settings(key,value) VALUES(?,?) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value', [key, value]);
 }
 
-module.exports = { all, get, run, initSchema, getSetting, setSetting, saveDB, DB_PATH };
+module.exports = { all, get, run, initSchema, getSetting, setSetting, saveDB, DB_PATH, getPg };
