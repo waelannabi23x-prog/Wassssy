@@ -1,30 +1,45 @@
 const { cacheGet, cacheSet } = require('./cache');
-const langs = new Map();
+const translations = require('./translations');
 
-const messages = {
-  ar: {
-    no_files: '_لا توجد ملفات في هذا القسم._',
-    not_found: '❌ الملف غير موجود.',
-    error: '⚠️ حدث خطأ. يرجى المحاولة مجدداً.',
-  },
-  en: {
-    no_files: '_No files in this section._',
-    not_found: '❌ File not found.',
-    error: '⚠️ An error occurred. Please try again.',
-  }
+const LANG_NAMES = {
+  ar: '🇩🇿 العربية',
+  fr: '🇫🇷 Français',
+  ru: '🇷🇺 Русский'
+};
+
+const LANG_SWITCH = {
+  ar: { fr: '🇫🇷 Français', ru: '🇷🇺 Русский' },
+  fr: { ar: '🇩🇿 العربية', ru: '🇷🇺 Русский' },
+  ru: { ar: '🇩🇿 العربية', fr: '🇫🇷 Français' }
 };
 
 function getLang(uid) {
-  const c = cacheGet('lang_'+uid);
-  return c || 'ar';
-}
-function setLang(uid, lang) {
-  langs.set(uid, lang);
-  cacheSet('lang_'+uid, lang, 86400000);
-}
-function t(uid, key) {
-  const lang = getLang(uid);
-  return (messages[lang] || messages.ar)[key] || key;
+  const c = cacheGet('lang_' + uid);
+  return (c && translations[c]) ? c : 'ar';
 }
 
-module.exports = { t, getLang, setLang };
+function setLang(uid, lang) {
+  if (translations[lang]) cacheSet('lang_' + uid, lang, 86400000);
+}
+
+function t(uid, key) {
+  const lang = getLang(uid);
+  return (translations[lang] || translations.ar)[key] || (translations.ar)[key] || key;
+}
+
+function getLangButtons(uid) {
+  const lang = getLang(uid);
+  const switches = LANG_SWITCH[lang] || LANG_SWITCH.ar;
+  return Object.entries(switches).map(([code, label]) => ({
+    text: label,
+    callback_data: 'lang_' + code
+  }));
+}
+
+function getGreeting(uid) {
+  const hour = new Date().getHours();
+  const key = hour < 12 ? 'welcome_morning' : hour < 17 ? 'welcome_afternoon' : 'welcome_evening';
+  return t(uid, key);
+}
+
+module.exports = { t, getLang, setLang, getLangButtons, getGreeting, LANG_NAMES };
