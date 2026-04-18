@@ -173,7 +173,7 @@ bot.use(async (ctx, next) => {
   return next();
 });
 bot.catch((err, ctx) => {
-  logger.error(`[BotErr] ${err.message}`, { uid: ctx.from?.id, type: ctx.updateType });
+  if(!err.message.includes('is not modified')&&!err.message.includes('message is not modified'))logger.error(`[BotErr] ${err.message}`, { uid: ctx.from?.id, type: ctx.updateType });
   if (!ctx.callbackQuery) ctx.reply('⚠️ حدث خطأ. حاول مجدداً.').catch(() => {});
 });
 
@@ -423,7 +423,7 @@ bot.on(['photo', 'video', 'audio', 'voice'], async ctx => {
   if (s?.type === 'mg_tpl_content') return manage.handleText(ctx, s);
 });
 
-bot.on('text', async ctx => {
+bot.on('text', async ctx => { try {
   if (ctx.message.text.startsWith('/')) return;
   const uid = ctx.uid, s = StateMgr.get(uid); if (!s) return;
   const txt = ctx.message.text.trim();
@@ -444,7 +444,7 @@ bot.on('text', async ctx => {
     cacheClear('cmts_' + s.fid + '_0'); cacheClear('cmts_' + s.fid + '_1');
     await ctx.reply('✅ تم إضافة تعليقك!').catch(() => {}); return browse.showComments(ctx, s.fid, s.spId, s.yrId, s.smId, s.sbId, s.catId);
   }
-  if (s.type?.startsWith('mg_') && ctx.isAdmin) return manage.handleText(ctx, s);
+  if (s.type?.startsWith('mg_') && ctx.isAdmin) return manage.handleText(ctx, s);} catch(e){}
 });
 
 bot.on('my_chat_member', async ctx => {
