@@ -1,6 +1,6 @@
 'use strict';
 
-const { cacheGet, cacheSet, cacheClear } = require('../utils/store');
+const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
 const { get, run } = require('../database/db');
 
 const OWNER_ID = parseInt(process.env.OWNER_ID || '5534474259');
@@ -79,7 +79,7 @@ async function authMiddleware(ctx, next) {
     }
   }
 
-  if (store.maintenance && !ctx.isOwner && !ctx.isAdmin) {
+  if (global.maintenanceMode && !ctx.isOwner && !ctx.isAdmin) {
     return ctx.reply('🔧 البوت تحت الصيانة. يرجى الانتظار!').catch(() => {});
   }
 
