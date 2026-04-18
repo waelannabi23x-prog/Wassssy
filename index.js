@@ -59,7 +59,7 @@ const StateMgr = {
 };
 global.userStates = StateMgr._s;
 global.setState = (u, v) => StateMgr.set(u, v);
-global.delState = (u) => StateMgr.delState(u);
+global.delState = (u) => StateMgr.del(u);
 
 
 const app = express();
@@ -85,7 +85,6 @@ app.get('/health', (_r, res) => {
 // store handles states
 
 global.setState = (u, v) => StateMgr.set(u, v);
-global.delState = (u) => StateMgr.delState(u);
 
 const RL = {
   _m: new Map(),
