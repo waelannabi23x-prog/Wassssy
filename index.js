@@ -40,6 +40,7 @@ if (!TOKEN) { logger.error('FATAL: BOT_TOKEN missing'); process.exit(1); }
 const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
 const PORT = process.env.PORT || 3000;
 
+const safeInt = v => { var n = parseInt(v); return isNaN(n) ? 0 : n; };
 const CFG = {
   rlWindow: 10000, rlMax: 25,
   cbDedupMax: 500, cbDedupTTL: 20000,
@@ -326,7 +327,7 @@ async function hMgTtype(ctx, d) {
 const prefR = [
   { p: 'grp_sp_', fn: hGrpSp },
   { p: 'grp_dl_', fn: hGrpDl },
-  { p: 'sp_', fn: (ctx, d) => browse.showYears(ctx, d.substring(3)) },
+  { p: 'sp_', fn: (ctx, d) => browse.showYears(ctx, safeInt(d.substring(3))) },
   { p: 'yr_', fn: (ctx, d) => { const p = d.split('_'); return browse.showSemesters(ctx, p[1], p[2]); } },
   { p: 'sm_', fn: (ctx, d) => { const p = d.split('_'); return browse.showSubjects(ctx, p[1], p[2], p[3]); } },
   { p: 'sb_', fn: (ctx, d) => { const p = d.split('_'); return browse.showCategories(ctx, p[1], p[2], p[3], p[4]); } },
@@ -341,9 +342,9 @@ const prefR = [
   { p: 'sbs_', fn: (ctx, d) => { const p = d.substring(4).split('_'); return browse.showSubjects(ctx, p[0], p[1], p[2]); } },
   { p: 'yrs_', fn: (ctx, d) => { const p = d.substring(4).split('_'); return browse.showYears(ctx, p[0]); } },
   { p: 'sms_', fn: (ctx, d) => { const p = d.substring(4).split('_'); return browse.showSemesters(ctx, p[0], p[1]); } },
-  { p: 'unfav_', fn: (ctx, d) => userH.toggleFav(ctx, d.substring(6), true) },
-  { p: 'fav_', fn: (ctx, d) => userH.toggleFav(ctx, d.substring(4), false) },
-  { p: 'set_sp_', fn: async (ctx, d) => { await usersDb.setSpecialty(ctx.uid, d.substring(7)); await ctx.answerCbQuery('✅ تم حفظ تخصصك').catch(() => {}); return startHandler.showMainMenu(ctx); } },
+  { p: 'unfav_', fn: (ctx, d) => userH.toggleFav(ctx, safeInt(d.substring(6)), true) },
+  { p: 'fav_', fn: (ctx, d) => userH.toggleFav(ctx, safeInt(d.substring(4)), false) },
+  { p: 'set_sp_', fn: async (ctx, d) => { await usersDb.setSpecialty(ctx.uid, safeInt(d.substring(7))); await ctx.answerCbQuery('✅ تم حفظ تخصصك').catch(() => {}); return startHandler.showMainMenu(ctx); } },
   { p: 'lang_', fn: (ctx, d) => { setLang(ctx.uid, d.substring(5)); return userH.showProfile(ctx); } },
   { p: 'rate_', fn: async (ctx, d) => { const p = d.substring(5).split('_'); await interactions.addRating(ctx.uid, p[0], parseInt(p[1])); await ctx.answerCbQuery('⭐ تم التقييم!').catch(() => {}); return browse.showPreview(ctx, p[0], p[2], p[3], p[4], p[5], p[6]); } },
   { p: 'do_report_', fn: (ctx, d) => { const p = d.substring(10).split('_'); return browse.doReport(ctx, p[0], p[1], p[2], p[3], p[4], p[5], p[6]); } },

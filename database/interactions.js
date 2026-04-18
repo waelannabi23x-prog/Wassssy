@@ -1,16 +1,18 @@
 'use strict';
+var safeInt=function(v){var n=parseInt(v);return isNaN(n)?0:n;};
+
 const { all, get, run } = require('./db');
 const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
 const J = `SELECT f.*,c.name as cat_name,s.name as sub_name FROM files f JOIN categories c ON f.category_id=c.id JOIN subjects s ON c.subject_id=s.id`;
 
 const getFavs = uid => all(J+' JOIN favorites fv ON fv.file_id=f.id WHERE fv.user_id=$1 AND f.is_deleted=0 ORDER BY fv.file_id DESC',[uid]);
-const isFav = async (uid,fid) => { const k='fav_'+uid+'_'+fid; const c=cacheGet(k); if(c!==null) return c; const r=!!(await get('SELECT 1 FROM favorites WHERE user_id=$1 AND file_id=$2',[uid,fid])); cacheSet(k,r,1800000); return r; };
-const addFav = (uid,fid) => { cacheClear('fav_'+uid+'_'+fid); cacheClear('favcnt_'+fid); return run('INSERT INTO favorites(user_id,file_id) VALUES($1,$2) ON CONFLICT(user_id,file_id) DO NOTHING',[uid,fid]); };
-const removeFav = (uid,fid) => { cacheClear('fav_'+uid+'_'+fid); cacheClear('favcnt_'+fid); return run('DELETE FROM favorites WHERE user_id=$1 AND file_id=$2',[uid,fid]); };
-const favCount = async fid => { const k='favcnt_'+fid; const c=cacheGet(k); if(c!==null) return c; const r=(await get('SELECT COUNT(*) as c FROM favorites WHERE file_id=$1',[fid]))?.c||0; cacheSet(k,r,3600000); return r; };
+const isFav = async (uid,fid) => { fid=safeInt(fid); fid=safeInt(fid); var _r => { const k='fav_'+uid+'_'+fid; const c=cacheGet(k); if(c!==null) return c; const r=!!(await get('SELECT 1 FROM favorites WHERE user_id=$1 AND file_id=$2',[uid,fid])); cacheSet(k,r,1800000); return r; };
+const addFav = (uid,fid) => { fid=safeInt(fid); cacheClear('fav_'+uid+'_'+fid); cacheClear('favcnt_'+fid); return run('INSERT INTO favorites(user_id,file_id) VALUES($1,$2) ON CONFLICT(user_id,file_id) DO NOTHING',[uid,fid]); };
+const removeFav = (uid,fid) => { fid=safeInt(fid); cacheClear('fav_'+uid+'_'+fid); cacheClear('favcnt_'+fid); return run('DELETE FROM favorites WHERE user_id=$1 AND file_id=$2',[uid,fid]); };
+const favCount = async fid => { fid=safeInt(fid); const k='favcnt_'+fid; const c=cacheGet(k); if(c!==null) return c; const r=(await get('SELECT COUNT(*) as c FROM favorites WHERE file_id=$1',[fid]))?.c||0; cacheSet(k,r,3600000); return r; };
 
 const _histDedup = new Map();
-const addHistory = (uid,fid) => {
+const addHistory = (uid,fid) => { fid=safeInt(fid);
   const k=uid+'_'+fid; const now=Date.now(); const last=_histDedup.get(k)||0;
   if(now-last<600000) return Promise.resolve();
   _histDedup.set(k,now);
@@ -46,9 +48,9 @@ const addLog = (uid,action,details) => run('INSERT INTO logs(user_id,action,deta
 const getLogs = (n=20) => all('SELECT l.*,u.first_name FROM logs l LEFT JOIN users u ON l.user_id=u.id ORDER BY l.created_at DESC LIMIT $1',[n]);
 const getActiveUsers = async (days=7) => { const k='active_users_'+days; const c=cacheGet(k); if(c) return c; const rows=await all(`SELECT id FROM users WHERE is_banned=0 AND last_active::timestamp >= NOW() - ($1::integer * INTERVAL '1 day')`,[days]); const ids=rows.map(r=>r.id); cacheSet(k,ids,600000); return ids; };
 
-const addRating = (uid,fid,rating) => { cacheClear('urating_'+uid+'_'+fid); cacheClear('avg_'+fid); cacheClear('prev_static_'+fid); return run('INSERT INTO ratings(user_id,file_id,rating) VALUES($1,$2,$3) ON CONFLICT(user_id,file_id) DO UPDATE SET rating=EXCLUDED.rating',[uid,fid,rating]); };
+const addRating = (uid,fid,rating) => { fid=safeInt(fid); cacheClear('urating_'+uid+'_'+fid); cacheClear('avg_'+fid); cacheClear('prev_static_'+fid); return run('INSERT INTO ratings(user_id,file_id,rating) VALUES($1,$2,$3) ON CONFLICT(user_id,file_id) DO UPDATE SET rating=EXCLUDED.rating',[uid,fid,rating]); };
 const getUserRating = async (uid,fid) => { const k='urating_'+uid+'_'+fid; const c=cacheGet(k); if(c!==null) return c; const r=(await get('SELECT rating FROM ratings WHERE user_id=$1 AND file_id=$2',[uid,fid]))?.rating||0; cacheSet(k,r,1800000); return r; };
-const getAvgRating = async fid => { const k='avg_'+fid; const c=cacheGet(k); if(c) return c; const r=await get('SELECT ROUND(AVG(rating),1) as avg, COUNT(*) as cnt FROM ratings WHERE file_id=$1',[fid]); const result={avg:parseFloat(r?.avg||0),cnt:parseInt(r?.cnt||0)}; cacheSet(k,result,3600000); return result; };
+const getAvgRating = async fid => { fid=safeInt(fid); const k='avg_'+fid; const c=cacheGet(k); if(c) return c; const r=await get('SELECT ROUND(AVG(rating),1) as avg, COUNT(*) as cnt FROM ratings WHERE file_id=$1',[fid]); const result={avg:parseFloat(r?.avg||0),cnt:parseInt(r?.cnt||0)}; cacheSet(k,result,3600000); return result; };
 
 const getFavBatch = async (uid,fileIds) => {
   if(!fileIds.length) return {};
