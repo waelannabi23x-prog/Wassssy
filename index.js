@@ -43,7 +43,6 @@ const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
 const PORT = process.env.PORT || 3000;
 
 const safeInt = v => { var n = parseInt(v); return isNaN(n) ? 0 : n; };
-const safeInt2 = safeInt;
 const CFG = {
   rlWindow: 10000, rlMax: 25,
   cbDedupMax: 500, cbDedupTTL: 20000,
