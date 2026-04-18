@@ -21,7 +21,9 @@ const contentDb = require('./database/content');
 const bundlesDb = require('./database/bundles');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { eos } = require('./utils/helpers');
-const { setState: redisSetState, delState: redisDelState, loadAllStates } = require('./utils/redis');
+const store = require('./utils/store');
+const { safeInt } = require('./utils/validate');
+const { loadAllStates } = require('./utils/redis');
 const { cacheWarmup, cacheClear, cacheClearPrefix } = require('./utils/cache');
 const { setLang } = require('./utils/i18n');
 const { startScheduler } = require('./utils/scheduler');
@@ -41,6 +43,7 @@ const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
 const PORT = process.env.PORT || 3000;
 
 const safeInt = v => { var n = parseInt(v); return isNaN(n) ? 0 : n; };
+const safeInt2 = safeInt;
 const CFG = {
   rlWindow: 10000, rlMax: 25,
   cbDedupMax: 500, cbDedupTTL: 20000,
@@ -68,17 +71,10 @@ app.get('/health', (_r, res) => {
   });
 });
 
-const StateMgr = {
-  _s: {},
-  get(u) { return this._s[u] || null; },
-  async set(u, v) { v._ts = Date.now(); this._s[u] = v; try { await redisSetState(u, v); } catch(_){} },
-  async del(u) { delete this._s[u]; try { await redisDelState(u); } catch(_){} },
-  gc() { const n = Date.now(); let c = 0; for (const u in this._s) { if (this._s[u]._ts && n - this._s[u]._ts > CFG.stateTTL) { this.del(u); c++; } } return c; },
-  get size() { return Object.keys(this._s).length; },
-};
-global.userStates = StateMgr._s;
-global.setState = (u, v) => StateMgr.set(u, v);
-global.delState = (u) => StateMgr.del(u);
+// StateMgr replaced by utils/store
+// store handles states
+global.setState = (u, v) => store.setState(u, v);
+global.delState = (u) => store.delState(u);
 
 const RL = {
   _m: new Map(),
@@ -144,9 +140,9 @@ const GrpMsgs = {
   prune() { const k = Object.keys(this._m); if (k.length > CFG.maxChatsTracked) k.slice(0, k.length - CFG.maxChatsTracked).forEach(x => delete this._m[x]); },
 };
 
-global.maintenanceMode = false;
-const maintenanceMsg = 'البوت تحت الصيانة. يرجى الانتظار!';
-async function loadMaintenance() { try { global.maintenanceMode = (await getSetting('maintenance')) === 'true'; } catch(_){} }
+store.maintenance = false;
+// maintenanceMsg in store
+async function loadMaintenance() { try { store.maintenance = (await getSetting('maintenance')) === 'true'; } catch(_){} }
 
 const bot = new Telegraf(TOKEN, { handlerTimeout: 90000, telegram: { apiRoot: process.env.TELEGRAM_API_ROOT || undefined } });
 let _botUn = null;
@@ -170,7 +166,7 @@ bot.use(async (ctx, next) => {
   return next();
 });
 bot.use(async (ctx, next) => {
-  if (global.maintenanceMode && ctx.chat?.type === 'private' && !ctx.isOwner) return ctx.reply(maintenanceMsg).catch(() => {});
+  if (store.maintenance && ctx.chat?.type === 'private' && !ctx.isOwner) return ctx.reply(store.maintenanceMsg).catch(() => {});
   return next();
 });
 bot.catch((err, ctx) => {
@@ -314,7 +310,7 @@ async function hGrpDl(ctx, d) {
 async function hSearchDel(ctx, d) {
   if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {});
   const p = d.substring(11).split('|'), fid = p[0], q = decodeURIComponent(p[1] || '');
-  await filesDb.softDelete(fid); cacheClearPrefix('search_'); if (global._clearSearchCache) global._clearSearchCache();
+  await filesDb.softDelete(fid); cacheClearPrefix('search_'); if (store._clearSearchCache) global._clearSearchCache();
   await ctx.answerCbQuery('✅ تم الحذف').catch(() => {}); return userH.handleSearch(ctx, q);
 }
 
@@ -491,14 +487,15 @@ async function launch() {
     logger.warn('⚠️ No WEBHOOK_URL - using polling');
     bot.launch({ drop_pending_updates: true });
   }
-    global.__bot = bot; // startSmartWarmup(); // disabled: cacheWarmup sufficient
+    store.bot = bot;
+store._clearSearchCache = function() { var cc = require('./utils/cache'); cc.cacheClearPrefix('search_'); cc.cacheClear('latest_15'); cc.cacheClear('popular_15'); }; // startSmartWarmup(); // disabled: cacheWarmup sufficient
     logger.info('🚀 Ready');
   } catch(e) { logger.error('[Launch]', e.message); setTimeout(launch, 10000); }
 }
 
 async function shutdown(sig) {
   logger.info('[Shutdown] ' + sig);
-  try { bot.stop(sig); await GrpBuf.stop(); StateMgr.gc(); const pg = getPg(); if (pg) await pg.end(); process.exit(0); } catch(e) { process.exit(1); }
+  try { bot.stop(sig); await GrpBuf.stop(); store.gc(); const pg = getPg(); if (pg) await pg.end(); process.exit(0); } catch(e) { process.exit(1); }
 }
 process.once('SIGINT', () => shutdown('SIGINT'));
 process.once('SIGTERM', () => shutdown('SIGTERM'));
