@@ -22,7 +22,6 @@ const bundlesDb = require('./database/bundles');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { eos } = require('./utils/helpers');
 const store = require('./utils/store');
-const { safeInt } = require('./utils/validate');
 const { loadAllStates } = require('./utils/redis');
 const { cacheWarmup, cacheClear, cacheClearPrefix } = require('./utils/cache');
 const { setLang } = require('./utils/i18n');
