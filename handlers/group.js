@@ -1,22 +1,12 @@
 require('dotenv').config();
+const { cacheGet, cacheSet, cacheClearPrefix } = require('../utils/cache');
 const { run: dbRun, all: dbAll } = require('../database/db');
 const filesDb = require('../database/files');
 const { isOwner } = require('../middlewares/auth');
 
-// cache البحث في القروب
-const _grpSearchCache = new Map();
-function _getGSC(q) {
-  const k = q.toLowerCase().trim();
-  const c = _grpSearchCache.get(k);
-  if(c && Date.now()-c.ts < 300000) return c.data;
-  return null;
-}
-function _setGSC(q, data) {
-  const k = q.toLowerCase().trim();
-  _grpSearchCache.set(k, {data, ts:Date.now()});
-  if(_grpSearchCache.size > 200) _grpSearchCache.delete(_grpSearchCache.keys().next().value);
-}
-global._clearSearchCache = () => _grpSearchCache.clear();
+function _getGSC(q) { return cacheGet('gsrc_'+q.toLowerCase().trim()); }
+function _setGSC(q, data) { cacheSet('gsrc_'+q.toLowerCase().trim(), data, 300000); }
+global._clearSearchCache = () => cacheClearPrefix('gsrc_');
 
 async function smartSearch(rawQ, limit=10) {
   const q = rawQ.replace(/[%;\\]/g,'').trim();
@@ -46,7 +36,7 @@ async function handleGroupSearch(ctx, raw) {
   }
   const results = await smartSearch(raw, 10);
   if(!results.length) {
-    const m = await ctx.reply('❌ لا نتائج لـ "'+raw+'"\n💡 جرب: /search '+raw.split(' ')[0]);
+    const m = await ctx.reply('❌ لا نتائج لـ "'+raw+'"');
     setTimeout(()=>ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(()=>{}), 8000);
     return;
   }
@@ -77,7 +67,7 @@ async function handleGrpSp(ctx, data) {
   const specId = parseInt(raw.substring(lastUs + 1));
   try {
     await dbRun('INSERT INTO group_chats(chat_id,specialty_id) VALUES($1,$2) ON CONFLICT(chat_id) DO UPDATE SET specialty_id=$3',[chatId,specId,specId]);
-    const specs = await dbAll('SELECT name FROM specialties $1',[specId]);
+    const specs = await dbAll('SELECT name FROM specialties WHERE id=$1',[specId]);
     const spName = specs[0]?.name || String(specId);
     await ctx.answerCbQuery('✅ ' + spName, {show_alert:false}).catch(()=>{});
     await ctx.telegram.editMessageText(chatId, ctx.callbackQuery.message.message_id, null, '✅ تخصص القروب: 🎓 ' + spName).catch(()=>{});

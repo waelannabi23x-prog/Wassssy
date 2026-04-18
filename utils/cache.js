@@ -24,38 +24,29 @@ function cacheClear(key) {
 }
 
 function cacheClearPrefix(prefix) {
-  for (const k of store.keys()) if (k.startsWith(prefix)) cacheClear(k);
+  const toDelete = [];
+  for (const k of store.keys()) if (k.startsWith(prefix)) toDelete.push(k);
+  for (const k of toDelete) cacheClear(k);
 }
 
 function _evict() {
   if (store.size <= MAX_CACHE) return;
   const toDelete = store.size - MAX_CACHE;
   let i = 0;
-  for (const k of store.keys()) {
-    if (i++ >= toDelete) break;
-    cacheClear(k);
-  }
+  for (const k of store.keys()) { if (i++ >= toDelete) break; cacheClear(k); }
 }
 
 async function cacheWarmup() {
   try {
     const { getSpecs, getYears, getSemesters, getSubjects, getCategories } = require('../database/content');
     const specs = await getSpecs();
-    cacheSet('specs', specs, 3600000);
-
     for (const sp of specs) {
       const years = await getYears(sp.id);
-      cacheSet('years_' + sp.id, years, 3600000);
       for (const yr of years) {
         const sems = await getSemesters(yr.id);
-        cacheSet('sems_raw_' + yr.id, sems, 3600000);
         for (const sm of sems) {
           const subs = await getSubjects(sm.id);
-          cacheSet('subs_raw_' + sm.id, subs, 3600000);
-          for (const sb of subs) {
-            const cats = await getCategories(sb.id);
-            cacheSet('cats_raw_' + sb.id, cats, 3600000);
-          }
+          for (const sb of subs) await getCategories(sb.id);
         }
       }
     }
