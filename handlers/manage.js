@@ -185,7 +185,7 @@ async function showUsers(ctx,page=0){ console.log("showUsers called, page:", pag
   list.forEach((u,i)=>{
     const j=u.joined_at?new Date(u.joined_at).toLocaleDateString("en-GB"):"?";
     const a=u.last_active?new Date(u.last_active).toLocaleDateString("en-GB"):"?";
-    text+=(page*PS+i+1)+". "+esc(u.first_name)+(u.username?" @"+esc(u.username):" ID:"+u.id)+(u.is_banned?" 🚫":"")+"\n   📅 "+j+" | 🕐 "+a+"\n";
+    text+=(page*PS+i+1)+". "+escMd2(u.first_name)+(u.username?" @"+escMd2(u.username):" ID:"+u.id)+(u.is_banned?" 🚫":"")+"\n   📅 "+j+" | 🕐 "+a+"\n";
   });
   const rows=list.map(u=>[
     btn('👤 '+(u.first_name||u.id),'mg_profile_'+u.id),
@@ -425,7 +425,7 @@ async function handleText(ctx,state){
         break;
       case 'mg_upl_desc': setState(uid,{...state,type:'mg_file',desc:text==='skip'?'':text,catId:state.catId}); ctx.reply('📎 أرسل الملف الآن:\n_(أو /cancel)_',{parse_mode:'Markdown'}); break;
       case 'mg_rn_fl': await filesDb.rename(state.id,text); done('✅ تمت إعادة التسمية!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_')); break;
-      case 'mg_desc_fl': await filesDb.updateDesc(state.id,text); done('✅ تم تحديث الوصف!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_')); break;
+      case 'mg_desc_fl': await filesDb.updateDescMd2(state.id,text); done('✅ تم تحديث الوصف!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_')); break;
       case 'mg_admin_search':{
         clearState(uid);
         const [fr,ur]=await Promise.all([filesDb.search(text),usersDb.searchUsers(text)]);
