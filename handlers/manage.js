@@ -293,24 +293,42 @@ async function showScheduled(ctx){
 async function handleBundleFileUpload(ctx){
   const uid=ctx.uid; const state=global.userStates?.[uid];
   if(!state||state.type!=='mg_bundle_files') return false;
-  const msg=ctx.message; let fid,ftype,title='';
-  const text=(msg.text||msg.caption||'').trim();
-  // التحقق من الرابط: نص عادي + entities + forwarded
-  const hasUrlEntity = msg.entities?.some(e=>e.type==='url'||e.type==='text_link');
-  const textLink = hasUrlEntity ? msg.text?.substring(msg.entities[0].offset, msg.entities[0].offset+msg.entities[0].length) : null;
-  const captionLink = msg.caption_entities?.some(e=>e.type==='url'||e.type==='text_link') ? msg.caption?.substring(msg.caption_entities[0].offset, msg.caption_entities[0].offset+msg.caption_entities[0].length) : null;
-  const link = textLink || captionLink || (text.match(/https?:\/\/[^\s]+/)||[])[0] || (text.match(/www\.[^\s]+/)||[])[0];
-  if(link){fid=link;ftype='link';title='🔗 '+link.substring(0,40)+(link.length>40?'...':'');}
-  else if(msg.document){fid=msg.document.file_id;ftype='document';title=msg.document.file_name||'';}
-  else if(msg.photo){fid=msg.photo[msg.photo.length-1].file_id;ftype='photo';title='🖼️ صورة';}
-  else if(msg.video){fid=msg.video.file_id;ftype='video';title=msg.video.file_name||'🎥 فيديو';}
-  else if(msg.audio){fid=msg.audio.file_id;ftype='audio';title=msg.audio.title||'🎵 صوت';}
-  else if(msg.voice){fid=msg.voice.file_id;ftype='voice';title='🎤 تسجيل صوتي';}
-  else return false;
+  const msg=ctx.message; let fid=null,ftype=null,title='';
+
+  // ═══ الأولوية 1: ملفات مرفوعة ═══
+  if(msg.document){
+    fid=msg.document.file_id; ftype='document';
+    title=msg.document.file_name||'📄 ملف';
+  } else if(msg.photo){
+    fid=msg.photo[msg.photo.length-1].file_id; ftype='photo';
+    title='🖼️ صورة';
+  } else if(msg.video){
+    fid=msg.video.file_id; ftype='video';
+    title=msg.video.file_name||'🎥 فيديو';
+  } else if(msg.audio){
+    fid=msg.audio.file_id; ftype='audio';
+    title=msg.audio.title||'🎵 صوت';
+  } else if(msg.voice){
+    fid=msg.voice.file_id; ftype='voice';
+    title='🎤 تسجيل صوتي';
+  }
+
+  // ═══ الأولوية 2: روابط (فقط إذا ما في ملف مرفوع) ═══
+  if(!fid){
+    const txt=(msg.text||'').trim();
+    const urlMatch=txt.match(/https?:\/\/[^\s]+/)||txt.match(/www\.[^\s]+/);
+    if(urlMatch){
+      fid=urlMatch[0]; ftype='link';
+      title='🔗 '+urlMatch[0].substring(0,35)+(urlMatch[0].length>35?'...':'');
+    }
+  }
+
+  if(!fid) return false;
+
   await bundlesDb.addBundleFile(state.bundleId,fid,ftype,title);
   state.fileCount=(state.fileCount||0)+1;
-  const icon=ftype==='link'?'🔗':ftype==='photo'?'🖼️':ftype==='video'?'🎥':ftype==='audio'?'🎵':ftype==='voice'?'🎤':'📄';
-  await ctx.reply(icon+' ملف '+state.fileCount+' تم الحفظ. ابعث المزيد أو /done.');
+  const icons={link:'🔗',photo:'🖼️',video:'🎥',audio:'🎵',voice:'🎤',document:'📄'};
+  await ctx.reply((icons[ftype]||'📄')+' ملف '+state.fileCount+' تم الحفظ. ابعث المزيد أو /done.');
   return true;
 }
 async function handleBulkUpload(ctx){
