@@ -39,6 +39,7 @@ async function mainMenu(ctx){
     rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp')]);
   }
   rows.push([btn('🕵️ جاسوس','mg_spy'),btn('🧬 اختبار أداء','mg_stress')]);
+  rows.push([btn('🕵️ جاسوس','mg_spy'),btn('🧬 اختبار أداء','mg_stress')]);
   rows.push([btn('🏠 القائمة الرئيسية','main_menu')]);
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
