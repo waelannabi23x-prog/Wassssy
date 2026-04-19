@@ -38,6 +38,9 @@ async function mainMenu(ctx){
     rows.push([btn('🚩 البلاغات','mg_reports'),btn('📨 نظام الرسائل','mg_msgs')]);
     rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp')]);
   }
+  rows.push([btn('🕵️ جاسوس','mg_spy'),btn('🧬 اختبار أداء','mg_stress')]);
+  rows.push([btn('🕵️ جاسوس','mg_spy'),btn('🧬 اختبار أداء','mg_stress')]);
+  rows.push([btn('🕵️ جاسوس','mg_spy'),btn('🧬 اختبار أداء','mg_stress')]);
   rows.push([btn('🏠 القائمة الرئيسية','main_menu')]);
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
@@ -191,7 +194,7 @@ async function handleText(ctx,state){
   const done=(msg,cb)=>{clearState(uid);ctx.reply(msg,{parse_mode:'Markdown',...build([[btn('◀️ رجوع',cb)]])});};
   try{
     switch(state.type){
-      case 'mg_add_sp':await content.addSpec(text);done('✅ تم إضافة *'+escMd(text)+'*!','mg_content');break;
+      case 'mg_stress_count':{var cnt=Math.min(parseInt(text)||50,200);if(isNaN(cnt)){clearState(uid);return ctx.reply('❌');}clearState(uid);await ctx.reply('Testing '+cnt+'...');var sM=process.memoryUsage().heapUsed/1024/1024;var sT=Date.now();for(var i=0;i<cnt;i++){ctx.telegram.sendMessage(ctx.chat.id,'T').catch(function(){});}var eT=Date.now();var eM=process.memoryUsage().heapUsed/1024/1024;return ctx.reply('Result: *'+cnt+'*\nTime: *'+(eT-sT)+'ms*\nRAM: *'+(eM-sM).toFixed(2)+' MB*',{parse_mode:'Markdown'});}
       case 'mg_rn_sp':await content.renameSpec(state.id,text);done('✅ تمت التسمية!','mg_content');break;
       case 'mg_add_yr':await content.addYear(state.spId,text);done('✅ تمت الإضافة!','mg_yrs_'+state.spId);break;
       case 'mg_rn_yr':await content.renameYear(state.id,text);done('✅ تمت التسمية!','mg_yrs_'+state.spId);break;
@@ -225,6 +228,12 @@ async function handleText(ctx,state){
 }
 async function handleCallback(ctx,data){
   const uid=ctx.uid;
+  if(data==='mg_spy'){setState(uid,{type:'mg_spy_id'});return ctx.reply('🕵ددددن ID:ل_(أو /cancel)_',{parse_mode:'Markdown'});}
+  if(data==='mg_stress'){setState(uid,{type:'mg_stress_count'});return ctx.reply('🧪 كم رسالة:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
+  if(data==='mg_spy'){setState(uid,{type:'mg_spy_id'});return ctx.reply('Enter ID:\n_(or /cancel)_',{parse_mode:'Markdown'});}
+  if(data==='mg_stress'){setState(uid,{type:'mg_stress_count'});return ctx.reply('How many? (50-200):\n_(or /cancel)_',{parse_mode:'Markdown'});}
+  if(data==='mg_spy'){setState(uid,{type:'mg_spy_id'});return ctx.reply('Enter ID:\n_(or /cancel)_',{parse_mode:'Markdown'});}
+  if(data==='mg_stress'){setState(uid,{type:'mg_stress_count'});return ctx.reply('How many? (50-200):\n_(or /cancel)_',{parse_mode:'Markdown'});}
   if(data==='mg_menu') return mainMenu(ctx);
   if(data==='mg_content') return showContent(ctx);
   if(data==='mg_analytics') return showAnalytics(ctx);
