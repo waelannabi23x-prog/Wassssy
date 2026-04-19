@@ -1,6 +1,8 @@
 const fs = require('fs');
 const path = require('path');
-const ERR_LOG = path.join(__dirname, '../logs/err.log');
+const LOG_DIR = path.join(__dirname, '../logs');
+if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
+const ERR_LOG = path.join(LOG_DIR, 'err.log');
 let buf = '';
 let flushT = null;
 

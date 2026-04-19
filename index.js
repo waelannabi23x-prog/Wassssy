@@ -54,8 +54,14 @@ const CFG = {
 const StateMgr = {
   _s: {},
   get(u) { return this._s[u] || null; },
-  async set(u, v) { v._ts = Date.now(); this._s[u] = v; try { await redisSetState(u, v); } catch(_){} },
-  async del(u) { delete this._s[u]; try { await redisDelState(u); } catch(_){} },
+  async set(u, v) {
+    v._ts = Date.now(); this._s[u] = v;
+    dbRun('INSERT INTO user_states(user_id,state,updated_at) VALUES($1,$2,CURRENT_TIMESTAMP) ON CONFLICT(user_id) DO UPDATE SET state=$2,updated_at=CURRENT_TIMESTAMP',[u,JSON.stringify(v)]).catch(()=>{});
+  },
+  async del(u) {
+    delete this._s[u];
+    dbRun('DELETE FROM user_states WHERE user_id=$1',[u]).catch(()=>{});
+  },
   gc() { var n = Date.now(); var c = 0; for (var u in this._s) { if (this._s[u]._ts && n - this._s[u]._ts > CFG.stateTTL) { this.del(u); c++; } } return c; },
   get size() { return Object.keys(this._s).length; },
 };
@@ -70,9 +76,6 @@ app.use(express.json({ limit: '1mb' }));
 app.set('trust proxy', 1);
 
 app.get('/', (_r, res) => res.send('OK'));
-
-
-global.setState = (u, v) => StateMgr.set(u, v);
 
 const RL = {
   _m: new Map(),
@@ -155,16 +158,6 @@ bot.use(async (ctx, next) => {
 });
 bot.use(rateLimit);
 bot.use(authMiddleware);
-bot.use(async (ctx, next) => {
-  if (!ctx.from) return next();
-  if (!RL.check(ctx.from.id)) {
-    const m = '⏳ أرسلت كثيراً، انتظر قليلاً';
-    return ctx.callbackQuery ? ctx.answerCbQuery(m, { show_alert: false }).catch(() => {}) : ctx.reply(m).catch(() => {});
-  }
-  return next();
-});
-bot.use(async (ctx, next) => {
-  if (global.maintenanceMode && ctx.chat?.type === 'private' && !ctx.isOwner) return ctx.reply(global.maintenanceMsg).catch(() => {});
   return next();
 });
 bot.catch((err, ctx) => {
@@ -439,7 +432,8 @@ bot.on('text', async ctx => { try {
     cacheClear('cmts_' + s.fid + '_0'); cacheClear('cmts_' + s.fid + '_1');
     await ctx.reply('✅ تم إضافة تعليقك!').catch(() => {}); return browse.showComments(ctx, s.fid, s.spId, s.yrId, s.smId, s.sbId, s.catId);
   }
-  if (s.type?.startsWith('mg_') && ctx.isAdmin) return manage.handleText(ctx, s);} catch(e){}
+    if (s.type?.startsWith('mg_') && ctx.isAdmin) return manage.handleText(ctx, s);
+  } catch(e) { logger.error('[TextHandler]', e.message, { uid: ctx.from?.id }); }
 });
 
 bot.on('my_chat_member', async ctx => {
@@ -523,7 +517,7 @@ const _cln = setInterval(async () => {
       dbRun("DELETE FROM group_members WHERE updated_at::timestamp < NOW() - INTERVAL '7 days'").catch(() => {}),
       dbRun("DELETE FROM cache_store WHERE expires_at::bigint < $1::bigint", [Date.now()]).catch(() => {}),
     ]);
-    StateMgr.gc(); RL.gc(); GrpMsgs.prune();
+    StateMgr.gc(); GrpMsgs.prune();
   } catch(_) {}
 }, CFG.cleanupMs);
 _cln.unref();

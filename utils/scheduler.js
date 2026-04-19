@@ -35,13 +35,13 @@ async function processScheduled() {
   const rows = await all(
     `SELECT sm.id, sm.target, sm.specialty_id, mt.type, mt.content, mt.file_id, mt.name
      FROM scheduled_messages sm JOIN message_templates mt ON sm.template_id = mt.id
-     WHERE sm.sent = 0 AND sm.send_at <= ?`, [now]
+     WHERE sm.sent = 0 AND sm.send_at <= $1`, [now]
   );
   if (!rows.length) return;
   for (const row of rows) {
     try {
       const count = await dispatchScheduled(row);
-      await run('UPDATE scheduled_messages SET sent = 1 WHERE id = ?', [row.id]);
+      await run('UPDATE scheduled_messages SET sent = 1 WHERE id = $1', [row.id]);
       logger.info(`[Sched] "${row.name}" → ${count}`);
       notifyOwners(`✅ رسالة مجدولة "${row.name}" أُرسلت لـ ${count} مستخدم`);
     } catch (e) { logger.error(`[Sched] id=${row.id}`, e.message); }
@@ -54,7 +54,7 @@ async function dispatchScheduled(msg) {
     const r = await all('SELECT id FROM users WHERE is_banned = 0');
     uids = r.map(x => x.id);
   } else if (msg.target === 'specialty' && msg.specialty_id) {
-    const r = await all('SELECT user_id FROM user_specialties WHERE specialty_id = ?', [msg.specialty_id]);
+    const r = await all('SELECT user_id FROM user_specialties WHERE specialty_id=$1', [msg.specialty_id]);
     uids = r.map(x => x.user_id);
   }
   if (!uids.length) return 0;
@@ -82,9 +82,9 @@ async function processGroupNotifications() {
     const setting = await (async () => { const { getSetting } = require('../database/db'); return getSetting('group_notify_enabled'); })();
     if (setting === 'false') return;
     const recent = await all(
-      `SELECT f.id, f.title, f.category_id, s.name as sub_name, s.semester_id, sem.year_id, gc.chat_id, gc.specialty_id
+      `SELECT f.id, f.title, f.category_id, s.name as sub_name, s.semester_id, yr.specialty_id, gc.chat_id
        FROM files f JOIN categories c ON c.id = f.category_id JOIN subjects s ON s.id = c.subject_id
-       JOIN semesters sem ON sem.id = s.semester_id JOIN group_chats gc ON gc.specialty_id = sem.year_id
+       JOIN semesters sem ON sem.id = s.semester_id JOIN years yr ON yr.id = sem.year_id JOIN group_chats gc ON gc.specialty_id = yr.specialty_id
        LEFT JOIN group_notify_log gnl ON gnl.file_id = f.id AND gnl.chat_id = gc.chat_id
        WHERE f.is_deleted = 0 AND gc.notify_new_files = 1 AND f.uploaded_at > NOW() - INTERVAL '10 minutes' AND gnl.id IS NULL LIMIT 100`
     );
@@ -95,7 +95,7 @@ async function processGroupNotifications() {
         const label = '📄 ' + r.title.substring(0, 30) + (r.sub_name ? ' · ' + r.sub_name : '');
         const kb = un ? { reply_markup: { inline_keyboard: [[{ text: '⬇️ تحميل', url: 'https://t.me/' + un + '?start=file_' + r.id }]] } } : {};
         await _bot.telegram.sendMessage(r.chat_id, '📢 *ملف جديد*\n\n' + label, { parse_mode: 'Markdown', ...kb });
-        await run('INSERT INTO group_notify_log(file_id, chat_id, sent_at) VALUES(?, ?, CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING', [r.id, r.chat_id]).catch(() => {});
+        await run('INSERT INTO group_notify_log(file_id, chat_id, sent_at) VALUES($1,$2,CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING', [r.id, r.chat_id]).catch(() => {});
       } catch (_) {}
     }
   } catch (_) {}

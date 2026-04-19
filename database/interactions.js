@@ -4,7 +4,6 @@ const { all, get, run } = require('./db');
 const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
 const J = 'SELECT f.*,c.name as cat_name,s.name as sub_name FROM files f JOIN categories c ON f.category_id=c.id JOIN subjects s ON c.subject_id=s.id';
 
-var _dlDedup = new Map();
 const getFavs = function(uid) { return all(J + ' JOIN favorites fv ON fv.file_id=f.id WHERE fv.user_id=$1 AND f.is_deleted=0 ORDER BY fv.file_id DESC', [uid]); };
 
 const isFav = async function(uid, fid) {
