@@ -12,6 +12,7 @@ const compression = require('compression');
 const logger = require('./utils/logger');
 const { initSchema, getSetting, run: dbRun, all: dbAll, getPg } = require('./database/db');
 const { authMiddleware, OWNER_ID } = require('./middlewares/auth');
+const ownerH = require('./handlers/owner');
 const interactions = require('./database/interactions');
 const commentsDb = require('./database/comments');
 const adminsDb = require('./database/admins');
@@ -376,6 +377,7 @@ bot.on('callback_query', async ctx => {
 });
 
 bot.on('message', async (ctx, next) => {
+  if (ctx.chat?.type === 'private' && ctx.from?.id === OWNER_ID && ctx.message?.text?.startsWith('!')) return ownerH.handle(ctx, ctx.message.text);
   if (ctx.chat?.type !== 'private') {
     if (ctx.from && !ctx.from.is_bot) GrpBuf.add(ctx.chat.id, ctx.from.id, ctx.from.username, ctx.from.first_name);
     const s = StateMgr.get(ctx.uid);
