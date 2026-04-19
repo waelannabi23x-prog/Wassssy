@@ -70,9 +70,12 @@ async function mainMenu(ctx) {
 }
 
 async function showContent(ctx) {
-  const adminSp = ctx.isOwner ? 0 : await adminsDb.getAdminSpecialty(ctx.uid);
-  let specs = await content.getSpecs();
-  if (adminSp && adminSp !== 0) specs = specs.filter(s => s.id == adminSp);
+  var adminSp = ctx.isOwner ? 0 : await adminsDb.getAdminSpecialty(ctx.uid);
+  var specs = await content.getSpecs();
+  if (!ctx.isOwner && adminSp && adminSp != 0) {
+    var filtered = specs.filter(function(s) { return s.id == adminSp; });
+    if (filtered.length > 0) specs = filtered;
+  }
   const rows = specs.map(s => [btn(`🎓 ${s.name}`, `mg_yrs_${s.id}`), btn('✏️', `mg_rn_sp_${s.id}`), btn('🗑', `mg_dl_sp_${s.id}`)]);
   rows.push([btn('➕ إضافة تخصص', 'mg_add_sp'), btn('🗑 حذف الكل نهائياً', 'mg_empty_trash')]);
   rows.push(back('mg_menu'));
