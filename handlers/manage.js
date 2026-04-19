@@ -297,6 +297,5 @@ async function handleCallback(ctx,data){
 }
 
 var _hCB=handleCallback;handleCallback=async function(ctx,data){try{await _hCB(ctx,data);}catch(e){console.error('[CB]',e.message);}finally{await ctx.answerCbQuery().catch(function(){});}};
-var _hCB=handleCallback;handleCallback=async function(ctx,data){try{await _hCB(ctx,data);}catch(e){console.error('[CB]',e.message);}finally{await ctx.answerCbQuery().catch(function(){});}};
 module.exports={mainMenu,handleCallback,handleText,handleFileUpload,handleBulkUpload,showUserProfile,showUsers,handleBundleFileUpload};
 
