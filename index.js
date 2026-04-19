@@ -41,6 +41,7 @@ const manage = require('./handlers/manage');
 const TOKEN = process.env.BOT_TOKEN;
 if (!TOKEN) { logger.error('FATAL: BOT_TOKEN missing'); process.exit(1); }
 const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
 const PORT = process.env.PORT || 3000;
 
 const safeInt = v => { var n = parseInt(v); return isNaN(n) ? 0 : n; };
@@ -54,9 +55,10 @@ const CFG = {
 const StateMgr = {
   _s: {},
   get(u) { return this._s[u] || null; },
-  async set(u, v) {
-    v._ts = Date.now(); this._s[u] = v;
-    dbRun('INSERT INTO user_states(user_id,state,updated_at) VALUES($1,$2,CURRENT_TIMESTAMP) ON CONFLICT(user_id) DO UPDATE SET state=$2,updated_at=CURRENT_TIMESTAMP',[u,JSON.stringify(v)]).catch(()=>{});
+  _pending:new Map(),_flushTimer:null,
+  async set(u,v){
+    v._ts=Date.now();this._s[u]=v;this._pending.set(u,v);
+    if(!this._flushTimer){this._flushTimer=setTimeout(async()=>{this._flushTimer=null;if(!this._pending.size)return;const snap=[...this._pending.entries()];this._pending.clear();const ph=snap.map((_,i)=>`(${i*2+1},${i*2+2},CURRENT_TIMESTAMP)`).join(',');dbRun(`INSERT INTO user_states(user_id,state,updated_at) VALUES ${ph} ON CONFLICT(user_id) DO UPDATE SET state=EXCLUDED.state,updated_at=CURRENT_TIMESTAMP`,snap.flatMap(([uid,s])=>[uid,JSON.stringify(s)])).catch(()=>{});},2000);if(this._flushTimer.unref)this._flushTimer.unref();}
   },
   async del(u) {
     delete this._s[u];
@@ -152,7 +154,7 @@ bot.use(async (ctx, next) => {
   if (ctx.chat?.type !== 'private') {
     if (ctx.callbackQuery) return next();
     const t = ctx.message?.text || '';
-    if (ctx.message && !['/search', '/setsp', '/dlt'].some(p => t.startsWith(p))) return ctx.deleteMessage().catch(() => {});
+    if (ctx.message && !['/search', '/setsp', '/dlt', '/done', '/cancel'].some(p => t.startsWith(p))) return ctx.deleteMessage().catch(() => {});
   }
   return next();
 });
@@ -313,17 +315,18 @@ const prefR = [
   { p: 'grp_sp_', fn: hGrpSp },
   { p: 'grp_dl_', fn: hGrpDl },
   { p: 'sp_', fn: (ctx, d) => browse.showYears(ctx, safeInt(d.substring(3))) },
+  { p: 'yr_page_', fn: (ctx, d) => { const p = d.substring(8).split('_'); return browse.showYears(ctx, p[0], parseInt(p[1])); } },
   { p: 'yr_', fn: (ctx, d) => { const p = d.split('_'); return browse.showSemesters(ctx, p[1], p[2]); } },
   { p: 'sm_', fn: (ctx, d) => { const p = d.split('_'); return browse.showSubjects(ctx, p[1], p[2], p[3]); } },
+  { p: 'sb_page_', fn: (ctx, d) => { const p = d.substring(8).split('_'); return browse.showSubjects(ctx, p[0], p[1], p[2], parseInt(p[3])); } },
   { p: 'sb_', fn: (ctx, d) => { const p = d.split('_'); return browse.showCategories(ctx, p[1], p[2], p[3], p[4]); } },
+  { p: 'ct_page_', fn: (ctx, d) => { const p = d.substring(8).split('_'); return browse.showFiles(ctx, p[0], p[1], p[2], p[3], p[4], parseInt(p[5])); } },
   { p: 'ct_', fn: (ctx, d) => { const p = d.split('_'); return browse.showFiles(ctx, p[1], p[2], p[3], p[4], p[5]); } },
   { p: 'fl_', fn: (ctx, d) => { const p = d.split('_'); return browse.sendFile(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); } },
   { p: 'preview_', fn: (ctx, d) => { const p = d.split('_'); return browse.showPreview(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); } },
   { p: 'bundle_', fn: (ctx, d) => { const p = d.split('_'); return browse.showBundle(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); } },
   { p: 'bdl_', fn: (ctx, d) => { const p = d.split('_'); return browse.sendBundle(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); } },
-  { p: 'ct_page_', fn: (ctx, d) => { const p = d.substring(8).split('_'); return browse.showFiles(ctx, p[0], p[1], p[2], p[3], p[4], parseInt(p[5])); } },
-  { p: 'yr_page_', fn: (ctx, d) => { const p = d.substring(8).split('_'); return browse.showYears(ctx, p[0], parseInt(p[1])); } },
-  { p: 'sb_page_', fn: (ctx, d) => { const p = d.substring(8).split('_'); return browse.showSubjects(ctx, p[0], p[1], p[2], parseInt(p[3])); } },
+  // [PATCHED] page handlers moved above
   { p: 'sbs_', fn: (ctx, d) => { const p = d.substring(4).split('_'); return browse.showSubjects(ctx, p[0], p[1], p[2]); } },
   { p: 'yrs_', fn: (ctx, d) => { const p = d.substring(4).split('_'); return browse.showYears(ctx, p[0]); } },
   { p: 'sms_', fn: (ctx, d) => { const p = d.substring(4).split('_'); return browse.showSemesters(ctx, p[0], p[1]); } },
@@ -335,7 +338,6 @@ const prefR = [
   { p: 'do_report_', fn: (ctx, d) => { const p = d.substring(10).split('_'); return browse.doReport(ctx, p[0], p[1], p[2], p[3], p[4], p[5], p[6]); } },
   { p: 'report_', fn: (ctx, d) => { const p = d.substring(7).split('_'); return browse.showReportMenu(ctx, p[0], p[1], p[2], p[3], p[4], p[5]); } },
   { p: 'cmt_pg_', fn: (ctx, d) => { const p = d.substring(7).split('_'); return browse.showComments(ctx, p[0], p[1], p[2], p[3], p[4], p[5], p[6], parseInt(p[7])); } },
-  { p: 'ct_', fn: (ctx, d) => { const p = d.substring(3).split('_'); return browse.showFiles(ctx, p[0], p[1], p[2], p[3], p[4]); } },
   { p: 'cmt_', fn: (ctx, d) => { const p = d.substring(4).split('_'); return browse.showComments(ctx, p[0], p[1], p[2], p[3], p[4], p[5], p[6]); } },
   { p: 'add_cmt_', fn: async (ctx, d) => { const p = d.substring(9).split('_'); await global.setState(ctx.uid, { type: 'add_comment', fid: p[0], spId: p[1], yrId: p[2], smId: p[3], sbId: p[4], catId: p[5] }); return ctx.reply('✍️ اكتب تعليقك:\n_(أو /cancel)_', { parse_mode: 'Markdown' }).catch(() => {}); } },
   { p: 'dcmt_', fn: async (ctx, d) => { const p = d.substring(5).split('_'); await commentsDb.deleteCommentAdmin(p[0]); await ctx.answerCbQuery('✅ تم الحذف').catch(() => {}); return browse.showComments(ctx, p[1], p[2], p[3], p[4], p[5], p[6], p[7]); } },
@@ -394,7 +396,7 @@ bot.on('document', async ctx => {
     try {
       const link = await ctx.telegram.getFileLink(ctx.message.document.file_id);
       const file = fs.createWriteStream(path.join(__dirname, 'study_bot.db'));
-      https.get(link.href, res => { res.pipe(file); file.on('finish', () => { file.close(); ctx.reply('✅ تمت الاستعادة!').catch(() => {}); }); });
+      const req=https.get(link.href,res=>{res.pipe(file);file.on('finish',()=>{file.close();ctx.reply('✅ تمت الاستعادة!').catch(()=>{});});file.on('error',e=>{ctx.reply('❌ فشل الحفظ: '+e.message).catch(()=>{});});});req.on('error',e=>{ctx.reply('❌ فشل التحميل: '+e.message).catch(()=>{});});
     } catch(e) { ctx.reply('❌ فشلت: ' + e.message).catch(() => {}); }
     return;
   }
@@ -470,7 +472,12 @@ async function launch() {
     await cacheWarmup(); logger.info('✅ Cache warm');
     startScheduler(bot, [OWNER_ID]);
     GrpBuf.start(); MGColl.start(); logger.info('✅ Services started');
-    app.use(bot.webhookCallback('/webhook/' + TOKEN));
+    app.use('/webhook/' + TOKEN, (req, res, next) => {
+  const secret = req.headers['x-telegram-bot-api-secret-token'];
+  if (WEBHOOK_SECRET && secret !== WEBHOOK_SECRET) return res.status(403).send('Forbidden');
+  next();
+});
+app.use(bot.webhookCallback('/webhook/' + TOKEN));
     app.get('/health', async (_r, res) => {
     res.setHeader('Cache-Control', 'no-store');
     var mu = process.memoryUsage();
@@ -488,7 +495,7 @@ async function launch() {
   });
 app.listen(PORT, () => logger.info('✅ Express :' + PORT));
     if (WEBHOOK_URL) {
-    await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, { allowed_updates: ['message', 'callback_query', 'my_chat_member'], drop_pending_updates: true, max_connections: 40 });
+    await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, { allowed_updates: ['message', 'callback_query', 'my_chat_member'], drop_pending_updates: true, max_connections: 40, ...(WEBHOOK_SECRET && { secret_token: WEBHOOK_SECRET }) });
     logger.info('✅ Webhook: ' + WEBHOOK_URL);
   } else {
     logger.warn('⚠️ No WEBHOOK_URL - using polling');
@@ -516,7 +523,7 @@ const _cln = setInterval(async () => {
       dbRun("DELETE FROM group_members WHERE updated_at::timestamp < NOW() - INTERVAL '7 days'").catch(() => {}),
       dbRun("DELETE FROM cache_store WHERE expires_at::bigint < $1::bigint", [Date.now()]).catch(() => {}),
     ]);
-    StateMgr.gc(); GrpMsgs.prune();
+    StateMgr.gc(); GrpMsgs.prune(); RL.gc();
   } catch(_) {}
 }, CFG.cleanupMs);
 _cln.unref();

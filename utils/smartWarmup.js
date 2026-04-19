@@ -1,10 +1,11 @@
+const logger = require('./logger');
 const { cacheSet, getCacheSize } = require('./cache');
 const { getSpecs, getYears, getSemesters, getSubjects } = require('../database/content');
 const { build, btn, backMenu } = require('./keyboard');
 const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
 
 async function startSmartWarmup() {
-  console.log('🔥 بدء التسخين التدريجي للقوائم...');
+  logger.info('🔥 بدء التسخين التدريجي للقوائم...');
   try {
     const specs = await getSpecs();
 
@@ -18,7 +19,7 @@ async function startSmartWarmup() {
         extra: {parse_mode:'Markdown',...build(rows)}
       }, 3600000);
     }
-    console.log('✅ تسخين السنوات - Cache:', getCacheSize());
+    logger.info('✅ تسخين السنوات - Cache:', getCacheSize());
 
     // المرحلة 2: الفصول (بعد ثانيتين)
     await new Promise(r => setTimeout(r, 2000));
@@ -34,7 +35,7 @@ async function startSmartWarmup() {
         }, 3600000);
       }
     }
-    console.log('✅ تسخين الفصول - Cache:', getCacheSize());
+    logger.info('✅ تسخين الفصول - Cache:', getCacheSize());
 
     // المرحلة 3: المواد (بعد 4 ثواني - أول تخصصين فقط لتوفير RAM)
     await new Promise(r => setTimeout(r, 4000));
@@ -58,9 +59,9 @@ async function startSmartWarmup() {
         }
       }
     }
-    console.log('✅ تسخين المواد - Cache:', getCacheSize());
-    console.log('🚀 انتهى التسخين! التصفح الآن فوري.');
-  } catch(e) { console.error('Warmup error:', e.message); }
+    logger.info('✅ تسخين المواد - Cache:', getCacheSize());
+    logger.info('🚀 انتهى التسخين! التصفح الآن فوري.');
+  } catch(e) { logger.error('Warmup error:', e.message); }
 }
 
 module.exports = { startSmartWarmup };

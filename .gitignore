@@ -7,3 +7,7 @@ backups/
 *.db
 *.bak
 fix*.js
+logs/
+*.backup
+*.db
+.env

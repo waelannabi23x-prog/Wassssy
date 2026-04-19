@@ -139,7 +139,7 @@ async function all(sql, params) {
   if (pg) {
     return withRetry(function() {
       return pg.query(toPgCached(sql), sanitizeParams(params)).then(function(r) { return r.rows; });
-    }).catch(function() { return []; });
+    }).catch(function(e){if(e&&e.message)logger.error('[DB]',e.message.substring(0,80));return[];});
   }
   try {
     var db = getSqlite();

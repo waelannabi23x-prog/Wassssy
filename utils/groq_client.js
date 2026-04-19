@@ -2,7 +2,7 @@
 const https = require('https');
 const logger = require('./logger');
 
-const GEMINI_KEY = process.env.GEMINI_KEY;
+const GEMINI_KEY = process.env.GEMINI_API_KEY;
 const GROQ_KEY = process.env.GROQ_API_KEY;
 
 const MAX_RETRIES = 2;

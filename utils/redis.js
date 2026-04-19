@@ -37,5 +37,5 @@ function scheduleFlush() {
 
 async function setState(uid, state) { _memStates.set(uid, state); _dirty.add(uid); const r = getRedis(); if (r) try { await r.set('state_' + uid, JSON.stringify(state), 'EX', 3600); } catch (_) {} scheduleFlush(); }
 async function delState(uid) { _memStates.delete(uid); _dirty.add(uid); const r = getRedis(); if (r) try { await r.del('state_' + uid); } catch (_) {} scheduleFlush(); }
-async function loadAllStates() { try { const { all } = require('../database/db'); const rows = await all('SELECT user_id, state FROM user_states'); for (const r of rows) { try { _memStates.set(r.user_id, JSON.parse(r.state)); } catch (_) {} } logger.info('✅ Loaded ' + _memStates.size + ' states'); } catch (_) {} }
+async function loadAllStates() { try { const { all } = require('../database/db'); const rows = await all('SELECT user_id, state FROM user_states'); for (const r of rows) { try { const s=JSON.parse(r.state); _memStates.set(r.user_id,s); if(global.userStates) global.userStates[r.user_id]=s; } catch(_){} } logger.info('✅ Loaded ' + _memStates.size + ' states'); } catch (_) {} }
 module.exports = { getRedis, setState, delState, loadAllStates };

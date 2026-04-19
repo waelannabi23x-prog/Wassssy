@@ -68,14 +68,10 @@ async function handleSummarize(ctx, fileId, fileType, title) {
 // Gemini يقرأ PDF مباشرة عبر API
 function geminiExtractPdf(buffer, title) {
   return new Promise((resolve, reject) => {
-    const boundary = '----FormBoundary' + Date.now();
-    const before = Buffer.from(
       '--' + boundary + '\r\n' +
       'Content-Type: application/pdf\r\n' +
       'Content-Disposition: form-data; name="file"; filename="' + title + '.pdf"\r\n\r\n'
     );
-    const after = Buffer.from('\r\n--' + boundary + '--\r\n');
-    const body = Buffer.concat([before, buffer, after]);
 
     const prompt = JSON.stringify({
       contents: [{ role: 'user', parts: [

@@ -3,7 +3,8 @@
 const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
 const { get, run } = require('../database/db');
 
-const OWNER_ID = parseInt(process.env.OWNER_ID || '5534474259');
+const OWNER_ID = parseInt(process.env.OWNER_ID);
+if (!OWNER_ID) { console.error('FATAL: OWNER_ID missing'); process.exit(1); }
 const isOwner = uid => parseInt(uid) === OWNER_ID;
 
 const _userBuf = new Map();
