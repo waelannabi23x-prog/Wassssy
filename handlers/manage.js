@@ -211,7 +211,20 @@ async function handleText(ctx,state){
       case 'mg_upl_desc':setState(uid,{...state,type:'mg_file',desc:text==='skip'?'':text,catId:state.catId});ctx.reply('📎 أرسل الملف:\n_(أو /cancel)_',{parse_mode:'Markdown'});break;
       case 'mg_rn_fl':await filesDb.rename(state.id,text);done('✅ تمت التسمية!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_'));break;
       case 'mg_desc_fl':await filesDb.updateDesc(state.id,text);done('✅ تم التحديث!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_'));break;
-      case 'mg_admin_search':{clearState(uid);const [fr,ur]=await Promise.all([filesDb.search(text),usersDb.searchUsers(text)]);let resp='🔍 *بحث: "'+escMd(text)+'"*\n\n';if(fr.length){resp+='📄 *ملفات ('+fr.length+'):*\n';fr.slice(0,5).forEach(f=>{resp+='• '+escMd(f.title)+' ('+escMd(f.sub_name)+')\n';});}if(ur.length){resp+='\n👥 *مستخدمون ('+ur.length+'):*\n';ur.slice(0,5).forEach(u=>{resp+='• '+escMd(u.first_name||'ID:'+u.id)+(u.username?' @'+escMd(u.username):'')+'\n';});}if(!fr.length&&!ur.length) resp+='_لا نتائج._';ctx.reply(resp,{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
+      case 'mg_admin_search':{
+  clearState(uid);
+  var words=text.trim().split(/\s+/).filter(Boolean);
+  var cond=words.map(w=>"LOWER(title) LIKE '%' || LOWER(?) || '%'").join(' AND ');
+  var fr = words.length ? await all("SELECT id, title, sub_name FROM files WHERE is_deleted=0 AND ("+cond+") ORDER BY downloads DESC LIMIT 10",words) : [];
+  var ur = await usersDb.searchUsers(text);
+  var rows=[];
+  if(fr.length){fr.forEach(function(f){rows.push([btn('📄 '+f.title+(f.sub_name?' | '+f.sub_name:''),'preview_'+f.id+'_0_0_0_0_0')]);});}
+  if(ur.length){ur.slice(0,5).forEach(function(u){rows.push([btn('👤 '+(u.first_name||u.id)+(u.username?' @'+u.username:''),'mg_profile_'+u.id)]);});}
+  if(!fr.length&&!ur.length) return ctx.reply('_لا نتائج._',{parse_mode:'Markdown',...build([back('mg_menu')])});
+  rows.push(back('mg_menu'));
+  return eos(ctx,'🔍 *نتائج: '+escMd(text)+'* ('+(fr.length+ur.length)+')',{parse_mode:'Markdown',...build(rows)});
+  break;
+}
       case 'mg_broadcast':{clearState(uid);const ids=await usersDb.allIds();const total_bc=ids.length;const sm=await ctx.reply('📢 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total_bc,{parse_mode:'Markdown'});const bcRes=await concurrentBroadcast(ctx.telegram,ctx.chat.id,sm.message_id,ids,'📢 *إعلان*\n\n'+text,{parse_mode:'Markdown'});ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ *اكتمل!*\n`[██████████] 100%`\n✅ '+bcRes.sent+' | ❌ '+bcRes.failed,{...build([back('mg_menu')]),parse_mode:'Markdown'}).catch(()=>{});break;}
       case 'mg_notify_sp_msg':{clearState(uid);const spUsers=await usersDb.getUsersBySpecialty(state.spId);const results=await Promise.allSettled(spUsers.map(id=>ctx.telegram.sendMessage(id,'🔔 '+text,{parse_mode:'Markdown'}).then(()=>true).catch(()=>false)));const spSent=results.filter(r=>r.status==='fulfilled'&&r.value).length;ctx.reply('✅ أُرسل لـ *'+spSent+'* مستخدم',{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
       case 'mg_notify_groups_msg':{clearState(uid);const groups=state.spId==='0'?await all('SELECT chat_id FROM group_chats'):await all('SELECT chat_id FROM group_chats WHERE specialty_id=$1',[state.spId]);let gSent=0,gFail=0;for(const g of groups){try{await ctx.telegram.sendMessage(g.chat_id,'📣 *إشعار*\n\n'+text,{parse_mode:'Markdown'});gSent++;}catch(_){gFail++;}await new Promise(r=>setTimeout(r,100));}ctx.reply('✅ أُرسل لـ *'+gSent+'* قروب'+(gFail?' | ❌ '+gFail:''),{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
