@@ -1,10 +1,13 @@
-const fs = require('fs');
+'use strict';
+const fs   = require('fs');
 const path = require('path');
-const LOG_DIR = path.join(__dirname, '../logs');
-if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
+
+const LOG_DIR = path.join(__dirname, '..', 'logs');
 const ERR_LOG = path.join(LOG_DIR, 'err.log');
-let buf = '';
-let flushT = null;
+
+try { if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true }); } catch (_) {}
+
+let buf = '', flushT = null;
 
 function ts() { return new Date().toISOString().replace('T', ' ').substring(0, 19); }
 
@@ -20,13 +23,13 @@ function _write(level, args) {
   if (!flushT) { flushT = setInterval(_flush, 3000); flushT.unref(); }
 }
 
-const isProd = process.env.NODE_ENV === 'production';
+// ✅ info يظهر دائماً حتى في production (Railway يلتقطها من stdout)
 const logger = {
-  info: (...a) => { if (!isProd) console.log(...a); },
-  warn: (...a) => { console.warn(...a); _write('WARN', a); },
-  error: (...a) => { console.error(...a); _write('ERROR', a); },
-  db: (...a) => { _write('DB', a); },
+  info:  (...a) => { console.log('[INFO]',  ...a); },
+  warn:  (...a) => { console.warn('[WARN]',  ...a); _write('WARN',  a); },
+  error: (...a) => { console.error('[ERROR]', ...a); _write('ERROR', a); },
+  db:    (...a) => { _write('DB', a); },
 };
-process.on('exit', _flush);
 
+process.on('exit', _flush);
 module.exports = logger;

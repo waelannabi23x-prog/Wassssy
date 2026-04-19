@@ -3,8 +3,12 @@
 const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
 const { get, run } = require('../database/db');
 
+// ✅ OWNER_ID إجباري من .env — لا fallback hardcoded
 const OWNER_ID = parseInt(process.env.OWNER_ID);
-if (!OWNER_ID) { console.error('FATAL: OWNER_ID missing'); process.exit(1); }
+if (!OWNER_ID || isNaN(OWNER_ID)) {
+  console.error('FATAL: OWNER_ID missing in .env');
+  process.exit(1);
+}
 const isOwner = uid => parseInt(uid) === OWNER_ID;
 
 const _userBuf = new Map();
@@ -49,22 +53,22 @@ async function getAdminInfo(uid) {
 }
 
 global.invalidateAdmin = uid => _admCache.delete(uid);
-global.invalidateBan = uid => cacheClear('ban_' + uid);
+global.invalidateBan   = uid => cacheClear('ban_' + uid);
 
 async function authMiddleware(ctx, next) {
   const uid = ctx.from?.id;
   if (!uid) return next();
 
-  ctx.uid = uid;
+  ctx.uid     = uid;
   ctx.isOwner = isOwner(uid);
   bufferUser(uid, ctx.from.first_name, ctx.from.last_name, ctx.from.username);
 
   if (ctx.isOwner) {
-    ctx.isAdmin = true;
+    ctx.isAdmin    = true;
     ctx.adminPerms = ['full'];
   } else {
-    const info = await getAdminInfo(uid);
-    ctx.isAdmin = info.isAdmin;
+    const info     = await getAdminInfo(uid);
+    ctx.isAdmin    = info.isAdmin;
     ctx.adminPerms = info.perms;
   }
 
@@ -81,7 +85,13 @@ async function authMiddleware(ctx, next) {
   }
 
   if (global.maintenanceMode && !ctx.isOwner && !ctx.isAdmin) {
-    return ctx.reply('🔧 البوت تحت الصيانة. يرجى الانتظار!').catch(() => {});
+    // ✅ رسالة صيانة احترافية مع وقت العودة
+    const { getSetting } = require('../database/db');
+    const endTime = await getSetting('maintenance_end').catch(() => null);
+    let msg = global.maintenanceMsg || '🔧 البوت تحت الصيانة حالياً لتحسين الخدمة.';
+    if (endTime) msg += `\n\n⏱ الوقت المتوقع للعودة: ${endTime}`;
+    msg += '\n\nنعتذر عن الإزعاج 🙏';
+    return ctx.reply(msg).catch(() => {});
   }
 
   return next();

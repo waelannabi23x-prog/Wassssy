@@ -135,9 +135,9 @@ async function showFiles(ctx, spId, yrId, smId, sbId, catId, page) {
 
 async function _showFiles(ctx, spId, yrId, smId, sbId, catId, page) {
   var uid = ctx.uid;
-  var userKey = 'showfiles_u_' + uid + '_' + catId + '_' + page;
-  var userCached = cacheGet(userKey);
-  if (userCached) return eos(ctx, userCached.text, userCached.extra);
+  // ✅ لا cache شخصي للبنية — فقط shared cache + fav شخصي خفيف
+  
+  
   var staticKey = 'showfiles_' + catId + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId;
   var staticData = cacheGet(staticKey);
   if (!staticData) {
@@ -182,7 +182,7 @@ async function _showFiles(ctx, spId, yrId, smId, sbId, catId, page) {
   }
   rows.push(backMenu('sbs_' + spId + '_' + yrId + '_' + smId));
   var extra = { parse_mode: 'Markdown', ...build(rows) };
-  cacheSet(userKey, { text: text, extra: extra }, 300000);
+  
   return eos(ctx, text, extra);
 }
 
