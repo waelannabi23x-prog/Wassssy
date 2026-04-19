@@ -4,7 +4,7 @@ const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
 const { get, run } = require('../database/db');
 
 // ✅ OWNER_ID إجباري من .env — لا fallback hardcoded
-const OWNER_ID = parseInt(process.env.OWNER_ID);
+const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
 if (!OWNER_ID || isNaN(OWNER_ID)) {
   console.error('FATAL: OWNER_ID missing in .env');
   process.exit(1);
