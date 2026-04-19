@@ -19,7 +19,7 @@ const usersDb = require('./database/users');
 const filesDb = require('./database/files');
 const contentDb = require('./database/content');
 const { initPersistentStates } = require('./utils/stateManager');
-const rateLimit = require('./utils/rateLimit');
+// RATE LIMITER: Integrated below
 const bundlesDb = require('./database/bundles');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { eos } = require('./utils/helpers');
@@ -158,6 +158,24 @@ bot.use(async (ctx, next) => {
   }
   return next();
 });
+// 🛡️ Ultra-Light Anti-Flood (Built-in)
+const _floodMap = new Map();
+const rateLimit = function(ctx, next) {
+  const uid = ctx.from?.id;
+  if (!uid) return next();
+  const now = Date.now();
+  let u = _floodMap.get(uid);
+  if (!u || now - u.t > 1000) { u = {c: 1, t: now}; _floodMap.set(uid, u); }
+  else {
+    u.c++;
+    if (u.c > 6) {
+      if (u.c === 7) return ctx.reply('⚠️ إبطاء قليلاً...').catch(() => {});
+      return;
+    }
+  }
+  return next();
+};
+
 bot.use(rateLimit);
 bot.use(authMiddleware);
 bot.catch((err, ctx) => {
