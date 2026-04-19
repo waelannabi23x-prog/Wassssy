@@ -158,8 +158,6 @@ bot.use(async (ctx, next) => {
 });
 bot.use(rateLimit);
 bot.use(authMiddleware);
-  return next();
-});
 bot.catch((err, ctx) => {
   if(!err.message.includes('is not modified')&&!err.message.includes('message is not modified'))logger.error(`[BotErr] ${err.message}`, { uid: ctx.from?.id, type: ctx.updateType });
   if (!ctx.callbackQuery) ctx.reply('⚠️ حدث خطأ. حاول مجدداً.').catch(() => {});
