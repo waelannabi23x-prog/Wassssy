@@ -453,7 +453,7 @@ bot.on('text', async ctx => { try {
     cacheClear('cmts_' + s.fid + '_0'); cacheClear('cmts_' + s.fid + '_1');
     await ctx.reply('✅ تم إضافة تعليقك!').catch(() => {}); return browse.showComments(ctx, s.fid, s.spId, s.yrId, s.smId, s.sbId, s.catId);
   }
-    if (s.type?.startsWith('mg_') && ctx.isAdmin) return manage.handleText(ctx, s);
+    if ((s?.type || '').startsWith('mg_') && ctx.isAdmin) return manage.handleText(ctx, s);
   } catch(e) { logger.error('[TextHandler]', e.message, { uid: ctx.from?.id }); }
 });
 
