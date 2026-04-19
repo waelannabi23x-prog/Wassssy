@@ -334,7 +334,7 @@ const prefR = [
   { p: 'fav_', fn: (ctx, d) => userH.toggleFav(ctx, safeInt(d.substring(4)), false) },
   { p: 'set_sp_', fn: async (ctx, d) => { await usersDb.setSpecialty(ctx.uid, safeInt(d.substring(7))); await ctx.answerCbQuery('✅ تم حفظ تخصصك').catch(() => {}); return startHandler.showMainMenu(ctx); } },
   { p: 'lang_', fn: (ctx, d) => { setLang(ctx.uid, d.substring(5)); return userH.showProfile(ctx); } },
-  { p: 'rate_', fn: async (ctx, d) => { const p = d.substring(5).split('_'); await interactions.addRating(ctx.uid, p[0], parseInt(p[1])); await ctx.answerCbQuery('⭐ تم التقييم!').catch(() => {}); var { cacheClear } = require('./utils/cache'); cacheClear('personal_'+ctx.uid+'_'+p[0]); return browse.showPreview(ctx, p[0], p[2], p[3], p[4], p[5], p[6]); } },
+  { p: 'rate_', fn: async (ctx, d) => { const p = d.substring(5).split('_'); await interactions.addRating(ctx.uid, p[0], parseInt(p[1])); await ctx.answerCbQuery('⭐ تم التقييم!').catch(() => {}); cacheClear('personal_'+ctx.uid+'_'+p[0]); return browse.showPreview(ctx, p[0], p[2], p[3], p[4], p[5], p[6]); } },
   { p: 'do_report_', fn: (ctx, d) => { const p = d.substring(10).split('_'); return browse.doReport(ctx, p[0], p[1], p[2], p[3], p[4], p[5], p[6]); } },
   { p: 'report_', fn: (ctx, d) => { const p = d.substring(7).split('_'); return browse.showReportMenu(ctx, p[0], p[1], p[2], p[3], p[4], p[5]); } },
   { p: 'cmt_pg_', fn: (ctx, d) => { const p = d.substring(7).split('_'); return browse.showComments(ctx, p[0], p[1], p[2], p[3], p[4], p[5], p[6], parseInt(p[7])); } },
