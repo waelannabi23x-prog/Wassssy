@@ -39,8 +39,6 @@ async function mainMenu(ctx){
     rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp')]);
   }
   rows.push([btn('🕵️ جاسوس','mg_spy'),btn('🧬 اختبار أداء','mg_stress')]);
-  rows.push([btn('🕵️ جاسوس','mg_spy'),btn('🧬 اختبار أداء','mg_stress')]);
-  rows.push([btn('🕵️ جاسوس','mg_spy'),btn('🧬 اختبار أداء','mg_stress')]);
   rows.push([btn('🏠 القائمة الرئيسية','main_menu')]);
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
@@ -230,10 +228,6 @@ async function handleCallback(ctx,data){
   const uid=ctx.uid;
   if(data==='mg_spy'){setState(uid,{type:'mg_spy_id'});return ctx.reply('🕵ددددن ID:ل_(أو /cancel)_',{parse_mode:'Markdown'});}
   if(data==='mg_stress'){setState(uid,{type:'mg_stress_count'});return ctx.reply('🧪 كم رسالة:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
-  if(data==='mg_spy'){setState(uid,{type:'mg_spy_id'});return ctx.reply('Enter ID:\n_(or /cancel)_',{parse_mode:'Markdown'});}
-  if(data==='mg_stress'){setState(uid,{type:'mg_stress_count'});return ctx.reply('How many? (50-200):\n_(or /cancel)_',{parse_mode:'Markdown'});}
-  if(data==='mg_spy'){setState(uid,{type:'mg_spy_id'});return ctx.reply('Enter ID:\n_(or /cancel)_',{parse_mode:'Markdown'});}
-  if(data==='mg_stress'){setState(uid,{type:'mg_stress_count'});return ctx.reply('How many? (50-200):\n_(or /cancel)_',{parse_mode:'Markdown'});}
   if(data==='mg_menu') return mainMenu(ctx);
   if(data==='mg_content') return showContent(ctx);
   if(data==='mg_analytics') return showAnalytics(ctx);
