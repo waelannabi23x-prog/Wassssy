@@ -6,7 +6,7 @@ const interactions = require('../database/interactions');
 const usersDb = require('../database/users');
 const content = require('../database/content');
 const { cacheGet, cacheSet } = require('../utils/cache');
-var safeInt = function(v) { var n = parseInt(v); return isNaN(v) ? 0 : n; };
+var safeInt = function(v) { var n = parseInt(v); return isNaN(n) ? 0 : n; };
 
 async function startHandler(ctx) {
   var uid = ctx.uid;
