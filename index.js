@@ -19,6 +19,7 @@ const usersDb = require('./database/users');
 const filesDb = require('./database/files');
 const contentDb = require('./database/content');
 const { initPersistentStates } = require('./utils/stateManager');
+const rateLimit = require('./utils/rateLimit');
 const bundlesDb = require('./database/bundles');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { eos } = require('./utils/helpers');
@@ -152,6 +153,7 @@ bot.use(async (ctx, next) => {
   }
   return next();
 });
+bot.use(rateLimit);
 bot.use(authMiddleware);
 bot.use(async (ctx, next) => {
   if (!ctx.from) return next();
