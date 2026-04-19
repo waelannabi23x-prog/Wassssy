@@ -270,13 +270,16 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
   var uid = ctx.uid;
     // ack removed for speed
   ctx.sendChatAction('upload_document').catch(function(){});
-  var results = await Promise.all([filesDb.getFile(fid), interactions.getSimilar(fid, 4), interactions.isFav(uid, fid)]);
-  var f = results[0], similar = results[1], fav = results[2];
+  var f = await filesDb.getFile(fid);
   if (!f) return ctx.reply(t(uid, 'not_found'));
-  filesDb.incDownloads(fid).catch(function(){});
-  interactions.addHistory(uid, fid).catch(function(){});
-  interactions.addLog(uid, 'download', f.title);
-  interactions.invalidateLastFile(uid);
+  var _bg = Promise.all([interactions.getSimilar(fid, 4), interactions.isFav(uid, fid), filesDb.incDownloads(fid), interactions.addHistory(uid, fid), interactions.addLog(uid, 'download', f.title)]);
+  var similar = await _bg.then(r=>r[0]);
+  var fav = await _bg.then(r=>r[1]);
+  if (!f) return ctx.reply(t(uid, 'not_found'));
+  
+  
+  
+  
   var caption = '📄 *' + escMd(f.title) + '*\n' + (f.description ? '📝 ' + escMd(f.description) + '\n' : '') + '📁 ' + escMd(f.cat_name || 'عام') + ' | 📖 ' + escMd(f.sub_name || 'عام');
   var backCb = catId !== 0 ? 'ct_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId : 'main_menu';
   var kb = build([[btn(fav ? '⭐ محفوظ' : '☆ حفظ', 'fav_' + fid)], [btn('◀️ رجوع', backCb), btn('🏠', 'main_menu')]]);

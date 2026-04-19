@@ -6,16 +6,11 @@ var formatDate = common.formatDate;
 
 async function eos(ctx, text, extra) {
   extra = extra || {};
-  var msg = ctx.callbackQuery && ctx.callbackQuery.message;
-  if (msg) {
-    try {
-      return await ctx.editMessageText(text, extra);
-    } catch (e) {
-      if (e.description && e.description.indexOf('message is not modified') !== -1) return;
-      if (e.description && e.description.indexOf('no text in the message') !== -1) {
-        try { return await ctx.editMessageCaption(text, extra); } catch(_) {}
-      }
-      try { return await ctx.reply(text, extra); } catch(_) {}
+  if (ctx.callbackQuery) {
+    try { return await ctx.editMessageText(text, extra); } catch (e) {
+      var d = e.description || '';
+      if (d.indexOf('not modified') !== -1) return;
+      try { return await ctx.editMessageCaption(text, { ...extra, parse_mode: undefined }); } catch (_) {}
     }
   }
   return ctx.reply(text, extra).catch(function(){});
