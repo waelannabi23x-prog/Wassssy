@@ -192,7 +192,9 @@ async function handleText(ctx,state){
   const done=(msg,cb)=>{clearState(uid);ctx.reply(msg,{parse_mode:'Markdown',...build([[btn('◀️ رجوع',cb)]])});};
   try{
     switch(state.type){
-      case 'mg_add_sp':await content.addSpec(text);done('✅ تم إضافة *'+escMd(text)+'*!','mg_content');break;
+      case 'mg_spy_id':{var tid=parseInt(text);if(isNaN(tid)){clearState(uid);return ctx.reply('❌');}clearState(uid);var u=await usersDb.getById(tid);if(!u)return ctx.reply('❌');var sp=await usersDb.getSpecialty(tid);var spN=sp&&sp.specialty_id?(await content.getSpec(sp.specialty_id))?.name:null;var st=global.userStates?global.userStates[tid]:null;return ctx.reply('🕵️ *'+escMd(u.first_name||'?')+'*\n━━━━\n🆔 `'+tid+'`\n📛 '+(u.username?'@'+escMd(u.username):'لا يوجد')+'\n🎓 '+escMd(spN||'غير محدد')+'\n'+(st?'🔄 *'+st.type+'*':'⬜ فاضي'),{parse_mode:'Markdown'});}
+case 'mg_stress_count':{var cnt=Math.min(parseInt(text)||50,200);if(isNaN(cnt)){clearState(uid);return ctx.reply('❌');}clearState(uid);await ctx.reply('🧬 جاري '+cnt+'...');var sM=process.memoryUsage().heapUsed/1024/1024;var sT=Date.now();var p=[];for(var i=0;i<cnt;i++){p.push(ctx.telegram.sendMessage(ctx.chat.id,'⚡ '+(i+1)).catch(function(){}));}await Promise.all(p);var eT=Date.now();var eM=process.memoryUsage().heapUsed/1024/1024;return ctx.reply('🧬 *اختبار*\n📦 *'+cnt+'*\n⏱️ *'+(eT-sT)+'ms*\n💾 *+'+(eM-sM).toFixed(2)+' MB*\n📊 *'+(cnt>0?((eT-sT)/cnt).toFixed(2):0)+'ms*',{parse_mode:'Markdown'});}
+case 'mg_add_sp':await content.addSpec(text);done('✅ تم إضافة *'+escMd(text)+'*!','mg_content');break;
       case 'mg_rn_sp':await content.renameSpec(state.id,text);done('✅ تمت التسمية!','mg_content');break;
       case 'mg_add_yr':await content.addYear(state.spId,text);done('✅ تمت الإضافة!','mg_yrs_'+state.spId);break;
       case 'mg_rn_yr':await content.renameYear(state.id,text);done('✅ تمت التسمية!','mg_yrs_'+state.spId);break;
