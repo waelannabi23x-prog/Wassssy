@@ -277,7 +277,7 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
   interactions.addHistory(uid, fid).catch(function(){});
   interactions.addLog(uid, 'download', f.title);
   interactions.invalidateLastFile(uid);
-  var caption = '📄 *' + escMd(f.title) + '*\n' + (f.description ? '📝 ' + escMd(f.description) + '\n' : '') + '📁 ' + escMd(f.cat_name) + ' | 📖 ' + escMd(f.sub_name);
+  var caption = '📄 *' + escMd(f.title) + '*\n' + (f.description ? '📝 ' + escMd(f.description) + '\n' : '') + '📁 ' + escMd(f.cat_name || 'عام') + ' | 📖 ' + escMd(f.sub_name || 'عام');
   var backCb = catId !== 0 ? 'ct_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId : 'main_menu';
   var kb = build([[btn(fav ? '⭐ محفوظ' : '☆ حفظ', 'fav_' + fid)], [btn('◀️ رجوع', backCb), btn('🏠', 'main_menu')]]);
   try {
