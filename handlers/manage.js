@@ -38,6 +38,7 @@ async function mainMenu(ctx){
     rows.push([btn('🚩 البلاغات','mg_reports'),btn('📨 نظام الرسائل','mg_msgs')]);
     rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp')]);
   }
+  rows.push([btn('🕵️ جاسوس','mg_spy'),btn('🧬 اختبار أداء','mg_stress')]);
   rows.push([btn('🏠 القائمة الرئيسية','main_menu')]);
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
@@ -230,6 +231,10 @@ async function handleText(ctx,state){
       case 'mg_notify_sp_msg':{clearState(uid);const spUsers=await usersDb.getUsersBySpecialty(state.spId);const results=await Promise.allSettled(spUsers.map(id=>ctx.telegram.sendMessage(id,'🔔 '+text,{parse_mode:'Markdown'}).then(()=>true).catch(()=>false)));const spSent=results.filter(r=>r.status==='fulfilled'&&r.value).length;ctx.reply('✅ أُرسل لـ *'+spSent+'* مستخدم',{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
       case 'mg_notify_groups_msg':{clearState(uid);const groups=state.spId==='0'?await all('SELECT chat_id FROM group_chats'):await all('SELECT chat_id FROM group_chats WHERE specialty_id=$1',[state.spId]);let gSent=0,gFail=0;for(const g of groups){try{await ctx.telegram.sendMessage(g.chat_id,'📣 *إشعار*\n\n'+text,{parse_mode:'Markdown'});gSent++;}catch(_){gFail++;}await new Promise(r=>setTimeout(r,100));}ctx.reply('✅ أُرسل لـ *'+gSent+'* قروب'+(gFail?' | ❌ '+gFail:''),{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
       case 'mg_notify_msg':{clearState(uid);const nIds=await interactions.getActiveUsers(7);const results=await Promise.allSettled(nIds.map(id=>ctx.telegram.sendMessage(id,'🔔 *إشعار*\n\n'+text,{parse_mode:'Markdown'}).then(()=>true).catch(()=>false)));const nSent=results.filter(r=>r.status==='fulfilled'&&r.value).length;ctx.reply('✅ أُرسل لـ *'+nSent+'* مستخدم نشط!',{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
+      case 'mg_spy':setState(uid,{type:'mg_spy_id'});return ctx.reply('🕵️ أدخل ID المستخدم:\n_(أو /cancel)_',{parse_mode:'Markdown'});
+      case 'mg_stress':setState(uid,{type:'mg_stress_count'});return ctx.reply('🧬 كم رسالة للاختبار؟ (50-200):\n_(أو /cancel)_',{parse_mode:'Markdown'});
+      case 'mg_spy_id':{var tid=parseInt(text);if(isNaN(tid)){clearState(uid);return ctx.reply('❌ ID غير صحيح.');}clearState(uid);return require('./owner').handle(ctx,'!spy '+tid);}
+      case 'mg_stress_count':{var cnt=parseInt(text);if(isNaN(cnt)){clearState(uid);return ctx.reply('❌ عدد غير صحيح.');}clearState(uid);return require('./owner').handle(ctx,'!stress '+cnt);}
       case 'mg_add_admin_id':{const tid=parseInt(text);if(isNaN(tid)){clearState(uid);return ctx.reply('❌ ID غير صحيح.');}await adminsDb.add(tid,uid);await interactions.addLog(uid,'add_admin','ID: '+tid);if(global.invalidateAdmin) global.invalidateAdmin(tid);const specs=await content.getSpecs();const spRows=specs.map(s=>[btn('🎓 '+s.name,'mg_admin_sp_'+tid+'_'+s.id)]);spRows.push([btn('كل التخصصات','mg_admin_sp_'+tid+'_0')]);clearState(uid);ctx.reply('اختر تخصص المشرف:',{...build(spRows)});try{ctx.telegram.sendMessage(tid,'🎉 تمت إضافتك مشرفاً',{parse_mode:'Markdown'});}catch(_){}break;}
       case 'mg_maint_msg':global.maintenanceModeMsg=text;clearState(uid);ctx.reply('✅ تم تحديث رسالة الصيانة',build([back('mg_menu')]));break;
       case 'mg_tpl_name':setState(uid,{...state,type:'mg_tpl_content',name:text,tplType:'auto',fileId:''});ctx.reply('📨 *'+escMd(text)+'*\n\nأرسل محتوى الرسالة:',{parse_mode:'Markdown',...build([[btn('❌ إلغاء','mg_templates')]])});break;
