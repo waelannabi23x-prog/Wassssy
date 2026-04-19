@@ -18,6 +18,7 @@ const adminsDb = require('./database/admins');
 const usersDb = require('./database/users');
 const filesDb = require('./database/files');
 const contentDb = require('./database/content');
+const { initPersistentStates } = require('./utils/stateManager');
 const bundlesDb = require('./database/bundles');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { eos } = require('./utils/helpers');
@@ -459,7 +460,8 @@ bot.on('my_chat_member', async ctx => {
 async function launch() {
   logger.info('🚀 Study Bot v5.0 — Enterprise Edition');
   try {
-    await initSchema(); logger.info('✅ DB ready');
+    await initSchema();
+  await initPersistentStates(); logger.info('✅ DB ready');
 
     try {
       const db = require('./database/db');
