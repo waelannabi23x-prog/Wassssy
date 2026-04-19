@@ -39,7 +39,6 @@ async function mainMenu(ctx){
     rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp')]);
   }
   rows.push([btn('🏠 القائمة الرئيسية','main_menu')]);
-  rows.push([btn('🕵️ جاسوس','mg_spy'),btn('🧬 اختبار أداء','mg_stress')]);
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
 
@@ -192,9 +191,7 @@ async function handleText(ctx,state){
   const done=(msg,cb)=>{clearState(uid);ctx.reply(msg,{parse_mode:'Markdown',...build([[btn('◀️ رجوع',cb)]])});};
   try{
     switch(state.type){
-      case 'mg_spy_id':{var tid=parseInt(text);if(isNaN(tid)){clearState(uid);return ctx.reply('❌');}clearState(uid);var u=await usersDb.getById(tid);if(!u)return ctx.reply('❌');var sp=await usersDb.getSpecialty(tid);var spN=sp&&sp.specialty_id?(await content.getSpec(sp.specialty_id))?.name:null;var st=global.userStates?global.userStates[tid]:null;return ctx.reply('🕵️ *'+escMd(u.first_name||'?')+'*\n━━━━\n🆔 `'+tid+'`\n📛 '+(u.username?'@'+escMd(u.username):'لا يوجد')+'\n🎓 '+escMd(spN||'غير محدد')+'\n'+(st?'🔄 *'+st.type+'*':'⬜ فاضي'),{parse_mode:'Markdown'});}
-case 'mg_stress_count':{var cnt=Math.min(parseInt(text)||50,200);if(isNaN(cnt)){clearState(uid);return ctx.reply('❌');}clearState(uid);await ctx.reply('🧬 جاري '+cnt+'...');var sM=process.memoryUsage().heapUsed/1024/1024;var sT=Date.now();var p=[];for(var i=0;i<cnt;i++){p.push(ctx.telegram.sendMessage(ctx.chat.id,'⚡ '+(i+1)).catch(function(){}));}await Promise.all(p);var eT=Date.now();var eM=process.memoryUsage().heapUsed/1024/1024;return ctx.reply('🧬 *اختبار*\n📦 *'+cnt+'*\n⏱️ *'+(eT-sT)+'ms*\n💾 *+'+(eM-sM).toFixed(2)+' MB*\n📊 *'+(cnt>0?((eT-sT)/cnt).toFixed(2):0)+'ms*',{parse_mode:'Markdown'});}
-case 'mg_add_sp':await content.addSpec(text);done('✅ تم إضافة *'+escMd(text)+'*!','mg_content');break;
+      case 'mg_add_sp':await content.addSpec(text);done('✅ تم إضافة *'+escMd(text)+'*!','mg_content');break;
       case 'mg_rn_sp':await content.renameSpec(state.id,text);done('✅ تمت التسمية!','mg_content');break;
       case 'mg_add_yr':await content.addYear(state.spId,text);done('✅ تمت الإضافة!','mg_yrs_'+state.spId);break;
       case 'mg_rn_yr':await content.renameYear(state.id,text);done('✅ تمت التسمية!','mg_yrs_'+state.spId);break;
@@ -228,8 +225,6 @@ case 'mg_add_sp':await content.addSpec(text);done('✅ تم إضافة *'+escMd(
 }
 async function handleCallback(ctx,data){
   const uid=ctx.uid;
-  if(data==='mg_spy'){setState(uid,{type:'mg_spy_id'});return ctx.reply('🕵️ أدخل ID:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
-  if(data==='mg_stress'){setState(uid,{type:'mg_stress_count'});return ctx.reply('🧬 كم رسالة:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
   if(data==='mg_menu') return mainMenu(ctx);
   if(data==='mg_content') return showContent(ctx);
   if(data==='mg_analytics') return showAnalytics(ctx);
@@ -249,6 +244,7 @@ async function handleCallback(ctx,data){
   if(data.startsWith('mg_del_tpl_')){await messagesDb.deleteTemplate(data.replace('mg_del_tpl_',''));return showTemplates(ctx);}
   if(data.startsWith('mg_sched_')&&!data.startsWith('mg_sched_all_')&&!data.startsWith('mg_sched_sp_')){const tplId=data.replace('mg_sched_','');const rows=[[btn('👥 كل المستخدمين','mg_sched_all_'+tplId)],[btn('🎓 تخصص معين','mg_sched_sp_'+tplId)],[back('mg_templates')[0]]];return eos(ctx,'📅 من تريد الإرسال؟',{parse_mode:'Markdown',...build(rows)});}
   if(data.startsWith('mg_sched_all_')){setState(uid,{type:'mg_sched_time',tplId:data.replace('mg_sched_all_',''),target:'all'});return ctx.reply('📅 وقت الإرسال\nمثال: 2026-04-10 20:00');}
+  if(data.startsWith('mg_sched_sp_')&&!data.startsWith('mg_sched_spid_')){const tplId=data.replace('mg_sched_sp_','');const specs=await content.getSpecs();const rows=specs.map(s=>[btn('🎓 '+s.name,'mg_sched_spid_'+tplId+'_'+s.id)]);return eos(ctx,'اختر التخصص:',{...build(rows)});}
   if(data.startsWith('mg_sched_spid_')){const p=data.replace('mg_sched_spid_','').split('_');setState(uid,{type:'mg_sched_time',tplId:p[0],target:'specialty',spId:p[1]});return ctx.reply('📅 وقت الإرسال\nمثال: 2026-04-10 20:00');}
   if(data.startsWith('mg_send_now_')){const tplId=data.replace('mg_send_now_','');const tpl=await messagesDb.getTemplate(tplId);if(!tpl) return ctx.reply('❌ غير موجود');const ids=await usersDb.allIds();let sent=0,failed=0;const total=ids.length;const sm=await ctx.reply('📤 *جاري...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total,{parse_mode:'Markdown'});async function st(id){const o={parse_mode:'Markdown'};if(tpl.type==='text')return ctx.telegram.sendMessage(id,tpl.content,o).then(()=>1).catch(()=>0);if(tpl.type==='photo')return ctx.telegram.sendPhoto(id,tpl.file_id,{caption:tpl.content,...o}).then(()=>1).catch(()=>0);if(tpl.type==='document')return ctx.telegram.sendDocument(id,tpl.file_id,{caption:tpl.content,...o}).then(()=>1).catch(()=>0);if(tpl.type==='video')return ctx.telegram.sendVideo(id,tpl.file_id,{caption:tpl.content,...o}).then(()=>1).catch(()=>0);if(tpl.type==='link')return ctx.telegram.sendMessage(id,tpl.content).then(()=>1).catch(()=>0);return 0;}for(let i=0;i<ids.length;i+=30){const r=await Promise.allSettled(ids.slice(i,i+30).map(st));r.forEach(x=>{if(x.status==='fulfilled'&&x.value)sent++;else failed++;});const p=Math.round((sent+failed)/total*100);const b='█'.repeat(Math.round(p/10))+'░'.repeat(10-Math.round(p/10));ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'📤 *جاري...*\x60['+b+'] '+p+'%\x60\n✅ '+sent+' | ❌ '+failed+' | ⏳ '+(total-sent-failed),{parse_mode:'Markdown'}).catch(()=>{});if(i+30<total)await new Promise(r=>setTimeout(r,50));}return ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ *اكتمل!*\n`[██████████] 100%`\n✅ '+sent+' | ❌ '+failed,{parse_mode:'Markdown',...build([back('mg_templates')])}).catch(()=>{});}
   if(data==='mg_scheduled') return showScheduled(ctx);
