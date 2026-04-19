@@ -388,4 +388,6 @@ async function handleText(ctx, state) {
 }
 
 
+async function handleCallback(ctx, data) { try { await ctx.answerCbQuery().catch(function(){}); } catch(e) {} }
+
 module.exports = { mainMenu, handleCallback, handleText, handleFileUpload, handleBulkUpload, showUserProfile, showUsers, handleBundleFileUpload };
