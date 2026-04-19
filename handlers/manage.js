@@ -1,4 +1,6 @@
 'use strict';
+var _gf=function(msg){if(msg.document)return{id:msg.document.file_id,type:'document',title:msg.document.file_name||'📄 ملف'};if(msg.photo)return{id:msg.photo[msg.photo.length-1].file_id,type:'photo',title:'🖼️ صورة'};if(msg.video)return{id:msg.video.file_id,type:'video',title:'🎥 فيديو'};if(msg.video_note)return{id:msg.video_note.file_id,type:'video',title:'🎥 فيديو دائري'};if(msg.audio)return{id:msg.audio.file_id,type:'audio',title:msg.audio.title||'🎵 صوت'};if(msg.voice)return{id:msg.voice.file_id,type:'voice',title:'🎤 تسجيل'};if(msg.sticker)return{id:msg.sticker.file_id,type:'photo',title:'🏷️ ملصق'};var t=(msg.text||msg.caption||'').trim();if(t.match(/https?:\/\/|www\./))return{id:t,type:'link',title:'🔗 رابط'};return null;};
+
 const content=require('../database/content');
 const bundlesDb=require('../database/bundles');
 const filesDb=require('../database/files');
@@ -294,6 +296,7 @@ async function handleCallback(ctx,data){
   if(data.startsWith('mg_cdl_fl_')){const p=data.replace('mg_cdl_fl_','').split('_');await filesDb.softDelete(p[5]);return showMgFiles(ctx,p[0],p[1],p[2],p[3],p[4]);}
 }
 
+var _hCB=handleCallback;handleCallback=async function(ctx,data){try{await _hCB(ctx,data);}catch(e){console.error('[CB]',e.message);}finally{await ctx.answerCbQuery().catch(function(){});}};
 var _hCB=handleCallback;handleCallback=async function(ctx,data){try{await _hCB(ctx,data);}catch(e){console.error('[CB]',e.message);}finally{await ctx.answerCbQuery().catch(function(){});}};
 module.exports={mainMenu,handleCallback,handleText,handleFileUpload,handleBulkUpload,showUserProfile,showUsers,handleBundleFileUpload};
 
