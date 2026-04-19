@@ -60,4 +60,12 @@ global.delState = function(uid) {
   run("DELETE FROM bot_states WHERE uid=$1", [uid]).catch(() => {});
 };
 
+
+// تنظيف تلقائي للمهملات كل ساعة (بدون ثقل)
+setInterval(function() {
+  if (global.userStates.size > 500) {
+    run("DELETE FROM bot_states WHERE updated_at <= NOW() - INTERVAL '1 hour'").catch(() => {});
+  }
+}, 3600000);
+
 module.exports = { initPersistentStates };
