@@ -35,8 +35,20 @@ function getPg() {
       keepAlive: true,
       keepAliveInitialDelayMillis: 10000
     });
-    pgPool.on('error', function(err) { logger.error('PG:', err.message); });
-    logger.info('✅ PostgreSQL');
+    pgPool.on('error', function(err) { logger.error('PG pool error:', err.message); });
+    pgPool.on('connect', function() {});
+    pgPool.on('remove',  function() {});
+
+    // Pool monitoring — alert if pool exhausted
+    setInterval(function() {
+      if (!pgPool) return;
+      const total = pgPool.totalCount, idle = pgPool.idleCount, waiting = pgPool.waitingCount;
+      if (waiting > 5)  logger.warn('[Pool] waiting=' + waiting + ' total=' + total + ' idle=' + idle);
+      if (waiting > 15) logger.error('[Pool] CRITICAL pool exhausted! waiting=' + waiting);
+      if (total >= 18)  logger.warn('[Pool] near limit: ' + total + '/20 connections');
+    }, 30000).unref();
+
+    logger.info('✅ PostgreSQL (pool max=20)');
     return pgPool;
   } catch (e) { return null; }
 }
