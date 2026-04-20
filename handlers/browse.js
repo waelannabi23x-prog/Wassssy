@@ -29,7 +29,7 @@ async function getPathData(spId, yrId, smId, sbId, catId) {
     catId && catId !== 0 ? content.getCategory(catId) : null,
   ]);
   var r = { sp: results[0], yr: results[1], sm: results[2], sb: results[3], cat: results[4] };
-  cacheSet(key, r, 7200000);
+  cacheSet(key, r, 86400000); // 24h — path names rarely change
   return r;
 }
 
@@ -47,7 +47,7 @@ async function showYears(ctx, spId, page) {
   if (!yd) {
     var results = await Promise.all([content.getSpec(spId), content.getYears(spId)]);
     yd = { sp: results[0], all: results[1] };
-    cacheSet(ckey, yd, 3600000);
+    cacheSet(ckey, yd, 21600000);
   }
   var sp = yd.sp, all = yd.all;
   var total = all.length;
@@ -72,7 +72,7 @@ async function showSemesters(ctx, spId, yrId) {
   if (!sd) {
     var results = await Promise.all([content.getSpec(spId), content.getYear(yrId), content.getSemesters(yrId)]);
     sd = { sp: results[0], yr: results[1], sems: results[2] };
-    cacheSet(ckey, sd, 3600000);
+    cacheSet(ckey, sd, 21600000);
   }
   var sp = sd.sp, yr = sd.yr, sems = sd.sems;
   if (!sems.length) return eos(ctx, buildPath([escMd(sp ? sp.name : ''), escMd(yr ? yr.name : '')]) + '\n\n📭 لا توجد فصول.', build([backMenu('yrs_' + spId)]));
@@ -88,7 +88,7 @@ async function showSubjects(ctx, spId, yrId, smId, page) {
   if (!subd) {
     var results = await Promise.all([content.getSpec(spId), content.getYear(yrId), content.getSemester(smId), content.getSubjects(smId)]);
     subd = { sp: results[0], yr: results[1], sm: results[2], all: results[3] };
-    cacheSet(ckey, subd, 3600000);
+    cacheSet(ckey, subd, 21600000);
   }
   var sp = subd.sp, yr = subd.yr, sm = subd.sm, all = subd.all;
   var total = all.length;

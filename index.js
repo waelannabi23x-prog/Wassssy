@@ -352,6 +352,19 @@ const prefR = [
   { p: 'mg_', fn: async (ctx, d) => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {}); return manage.handleCallback(ctx, d); } },
 ];
 
+
+// O(1) callback prefix dispatcher — built from prefR at startup
+let _prefixMap = null;
+function _getPrefixHandler(data) {
+  if (!_prefixMap) {
+    // Sort by length descending so longer prefixes match first
+    const sorted = [...prefR].sort((a, b) => b.p.length - a.p.length);
+    _prefixMap = sorted;
+  }
+  for (const r of _prefixMap) if (data.startsWith(r.p)) return r.fn;
+  return null;
+}
+
 bot.on('callback_query', async ctx => {
   const _raw = ctx.callbackQuery?.data, cbId = ctx.callbackQuery?.id;
   if (!_raw || CBDedup.isDupe(cbId)) return;
@@ -360,7 +373,8 @@ bot.on('callback_query', async ctx => {
     // no blanket answerCbQuery — saves 100ms per click
     if (ctx.chat?.type !== 'private' && !data.startsWith('grp_')) return ctx.answerCbQuery('👉 استخدم البوت في الخاص').catch(() => {});
     if (exactR.has(data)) return exactR.get(data)(ctx);
-    for (const r of prefR) { if (data.startsWith(r.p)) return r.fn(ctx, data); }
+    const _h = _getPrefixHandler(data);
+  if (_h) return _h(ctx, data);
   } catch(e) { logger.error('[CB]', e.message, { data, uid: ctx.from?.id }); }
 });
 

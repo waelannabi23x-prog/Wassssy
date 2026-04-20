@@ -44,6 +44,11 @@ setInterval(() => {
 // ══════════════════════════════════════
 const _aiHistory  = new Map();
 const HIST_MAX    = 10; // أقصى 10 أزواج سؤال/جواب
+// Cleanup idle histories every 30 min (unused > 2h)
+setInterval(() => {
+  const cut = Date.now() - 7200000;
+  for (const [k, v] of _aiHistory) if (!v._ts || v._ts < cut) _aiHistory.delete(k);
+}, 1800000).unref();
 
 // ✅ resetChat تفعل شيئاً حقيقياً الآن
 async function resetChat(uid) {
@@ -146,6 +151,7 @@ async function handleAiChat(ctx, text) {
     history.push({ role: 'user',      content: text  });
     history.push({ role: 'assistant', content: reply });
     if (history.length > HIST_MAX * 2) history.splice(0, 2);
+    history._ts = Date.now();
     _aiHistory.set(uid, history);
 
     // ✅ تنظيف تلقائي بعد ساعة خمول

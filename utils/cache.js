@@ -33,28 +33,43 @@ function _evictLRU() {
   while (store.size > MAX) store.delete(iter.next().value);
 }
 
+// Throttled warmup — max CONC concurrent DB queries to avoid startup pressure
 async function cacheWarmup() {
+  const CONC = 5;
   try {
     const content = require('../database/content');
     const specs = await content.getSpecs();
     if (!specs?.length) return;
-    await Promise.all(specs.map(async sp => {
+
+    // Collect all tasks first, then run with concurrency limit
+    const tasks = [];
+    for (const sp of specs) {
+      tasks.push(async () => { try { await content.getYears(sp.id); } catch(_){} });
       try {
         const years = await content.getYears(sp.id);
-        await Promise.all((years || []).map(async yr => {
+        for (const yr of (years||[])) {
+          tasks.push(async () => { try { await content.getSemesters(yr.id); } catch(_){} });
           try {
             const sems = await content.getSemesters(yr.id);
-            await Promise.all((sems || []).map(async sm => {
+            for (const sm of (sems||[])) {
+              tasks.push(async () => { try { await content.getSubjects(sm.id); } catch(_){} });
               try {
                 const subs = await content.getSubjects(sm.id);
-                await Promise.all((subs || []).map(sb =>
-                  content.getCategories(sb.id).catch(() => {})));
-              } catch (_) {}
-            }));
-          } catch (_) {}
-        }));
-      } catch (_) {}
-    }));
+                for (const sb of (subs||[]))
+                  tasks.push(async () => { try { await content.getCategories(sb.id); } catch(_){} });
+              } catch(_){}
+            }
+          } catch(_){}
+        }
+      } catch(_){}
+    }
+
+    // Run with concurrency limit
+    let i = 0;
+    async function worker() {
+      while (i < tasks.length) { const t = tasks[i++]; await t(); }
+    }
+    await Promise.all(Array.from({length: Math.min(CONC, tasks.length)}, worker));
     _evictLRU();
   } catch (_) {}
 }

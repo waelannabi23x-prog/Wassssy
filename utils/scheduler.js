@@ -3,7 +3,7 @@
 const logger = require('./logger');
 const { all, run } = require('../database/db');
 
-const CFG = { tickMs: 60000, batchSize: 25, batchDelayMs: 1000 };
+const CFG = { tickMs: 120000, batchSize: 25, batchDelayMs: 1000 }; // 2min tick — sufficient for notifications
 let _bot = null, _owners = [], _timer = null, _lock = false;
 
 function startScheduler(bot, owners) {
@@ -125,7 +125,10 @@ async function processGroupNotifications() {
 
 async function cleanup() {
   try { await run("DELETE FROM scheduled_messages WHERE sent = 1 AND created_at < NOW() - INTERVAL '7 days'"); } catch (_) {}
-  try { await run("DELETE FROM group_notify_log WHERE sent_at < NOW() - INTERVAL '30 days'"); }   catch (_) {}
+  try { await run("DELETE FROM group_notify_log WHERE sent_at < NOW() - INTERVAL '30 days'"); } catch (_) {}
+  try { await run("DELETE FROM group_bot_msgs WHERE sent_at < NOW() - INTERVAL '3 days'"); } catch (_) {}
+  try { await run("DELETE FROM ai_history WHERE created_at < NOW() - INTERVAL '7 days'"); } catch (_) {}
+  try { await run("DELETE FROM logs WHERE created_at < NOW() - INTERVAL '30 days'"); } catch (_) {}
 }
 
 function notifyOwners(text) { for (const oid of _owners) _bot.telegram.sendMessage(oid, text).catch(() => {}); }
