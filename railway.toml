@@ -2,12 +2,12 @@
 builder = "nixpacks"
 
 [build.nixpacksPlan.phases.setup]
-nixPkgs = ["nodejs_20", "go"]
+nixPkgs = ["nodejs_20", "go_1_22"]
 
 [build.nixpacksPlan.phases.build]
 cmds = [
   "npm install --production",
-  "cd go-search && go mod download && go build -ldflags='-s -w' -o ../search-svc . && cd .."
+  "cd go-search && go mod download && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='-s -w' -o ../search-svc . && cd .."
 ]
 
 [deploy]
