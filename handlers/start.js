@@ -19,11 +19,15 @@ async function startHandler(ctx) {
       var filesDb = require('../database/files');
       var f = await filesDb.getFile(fid);
       if (f) {
-        var cap = '📄 ' + f.title + (f.description ? '\n📝 ' + f.description : '') + '\n📁 ' + f.cat_name + ' | 📖 ' + f.sub_name;
+        var { build: kbBuild, btn: kbBtn } = require('../utils/keyboard');
+        var { escMd } = require('../utils/common');
+        var isFav = await interactions.isFav(uid, fid).catch(function(){ return false; });
+        var cap = '📄 *' + escMd(f.title) + '*' + (f.description ? '\n📝 ' + escMd(f.description) : '') + '\n📁 ' + escMd(f.cat_name||'') + ' | 📖 ' + escMd(f.sub_name||'');
+        var kb = kbBuild([[kbBtn(isFav ? '⭐ محفوظ' : '☆ حفظ', 'fav_' + fid), kbBtn('🏠 الرئيسية', 'main_menu')]]);
         try {
-          if (f.file_type === 'photo') await ctx.replyWithPhoto(f.file_id, { caption: cap });
-          else if (f.file_type === 'link') await ctx.reply(cap + '\n\n🔗 ' + f.file_id);
-          else await ctx.replyWithDocument(f.file_id, { caption: cap });
+          if (f.file_type === 'photo') await ctx.replyWithPhoto(f.file_id, { caption: cap, parse_mode: 'Markdown', ...kb });
+          else if (f.file_type === 'link') await ctx.reply(cap + '\n\n🔗 ' + f.file_id, { parse_mode: 'Markdown', ...kb });
+          else await ctx.replyWithDocument(f.file_id, { caption: cap, parse_mode: 'Markdown', ...kb });
           interactions.addHistory(uid, fid).catch(function(){});
           filesDb.incDownloads(fid).catch(function(){});
         } catch (e) { await ctx.reply('❌ تعذر إرسال الملف'); }
