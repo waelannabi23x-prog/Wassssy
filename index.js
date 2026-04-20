@@ -36,6 +36,7 @@ const { smartSearch } = require('./handlers/group');
 const tools = require('./handlers/owner_tools');
 const startHandler = require('./handlers/start');
 const browse = require('./handlers/browse');
+const ownerH = require('./handlers/owner');
 const userH = require('./handlers/user');
 const manage = require('./handlers/manage');
 
