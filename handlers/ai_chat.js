@@ -1,4 +1,17 @@
 'use strict';
+
+// AI rate limit: max 10 req/min per user
+const _aiRateMap = new Map();
+function _aiAllowed(uid) {
+  const now = Date.now();
+  let e = _aiRateMap.get(uid);
+  if (!e || now > e.r) { e = { c: 1, r: now + 60000 }; _aiRateMap.set(uid, e); return true; }
+  if (++e.c > 10) return false;
+  return true;
+}
+// Cleanup every 5 min
+setInterval(() => { const n = Date.now(); for (const [k,v] of _aiRateMap) if (n > v.r) _aiRateMap.delete(k); }, 300000).unref();
+
 const { aiChat }  = require('../utils/groq_client');
 const filesDb     = require('../database/files');
 

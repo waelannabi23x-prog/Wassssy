@@ -10,6 +10,7 @@ const express = require('express');
 const compression = require('compression');
 
 const logger = require('./utils/logger');
+const { res: cbRes, purge: cbPurge } = require('./utils/cbRegistry');
 const { initSchema, getSetting, run: dbRun, all: dbAll, getPg } = require('./database/db');
 const { authMiddleware, OWNER_ID } = require('./middlewares/auth');
 const ownerH = require('./handlers/owner');
@@ -352,8 +353,9 @@ const prefR = [
 ];
 
 bot.on('callback_query', async ctx => {
-  const data = ctx.callbackQuery?.data, cbId = ctx.callbackQuery?.id;
-  if (!data || CBDedup.isDupe(cbId) || data.length > 64) return;
+  const _raw = ctx.callbackQuery?.data, cbId = ctx.callbackQuery?.id;
+  if (!_raw || CBDedup.isDupe(cbId)) return;
+  const data = cbRes(_raw); // resolve registry key → full data
   try {
     // no blanket answerCbQuery — saves 100ms per click
     if (ctx.chat?.type !== 'private' && !data.startsWith('grp_')) return ctx.answerCbQuery('👉 استخدم البوت في الخاص').catch(() => {});

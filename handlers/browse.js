@@ -1,3 +1,4 @@
+var { reg: cbReg } = require('../utils/cbRegistry');
 var common = require('../utils/common');
 var escMd = common.escMd;
 var buildPath = common.buildPath;
@@ -121,7 +122,7 @@ async function showCategories(ctx, spId, yrId, smId, sbId) {
   }
   var sp = catd.sp, yr = catd.yr, sm = catd.sm, sb = catd.sb, cats = catd.cats;
   if (!cats.length) return eos(ctx, buildPath([escMd(sp ? sp.name : ''), escMd(yr ? yr.name : ''), escMd(sm ? sm.name : ''), escMd(sb ? sb.name : '')]) + '\n\n📭 لا توجد فئات.', build([backMenu('sbs_' + spId + '_' + yrId + '_' + smId)]));
-  var rows = cats.map(function(c) { return [btn('📁 ' + c.name, 'ct_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + c.id)]; });
+  var rows = cats.map(function(c) { return [btn('📁 ' + c.name, cbReg('ct_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + c.id))]; });
   rows.push(backMenu('sbs_' + spId + '_' + yrId + '_' + smId));
   return eos(ctx, buildPath([escMd(sp ? sp.name : ''), escMd(yr ? yr.name : ''), escMd(sm ? sm.name : ''), escMd(sb ? sb.name : '')]) + '\n\n📁 *اختر القسم:*', { parse_mode: 'Markdown', ...build(rows) });
 }
@@ -165,7 +166,7 @@ async function _showFiles(ctx, spId, yrId, smId, sbId, catId, page) {
     var star = avg >= 4 ? '⭐' : avg >= 2 ? '🌟' : '📄';
     var typeIcon = f.file_type === 'link' ? '🔗' : f.file_type === 'photo' ? '🖼️' : '📄';
     return [
-      btn(typeIcon + ' ' + f.title + (avg > 0 ? ' (' + avg + '★)' : ''), 'preview_' + f.id + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId),
+      btn(typeIcon + ' ' + f.title + (avg > 0 ? ' (' + avg + '★)' : ''), cbReg('preview_' + f.id + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId)),
       btn(fav ? '⭐' : '☆', 'fav_' + f.id)
     ];
   });
@@ -178,7 +179,7 @@ async function _showFiles(ctx, spId, yrId, smId, sbId, catId, page) {
   }
   if (bundles.length) {
     rows.unshift([btn('━━━ الحزم (' + bundles.length + ') ━━━', 'noop')]);
-    bundles.forEach(function(b) { rows.splice(1, 0, [btn('📦 ' + b.title + ' (' + b.downloads + ' تحميل)', 'bundle_' + b.id + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId)]); });
+    bundles.forEach(function(b) { rows.splice(1, 0, [btn('📦 ' + b.title + ' (' + b.downloads + ' تحميل)', cbReg('bundle_' + b.id + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId))]); });
   }
   rows.push(backMenu('sbs_' + spId + '_' + yrId + '_' + smId));
   var extra = { parse_mode: 'Markdown', ...build(rows) };
@@ -211,10 +212,10 @@ async function _showPreview(ctx, fid, spId, yrId, smId, sbId, catId) {
   var avg = ratingData.avg, cnt = ratingData.cnt;
   var text = '📄 *' + escMd(f.title) + '*\n' + (f.description ? '📝 _' + escMd(f.description) + '_\n' : '') + '\n📁 ' + escMd(f.cat_name) + ' | 📖 ' + escMd(f.sub_name) + '\n⬇️ *' + f.downloads + '* تحميل | ⭐ *' + favCnt + '* محفوظ' + '\n💬 *' + commentCount + '* تعليق\n' + starsDisplay(avg, cnt);
   var backCb = catId !== 0 ? 'ct_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId : 'main_menu';
-  var ratingBtns = [1,2,3,4,5].map(function(i) { return btn(i <= userRating ? '⭐' : '☆', 'rate_' + fid + '_' + i + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId); });
+  var ratingBtns = [1,2,3,4,5].map(function(i) { return btn(i <= userRating ? '⭐' : '☆', cbReg('rate_' + fid + '_' + i + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId)); });
   var rows = [
-    [btn('⬇️ تحميل الملف', 'fl_' + fid + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId)],
-    [btn(fav ? '⭐ محفوظ' : '☆ حفظ', 'fav_' + fid), btn('💬 تعليقات (' + commentCount + ')', 'cmt_' + fid + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId)],
+    [btn('⬇️ تحميل الملف', cbReg('fl_' + fid + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId))],
+    [btn(fav ? '⭐ محفوظ' : '☆ حفظ', 'fav_' + fid), btn('💬 تعليقات (' + commentCount + ')', cbReg('cmt_' + fid + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId))],
     ratingBtns,
     [btn(alreadyReported ? '🚩 تم التبليغ' : '⚠️ تبليغ عن مشكلة', alreadyReported ? 'noop' : 'report_' + fid + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId)],
     [btn('◀️ رجوع', backCb)]
@@ -224,8 +225,8 @@ async function _showPreview(ctx, fid, spId, yrId, smId, sbId, catId) {
 
 async function showReportMenu(ctx, fid, spId, yrId, smId, sbId, catId) {
   var reasons = [['🔗 رابط معطوب', 'broken_link'], ['📄 ملف تالف', 'corrupted'], ['❌ ملف خاطئ', 'wrong_file'], ['🔄 ملف مكرر', 'duplicate'], ['⚠️ محتوى غير لائق', 'inappropriate']];
-  var rows = reasons.map(function(r) { return [btn(r[0], 'do_report_' + fid + '_' + r[1] + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId)]; });
-  rows.push([btn('◀️ إلغاء', 'preview_' + fid + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId)]);
+  var rows = reasons.map(function(r) { return [btn(r[0], cbReg('do_report_' + fid + '_' + r[1] + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId))]; });
+  rows.push([btn('◀️ إلغاء', cbReg('preview_' + fid + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId))]);
   return eos(ctx, '⚠️ *تبليغ عن مشكلة*\n\nاختر نوع المشكلة:', { parse_mode: 'Markdown', ...build(rows) });
 }
 
@@ -260,8 +261,8 @@ async function showComments(ctx, fid, spId, yrId, smId, sbId, catId, page) {
   if (page > 0) nav.push(btn('⬅️', 'cmt_pg_' + fid + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId + '_' + (page - 1)));
   if ((page + 1) * CPS < total) nav.push(btn('➡️', 'cmt_pg_' + fid + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId + '_' + (page + 1)));
   if (nav.length) rows.push(nav);
-  rows.push([btn('✍️ أضف تعليق', 'add_cmt_' + fid + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId)]);
-  rows.push([btn('◀️ رجوع', 'preview_' + fid + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId)]);
+  rows.push([btn('✍️ أضف تعليق', cbReg('add_cmt_' + fid + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId))]);
+  rows.push([btn('◀️ رجوع', cbReg('preview_' + fid + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId))]);
   return eos(ctx, text, { parse_mode: 'Markdown', ...build(rows) });
 }
 
@@ -305,10 +306,10 @@ async function showBundle(ctx, bundleId, spId, yrId, smId, sbId, catId) {
   var typeStr = Object.keys(typeCounts).map(function(t) { return (typeIcons[t] || '📄') + ' ' + typeCounts[t]; }).join(' | ');
   var text = '📦 *' + escMd(b.title) + '*' + (b.description ? '\n📝 ' + escMd(b.description) : '') + '\n\n📁 *' + files.length + ' ملف*\n' + typeStr + '\n\n⬇️ تحميل: *' + b.downloads + '*';
   var backCb = catId !== 0 ? 'ct_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId : 'main_menu';
-  var rows = [[btn('⬇️ تحميل الكل', 'bdl_' + bundleId + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId)]];
+  var rows = [[btn('⬇️ تحميل الكل', cbReg('bdl_' + bundleId + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId))]];
   if (ctx.isAdmin) {
-    rows.push([btn('➕ إضافة ملفات', 'mg_add_bundle_files_' + bundleId + '_' + catId + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId)]);
-    rows.push([btn('✏️ تعديل', 'mg_rn_bundle_' + bundleId + '_' + catId + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId), btn('🗑 حذف', 'mg_dl_bundle_' + bundleId + '_' + catId + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId)]);
+    rows.push([btn('➕ إضافة ملفات', cbReg('mg_add_bundle_files_' + bundleId + '_' + catId + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId))]);
+    rows.push([btn('✏️ تعديل', cbReg('mg_rn_bundle_' + bundleId + '_' + catId + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId)), btn('🗑 حذف', cbReg('mg_dl_bundle_' + bundleId + '_' + catId + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId))]);
   }
   rows.push([btn('◀️ رجوع', backCb)]);
   return eos(ctx, text, { parse_mode: 'Markdown', ...build(rows) });
