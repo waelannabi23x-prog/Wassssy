@@ -68,11 +68,7 @@ async function handleSummarize(ctx, fileId, fileType, title) {
 // Gemini يقرأ PDF مباشرة عبر API
 function geminiExtractPdf(buffer, title) {
   return new Promise((resolve, reject) => {
-      '--' + boundary + '\r\n' +
-      'Content-Type: application/pdf\r\n' +
-      'Content-Disposition: form-data; name="file"; filename="' + title + '.pdf"\r\n\r\n'
-    );
-
+  
     const prompt = JSON.stringify({
       contents: [{ role: 'user', parts: [
         { text: 'استخرج كل النص من هذا PDF. ارجع النص فقط بدون أي إضافة.' },
@@ -102,7 +98,7 @@ function geminiExtractPdf(buffer, title) {
     req.on('error', reject);
     req.write(prompt);
     req.end();
-  });
-}
+  };
+
 
 module.exports = { handleSummarize };
