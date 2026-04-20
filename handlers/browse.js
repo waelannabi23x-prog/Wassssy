@@ -286,7 +286,7 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
     // Edit original preview msg to show back button (don't delete — user needs to go back)
     var doneText = '✅ *' + escMd(f.title) + '*\n📥 تم الإرسال';
     var doneKb = build([[btn('◀️ رجوع', backCb), btn('🏠', 'main_menu')]]);
-    ctx.editMessageText(doneText, { parse_mode: 'Markdown', ...doneKb }).catch(function(){});
+    if (ctx.callbackQuery) ctx.deleteMessage().catch(function(){});
     if (similar.length) {
       var simRows = similar.map(function(sf) { return [btn('📄 ' + sf.title + ' · ' + sf.sub_name, 'preview_' + sf.id + '_0_0_0_0_0')]; });
       simRows.push([btn('🏠 القائمة', 'main_menu')]);

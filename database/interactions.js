@@ -89,10 +89,12 @@ async function getRecommended(uid, limit = 8) {
       ORDER  BY MAX(h.viewed_at) DESC
       LIMIT  5
     )
-    SELECT DISTINCT ${J.replace('SELECT ', '')}
-    FROM   user_cats uc
-    WHERE  f.category_id = uc.id
-      AND  f.is_deleted  = 0
+    SELECT DISTINCT f.*, c.name as cat_name, s.name as sub_name
+    FROM   files f
+    JOIN   categories c ON f.category_id = c.id
+    JOIN   subjects s   ON c.subject_id  = s.id
+    JOIN   user_cats uc ON f.category_id = uc.id
+    WHERE  f.is_deleted = 0
       AND  f.id NOT IN (SELECT file_id FROM history WHERE user_id = $1)
     ORDER  BY f.downloads DESC
     LIMIT  $2
@@ -113,12 +115,12 @@ async function getSimilar(fileId, limit = 4) {
 
   // Single query: same category first, then same subject, ranked by downloads
   const results = await all(`
-    SELECT DISTINCT ${J.replace('SELECT ', '')},
+    SELECT DISTINCT f.*, cc.name as cat_name, s.name as sub_name,
            CASE WHEN f.category_id = (SELECT category_id FROM files WHERE id=$1) THEN 0 ELSE 1 END as _rank
     FROM   categories c2
-    JOIN   files f  ON f.category_id = c2.id
-    JOIN   categories cc ON cc.id = f.category_id
-    JOIN   subjects s    ON s.id  = cc.subject_id
+    JOIN   files f   ON f.category_id = c2.id
+    JOIN   categories cc ON cc.id     = f.category_id
+    JOIN   subjects s    ON s.id      = cc.subject_id
     WHERE  c2.subject_id = (SELECT c3.subject_id FROM files fi JOIN categories c3 ON fi.category_id=c3.id WHERE fi.id=$1)
       AND  f.id != $1
       AND  f.is_deleted = 0
