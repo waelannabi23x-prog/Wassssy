@@ -43,6 +43,7 @@ setInterval(() => {
 // 💬 تاريخ المحادثة (حقيقي الآن)
 // ══════════════════════════════════════
 const _aiHistory  = new Map();
+const _aiTimers   = new Map(); // timers منفصلة بدل property على Map
 const HIST_MAX    = 10; // أقصى 10 أزواج سؤال/جواب
 // Cleanup idle histories every 30 min (unused > 2h)
 setInterval(() => {
@@ -155,11 +156,10 @@ async function handleAiChat(ctx, text) {
     _aiHistory.set(uid, history);
 
     // ✅ تنظيف تلقائي بعد ساعة خمول
-    const existing = _aiHistory._timers = _aiHistory._timers || new Map();
-    if (existing.get(uid)) clearTimeout(existing.get(uid));
-    existing.set(uid, setTimeout(() => {
+    if (_aiTimers.get(uid)) clearTimeout(_aiTimers.get(uid));
+    _aiTimers.set(uid, setTimeout(() => {
       _aiHistory.delete(uid);
-      existing.delete(uid);
+      _aiTimers.delete(uid);
     }, 3600000));
 
     await ctx.reply(reply, {

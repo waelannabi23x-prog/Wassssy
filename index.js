@@ -30,7 +30,6 @@ const { loadAllStates } = require('./utils/redis');
 const { cacheWarmup, cacheClear, cacheClearPrefix } = require('./utils/cache');
 const { setLang } = require('./utils/i18n');
 const { startScheduler } = require('./utils/scheduler');
-const { startSmartWarmup } = require('./utils/smartWarmup');
 const { handleAiChat, resetChat } = require('./handlers/ai_chat');
 const { handleOwnerAI } = require('./handlers/ai_owner');
 const { smartSearch } = require('./handlers/group');
@@ -112,12 +111,12 @@ const MGColl = {
   _g: new Map(),
   add(id, msg) { if (!this._g.has(id)) this._g.set(id, []); this._g.get(id).push(msg); },
   drain(id) { const m = this._g.get(id) || []; this._g.delete(id); return m; },
-  start() { const t = setInterval(() => { const n = Date.now(); for (const k in this._g) if (!this._g[k]._ts || n - this._g[k]._ts > 10000) delete this._g[k]; }, 30000); t.unref(); },
+  start() { const t = setInterval(() => { for (const k of this._g.keys()) this._g.delete(k); }, 30000); t.unref(); },
   stop() {},
 };
 
 const GrpMsgs = {
-  _m: {},
+  _m: Object.create(null),
   add(c, m) { if (!this._m[c]) this._m[c] = []; this._m[c].push(m); if (this._m[c].length > CFG.botMsgsPerChat) this._m[c] = this._m[c].slice(-CFG.botMsgsPerChat); },
   all(c) { return [...new Set(this._m[c] || [])]; },
   clear(c) { this._m[c] = []; },
@@ -281,6 +280,7 @@ const exactR = new Map([
   ['progress', ctx => userH.showProgress(ctx)],
   ['search_prompt', ctx => { global.setState(ctx.uid, { type: 'search' }); return ctx.reply('🔍 اكتب كلمة البحث:').catch(() => {}); }],
   ['ai_prompt', ctx => { global.setState(ctx.uid, { type: 'ai_mode' }); return ctx.reply('🤖 المساعد الذكي مفعل!\n\nاكتب سؤالك:').catch(() => {}); }],
+  ['ai_reset', ctx => { const { resetChat } = require('./handlers/ai_chat'); resetChat(ctx.uid); return ctx.reply('🔄 تم مسح سياق المحادثة.').catch(() => {}); }],
   ['skip_sp', async ctx => { await usersDb.setSpecialty(ctx.uid, 0); return startHandler.showMainMenu(ctx); }],
   ['change_sp', async ctx => { const sp = await contentDb.getSpecs(); return eos(ctx, '🎓 *اختر تخصصك:*', { parse_mode: 'Markdown', ...kbBuild(sp.map(s => [kbBtn('🎓 ' + s.name, 'set_sp_' + s.id)])) }); }],
 ]);
@@ -438,7 +438,10 @@ bot.on('document', async ctx => {
       for (const [table, rows] of Object.entries(backup.tables)) {
         if (!rows.length) continue;
         try {
-          const cols = Object.keys(rows[0]);
+          const SAFE_TABLES = new Set(['users','admins','specialties','years','semesters','subjects','categories','files','favorites','history','ratings','user_specialties','settings','bundles','bundle_files','message_templates','scheduled_messages','comments','reports','group_chats','group_members','group_chats']);
+          if (!SAFE_TABLES.has(table)) { errors++; logger.warn('[Restore] blocked unsafe table: ' + table); continue; }
+          const cols = Object.keys(rows[0]).filter(c => /^[a-zA-Z_][a-zA-Z0-9_]{0,59}$/.test(c));
+          if (!cols.length) { errors++; continue; }
           const ph   = rows.map((_, ri) => '(' + cols.map((_, ci) => '$' + (ri * cols.length + ci + 1)).join(',') + ')').join(',');
           const vals = rows.flatMap(r => cols.map(c => r[c]));
           await dbRun('INSERT INTO ' + table + '(' + cols.join(',') + ') VALUES ' + ph + ' ON CONFLICT DO NOTHING', vals);
@@ -525,14 +528,7 @@ async function launch() {
     await cacheWarmup(); logger.info('✅ Cache warm');
     startScheduler(bot, [OWNER_ID]);
     GrpBuf.start(); MGColl.start(); logger.info('✅ Services started');
-    app.use('/webhook/' + TOKEN, (req, res, next) => {
-  const secret = req.headers['x-telegram-bot-api-secret-token'];
-  if (WEBHOOK_SECRET && secret !== WEBHOOK_SECRET) return res.status(403).send('Forbidden');
-  next();
-});
-const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
-if (!WEBHOOK_SECRET) logger.warn('[WARN] ⚠️ WEBHOOK_SECRET is not set — webhook is unprotected!');
-app.use(bot.webhookCallback('/webhook/' + TOKEN, { secretToken: WEBHOOK_SECRET || undefined }));
+    app.use(bot.webhookCallback('/webhook/' + TOKEN, { secretToken: WEBHOOK_SECRET || undefined }));
     app.get('/health', async (_r, res) => {
     res.setHeader('Cache-Control', 'no-store');
     var mu = process.memoryUsage();
@@ -549,7 +545,6 @@ app.use(bot.webhookCallback('/webhook/' + TOKEN, { secretToken: WEBHOOK_SECRET |
     res.json({ status: ok ? 'ok' : 'degraded', uptime: Math.floor(process.uptime()), heap: heapMB + 'MB', rss: Math.round(mu.rss / 1048576) + 'MB', checks: checks, region: process.env.RAILWAY_REGION || 'local', ts: Date.now() });
   });
 app.listen(PORT, () => logger.info('✅ Express :' + PORT));
-    if (!WEBHOOK_SECRET) logger.warn('⚠️  WEBHOOK_SECRET is not set — webhook is unprotected!');
   if (WEBHOOK_URL) {
     await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, { allowed_updates: ['message', 'callback_query', 'my_chat_member'], drop_pending_updates: true, max_connections: 40, ...(WEBHOOK_SECRET && { secret_token: WEBHOOK_SECRET }) });
     logger.info('✅ Webhook: ' + WEBHOOK_URL);
@@ -578,7 +573,8 @@ const _cln = setInterval(async () => {
       dbRun("DELETE FROM group_members WHERE updated_at::timestamp < NOW() - INTERVAL '7 days'").catch(() => {}),
       dbRun("DELETE FROM cache_store WHERE expires_at::bigint < $1::bigint", [Date.now()]).catch(() => {}),
     ]);
-    // StateMgr.gc() removed — handled by DB TTL GrpMsgs.prune(); 
+    GrpMsgs.prune();
+    
   } catch(_) {}
 }, CFG.cleanupMs);
 _cln.unref();

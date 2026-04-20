@@ -8,8 +8,9 @@ function sanitizeParams(params) {
   var out = [];
   for (var i = 0; i < params.length; i++) {
     var p = params[i];
-    if (typeof p === 'string' && /^\d+$/.test(p)) {
-      out.push(parseInt(p));
+    // فقط أرقام صغيرة (< 10 خانات) — IDs تيليجرام BIGINT لا نلمسها
+    if (typeof p === 'string' && /^\d+$/.test(p) && p.length <= 9) {
+      out.push(parseInt(p, 10));
     } else {
       out.push(p);
     }

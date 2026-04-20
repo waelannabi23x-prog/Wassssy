@@ -3,7 +3,8 @@
 // Stores full context in memory, sends short key in callback_data
 // Key format: "r_XXXXXX" (8 chars total)
 
-const store = new Map(); // key → {data, ts}
+const store   = new Map(); // key → {data, ts}
+const reverse = new Map(); // data → key  (O(1) dedup)
 const TTL      = 3600000;  // 1 hour
 const MAX_SIZE = 2000;      // max 2000 entries — prevents spam
 const CHARS    = 'abcdefghijklmnopqrstuvwxyz0123456789';
@@ -17,16 +18,16 @@ function _genKey() {
 // Store long data → returns short key (≤8 chars)
 function reg(data) {
   if (data.length <= 64) return data; // no need to register
-  // Check if already stored
-  for (const [k, v] of store) if (v.data === data) { v.ts = Date.now(); return k; }
+  // O(1) dedup check
+  if (reverse.has(data)) { const k = reverse.get(data); store.get(k).ts = Date.now(); return k; }
   // Evict oldest if at capacity
   if (store.size >= MAX_SIZE) {
     const oldest = [...store.entries()].reduce((a,b) => a[1].ts < b[1].ts ? a : b);
-    store.delete(oldest[0]);
+    store.delete(oldest[0]); reverse.delete(oldest[1].data);
   }
   let key;
   do { key = _genKey(); } while (store.has(key));
-  store.set(key, { data, ts: Date.now() });
+  store.set(key, { data, ts: Date.now() }); reverse.set(data, key);
   return key;
 }
 
@@ -42,7 +43,7 @@ function res(key) {
 // Cleanup old entries (called by periodic cleaner)
 function purge() {
   const cut = Date.now() - TTL;
-  for (const [k, v] of store) if (v.ts < cut) store.delete(k);
+  for (const [k, v] of store) if (v.ts < cut) { reverse.delete(v.data); store.delete(k); }
 }
 
 // Stats
