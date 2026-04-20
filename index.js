@@ -415,11 +415,36 @@ bot.on('document', async ctx => {
   if (s?.type === 'mg_tpl_file') { await global.setState(ctx.uid, { ...s, type: 'mg_tpl_content', fileId: ctx.message.document.file_id }); return ctx.reply('✏️ اكتب نص الرسالة (أو skip):').catch(() => {}); }
   if (s?.type === 'mg_awaiting_restore' && ctx.isOwner) {
     await global.delState(ctx.uid);
+    const msg = await ctx.reply('⏳ جاري الاستعادة...').catch(()=>{});
     try {
       const link = await ctx.telegram.getFileLink(ctx.message.document.file_id);
-      const file = fs.createWriteStream(path.join(__dirname, 'study_bot.db'));
-      const req=https.get(link.href,res=>{res.pipe(file);file.on('finish',()=>{file.close();ctx.reply('✅ تمت الاستعادة!').catch(()=>{});});file.on('error',e=>{ctx.reply('❌ فشل الحفظ: '+e.message).catch(()=>{});});});req.on('error',e=>{ctx.reply('❌ فشل التحميل: '+e.message).catch(()=>{});});
-    } catch(e) { ctx.reply('❌ فشلت: ' + e.message).catch(() => {}); }
+      // Download JSON backup
+      const raw = await new Promise((resolve, reject) => {
+        let data = '';
+        https.get(link.href, res => {
+          res.on('data', c => data += c);
+          res.on('end', () => resolve(data));
+        }).on('error', reject);
+      });
+      const backup = JSON.parse(raw);
+      if (!backup.tables) throw new Error('ملف غير صالح — يجب أن يكون backup JSON');
+      let restored = 0, errors = 0;
+      for (const [table, rows] of Object.entries(backup.tables)) {
+        if (!rows.length) continue;
+        try {
+          const cols = Object.keys(rows[0]);
+          const ph   = rows.map((_, ri) => '(' + cols.map((_, ci) => '$' + (ri * cols.length + ci + 1)).join(',') + ')').join(',');
+          const vals = rows.flatMap(r => cols.map(c => r[c]));
+          await dbRun('INSERT INTO ' + table + '(' + cols.join(',') + ') VALUES ' + ph + ' ON CONFLICT DO NOTHING', vals);
+          restored += rows.length;
+        } catch(e) { errors++; logger.error('[Restore]', table, e.message); }
+      }
+      if (msg) ctx.deleteMessage(msg.message_id).catch(()=>{});
+      ctx.reply('✅ تمت الاستعادة\n\n' + restored + ' سجل | ' + errors + ' خطأ').catch(()=>{});
+    } catch(e) {
+      if (msg) ctx.deleteMessage(msg.message_id).catch(()=>{});
+      ctx.reply('❌ فشلت الاستعادة: ' + e.message).catch(() => {});
+    }
     return;
   }
   if (s?.type === 'mg_file') return manage.handleFileUpload(ctx);
