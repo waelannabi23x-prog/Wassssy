@@ -76,7 +76,7 @@ async function showMainMenu(ctx, name) {
 }
 
 startHandler.clearAiMode = async function(uid) {
-  var state = global.userStates && global.userStates[uid];
+  var state = global.getState(uid);
   if (state && state.type === 'ai_mode') await global.delState(uid);
 };
 

@@ -133,7 +133,7 @@ async function showMsgsMenu(ctx){const templates=await messagesDb.getTemplates()
 async function showTemplates(ctx){const list=await messagesDb.getTemplates();const text='📝 *القوالب ('+list.length+')*';const rows=list.map(t=>[btn(t.name,'mg_tpl_'+t.id)]);rows.push([btn('➕ قالب جديد','mg_add_template')]);rows.push(back('mg_msgs'));return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});}
 async function showScheduled(ctx){const list=await messagesDb.getScheduled();const text='📅 *المجدولة ('+list.length+')*';const rows=list.map(s=>[btn((s.name||'رسالة')+' — '+s.send_at,'noop'),btn('🗑','mg_del_sched_'+s.id)]);rows.push(back('mg_msgs'));return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});}
 async function handleBundleFileUpload(ctx){
-  const uid=ctx.uid;const state=global.userStates?.[uid];
+  const uid=ctx.uid;const state=global.getState(uid);
   if(!state||state.type!=='mg_bundle_files') return false;
   const msg=ctx.message;let fid=null,ftype=null,title='';
   if(msg.document){fid=msg.document.file_id;ftype='document';title=msg.document.file_name||'📄 ملف';}
@@ -151,7 +151,7 @@ async function handleBundleFileUpload(ctx){
 }
 
 async function handleBulkUpload(ctx){
-  const uid=ctx.uid;const state=global.userStates?.[uid];
+  const uid=ctx.uid;const state=global.getState(uid);
   if(!state||state.type!=='mg_bulk_files') return false;
   const msg=ctx.message;let fid,ftype,title='';
   if(msg.document){fid=msg.document.file_id;ftype='document';title=msg.document.file_name||msg.caption||('ملف_'+Date.now());title=title.replace(/.[^/.]+$/,'').trim()||('ملف_'+Date.now());}
@@ -167,7 +167,7 @@ async function handleBulkUpload(ctx){
 
 async function handleFileUpload(ctx){
   if(await handleBundleFileUpload(ctx)) return;
-  const uid=ctx.uid;const state=global.userStates?.[uid];
+  const uid=ctx.uid;const state=global.getState(uid);
   if(!state||state.type!=='mg_file') return;
   const msg=ctx.message;let fid,ftype;let msgText=(msg.text||msg.caption||'').trim();
   const isLink=msg.entities?.some(e=>e.type==='url'||e.type==='text_link')||msgText.startsWith('http');

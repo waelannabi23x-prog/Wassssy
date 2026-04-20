@@ -262,6 +262,7 @@ bot.command('help', ctx => ctx.reply(
 const exactR = new Map([
   ['noop', () => {}],
   ['main_menu', ctx => startHandler(ctx)],
+  ['mg_menu', ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', {show_alert:true}).catch(()=>{}); return manage.mainMenu(ctx); }],
   ['browse', ctx => browse.showSpecs(ctx)],
   ['latest', ctx => userH.showLatest(ctx)],
   ['new_in_sp', ctx => userH.showNewInSpecialty(ctx)],

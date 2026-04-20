@@ -11,7 +11,7 @@ async function spy(ctx, text) {
   if (!u) return ctx.reply('❌ غير موجود.');
   var sp = await usersDb.getSpecialty(tid);
   var spN = sp && sp.specialty_id ? (await content.getSpec(sp.specialty_id))?.name : null;
-  var st = global.userStates ? global.userStates[tid] : null;
+  var st = global.getState(tid);
   var text = '🕵️ *' + escMd(u.first_name || '?') + '*\n━━━━\n🆔 `' + tid + '`\n📛 ' + (u.username ? '@' + escMd(u.username) : 'لا يوجد') + '\n🎓 ' + escMd(spN || 'غير محدد') + '\n' + (st ? '🔄 *' + st.type + '*' : '⬜ فاضي');
   return ctx.reply(text, { parse_mode: 'Markdown' });
 }
