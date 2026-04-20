@@ -53,24 +53,12 @@ const CFG = {
   stateTTL: 3600000, cleanupMs: 3600000,
   botMsgsPerChat: 100, maxChatsTracked: 150,
 };
-const StateMgr = {
-  _s: {},
-  get(u) { return this._s[u] || null; },
-  _pending:new Map(),_flushTimer:null,
-  async set(u,v){
-    v._ts=Date.now();this._s[u]=v;this._pending.set(u,v);
-    if(!this._flushTimer){this._flushTimer=setTimeout(async()=>{this._flushTimer=null;if(!this._pending.size)return;const snap=[...this._pending.entries()];this._pending.clear();const ph=snap.map((_,i)=>`(${i*2+1},${i*2+2},CURRENT_TIMESTAMP)`).join(',');dbRun(`INSERT INTO user_states(user_id,state,updated_at) VALUES ${ph} ON CONFLICT(user_id) DO UPDATE SET state=EXCLUDED.state,updated_at=CURRENT_TIMESTAMP`,snap.flatMap(([uid,s])=>[uid,JSON.stringify(s)])).catch(()=>{});},2000);if(this._flushTimer.unref)this._flushTimer.unref();}
-  },
-  async del(u) {
-    delete this._s[u];
-    dbRun('DELETE FROM user_states WHERE user_id=$1',[u]).catch(()=>{});
-  },
-  gc() { var n = Date.now(); var c = 0; for (var u in this._s) { if (this._s[u]._ts && n - this._s[u]._ts > CFG.stateTTL) { this.del(u); c++; } } return c; },
-  get size() { return Object.keys(this._s).length; },
-};
-global.userStates = StateMgr._s;
-global.setState = (u, v) => StateMgr.set(u, v);
-global.delState = (u) => StateMgr.del(u);
+const { setState: _setState, delState: _delState, getState: _getState } = require('./utils/redis');
+global.setState = _setState;
+global.delState = _delState;
+global.getState = _getState;
+// userStates shim — handlers that read global.getState() use getState() instead
+global.userStates = {}; // kept for back-compat, actual state lives in redis.js _mem
 
 
 const app = express();
@@ -80,15 +68,6 @@ app.set('trust proxy', 1);
 
 app.get('/', (_r, res) => res.send('OK'));
 
-const RL = {
-  _m: new Map(),
-  check(u) {
-    const n = Date.now(); let e = this._m.get(u);
-    if (!e || n > e.r) { e = { c: 0, r: n + CFG.rlWindow }; this._m.set(u, e); }
-    return ++e.c <= CFG.rlMax;
-  },
-  gc() { const n = Date.now(); for (const [k, v] of this._m) if (n > v.r + 5000) this._m.delete(k); },
-};
 
 const CBDedup = {
   _s: new Map(),
@@ -161,6 +140,12 @@ bot.use(async (ctx, next) => {
 });
 // 🛡️ Ultra-Light Anti-Flood (Built-in)
 const _floodMap = new Map();
+// Auto-cleanup flood entries older than 60 s
+const _floodClean = setInterval(() => {
+  const cut = Date.now() - 60000;
+  for (const [k,v] of _floodMap) if (v.t < cut) _floodMap.delete(k);
+}, 60000);
+if (_floodClean.unref) _floodClean.unref();
 const rateLimit = function(ctx, next) {
   const uid = ctx.from?.id;
   if (!uid) return next();
@@ -227,7 +212,7 @@ bot.command('profile', ctx => userH.showProfile(ctx));
 bot.command('stats', ctx => userH.showStats(ctx));
 
 bot.command('done', async ctx => {
-  const s = StateMgr.get(ctx.uid); if (!s) return;
+  const s = global.getState(ctx.uid); if (!s) return;
   if (s.type === 'mg_bundle_files') { await global.delState(ctx.uid); return ctx.reply('✅ تم حفظ الحزمة بـ ' + (s.fileCount || 0) + ' ملف').catch(() => {}); }
   if (s.type === 'mg_bulk_files') {
     const up = s.uploaded || [], fl = s.failed || [];
@@ -263,7 +248,7 @@ bot.command('dlt', async ctx => {
 bot.command('ai', async ctx => { await global.setState(ctx.uid, { type: 'ai_mode' }); return ctx.reply('🤖 وضع المساعد الذكي مفعل!\n\nاكتب أي سؤال.\n/start للرجوع.').catch(() => {}); });
 bot.command('reset', ctx => { resetChat(ctx.uid); return ctx.reply('🔄 تم مسح سياق المحادثة.').catch(() => {}); });
 bot.command('promote', ctx => tools.batchPromote(ctx));
-bot.command('cancel', async ctx => { if (StateMgr.get(ctx.uid)) { await global.delState(ctx.uid); return ctx.reply('❌ تم الإلغاء.').catch(() => {}); } });
+bot.command('cancel', async ctx => { if (global.getState(ctx.uid)) { await global.delState(ctx.uid); return ctx.reply('❌ تم الإلغاء.').catch(() => {}); } });
 bot.command('users', async ctx => {
   if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫').catch(() => {});
   if (ctx.isAdmin && !ctx.isOwner) { const p = await adminsDb.getPerms(ctx.uid).catch(() => []); if (!p.includes('full') && !p.includes('view_users')) return ctx.reply('🚫').catch(() => {}); }
@@ -380,7 +365,7 @@ bot.on('message', async (ctx, next) => {
   if (ctx.chat?.type === 'private' && ctx.from?.id === OWNER_ID && ctx.message?.text?.startsWith('!')) return ownerH.handle(ctx, ctx.message.text);
   if (ctx.chat?.type !== 'private') {
     if (ctx.from && !ctx.from.is_bot) GrpBuf.add(ctx.chat.id, ctx.from.id, ctx.from.username, ctx.from.first_name);
-    const s = StateMgr.get(ctx.uid);
+    const s = global.getState(ctx.uid);
     if (s?.type === 'mg_bundle_files' && ctx.message.media_group_id) {
       const mgId = ctx.message.media_group_id; MGColl.add(mgId, ctx.message);
       setTimeout(async () => {
@@ -406,7 +391,7 @@ bot.on('message', async (ctx, next) => {
 
 bot.on('document', async ctx => {
   if (!ctx.isAdmin && !ctx.isOwner) return;
-  const s = StateMgr.get(ctx.uid);
+  const s = global.getState(ctx.uid);
   if (await tools.trySmartUpload(ctx)) return;
   if (s?.type === 'mg_bundle_files') return manage.handleBundleFileUpload(ctx);
   if (s?.type === 'mg_bulk_files') return manage.handleBulkUpload(ctx);
@@ -425,7 +410,7 @@ bot.on('document', async ctx => {
 
 bot.on(['photo', 'video', 'audio', 'voice'], async ctx => {
   if (!ctx.isAdmin && !ctx.isOwner) return;
-  const s = StateMgr.get(ctx.uid);
+  const s = global.getState(ctx.uid);
   if (s?.type === 'mg_bulk_files') return manage.handleBulkUpload(ctx);
   if (s?.type === 'mg_bundle_files') return manage.handleBundleFileUpload(ctx);
   if (s?.type === 'mg_file') return manage.handleFileUpload(ctx);
@@ -434,7 +419,7 @@ bot.on(['photo', 'video', 'audio', 'voice'], async ctx => {
 
 bot.on('text', async ctx => { try {
   if (ctx.message.text.startsWith('/')) return;
-  const uid = ctx.uid, s = StateMgr.get(uid); if (!s) return;
+  const uid = ctx.uid, s = global.getState(uid); if (!s) return;
   const txt = ctx.message.text.trim();
   if (s.type === 'ai_mode' && ctx.chat?.type === 'private') {
     if (txt.length > 1000) return ctx.reply('⚠️ الحد 1000 حرف.').catch(() => {});
@@ -521,15 +506,14 @@ app.listen(PORT, () => logger.info('✅ Express :' + PORT));
     logger.warn('⚠️ No WEBHOOK_URL - using polling');
     bot.launch({ drop_pending_updates: true });
   }
-    global.__bot = bot;
-global._clearSearchCache = function() { var cc = require('./utils/cache'); cc.cacheClearPrefix('search_'); cc.cacheClear('latest_15'); cc.cacheClear('popular_15'); }; // startSmartWarmup(); // disabled: cacheWarmup sufficient
+    global.__bot = bot; // _clearSearchCache set in handlers/group.js // startSmartWarmup(); // disabled: cacheWarmup sufficient
     logger.info('🚀 Ready');
   } catch(e) { logger.error('[Launch]', e.message); setTimeout(launch, 10000); }
 }
 
 async function shutdown(sig) {
   logger.info('[Shutdown] ' + sig);
-  try { bot.stop(sig); await GrpBuf.stop(); StateMgr.gc(); const pg = getPg(); if (pg) await pg.end(); process.exit(0); } catch(e) { process.exit(1); }
+  try { bot.stop(sig); await GrpBuf.stop(); const pg = getPg(); if (pg) await pg.end(); process.exit(0); } catch(e) { process.exit(1); }
 }
 process.once('SIGINT', () => shutdown('SIGINT'));
 process.once('SIGTERM', () => shutdown('SIGTERM'));
@@ -543,7 +527,7 @@ const _cln = setInterval(async () => {
       dbRun("DELETE FROM group_members WHERE updated_at::timestamp < NOW() - INTERVAL '7 days'").catch(() => {}),
       dbRun("DELETE FROM cache_store WHERE expires_at::bigint < $1::bigint", [Date.now()]).catch(() => {}),
     ]);
-    StateMgr.gc(); GrpMsgs.prune(); RL.gc();
+    // StateMgr.gc() removed — handled by DB TTL GrpMsgs.prune(); 
   } catch(_) {}
 }, CFG.cleanupMs);
 _cln.unref();

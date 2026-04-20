@@ -1,8 +1,17 @@
 [build]
 builder = "nixpacks"
 
+[build.nixpacksPlan.phases.setup]
+nixPkgs = ["nodejs_20", "go"]
+
+[build.nixpacksPlan.phases.build]
+cmds = [
+  "npm install --production",
+  "cd go-search && go mod download && go build -ldflags='-s -w' -o ../search-svc . && cd .."
+]
+
 [deploy]
-startCommand = "node --max-old-space-size=512 --optimize-for-size --expose-gc index.js"
+startCommand = "sh -c '(DATABASE_URL=$DATABASE_URL SEARCH_PORT=3001 ./search-svc &) && node --max-old-space-size=512 --optimize-for-size --expose-gc index.js'"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 region = "europe-west4"

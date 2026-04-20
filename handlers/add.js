@@ -30,7 +30,8 @@ async function handleAdd(ctx) {
 }
 
 async function handleAddFile(ctx) {
-  var state = global.userStates && global.userStates[ctx.uid];
+  var state = global.userStates && (global.getState && {}) || {}; // see global.getState
+// ctx.uid];
   if (!state || state.type !== 'add_mode') return false;
   var msg = ctx.message;
   var fid, ftype, filename = '';
@@ -58,7 +59,8 @@ async function handleAddFile(ctx) {
 }
 
 async function handleAddCallback(ctx, data) {
-  var state = global.userStates && global.userStates[ctx.uid];
+  var state = global.userStates && (global.getState && {}) || {}; // see global.getState
+// ctx.uid];
   if (data === 'add_cancel') { await global.delState(ctx.uid); return ctx.editMessageText('❌ تم الإلغاء').catch(function(){}); }
   if (data.startsWith('add_sub_')) {
     var subId = safeInt(data.replace('add_sub_', ''));

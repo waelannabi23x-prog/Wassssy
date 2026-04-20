@@ -143,7 +143,8 @@ async function showStats(ctx) {
 }
 
 async function handleSearch(ctx, query) {
-  if (global.delState) await global.delState(ctx.uid); else delete global.userStates[ctx.uid];
+  if (global.delState) await global.delState(ctx.uid); else delete (global.getState && {}) || {}; // see global.getState
+// ctx.uid];
   if (!query || query.trim().length < 2) return ctx.reply('⚠️ قصير جداً. ادخل كلمة على الأقل.');
   if (query.trim().length > 100) return ctx.reply('⚠️ البحث طويل جداً.');
   query = query.trim().replace(/[%;\\]/g, '');
