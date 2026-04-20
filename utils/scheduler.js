@@ -105,9 +105,10 @@ async function processGroupNotifications() {
     );
     if (!recent.length) return;
 
-    const un = await (async () => {
-      try { const m = await _bot.telegram.getMe(); return m.username; } catch (_) { return null; }
-    })();
+    if (!_bot._cachedUsername) {
+      try { const m = await _bot.telegram.getMe(); _bot._cachedUsername = m.username; } catch (_) {}
+    }
+    const un = _bot._cachedUsername || null;
 
     for (const r of recent) {
       try {

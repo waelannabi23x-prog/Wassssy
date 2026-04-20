@@ -57,7 +57,7 @@ const getHistory = (uid, n = 15) => all(J + ' JOIN history h ON h.file_id=f.id W
 
 const getLastFile = async uid => {
   const k = 'lastfile_' + uid, cv = cacheGet(k);
-  if (cv !== undefined) return cv || null;
+  if (cv !== null) return cv;
   const r = (await all(J + ' JOIN history h ON h.file_id=f.id WHERE h.user_id=$1 AND f.is_deleted=0 ORDER BY h.viewed_at DESC LIMIT 1', [uid]))[0] || null;
   cacheSet(k, r, 600000); return r;
 };
@@ -145,7 +145,8 @@ const getActiveUsers = async (days = 7) => {
     "SELECT id FROM users WHERE is_banned=0 AND last_active >= NOW() - ($1 * INTERVAL '1 day')",
     [days]
   );
-  cacheSet(k, rows.map(r => r.id), 600000); return rows;
+  const _ids = rows.map(r => r.id);
+  cacheSet(k, _ids, 600000); return _ids;
 };
 
 // ─── Ratings ──────────────────────────────────────────────────────────────────
