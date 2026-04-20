@@ -530,7 +530,9 @@ async function launch() {
   if (WEBHOOK_SECRET && secret !== WEBHOOK_SECRET) return res.status(403).send('Forbidden');
   next();
 });
-app.use(bot.webhookCallback('/webhook/' + TOKEN));
+const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
+if (!WEBHOOK_SECRET) logger.warn('[WARN] ⚠️ WEBHOOK_SECRET is not set — webhook is unprotected!');
+app.use(bot.webhookCallback('/webhook/' + TOKEN, { secretToken: WEBHOOK_SECRET || undefined }));
     app.get('/health', async (_r, res) => {
     res.setHeader('Cache-Control', 'no-store');
     var mu = process.memoryUsage();

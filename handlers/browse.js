@@ -273,9 +273,9 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
   ctx.sendChatAction('upload_document').catch(function(){});
   var f = await filesDb.getFile(fid);
   if (!f) return ctx.reply(t(uid, 'not_found'));
-  var _bg = Promise.all([interactions.getSimilar(fid, 4), interactions.isFav(uid, fid), filesDb.incDownloads(fid), interactions.addHistory(uid, fid), interactions.addLog(uid, 'download', f.title)]);
-  var similar = await _bg.then(r=>r[0]);
-  var fav = await _bg.then(r=>r[1]);
+  var _bgResults = await Promise.all([interactions.getSimilar(fid, 4), interactions.isFav(uid, fid), filesDb.incDownloads(fid), interactions.addHistory(uid, fid), interactions.addLog(uid, 'download', f.title)]);
+  var similar = _bgResults[0];
+  var fav = _bgResults[1];
   var caption = '📄 *' + escMd(f.title) + '*\n' + (f.description ? '📝 ' + escMd(f.description) + '\n' : '') + '📁 ' + escMd(f.cat_name || 'عام') + ' | 📖 ' + escMd(f.sub_name || 'عام');
   var backCb = catId !== 0 ? 'ct_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId : 'main_menu';
   var kb = build([[btn(fav ? '⭐ محفوظ' : '☆ حفظ', 'fav_' + fid)], [btn('◀️ رجوع', backCb), btn('🏠', 'main_menu')]]);
@@ -283,7 +283,10 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
     if (f.file_type === 'link') await ctx.reply(caption + '\n\n🔗 ' + f.file_id, { parse_mode: 'Markdown', ...kb });
     else if (f.file_type === 'photo') await ctx.replyWithPhoto(f.file_id, { caption: caption, parse_mode: 'Markdown', ...kb });
     else await ctx.replyWithDocument(f.file_id, { caption: caption, parse_mode: 'Markdown', ...kb });
-    ctx.deleteMessage().catch(function(){});
+    // Edit original preview msg to show back button (don't delete — user needs to go back)
+    var doneText = '✅ *' + escMd(f.title) + '*\n📥 تم الإرسال';
+    var doneKb = build([[btn('◀️ رجوع', backCb), btn('🏠', 'main_menu')]]);
+    ctx.editMessageText(doneText, { parse_mode: 'Markdown', ...doneKb }).catch(function(){});
     if (similar.length) {
       var simRows = similar.map(function(sf) { return [btn('📄 ' + sf.title + ' · ' + sf.sub_name, 'preview_' + sf.id + '_0_0_0_0_0')]; });
       simRows.push([btn('🏠 القائمة', 'main_menu')]);
