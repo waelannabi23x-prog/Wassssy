@@ -140,11 +140,16 @@ bot.use(async (ctx, next) => {
   return next();
 });
 // 🛡️ Ultra-Light Anti-Flood (Built-in)
-const _floodMap = new Map();
-// Auto-cleanup flood entries older than 60 s
+const _floodMap  = new Map();
+const FLOOD_MAX  = 10000; // hard cap — prevents memory abuse
 const _floodClean = setInterval(() => {
   const cut = Date.now() - 60000;
   for (const [k,v] of _floodMap) if (v.t < cut) _floodMap.delete(k);
+  // Emergency evict if still over cap
+  if (_floodMap.size > FLOOD_MAX) {
+    const iter = _floodMap.keys();
+    while (_floodMap.size > FLOOD_MAX * 0.8) _floodMap.delete(iter.next().value);
+  }
 }, 60000);
 if (_floodClean.unref) _floodClean.unref();
 const rateLimit = function(ctx, next) {
@@ -542,7 +547,8 @@ app.use(bot.webhookCallback('/webhook/' + TOKEN));
     res.json({ status: ok ? 'ok' : 'degraded', uptime: Math.floor(process.uptime()), heap: heapMB + 'MB', rss: Math.round(mu.rss / 1048576) + 'MB', checks: checks, region: process.env.RAILWAY_REGION || 'local', ts: Date.now() });
   });
 app.listen(PORT, () => logger.info('✅ Express :' + PORT));
-    if (WEBHOOK_URL) {
+    if (!WEBHOOK_SECRET) logger.warn('⚠️  WEBHOOK_SECRET is not set — webhook is unprotected!');
+  if (WEBHOOK_URL) {
     await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, { allowed_updates: ['message', 'callback_query', 'my_chat_member'], drop_pending_updates: true, max_connections: 40, ...(WEBHOOK_SECRET && { secret_token: WEBHOOK_SECRET }) });
     logger.info('✅ Webhook: ' + WEBHOOK_URL);
   } else {

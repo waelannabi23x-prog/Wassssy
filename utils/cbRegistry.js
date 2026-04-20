@@ -4,8 +4,9 @@
 // Key format: "r_XXXXXX" (8 chars total)
 
 const store = new Map(); // key → {data, ts}
-const TTL   = 3600000;  // 1 hour
-const CHARS = 'abcdefghijklmnopqrstuvwxyz0123456789';
+const TTL      = 3600000;  // 1 hour
+const MAX_SIZE = 2000;      // max 2000 entries — prevents spam
+const CHARS    = 'abcdefghijklmnopqrstuvwxyz0123456789';
 
 function _genKey() {
   let k = '';
@@ -18,6 +19,11 @@ function reg(data) {
   if (data.length <= 64) return data; // no need to register
   // Check if already stored
   for (const [k, v] of store) if (v.data === data) { v.ts = Date.now(); return k; }
+  // Evict oldest if at capacity
+  if (store.size >= MAX_SIZE) {
+    const oldest = [...store.entries()].reduce((a,b) => a[1].ts < b[1].ts ? a : b);
+    store.delete(oldest[0]);
+  }
   let key;
   do { key = _genKey(); } while (store.has(key));
   store.set(key, { data, ts: Date.now() });
