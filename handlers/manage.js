@@ -228,6 +228,7 @@ async function handleCallback(ctx,data){
   const uid=ctx.uid;
 
 
+  if(data==='mg_content') return showContent(ctx);
   if(data==='mg_analytics') return showAnalytics(ctx);
   if(data==='mg_logs') return showLogs(ctx);
   if(data==='mg_users'){const p=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);if(!p.includes('full')&&!p.includes('view_users')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});return showUsers(ctx);}
