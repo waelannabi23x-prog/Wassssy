@@ -189,28 +189,54 @@ bot.command('setsp', async ctx => {
 });
 
 bot.command('search', async ctx => {
-  const isGrp = ctx.chat?.type !== 'private';
-  const raw = ctx.message.text.replace('/search', '').replace(/@\w+/g, '').trim();
+  const isGrp = ctx.chat && ctx.chat.type !== 'private';
+  const raw   = ctx.message.text.replace('/search', '').replace(/@\w+/g, '').trim();
   if (isGrp) {
-    await ctx.deleteMessage().catch(() => {});
-    if (!raw || raw.length < 2) { const m = await ctx.reply('🔍 مثال: /search algo serie 1').catch(() => {}); if (m) setTimeout(() => ctx.deleteMessage(m.message_id).catch(() => {}), 6000); return; }
+    await ctx.deleteMessage().catch(function(){});
+    const q = (raw || '').slice(0, 80);
+    if (!q || q.length < 2) {
+      const m = await ctx.reply('\u{1F50D} \u0645\u062B\u0627\u0644: /search algo 2  \u00B7  serie 1  \u00B7  td analyse').catch(function(){});
+      if (m) setTimeout(function(){ ctx.deleteMessage(m.message_id).catch(function(){}); }, 7000);
+      return;
+    }
+    let loadMsg = null;
+    try { loadMsg = await ctx.reply('\u{1F50D} \u062C\u0627\u0631\u064A \u0627\u0644\u0628\u062D\u062B...'); } catch(_) {}
     try {
-      const res = await smartSearch(raw, 10);
-      if (!res.length) { const m = await ctx.reply('❌ لا نتائج لـ "' + raw + '"').catch(() => {}); if (m) setTimeout(() => ctx.deleteMessage(m.message_id).catch(() => {}), 8000); return; }
-      const un = await botUn(ctx);
-      const rows = res.map(f => {
-        const l = '📄 ' + f.title.substring(0, 32) + ' · ' + f.sub_name;
-        return ctx.isOwner ? [{ text: l, callback_data: 'grp_dl_' + f.id }] : [{ text: l, url: 'https://t.me/' + un + '?start=file_' + f.id }];
+      const [res, un] = await Promise.all([smartSearch(q, 12), botUn(ctx)]);
+      if (!res || !res.length) {
+        if (loadMsg) ctx.deleteMessage(loadMsg.message_id).catch(function(){});
+        const m = await ctx.reply('\u274C \u0644\u0627 \u0646\u062A\u0627\u0626\u062C \u0644\u0640 "' + q + '"\n\u{1F4A1} \u062C\u0631\u0628: algo \u00B7 serie \u00B7 td \u00B7 exam').catch(function(){});
+        if (m) setTimeout(function(){ ctx.deleteMessage(m.message_id).catch(function(){}); }, 10000);
+        return;
+      }
+      const rows = res.map(function(f) {
+        const label = '\u{1F4C4} ' + f.title.substring(0, 35) + (f.sub_name ? ' \u00B7 ' + f.sub_name.substring(0, 15) : '');
+        return un ? [{ text: label, url: 'https://t.me/' + un + '?start=file_' + f.id }] : [{ text: label, callback_data: 'grp_dl_' + f.id }];
       });
-      if (!ctx.isOwner && un) rows.push([{ text: '🤖 فتح البوت', url: 'https://t.me/' + un }]);
-      const m = await ctx.reply('🔍 "' + raw + '" — ' + res.length + ' نتيجة\nاضغط للتحميل 👇', { reply_markup: { inline_keyboard: rows } }).catch(() => {});
-      if (m) { GrpMsgs.add(ctx.chat.id, m.message_id); setTimeout(() => ctx.deleteMessage(m.message_id).catch(() => {}), 60000); }
-    } catch(e) { logger.error('[search grp]', e.message); }
+      if (un) rows.push([{ text: '\u{1F916} \u0641\u062A\u062D \u0627\u0644\u0628\u0648\u062A \u0644\u0644\u062A\u062D\u0645\u064A\u0644', url: 'https://t.me/' + un }]);
+      const rTxt = '\u{1F50D} *' + q + '* \u2014 ' + res.length + ' \u0646\u062A\u064A\u062C\u0629\n_\u0627\u0636\u063A\u0637 \u0639\u0644\u0649 \u0627\u0644\u0645\u0644\u0641 \u0644\u0644\u062A\u062D\u0645\u064A\u0644_ \u{1F447}';
+      let resultMsg = null;
+      if (loadMsg) {
+        try {
+          resultMsg = await ctx.telegram.editMessageText(ctx.chat.id, loadMsg.message_id, null, rTxt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } });
+        } catch(_) {
+          ctx.deleteMessage(loadMsg.message_id).catch(function(){});
+          resultMsg = await ctx.reply(rTxt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } }).catch(function(){});
+        }
+      } else {
+        resultMsg = await ctx.reply(rTxt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } }).catch(function(){});
+      }
+      const msgId = (resultMsg && resultMsg.message_id) || (loadMsg && loadMsg.message_id);
+      if (msgId) { GrpMsgs.add(ctx.chat.id, msgId); setTimeout(function(){ ctx.deleteMessage(msgId).catch(function(){}); }, 90000); }
+    } catch(e) {
+      logger.error('[search grp]', e.message);
+      if (loadMsg) ctx.deleteMessage(loadMsg.message_id).catch(function(){});
+    }
     return;
   }
   if (raw) return userH.handleSearch(ctx, raw);
   await global.setState(ctx.uid, { type: 'search' });
-  return ctx.reply('🔍 اكتب كلمة البحث:').catch(() => {});
+  return ctx.reply('\u{1F50D} \u0627\u0643\u062A\u0628 \u0643\u0644\u0645\u0629 \u0627\u0644\u0628\u062D\u062B:').catch(function(){});
 });
 
 bot.command('profile', ctx => userH.showProfile(ctx));

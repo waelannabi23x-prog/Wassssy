@@ -39,6 +39,7 @@ function getPg() {
     pgPool.on('error', function(err) { logger.error('PG pool error:', err.message); });
     pgPool.on('connect', function() {});
     pgPool.on('remove',  function() {});
+    setTimeout(async function() { try { await Promise.all(Array.from({length:3}, () => pgPool.query('SELECT 1'))); } catch(_) {} }, 1000);
 
     // Pool monitoring — alert if pool exhausted
     setInterval(function() {

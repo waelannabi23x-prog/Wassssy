@@ -161,7 +161,7 @@ if err := globalIdx.Rebuild(globalDB); err != nil { log.Printf("Initial build fa
 
 // Auto-refresh every 30 s
 go func() {
-t := time.NewTicker(30 * time.Second)
+t := time.NewTicker(5 * time.Minute)
 defer t.Stop()
 for range t.C {
 if err := globalIdx.Rebuild(globalDB); err != nil { log.Printf("Rebuild error: %v", err) }

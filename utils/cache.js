@@ -1,7 +1,7 @@
 'use strict';
 // LRU cache — O(1) get/set/evict via Map insertion-order
 const store = new Map();
-const MAX = 8000;
+const MAX = 20000;
 
 function cacheGet(key) {
   const e = store.get(key);
