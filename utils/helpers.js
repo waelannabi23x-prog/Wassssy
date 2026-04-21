@@ -8,16 +8,13 @@ async function eos(ctx, text, extra) {
   extra = extra || {};
   if (ctx.callbackQuery) {
     var msg = ctx.callbackQuery.message;
-    var isMedia = msg && !msg.text; // photo/document/video
-
-    if (!isMedia) {
-      // رسالة نص عادية — عدّل في مكانها
+    // نص عادي → عدّل في مكانه
+    if (msg && msg.text) {
       try { return await ctx.editMessageText(text, extra); } catch (e) {
         if ((e.description || '').indexOf('not modified') !== -1) return;
       }
     }
-
-    // رسالة ميديا — احذف وابعث جديدة (نظيف 100%)
+    // ميديا (صورة/ملف/فيديو) → احذف وابعث جديدة نظيفة
     ctx.deleteMessage().catch(function(){});
     return ctx.reply(text, extra).catch(function(){});
   }
@@ -27,7 +24,6 @@ async function eos(ctx, text, extra) {
 async function quickAck(ctx, text) {
   return ctx.answerCbQuery(text || '', { show_alert: false }).catch(function(){});
 }
-
 async function showTyping(ctx) {
   return ctx.sendChatAction('typing').catch(function(){});
 }
