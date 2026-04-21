@@ -529,7 +529,7 @@ bot.on('my_chat_member', async ctx => {
       await dbRun('INSERT INTO group_chats(chat_id,title) VALUES($1,$2) ON CONFLICT(chat_id) DO UPDATE SET title=EXCLUDED.title', [chat.id, chat.title || '']);
       const sp = await dbAll('SELECT id,name FROM specialties WHERE is_deleted=0 ORDER BY id');
       await ctx.telegram.sendMessage(chat.id, 'مرحباً! أنا بوت الدراسة\n\nاختر تخصص هذا القروب:', { reply_markup: { inline_keyboard: sp.map(s => [{ text: '🎓 ' + s.name, callback_data: 'grp_sp_' + chat.id + '_' + s.id }]) } });
-    } catch(e) { logger.error('[GrpJoin]', e.message); }
+    } catch(e) { if(!e.message?.includes('TOPIC_CLOSED')&&!e.message?.includes('CHAT_WRITE_FORBIDDEN'))logger.error('[GrpJoin]',e.message); }
   } else if (['left', 'kicked'].includes(member?.status)) {
     await dbRun('DELETE FROM group_chats WHERE chat_id=$1', [chat.id]).catch(() => {});
     await dbRun('DELETE FROM group_members WHERE chat_id=$1', [chat.id]).catch(() => {});
