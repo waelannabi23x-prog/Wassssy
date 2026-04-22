@@ -70,6 +70,7 @@ async function showHistory(ctx) {
   if (!hist.length) return eos(ctx, '📂 *السجل*\n\nلم تشاهد أي ملفات بعد.', { parse_mode: 'Markdown', ...build([back('main_menu')]) });
   var rows = hist.map(f => [btn('📄 ' + f.title, 'preview_' + f.id + '_0_0_0_0_0')]);
   rows.push(back('main_menu'));
+  rows.push([btn('🗑 مسح سجلي','clear_my_history')]);
   return eos(ctx, '📂 *السجل (' + hist.length + ')*', { parse_mode: 'Markdown', ...build(rows) });
 }
 
@@ -136,7 +137,10 @@ async function handleSearch(ctx, query) {
   var results = cacheGet(key);
   if (!results) {
     results = await smartSearch(query, 20);
-    if (results && results.length) cacheSet(key, results, 300000);
+    if (results && results.length) {
+      cacheSet(key, results, 300000);
+      try{var{run:_lr}=require('../database/db');_lr('INSERT INTO logs(user_id,action,details) VALUES($1,$2,$3)',[ctx.uid,'search',query.substring(0,80)]).catch(function(){});}catch(_){}
+    }
   }
 
   if (!results || !results.length) {
