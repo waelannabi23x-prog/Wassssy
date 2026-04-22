@@ -484,8 +484,7 @@ bot.on('document', async ctx => {
     const hasCap = !!(ctx.message.caption && /تخصص:|سنة:|spec:|year:|sem:|mat:|cat:/i.test(ctx.message.caption));
     if (isFwd && !hasCap && !s) {
       await global.setState(ctx.uid, { type: 'pending_forward', doc: ctx.message.document, photo: null });
-      await ctx.reply('📎 ملف محفوظ! أرسل المسار:
-`تخصص: X | سنة: X | فصل: X | مادة: X | قسم: X`', { parse_mode: 'Markdown' }).catch(()=>{});
+      await ctx.reply('\u{1F4CE} \u0645\u0644\u0641 \u0645\u062D\u0641\u0648\u0638! \u0623\u0631\u0633\u0644 \u0627\u0644\u0645\u0633\u0627\u0631:\n`\u062A\u062E\u0635\u0635: X | \u0633\u0646\u0629: X | \u0641\u0635\u0644: X | \u0645\u0627\u062F\u0629: X | \u0642\u0633\u0645: X`', { parse_mode: 'Markdown' }).catch(()=>{});
       return;
     }
   }
@@ -645,23 +644,27 @@ async function shutdown(sig) {
   logger.info('[Shutdown] ' + sig);
   try { bot.stop(sig); await GrpBuf.stop(); const pg = getPg(); if (pg) await pg.end(); process.exit(0); } catch(e) { process.exit(1); }
 }
-// ✨ Inline Search @BotName algo 2
+
+
 bot.on('inline_query', async ctx => {
-  const q=(ctx.inlineQuery?.query||'').trim();
-  if(q.length<2) return ctx.answerInlineQuery([],{cache_time:5});
-  try{
-    const res=await smartSearch(q,10);
-    const un=_botUn||'';
-    const items=res.slice(0,10).map(f=>({
-      type:'article',id:String(f.id),title:f.title,
-      description:(f.sub_name||'')+(f.downloads?' · '+f.downloads+' تحميل':''),
-      input_message_content:{message_text:un?'['+f.title+'](https://t.me/'+un+'?start=file_'+f.id+')
-'+(f.sub_name||''):'📄 '+f.title,parse_mode:'Markdown'},
-      ...(un?{reply_markup:{inline_keyboard:[[{text:'⬇️ تحميل',url:'https://t.me/'+un+'?start=file_'+f.id}]]}}:{}),
-    }));
-    await ctx.answerInlineQuery(items,{cache_time:30});
-  }catch(e){await ctx.answerInlineQuery([],{cache_time:5});}
+  var q = (ctx.inlineQuery && ctx.inlineQuery.query || '').trim();
+  if (q.length < 2) { ctx.answerInlineQuery([], {cache_time:5}); return; }
+  try {
+    var res = await smartSearch(q, 10);
+    var un = _botUn || '';
+    var items = res.slice(0, 10).map(function(f) {
+      var url = un ? ('https://t.me/' + un + '?start=file_' + f.id) : '';
+      var txt = url ? ('[' + f.title + '](' + url + ')') : f.title;
+      var item = {type:'article', id:String(f.id), title:f.title,
+        description: f.sub_name || '',
+        input_message_content: {message_text: txt, parse_mode: 'Markdown'}};
+      if (url) item.reply_markup = {inline_keyboard:[[{text:'Download', url:url}]]};
+      return item;
+    });
+    ctx.answerInlineQuery(items, {cache_time:30});
+  } catch(e) { ctx.answerInlineQuery([], {cache_time:5}); }
 });
+
 process.once('SIGINT', () => shutdown('SIGINT'));
 process.once('SIGTERM', () => shutdown('SIGTERM'));
 process.on('uncaughtException', e => logger.error('[Uncaught]', e.message));
