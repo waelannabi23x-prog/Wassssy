@@ -89,7 +89,7 @@ async function handleAiChat(ctx, text) {
     const files = await smartSearchForAI(text, 5);
     if (files.length > 0) {
       const rows = files.slice(0, 5).map(f => [
-        { text: '📄 ' + f.title.substring(0, 35) + ' · ' + f.sub_name, callback_data: 'preview_' + f.id + '_0_0_0_0_0' }
+        { text: '📄 ' + f.title.substring(0, 35) + ' · ' + (f.sub_name||''), callback_data: 'preview_' + f.id + '_0_0_0_0_0' }
       ]);
       rows.push([{ text: '🔍 بحث يدوي', callback_data: 'search_prompt' }, { text: '🏠', callback_data: 'main_menu' }]);
       const fileListStr = files.map(f => '- ' + f.title + ' (' + f.sub_name + ')').join('\n');
