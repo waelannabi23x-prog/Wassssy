@@ -32,7 +32,7 @@ function sanitizeInput(str, maxLen = 200) {
 const setState=(uid,s)=>{ if(global.setState) global.setState(uid,s); };
 const clearState=uid=>{ if(global.delState) global.delState(uid); };
 
-async function concurrentBroadcast(bot,chatId,msgId,ids,txt,opt={}){
+async function concurrentBroadcast(bot,chatId,msgId,ids,txt,opt={}){if(!bot)return {sent:0,failed:0};
   if(!bot||!bot.sendMessage){console.error('[BC] bot is undefined');return {sent:0,failed:ids.length};}
   let s=0,f=0;const t=ids.length,B=30;
   const ui=async()=>{const p=Math.round((s+f)/t*100),b='█'.repeat(Math.round(p/10))+'░'.repeat(10-Math.round(p/10));bot.telegram.editMessageText(chatId,msgId,null,'📢 *جاري الإرسال...*\x60['+b+'] '+p+'%\x60\n✅ '+s+' | ❌ '+f+' | ⏳ '+(t-s-f),{parse_mode:'Markdown'}).catch(()=>{});};
