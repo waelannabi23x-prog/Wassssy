@@ -653,7 +653,7 @@ app.listen(PORT, () => logger.info('✅ Express :' + PORT));
     logger.info('✅ Webhook: ' + WEBHOOK_URL);
   } else {
     logger.warn('⚠️ No WEBHOOK_URL - using polling');
-    setupGroupCommands(bot);
+setupGroupCommands(bot);
 bot.launch({ drop_pending_updates: true });
   }
     global.__bot = bot; // _clearSearchCache set in handlers/group.js // startSmartWarmup(); // disabled: cacheWarmup sufficient
