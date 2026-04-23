@@ -3,7 +3,7 @@
 const logger = require('./logger');
 const { all, run } = require('../database/db');
 
-const CFG = { tickMs: 120000, batchSize: 25, batchDelayMs: 1000 }; // 2min tick — sufficient for notifications
+const CFG = { tickMs: 300000, batchSize: 25, batchDelayMs: 1000 }; // 5min tick // 2min tick — sufficient for notifications
 let _bot = null, _owners = [], _timer = null, _lock = false;
 
 function startScheduler(bot, owners) {

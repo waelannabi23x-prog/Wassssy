@@ -38,7 +38,7 @@ const _bufT = setInterval(flushUsers, 10000);
 _bufT.unref();
 
 const _admCache = new Map();
-const ADM_TTL = 300000;
+const ADM_TTL = 900000; // 15 min
 
 async function getAdminInfo(uid) {
   const now = Date.now();
