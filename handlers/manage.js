@@ -33,6 +33,7 @@ const setState=(uid,s)=>{ if(global.setState) global.setState(uid,s); };
 const clearState=uid=>{ if(global.delState) global.delState(uid); };
 
 async function concurrentBroadcast(bot,chatId,msgId,ids,txt,opt={}){
+  if(!bot||!bot.sendMessage){console.error('[BC] bot is undefined');return {sent:0,failed:ids.length};}
   let s=0,f=0;const t=ids.length,B=30;
   const ui=async()=>{const p=Math.round((s+f)/t*100),b='█'.repeat(Math.round(p/10))+'░'.repeat(10-Math.round(p/10));bot.telegram.editMessageText(chatId,msgId,null,'📢 *جاري الإرسال...*\x60['+b+'] '+p+'%\x60\n✅ '+s+' | ❌ '+f+' | ⏳ '+(t-s-f),{parse_mode:'Markdown'}).catch(()=>{});};
   for(let i=0;i<t;i+=B){const r=await Promise.allSettled(ids.slice(i,i+B).map(id=>bot.sendMessage(id,txt,opt).then(()=>true).catch(()=>false)));r.forEach(x=>{if(x.status==='fulfilled'&&x.value)s++;else f++;});await ui();if(i+B<t)await new Promise(r=>setTimeout(r,1100));}
