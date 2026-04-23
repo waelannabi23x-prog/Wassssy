@@ -7,6 +7,7 @@ var formatDate = common.formatDate;
 async function eos(ctx, text, extra) {
   extra = extra || {};
   if (ctx.callbackQuery) {
+    ctx.answerCbQuery('').catch(function(){});
     var msg = ctx.callbackQuery.message;
     // نص عادي → عدّل في مكانه
     if (msg && msg.text) {
