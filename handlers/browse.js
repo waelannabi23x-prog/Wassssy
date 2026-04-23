@@ -73,9 +73,9 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
   var bgRes = await Promise.all([
     interactions.getSimilar(fid, 4),
     interactions.isFav(uid, fid),
-    filesDb.incDownloads(fid),
-    interactions.addHistory(uid, fid),
-    interactions.addLog(uid, 'download', f.title)
+    filesDb.incDownloads(fid).catch(function(){}),
+    interactions.addHistory(uid, fid).catch(function(){}),
+    interactions.addLog(uid, 'download', f.title).catch(function(){})
   ]);
   var similar = bgRes[0], fav = bgRes[1];
 
