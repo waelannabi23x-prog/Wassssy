@@ -1,5 +1,5 @@
 'use strict';
-const { dbRun, dbAll, dbGet } = require('../database/db');
+const { run: dbRun, all: dbAll, get: dbGet } = require('../database/db');
 
 async function handleNewMember(bot, chatId, userId, firstName) {
   try {
