@@ -32,6 +32,7 @@ const { setLang } = require('./utils/i18n');
 const { startScheduler } = require('./utils/scheduler');
 const { handleAiChat, resetChat } = require('./handlers/ai_chat');
 const { handleOwnerAI } = require('./handlers/ai_owner');
+const setupGroupCommands = require('./handlers/group_commands');
 const { smartSearch } = require('./handlers/group');
 const tools = require('./handlers/owner_tools');
 const startHandler = require('./handlers/start');
