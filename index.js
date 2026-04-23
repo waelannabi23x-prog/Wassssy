@@ -452,8 +452,12 @@ bot.on('callback_query', async ctx => {
   const data = cbRes(_raw); // resolve registry key → full data
   try {
     // no blanket answerCbQuery — saves 100ms per click
-    if (ctx.chat?.type !== 'private' && !data.startsWith('grp_')) return ctx.answerCbQuery('👉 استخدم البوت في الخاص').catch(() => {});
+    if (ctx.chat?.type !== 'private' && !data.startsWith('grp_') && !data.startsWith('tag_all_') && !data.startsWith('mute_all_') && !data.startsWith('unmute_all_')) return ctx.answerCbQuery('👉 استخدم البوت في الخاص').catch(() => {});
     if (exactR.has(data)) return exactR.get(data)(ctx);
+    // Group admin prefix callbacks
+    if (data.startsWith('tag_all_')) { const { tagAll } = require('./handlers/group_admin'); return tagAll(ctx, parseInt(data.replace('tag_all_',''))); }
+    if (data.startsWith('mute_all_')) { const { muteAll } = require('./handlers/group_admin'); return muteAll(ctx, parseInt(data.replace('mute_all_',''))); }
+    if (data.startsWith('unmute_all_')) { const { unmuteAll } = require('./handlers/group_admin'); return unmuteAll(ctx, parseInt(data.replace('unmute_all_',''))); }
     const _h = _getPrefixHandler(data);
   if (_h) return _h(ctx, data);
   } catch(e) { logger.error('[CB]', e.message, { data, uid: ctx.from?.id }); }
