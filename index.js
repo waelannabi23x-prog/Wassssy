@@ -330,6 +330,10 @@ bot.command('help', ctx => ctx.reply(
 ).catch(() => {}));
 
 const exactR = new Map([
+  ['tag_all_', (ctx, d) => { const { tagAll } = require('./handlers/group_admin'); return tagAll(ctx, parseInt(d.replace('tag_all_',''))); }],
+  ['mute_all_', (ctx, d) => { const { muteAll } = require('./handlers/group_admin'); return muteAll(ctx, parseInt(d.replace('mute_all_',''))); }],
+  ['unmute_all_', (ctx, d) => { const { unmuteAll } = require('./handlers/group_admin'); return unmuteAll(ctx, parseInt(d.replace('unmute_all_',''))); }],
+
   ['noop', () => {}],
   ['main_menu', ctx => startHandler(ctx)],
   ['mg_menu',    ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', {show_alert:true}).catch(()=>{}); return manage.mainMenu(ctx); }],
