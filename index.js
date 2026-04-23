@@ -175,7 +175,13 @@ bot.catch((err, ctx) => {
   if (!ctx.callbackQuery) ctx.reply('⚠️ حدث خطأ. حاول مجدداً.').catch(() => {});
 });
 
-bot.command('start', async ctx => { if (startHandler.clearAiMode) await startHandler.clearAiMode(ctx.uid); return startHandler(ctx); });
+bot.command('start', async ctx => {
+  // ترحيب في القروب
+  if (ctx.chat.type === 'supergroup' || ctx.chat.type === 'group') {
+    const { handleNewMember } = require('./handlers/group_admin');
+    await handleNewMember(bot, ctx.chat.id, ctx.from.id, ctx.from.first_name);
+    return;
+  } if (startHandler.clearAiMode) await startHandler.clearAiMode(ctx.uid); return startHandler(ctx); });
 bot.command(['admin', 'owner', 'manage'], ctx => { if (!ctx.isAdmin) return ctx.reply('🚫 ليس لديك صلاحية.').catch(() => {}); return manage.mainMenu(ctx); });
 
 bot.command('setsp', async ctx => {
