@@ -577,6 +577,19 @@ bot.on('text', async ctx => { try {
   } catch(e) { logger.error('[TextHandler]', e.message, { uid: ctx.from?.id }); }
 });
 
+bot.on('chat_member', async ctx => {
+  try {
+    const member = ctx.chatMember?.new_chat_member;
+    const chat = ctx.chatMember?.chat;
+    const old_status = ctx.chatMember?.old_chat_member?.status;
+    if (!member || !chat) return;
+    if (['left','kicked'].includes(old_status) && !['left','kicked'].includes(member.status)) {
+      const { handleNewMember } = require('./handlers/group_admin');
+      await handleNewMember(bot, chat.id, member.user.id, member.user.first_name);
+    }
+  } catch(e) { console.error('[chat_member]', e.message); }
+});
+
 bot.on('my_chat_member', async ctx => {
   const chat = ctx.myChatMember?.chat, member = ctx.myChatMember?.new_chat_member;
   if (!chat || chat.type === 'private') return;
@@ -630,7 +643,7 @@ async function launch() {
   });
 app.listen(PORT, () => logger.info('✅ Express :' + PORT));
   if (WEBHOOK_URL) {
-    await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, { allowed_updates: ['message', 'callback_query', 'my_chat_member', 'inline_query'], drop_pending_updates: true, max_connections: 40, ...(WEBHOOK_SECRET && { secret_token: WEBHOOK_SECRET }) });
+    await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, { allowed_updates: ['message', 'callback_query', 'my_chat_member', 'chat_member', 'inline_query'], drop_pending_updates: true, max_connections: 40, ...(WEBHOOK_SECRET && { secret_token: WEBHOOK_SECRET }) });
     logger.info('✅ Webhook: ' + WEBHOOK_URL);
   } else {
     logger.warn('⚠️ No WEBHOOK_URL - using polling');
