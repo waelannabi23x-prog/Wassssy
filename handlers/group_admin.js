@@ -21,8 +21,7 @@ async function handleNewMember(bot, chatId, userId, firstName) {
 async function showAllMembers(ctx, chatId) {
   try {
     const members = await dbAll('SELECT user_id, first_name FROM group_members WHERE chat_id=$1 LIMIT 200', [chatId]).catch(e => { console.error('[/all DB]', e.message); return []; });
-    if (!members.length) return ctx.reply('📭 لا أعضاء مسجلين بعد
-سيتسجلون تلقائياً عند دخولهم للمرة القادمة').catch(() => {});
+    if (!members.length) return ctx.reply('📭 لا أعضاء مسجلين بعد\nسيتسجلون تلقائياً عند دخولهم للمرة القادمة').catch(() => {});
 
     let text = `👥 ${members.length} عضو\n━━━\n`;
     members.forEach((m, i) => { text += `${i+1}. ${m.first_name}\n`; });
