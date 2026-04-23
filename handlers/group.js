@@ -3,7 +3,7 @@ const { cacheGet, cacheSet, cacheClearPrefix, cacheClear } = require('../utils/c
 const filesDb = require('../database/files');
 const { parseQuery, scoreFile } = require('../utils/searchParser');
 const SEARCH_SVC = process.env.SEARCH_SERVICE_URL || 'http://localhost:3001';
-const USE_GO_SEARCH = !process.env.DISABLE_GO_SEARCH;
+const USE_GO_SEARCH = false;
 function _getCached(key){return cacheGet('gsrc_'+key);}
 function _setCached(key,data){cacheSet('gsrc_'+key,data,300000);}
 async function _goSearch(q,limit){

@@ -1,6 +1,6 @@
 'use strict';
 
-const { aiChat } = require('../utils/groq_client');
+const { aiChat } = require('../utils/glm_client');
 const filesDb = require('../database/files');
 const { smartSearch } = require('./group');
 const { getBotKnowledge } = require('../utils/ai_knowledge');
