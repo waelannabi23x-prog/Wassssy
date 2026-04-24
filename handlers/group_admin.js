@@ -81,7 +81,7 @@ async function showAllMembers(ctx, chatId) {
       parse_mode: 'Markdown',
       reply_markup: { inline_keyboard: rows }
     }).catch(() => null);
-    if (sentMsg) setTimeout(() => ctx.deleteMessage(sentMsg.message_id).catch(() => {}), 30000);
+    if (sentMsg) setTimeout(() => ctx.deleteMessage(sentMsg.message_id).catch(() => {}), 5000);
     return sentMsg;
   } catch(e) {
     console.error('[/all]', e.message);
@@ -106,7 +106,7 @@ async function tagAll(ctx, chatId) {
 
     const mentions = members.map(m => `[${m.first_name || '👤'}](tg://user?id=${m.user_id})`).join(' ');
     const m1 = await ctx.reply('👋 ' + mentions, { parse_mode: 'Markdown' }).catch(() => null);
-  if (m1) setTimeout(() => ctx.deleteMessage(m1.message_id).catch(() => {}), 3000);
+  if (m1) setTimeout(() => ctx.deleteMessage(m1.message_id).catch(() => {}), 5000);
   } catch(e) {
     console.error('[tag]', e.message);
   }
@@ -141,7 +141,7 @@ async function muteAll(ctx, chatId) {
       `🔇 *تم الإسكات*\n✅ ${ok} عضو | ❌ ${fail} فشل\n⏱ لمدة ساعة واحدة`,
       { parse_mode: 'Markdown' }
     ).catch(() => null);
-  if (m2) setTimeout(() => ctx.deleteMessage(m2.message_id).catch(() => {}), 3000);
+  if (m2) setTimeout(() => ctx.deleteMessage(m2.message_id).catch(() => {}), 5000);
   } catch(e) {
     console.error('[mute]', e.message);
   }
@@ -180,7 +180,7 @@ async function unmuteAll(ctx, chatId) {
       `🔊 *تم التفعيل*\n✅ ${ok} عضو | ❌ ${fail} فشل`,
       { parse_mode: 'Markdown' }
     ).catch(() => null);
-  if (m3) setTimeout(() => ctx.deleteMessage(m3.message_id).catch(() => {}), 3000);
+  if (m3) setTimeout(() => ctx.deleteMessage(m3.message_id).catch(() => {}), 5000);
   } catch(e) {
     console.error('[unmute]', e.message);
   }
