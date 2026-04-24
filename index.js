@@ -360,9 +360,7 @@ bot.command('poll', async ctx => {
   // بدء إنشاء تصويت
   await global.setState(ctx.uid, { type: 'poll_create', step: 'question', chatId: ctx.chat.id });
   return ctx.reply(
-    '🗳️ *إنشاء تصويت جديد*
-
-📝 أرسل *السؤال* أو أرسل صورة/فيديو مع السؤال كـ caption:',
+    '🗳️ *إنشاء تصويت جديد*\n\n📝 أرسل *السؤال* أو أرسل صورة/فيديو مع السؤال كـ caption:',
     { parse_mode: 'Markdown' }
   ).catch(() => {});
 });
@@ -374,9 +372,7 @@ bot.command('polls', async ctx => {
     [ctx.chat.id]
   ).catch(() => []);
   if (!polls.length) return ctx.reply('📭 لا يوجد تصويتات').catch(() => {});
-  let text = '📊 *التصويتات النشطة:*
-
-';
+  let text = '📊 *التصويتات النشطة:*\n\n';
   polls.forEach((p, i) => { text += `${i+1}. ${p.question} — /delpoll_${p.id}
 `; });
   return ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => {});
@@ -711,12 +707,7 @@ bot.on('text', async ctx => { try {
                            ctx.message.video ? ctx.message.video.file_id : null;
         const mediaType = ctx.message.photo ? 'photo' : ctx.message.video ? 'video' : null;
         await global.setState(ctx.uid, { type: 'poll_create', step: 'options', chatId, question, mediaFileId, mediaType, options: [] });
-        return ctx.reply('✅ *السؤال:* ' + question + '
-
-📝 الآن أرسل *خيارات التصويت* واحداً تلو الآخر.
-مثال: 🔴 صعبة
-
-اكتب /done عند الانتهاء (2-8 خيارات)', { parse_mode: 'Markdown' }).catch(() => {});
+        return ctx.reply('✅ *السؤال:* ' + question + '\n\n📝 الآن أرسل *خيارات التصويت* واحداً تلو الآخر.\nمثال: 🔴 صعبة\n\nاكتب /done عند الانتهاء (2-8 خيارات)', { parse_mode: 'Markdown' }).catch(() => {});
       }
 
       if (step === 'options') {
