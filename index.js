@@ -135,7 +135,7 @@ bot.use(async (ctx, next) => {
   if (ctx.chat?.type !== 'private') {
     if (ctx.callbackQuery) return next();
     const t = ctx.message?.text || '';
-    if (ctx.message && !['/search', '/setsp', '/dlt', '/done', '/cancel', '/new', '/top', '/all', '/tag', '/mute', '/unmute', '/ai', '/reset', '/start', '/help', '/stats'].some(p => t.startsWith(p))) return ctx.deleteMessage().catch(() => {});
+    const _tcmd = t.split('@')[0].split(' ')[0]; if (ctx.message && !['/search', '/setsp', '/dlt', '/done', '/cancel', '/new', '/top', '/all', '/tag', '/mute', '/unmute', '/ai', '/reset', '/start', '/help', '/stats'].some(p => _tcmd === p || t.startsWith(p))) return ctx.deleteMessage().catch(() => {});
   }
   return next();
 });
