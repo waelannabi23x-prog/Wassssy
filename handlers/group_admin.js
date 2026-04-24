@@ -181,4 +181,16 @@ async function unmuteAll(ctx, chatId) {
   }
 }
 
-module.exports = { handleNewMember, showAllMembers, tagAll, muteAll, unmuteAll };
+async function handleMemberLeft(chatId, userId) {
+  try {
+    await run(
+      'DELETE FROM group_members WHERE chat_id=$1 AND user_id=$2',
+      [chatId, userId]
+    ).catch(() => {});
+    console.log('[Left]', userId, 'removed from', chatId);
+  } catch(e) {
+    console.error('[Left]', e.message);
+  }
+}
+
+module.exports = { handleNewMember, handleMemberLeft, showAllMembers, tagAll, muteAll, unmuteAll };

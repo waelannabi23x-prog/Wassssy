@@ -326,21 +326,25 @@ bot.command('top', async ctx => {
 });
 bot.command('all', async ctx => {
   if (!['supergroup','group'].includes(ctx.chat?.type)) return;
+  if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
   try { const { showAllMembers } = require('./handlers/group_admin'); await showAllMembers(ctx, ctx.chat.id); }
   catch(e) { ctx.reply('❌ ' + e.message).catch(() => {}); }
 });
 bot.command('tag', async ctx => {
   if (!['supergroup','group'].includes(ctx.chat?.type)) return;
+  if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
   try { const { tagAll } = require('./handlers/group_admin'); await tagAll(ctx, ctx.chat.id); }
   catch(e) { ctx.reply('❌').catch(() => {}); }
 });
 bot.command('mute', async ctx => {
   if (!['supergroup','group'].includes(ctx.chat?.type)) return;
+  if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
   try { const { muteAll } = require('./handlers/group_admin'); await muteAll(ctx, ctx.chat.id); }
   catch(e) { ctx.reply('❌').catch(() => {}); }
 });
 bot.command('unmute', async ctx => {
   if (!['supergroup','group'].includes(ctx.chat?.type)) return;
+  if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
   try { const { unmuteAll } = require('./handlers/group_admin'); await unmuteAll(ctx, ctx.chat.id); }
   catch(e) { ctx.reply('❌').catch(() => {}); }
 });
@@ -617,9 +621,15 @@ bot.on('chat_member', async ctx => {
     const chat = ctx.chatMember?.chat;
     const old_status = ctx.chatMember?.old_chat_member?.status;
     if (!member || !chat) return;
+    // عضو جديد دخل
     if (['left','kicked'].includes(old_status) && !['left','kicked'].includes(member.status)) {
       const { handleNewMember } = require('./handlers/group_admin');
       await handleNewMember(bot, chat.id, member.user.id, member.user.first_name);
+    }
+    // عضو خرج → احذفه من DB
+    if (!['left','kicked'].includes(old_status) && ['left','kicked'].includes(member.status)) {
+      const { handleMemberLeft } = require('./handlers/group_admin');
+      await handleMemberLeft(chat.id, member.user.id);
     }
   } catch(e) { console.error('[chat_member]', e.message); }
 });
