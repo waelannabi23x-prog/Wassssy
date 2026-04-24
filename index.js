@@ -359,12 +359,21 @@ bot.command('poll', async ctx => {
   }
   if (!isGroupAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
 
-  // بدء إنشاء تصويت
-  await global.setState(ctx.uid, { type: 'poll_create', step: 'question', chatId: ctx.chat.id });
-  return ctx.reply(
-    '🗳️ *إنشاء تصويت جديد*\n\n📝 أرسل *السؤال* أو أرسل صورة/فيديو مع السؤال كـ caption:',
-    { parse_mode: 'Markdown' }
-  ).catch(() => {});
+  const chatId = ctx.chat.id;
+  // احفظ chatId وأرسل للخاص
+  await global.setState(ctx.uid, { type: 'poll_create', step: 'question', chatId });
+  try {
+    await ctx.telegram.sendMessage(ctx.from.id,
+      '🗳️ *إنشاء تصويت جديد*
+
+📝 أرسل *السؤال* أو صورة/فيديو مع السؤال كـ caption:',
+      { parse_mode: 'Markdown' }
+    );
+    await ctx.reply('📩 تم إرسال رابط الإنشاء في الخاص!').catch(() => {});
+    setTimeout(() => ctx.deleteMessage().catch(() => {}), 3000);
+  } catch(e) {
+    await ctx.reply('⚠️ افتح البوت في الخاص أولاً: @' + (await ctx.telegram.getMe()).username).catch(() => {});
+  }
 });
 
 bot.command('polls', async ctx => {
