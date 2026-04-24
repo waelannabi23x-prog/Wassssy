@@ -326,25 +326,54 @@ bot.command('top', async ctx => {
 });
 bot.command('all', async ctx => {
   if (!['supergroup','group'].includes(ctx.chat?.type)) return;
-  if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+  // تحقق من admin في Telegram مباشرة
+  let isGroupAdmin = ctx.isOwner;
+  if (!isGroupAdmin) {
+    try {
+      const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+      isGroupAdmin = ['administrator','creator'].includes(member.status);
+    } catch(_) {}
+  }
+  if (!isGroupAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
   try { const { showAllMembers } = require('./handlers/group_admin'); await showAllMembers(ctx, ctx.chat.id); }
   catch(e) { ctx.reply('❌ ' + e.message).catch(() => {}); }
 });
 bot.command('tag', async ctx => {
   if (!['supergroup','group'].includes(ctx.chat?.type)) return;
-  if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+  let isGroupAdmin = ctx.isOwner;
+  if (!isGroupAdmin) {
+    try {
+      const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+      isGroupAdmin = ['administrator','creator'].includes(member.status);
+    } catch(_) {}
+  }
+  if (!isGroupAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
   try { const { tagAll } = require('./handlers/group_admin'); await tagAll(ctx, ctx.chat.id); }
   catch(e) { ctx.reply('❌').catch(() => {}); }
 });
 bot.command('mute', async ctx => {
   if (!['supergroup','group'].includes(ctx.chat?.type)) return;
-  if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+  let isGroupAdmin = ctx.isOwner;
+  if (!isGroupAdmin) {
+    try {
+      const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+      isGroupAdmin = ['administrator','creator'].includes(member.status);
+    } catch(_) {}
+  }
+  if (!isGroupAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
   try { const { muteAll } = require('./handlers/group_admin'); await muteAll(ctx, ctx.chat.id); }
   catch(e) { ctx.reply('❌').catch(() => {}); }
 });
 bot.command('unmute', async ctx => {
   if (!['supergroup','group'].includes(ctx.chat?.type)) return;
-  if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+  let isGroupAdmin = ctx.isOwner;
+  if (!isGroupAdmin) {
+    try {
+      const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+      isGroupAdmin = ['administrator','creator'].includes(member.status);
+    } catch(_) {}
+  }
+  if (!isGroupAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
   try { const { unmuteAll } = require('./handlers/group_admin'); await unmuteAll(ctx, ctx.chat.id); }
   catch(e) { ctx.reply('❌').catch(() => {}); }
 });
