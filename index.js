@@ -701,11 +701,35 @@ bot.on('text', async ctx => { try {
   if (ctx.message.text.startsWith('/')) return;
   const uid = ctx.uid, s = global.getState(uid); if (!s) return;
   const txt = ctx.message.text.trim();
+  // Poll creation flow — يشتغل في أي وضع
+  const pollState = global.getState(ctx.uid);
+  if (pollState?.type === 'poll_create') {
+    const step = pollState.step;
+    const chatId = pollState.chatId;
+    if (step === 'question') {
+      const question = ctx.message.caption || ctx.message.text || '';
+      const mediaFileId = ctx.message.photo ? ctx.message.photo[ctx.message.photo.length-1].file_id :
+                         ctx.message.video ? ctx.message.video.file_id : null;
+      const mediaType = ctx.message.photo ? 'photo' : ctx.message.video ? 'video' : null;
+      await global.setState(ctx.uid, { type: 'poll_create', step: 'options', chatId, question, mediaFileId, mediaType, options: [] });
+      return ctx.reply('✅ السؤال: ' + question + '\n\n📝 أرسل الخيارات واحداً تلو الآخر.\nمثال: 🔴 صعبة\n\nاكتب /done عند الانتهاء', { parse_mode: 'Markdown' }).catch(() => {});
+    }
+    if (step === 'options') {
+      const optText = (ctx.message.text || '').trim();
+      const emoji = optText.match(/^(\p{Emoji})/u)?.[1] || '🔵';
+      const text = optText.replace(/^(\p{Emoji}\s*)/u, '').trim() || optText;
+      const opts = pollState.options || [];
+      opts.push({ emoji, text });
+      await global.setState(ctx.uid, { ...pollState, options: opts });
+      return ctx.reply('✅ الخيار ' + opts.length + ': ' + emoji + ' ' + text + '\n\n' + (opts.length >= 2 ? 'اكتب /done للإنشاء أو أضف المزيد' : 'أضف خياراً آخر على الأقل'), { parse_mode: 'Markdown' }).catch(() => {});
+    }
+    return;
+  }
+
   if (s.type === 'ai_mode' && ctx.chat?.type === 'private') {
     if (txt.length > 1000) return ctx.reply('⚠️ الحد 1000 حرف.').catch(() => {});
     if (ctx.isOwner && await handleOwnerAI(ctx, txt, null, null)) return;
-    // Poll creation flow
-    const pollState = global.getState(ctx.uid);
+    const pollState2 = null; // already handled above
     if (pollState?.type === 'poll_create') {
       const step = pollState.step;
       const chatId = pollState.chatId;
