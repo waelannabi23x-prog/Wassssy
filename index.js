@@ -137,8 +137,10 @@ bot.use(async (ctx, next) => {
     if (ctx.callbackQuery) return next();
     const t = ctx.message?.text || '';
     const _tcmd = t.split('@')[0].split(' ')[0];
+    // لو في poll state نسمح بالرسالة تعبر
+    const _pollState = global.getState && global.getState(ctx.from?.id);
+    if (_pollState?.type === 'poll_create') return next();
     if (ctx.message && !['/search', '/setsp', '/dlt', '/done', '/cancel', '/new', '/top', '/all', '/tag', '/mute', '/unmute', '/ai', '/reset', '/start', '/help', '/stats', '/poll', '/polls'].some(p => _tcmd === p || t.startsWith(p))) {
-      // سجّل العضو قبل الحذف
       if (ctx.from && !ctx.from.is_bot) {
         const { run } = require('./database/db');
         run('INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at) VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP) ON CONFLICT(chat_id,user_id) DO UPDATE SET first_name=EXCLUDED.first_name,updated_at=CURRENT_TIMESTAMP',
