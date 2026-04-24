@@ -364,9 +364,7 @@ bot.command('poll', async ctx => {
   await global.setState(ctx.uid, { type: 'poll_create', step: 'question', chatId });
   try {
     await ctx.telegram.sendMessage(ctx.from.id,
-      '🗳️ *إنشاء تصويت جديد*
-
-📝 أرسل *السؤال* أو صورة/فيديو مع السؤال كـ caption:',
+      '🗳️ *إنشاء تصويت جديد*\n\n📝 أرسل *السؤال* أو صورة/فيديو مع السؤال كـ caption:',
       { parse_mode: 'Markdown' }
     );
     await ctx.reply('📩 تم إرسال رابط الإنشاء في الخاص!').catch(() => {});
