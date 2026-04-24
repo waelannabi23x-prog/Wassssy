@@ -97,8 +97,6 @@ async function tagAll(ctx, chatId) {
     ctx.answerCbQuery('⏳ جاري المنشن...').catch(() => {});
     // احذف رسالة القائمة فوراً
     ctx.deleteMessage().catch(() => {});
-    // احذف رسالة القائمة فوراً
-    ctx.deleteMessage().catch(() => {});
     const members = await all(
       'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 LIMIT 100',
       [chatId]

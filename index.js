@@ -157,7 +157,7 @@ const rateLimit = function(ctx, next) {
   if (!uid) return next();
   const now = Date.now();
   let u = _floodMap.get(uid);
-  if (!u || now - u.t > 1000) { u = {c: 1, t: now}; _floodMap.set(uid, u); }
+  if (!u || now - u.t > 10000) { u = {c: 1, t: now}; _floodMap.set(uid, u); }
   else {
     u.c++;
     if (u.c > 6) {
@@ -731,7 +731,7 @@ async function launch() {
 app.listen(PORT, () => logger.info('✅ Express :' + PORT));
 setupGroupCommands(bot);
   if (WEBHOOK_URL) {
-    await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, { allowed_updates: ['message', 'callback_query', 'my_chat_member', 'chat_member', 'inline_query'], drop_pending_updates: true, max_connections: 40, ...(WEBHOOK_SECRET && { secret_token: WEBHOOK_SECRET }) });
+    await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, { allowed_updates: ['message', 'callback_query', 'my_chat_member', 'chat_member', 'inline_query'], drop_pending_updates: true, max_connections: 100, ...(WEBHOOK_SECRET && { secret_token: WEBHOOK_SECRET }) });
     logger.info('✅ Webhook: ' + WEBHOOK_URL);
   } else {
     logger.warn('⚠️ No WEBHOOK_URL - using polling');
@@ -776,7 +776,7 @@ const _cln = setInterval(async () => {
   try {
     await Promise.all([
       dbRun("DELETE FROM user_states WHERE updated_at::timestamp < NOW() - INTERVAL '1 hour'").catch(() => {}),
-      dbRun("DELETE FROM group_members WHERE updated_at::timestamp < NOW() - INTERVAL '7 days'").catch(() => {}),
+      dbRun("DELETE FROM group_members WHERE updated_at::timestamp < NOW() - INTERVAL '30 days'").catch(() => {}),
       dbRun("DELETE FROM cache_store WHERE expires_at::bigint < $1::bigint", [Date.now()]).catch(() => {}),
     ]);
     GrpMsgs.prune();

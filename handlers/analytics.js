@@ -52,7 +52,7 @@ async function showAnalytics(ctx) {
   }
   text += `\n_\u23f0 ${new Date().toLocaleTimeString('ar-DZ')}_`;
   const kb = [[btn('\ud83d\udcc8 \u062a\u0641\u0635\u064a\u0644\u064a','mg_analytics_detail'),btn('\ud83d\udd04 \u062a\u062d\u062f\u064a\u062b','mg_analytics')],[btn('\ud83d\uddd3 \u0627\u0644\u064a\u0648\u0645','mg_analytics_daily'),btn('\ud83d\udc65 \u0623\u0641\u0636\u0644 \u0645\u0633\u062a\u062e\u062f\u0645\u064a\u0646','mg_analytics_users')],back('mg_menu')];
-  cacheSet(cKey, { text, kb }, 120000);
+  cacheSet(cKey, { text, kb }, 600000);
   return eos(ctx, text, { parse_mode: 'Markdown', ...build(kb) });
 }
 

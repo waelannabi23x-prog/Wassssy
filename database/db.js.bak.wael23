@@ -27,7 +27,7 @@ function getPg() {
     pgPool = new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
-      max: 30, min: 8,
+      max: 20, min: 5,
       idleTimeoutMillis: 60000,
       connectionTimeoutMillis: 5000,
       statement_timeout: 10000,
@@ -152,7 +152,7 @@ async function all(sql, params) {
   var pg = getPg();
   if (pg) {
     return withRetry(function() {
-      return pg.query(sql, sanitizeParams(params)).then(function(r) { return r.rows; });
+      return pg.query(toPgCached(sql), sanitizeParams(params)).then(function(r) { return r.rows; });
     }).catch(function(e){if(e&&e.message)logger.error('[DB]',e.message.substring(0,80));return[];});
   }
   try {
@@ -176,7 +176,7 @@ async function run(sql, params) {
   var pg = getPg();
   if (pg) {
     return withRetry(function() {
-      return pg.query(sql, sanitizeParams(params));
+      return pg.query(toPgCached(sql), sanitizeParams(params));
     });
   }
   try {
