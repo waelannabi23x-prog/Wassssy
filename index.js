@@ -656,7 +656,7 @@ async function launch() {
     res.json({ status: ok ? 'ok' : 'degraded', uptime: Math.floor(process.uptime()), heap: heapMB + 'MB', rss: Math.round(mu.rss / 1048576) + 'MB', checks: checks, region: process.env.RAILWAY_REGION || 'local', ts: Date.now() });
   });
 app.listen(PORT, () => logger.info('✅ Express :' + PORT));
-  setupGroupCommands(bot);
+setupGroupCommands(bot);
   if (WEBHOOK_URL) {
     await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, { allowed_updates: ['message', 'callback_query', 'my_chat_member', 'chat_member', 'inline_query'], drop_pending_updates: true, max_connections: 40, ...(WEBHOOK_SECRET && { secret_token: WEBHOOK_SECRET }) });
     logger.info('✅ Webhook: ' + WEBHOOK_URL);
