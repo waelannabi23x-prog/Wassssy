@@ -31,6 +31,7 @@ const { cacheWarmup, cacheClear, cacheClearPrefix } = require('./utils/cache');
 const { setLang } = require('./utils/i18n');
 const { startScheduler } = require('./utils/scheduler');
 const { handleAiChat, resetChat } = require('./handlers/ai_chat');
+const poll = require('./handlers/group_admin_poll');
 const { handleOwnerAI } = require('./handlers/ai_owner');
 const setupGroupCommands = require('./handlers/group_commands');
 const { smartSearch } = require('./handlers/group');
@@ -296,6 +297,18 @@ bot.command('ai', async ctx => { await global.setState(ctx.uid, { type: 'ai_mode
 bot.command('reset', ctx => { resetChat(ctx.uid); return ctx.reply('🔄 تم مسح سياق المحادثة.').catch(() => {}); });
 bot.command('promote', ctx => tools.batchPromote(ctx));
 bot.command('cancel', async ctx => { if (global.getState(ctx.uid)) { await global.delState(ctx.uid); return ctx.reply('❌ تم الإلغاء.').catch(() => {}); } });
+
+bot.command('done', async ctx => {
+  const s = global.getState(ctx.uid);
+  if (s?.type === 'poll_create' && s.step === 'options') {
+    if (!s.options || s.options.length < 2) return ctx.reply('⚠️ أضف خيارين على الأقل').catch(() => {});
+    await global.delState(ctx.uid);
+    const pollId = await poll.createPoll(ctx, s.chatId, s.question, s.options, s.mediaFileId, s.mediaType);
+    if (!pollId) return ctx.reply('❌ فشل إنشاء التصويت').catch(() => {});
+    await poll.sendPoll(ctx, s.chatId, pollId);
+    return ctx.reply('✅ تم إنشاء التصويت!').catch(() => {});
+  }
+});
 bot.command('users', async ctx => {
   if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫').catch(() => {});
   if (ctx.isAdmin && !ctx.isOwner) { const p = await adminsDb.getPerms(ctx.uid).catch(() => []); if (!p.includes('full') && !p.includes('view_users')) return ctx.reply('🚫').catch(() => {}); }
@@ -333,6 +346,42 @@ bot.command('top', async ctx => {
     if (m) { GrpMsgs.add(ctx.chat.id,m.message_id); setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}),90000); }
   } catch(e) { logger.error('[/top]',e.message); }
 });
+bot.command('poll', async ctx => {
+  if (!['supergroup','group'].includes(ctx.chat?.type)) return;
+  let isGroupAdmin = ctx.isOwner;
+  if (!isGroupAdmin) {
+    try {
+      const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+      isGroupAdmin = ['administrator','creator'].includes(member.status);
+    } catch(_) {}
+  }
+  if (!isGroupAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+
+  // بدء إنشاء تصويت
+  await global.setState(ctx.uid, { type: 'poll_create', step: 'question', chatId: ctx.chat.id });
+  return ctx.reply(
+    '🗳️ *إنشاء تصويت جديد*
+
+📝 أرسل *السؤال* أو أرسل صورة/فيديو مع السؤال كـ caption:',
+    { parse_mode: 'Markdown' }
+  ).catch(() => {});
+});
+
+bot.command('polls', async ctx => {
+  if (!['supergroup','group'].includes(ctx.chat?.type)) return;
+  const polls = await require('./database/db').all(
+    'SELECT id, question, created_at FROM polls WHERE chat_id=$1 AND is_closed=0 ORDER BY created_at DESC LIMIT 10',
+    [ctx.chat.id]
+  ).catch(() => []);
+  if (!polls.length) return ctx.reply('📭 لا يوجد تصويتات').catch(() => {});
+  let text = '📊 *التصويتات النشطة:*
+
+';
+  polls.forEach((p, i) => { text += `${i+1}. ${p.question} — /delpoll_${p.id}
+`; });
+  return ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => {});
+});
+
 bot.command('all', async ctx => {
   if (!['supergroup','group'].includes(ctx.chat?.type)) return;
   // تحقق من admin في Telegram مباشرة
@@ -523,6 +572,17 @@ bot.on('callback_query', async ctx => {
     if (ctx.chat?.type !== 'private' && !data.startsWith('grp_') && !data.startsWith('tag_all_') && !data.startsWith('mute_all_') && !data.startsWith('unmute_all_')) return ctx.answerCbQuery('👉 استخدم البوت في الخاص').catch(() => {});
     if (exactR.has(data)) return exactR.get(data)(ctx);
     // Group admin prefix callbacks
+    if (data.startsWith('vote_')) {
+      const parts = data.split('_');
+      return poll.castVote(ctx, parseInt(parts[1]), parseInt(parts[2]));
+    }
+    if (data.startsWith('poll_results_')) {
+      return poll.showPollResults(ctx, parseInt(data.replace('poll_results_','')));
+    }
+    if (data.startsWith('poll_refresh_')) {
+      ctx.answerCbQuery('🔄').catch(()=>{});
+      return poll.refreshPollMessage(ctx, parseInt(data.replace('poll_refresh_','')));
+    }
     if (data.startsWith('tag_all_')) { const { tagAll } = require('./handlers/group_admin'); return tagAll(ctx, parseInt(data.replace('tag_all_',''))); }
     if (data.startsWith('mute_all_')) { const { muteAll } = require('./handlers/group_admin'); return muteAll(ctx, parseInt(data.replace('mute_all_',''))); }
     if (data.startsWith('unmute_all_')) { const { unmuteAll } = require('./handlers/group_admin'); return unmuteAll(ctx, parseInt(data.replace('unmute_all_',''))); }
@@ -639,6 +699,40 @@ bot.on('text', async ctx => { try {
   if (s.type === 'ai_mode' && ctx.chat?.type === 'private') {
     if (txt.length > 1000) return ctx.reply('⚠️ الحد 1000 حرف.').catch(() => {});
     if (ctx.isOwner && await handleOwnerAI(ctx, txt, null, null)) return;
+    // Poll creation flow
+    const pollState = global.getState(ctx.uid);
+    if (pollState?.type === 'poll_create') {
+      const step = pollState.step;
+      const chatId = pollState.chatId;
+
+      if (step === 'question') {
+        const question = ctx.message.caption || ctx.message.text || '';
+        const mediaFileId = ctx.message.photo ? ctx.message.photo[ctx.message.photo.length-1].file_id :
+                           ctx.message.video ? ctx.message.video.file_id : null;
+        const mediaType = ctx.message.photo ? 'photo' : ctx.message.video ? 'video' : null;
+        await global.setState(ctx.uid, { type: 'poll_create', step: 'options', chatId, question, mediaFileId, mediaType, options: [] });
+        return ctx.reply('✅ *السؤال:* ' + question + '
+
+📝 الآن أرسل *خيارات التصويت* واحداً تلو الآخر.
+مثال: 🔴 صعبة
+
+اكتب /done عند الانتهاء (2-8 خيارات)', { parse_mode: 'Markdown' }).catch(() => {});
+      }
+
+      if (step === 'options') {
+        const optText = (ctx.message.text || '').trim();
+        const emoji = optText.match(/^(\p{Emoji})/u)?.[1] || '🔵';
+        const text = optText.replace(/^(\p{Emoji}\s*)/u, '').trim() || optText;
+        const opts = pollState.options || [];
+        opts.push({ emoji, text });
+        await global.setState(ctx.uid, { ...pollState, options: opts });
+        return ctx.reply(`✅ الخيار ${opts.length}: ${emoji} ${text}
+
+${opts.length >= 2 ? 'اكتب /done للإنشاء أو أضف المزيد' : 'أضف خياراً آخر على الأقل'}`, { parse_mode: 'Markdown' }).catch(() => {});
+      }
+      return;
+    }
+
     if (await handleAiChat(ctx, txt)) return;
   }
   if (s.type === 'mg_file') return manage.handleFileUpload(ctx);
