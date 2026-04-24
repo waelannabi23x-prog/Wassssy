@@ -137,7 +137,7 @@ bot.use(async (ctx, next) => {
     if (ctx.callbackQuery) return next();
     const t = ctx.message?.text || '';
     const _tcmd = t.split('@')[0].split(' ')[0];
-    if (ctx.message && !['/search', '/setsp', '/dlt', '/done', '/cancel', '/new', '/top', '/all', '/tag', '/mute', '/unmute', '/ai', '/reset', '/start', '/help', '/stats'].some(p => _tcmd === p || t.startsWith(p))) {
+    if (ctx.message && !['/search', '/setsp', '/dlt', '/done', '/cancel', '/new', '/top', '/all', '/tag', '/mute', '/unmute', '/ai', '/reset', '/start', '/help', '/stats', '/poll', '/polls'].some(p => _tcmd === p || t.startsWith(p))) {
       // سجّل العضو قبل الحذف
       if (ctx.from && !ctx.from.is_bot) {
         const { run } = require('./database/db');
