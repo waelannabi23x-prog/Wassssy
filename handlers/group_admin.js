@@ -110,7 +110,7 @@ async function tagAll(ctx, chatId) {
 
     const mentions = members.map(m => `[${m.first_name || '👤'}](tg://user?id=${m.user_id})`).join(' ');
     const m1 = await ctx.reply('👋 ' + mentions, { parse_mode: 'Markdown' }).catch(() => null);
-  if (m1) setTimeout(() => ctx.deleteMessage(m1.message_id).catch(() => {}), 5000);
+  // المنشن يبقى — عشان الأعضاء يشوفونه
   } catch(e) {
     console.error('[tag]', e.message);
   }

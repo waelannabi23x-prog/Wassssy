@@ -525,7 +525,15 @@ bot.on('callback_query', async ctx => {
 bot.on('message', async (ctx, next) => {
   if (ctx.chat?.type === 'private' && ctx.from?.id === OWNER_ID && ctx.message?.text?.startsWith('!')) return ownerH.handle(ctx, ctx.message.text);
   if (ctx.chat?.type !== 'private') {
-    if (ctx.from && !ctx.from.is_bot) GrpBuf.add(ctx.chat.id, ctx.from.id, ctx.from.username, ctx.from.first_name);
+    if (ctx.from && !ctx.from.is_bot) {
+      GrpBuf.add(ctx.chat.id, ctx.from.id, ctx.from.username, ctx.from.first_name);
+      // سجّل في group_members تلقائياً
+      const { run } = require('./database/db');
+      run(
+        'INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at) VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP) ON CONFLICT(chat_id,user_id) DO UPDATE SET first_name=EXCLUDED.first_name,updated_at=CURRENT_TIMESTAMP',
+        [ctx.chat.id, ctx.from.id, ctx.from.username||'', ctx.from.first_name||'عضو']
+      ).catch(()=>{});
+    }
     const s = global.getState(ctx.uid);
     if (s?.type === 'mg_bundle_files' && ctx.message.media_group_id) {
       const mgId = ctx.message.media_group_id; MGColl.add(mgId, ctx.message);
