@@ -329,10 +329,16 @@ bot.command('all', async ctx => {
   // تحقق من admin في Telegram مباشرة
   let isGroupAdmin = ctx.isOwner;
   if (!isGroupAdmin) {
-    try {
-      const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
-      isGroupAdmin = ['administrator','creator'].includes(member.status);
-    } catch(_) {}
+    const cacheKey = 'grp_admin_' + ctx.chat.id + '_' + ctx.from.id;
+    let cached = require('./utils/cache').cacheGet(cacheKey);
+    if (cached === null) {
+      try {
+        const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+        cached = ['administrator','creator'].includes(member.status) ? 1 : 0;
+        require('./utils/cache').cacheSet(cacheKey, cached, 300000);
+      } catch(_) { cached = 0; }
+    }
+    isGroupAdmin = cached === 1;
   }
   if (!isGroupAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
   try { const { showAllMembers } = require('./handlers/group_admin'); await showAllMembers(ctx, ctx.chat.id); }
