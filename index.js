@@ -324,6 +324,26 @@ bot.command('top', async ctx => {
     if (m) { GrpMsgs.add(ctx.chat.id,m.message_id); setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}),90000); }
   } catch(e) { logger.error('[/top]',e.message); }
 });
+bot.command('all', async ctx => {
+  if (!['supergroup','group'].includes(ctx.chat?.type)) return;
+  try { const { showAllMembers } = require('./handlers/group_admin'); await showAllMembers(ctx, ctx.chat.id); }
+  catch(e) { ctx.reply('❌ ' + e.message).catch(() => {}); }
+});
+bot.command('tag', async ctx => {
+  if (!['supergroup','group'].includes(ctx.chat?.type)) return;
+  try { const { tagAll } = require('./handlers/group_admin'); await tagAll(ctx, ctx.chat.id); }
+  catch(e) { ctx.reply('❌').catch(() => {}); }
+});
+bot.command('mute', async ctx => {
+  if (!['supergroup','group'].includes(ctx.chat?.type)) return;
+  try { const { muteAll } = require('./handlers/group_admin'); await muteAll(ctx, ctx.chat.id); }
+  catch(e) { ctx.reply('❌').catch(() => {}); }
+});
+bot.command('unmute', async ctx => {
+  if (!['supergroup','group'].includes(ctx.chat?.type)) return;
+  try { const { unmuteAll } = require('./handlers/group_admin'); await unmuteAll(ctx, ctx.chat.id); }
+  catch(e) { ctx.reply('❌').catch(() => {}); }
+});
 bot.command('help', ctx => ctx.reply(
   '📚 *أوامر البوت*\n\n/start — الرئيسية\n/search — البحث\n/profile — شخصي\n/stats — إحصائيات\n/cancel — إلغاء\n/ai — مساعد ذكي\n/reset — مسح سياق\n\n👑 *المشرفين:*\n/admin — الإدارة',
   { parse_mode: 'Markdown' }
