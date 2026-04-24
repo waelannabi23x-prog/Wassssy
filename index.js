@@ -303,13 +303,14 @@ bot.command('cancel', async ctx => { if (global.getState(ctx.uid)) { await globa
 bot.command('done', async ctx => {
   const s = global.getState(ctx.uid);
   if (s?.type === 'poll_create' && s.step === 'options') {
-    if (!s.options || s.options.length < 2) return ctx.reply('⚠️ أضف خيارين على الأقل').catch(() => {});
+    if (!s.options || s.options.length < 2) return ctx.reply('\u26a0\ufe0f أضف خيارين على الأقل').catch(() => {});
     await global.delState(ctx.uid);
     const pollId = await poll.createPoll(ctx, s.chatId, s.question, s.options, s.mediaFileId, s.mediaType);
-    if (!pollId) return ctx.reply('❌ فشل إنشاء التصويت').catch(() => {});
+    if (!pollId) return ctx.reply('\u274c فشل إنشاء التصويت').catch(() => {});
     await poll.sendPoll(ctx, s.chatId, pollId);
-    return ctx.reply('✅ تم إنشاء التصويت!').catch(() => {});
+    return ctx.reply('\u2705 تم إنشاء التصويت وإرساله للقروب!').catch(() => {});
   }
+  if (global.getState(ctx.uid)) { await global.delState(ctx.uid); return ctx.reply('\u274c تم الإلغاء.').catch(() => {}); }
 });
 bot.command('users', async ctx => {
   if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫').catch(() => {});
