@@ -612,6 +612,16 @@ bot.on('callback_query', async ctx => {
       return poll.showPollResults(ctx, parseInt(data.replace('poll_results_','')));
     }
     if (data === 'poll_closed_notice') return ctx.answerCbQuery('🔒 التصويت مغلق!', { show_alert: true }).catch(()=>{});
+    if (data.startsWith('leave_grp_')) {
+      const chatId = parseInt(data.replace('leave_grp_',''));
+      try {
+        await ctx.telegram.leaveChat(chatId);
+        await require('./database/db').run('DELETE FROM group_chats WHERE chat_id=$1', [chatId]);
+        return ctx.answerCbQuery('✅ تم الخروج').catch(()=>{});
+      } catch(e) {
+        return ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(()=>{});
+      }
+    }
     if (data.startsWith('poll_reset_')) { return poll.resetPoll(ctx, parseInt(data.replace('poll_reset_',''))); }
     if (data.startsWith('poll_delete_')) { return poll.deletePoll(ctx, parseInt(data.replace('poll_delete_',''))); }
     if (data.startsWith('poll_close_')) {
@@ -868,6 +878,7 @@ bot.on('my_chat_member', async ctx => {
   if (['member', 'administrator'].includes(member?.status)) {
     try {
       await dbRun('INSERT INTO group_chats(chat_id,title) VALUES($1,$2) ON CONFLICT(chat_id) DO UPDATE SET title=EXCLUDED.title', [chat.id, chat.title || '']);
+    logger.info('[Group Joined]', chat.id, chat.title);
       const sp = await dbAll('SELECT id,name FROM specialties WHERE is_deleted=0 ORDER BY id');
       await ctx.telegram.sendMessage(chat.id, 'مرحباً! أنا بوت الدراسة\n\nاختر تخصص هذا القروب:', { reply_markup: { inline_keyboard: sp.map(s => [{ text: '🎓 ' + s.name, callback_data: 'grp_sp_' + chat.id + '_' + s.id }]) } });
     } catch(e) { if(!e.message?.includes('TOPIC_CLOSED')&&!e.message?.includes('CHAT_WRITE_FORBIDDEN'))logger.error('[GrpJoin]',e.message); }
