@@ -639,9 +639,37 @@ bot.on('callback_query', async ctx => {
 });
 
 bot.on('message', async (ctx, next) => {
-  // Photo handler for setwelcome
-  if (ctx.message?.photo) {
+  // Photo/Video/Document handler
+  if (ctx.message?.photo || ctx.message?.video || ctx.message?.document) {
     const s = global.getState(ctx.uid);
+
+    // إشعار القروبات بوسائط
+    if (s?.type === 'mg_notify_groups_msg') {
+      const msg = ctx.message;
+      let mediaFileId = null, mediaType = null;
+      if (msg.photo) { mediaFileId = msg.photo[msg.photo.length-1].file_id; mediaType = 'photo'; }
+      else if (msg.video) { mediaFileId = msg.video.file_id; mediaType = 'video'; }
+      else if (msg.document) { mediaFileId = msg.document.file_id; mediaType = 'document'; }
+      const text = msg.caption || '';
+      const { all: dbAll } = require('./database/db');
+      const groups = s.spId === '0' ? await dbAll('SELECT chat_id FROM group_chats') : await dbAll('SELECT chat_id FROM group_chats WHERE specialty_id=$1', [s.spId]);
+      let gSent = 0, gFail = 0;
+      const msgText = '📣 *إشعار*
+
+' + text;
+      for (const g of groups) {
+        try {
+          if (mediaType === 'photo') await ctx.telegram.sendPhoto(g.chat_id, mediaFileId, { caption: msgText, parse_mode: 'Markdown' });
+          else if (mediaType === 'video') await ctx.telegram.sendVideo(g.chat_id, mediaFileId, { caption: msgText, parse_mode: 'Markdown' });
+          else if (mediaType === 'document') await ctx.telegram.sendDocument(g.chat_id, mediaFileId, { caption: msgText, parse_mode: 'Markdown' });
+          gSent++;
+        } catch(_) { gFail++; }
+        await new Promise(r => setTimeout(r, 600));
+      }
+      await global.delState(ctx.uid);
+      return ctx.reply('✅ أُرسل لـ *' + gSent + '* قروب' + (gFail ? ' | ❌ ' + gFail : ''), { parse_mode: 'Markdown' }).catch(() => {});
+    }
+
     if (s?.type === 'set_welcome_image') {
       const fileId = ctx.message.photo[ctx.message.photo.length-1].file_id;
       const { setWelcomeImage } = require('./handlers/group_admin');
