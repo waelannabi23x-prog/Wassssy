@@ -654,7 +654,7 @@ bot.on('message', async (ctx, next) => {
       const { all: dbAll } = require('./database/db');
       const groups = s.spId === '0' ? await dbAll('SELECT chat_id FROM group_chats') : await dbAll('SELECT chat_id FROM group_chats WHERE specialty_id=$1', [s.spId]);
       let gSent = 0, gFail = 0;
-      const msgText = '📣 *إشعار*\n\n' + text;
+      const msgText = text;
       for (const g of groups) {
         try {
           if (mediaType === 'photo') await ctx.telegram.sendPhoto(g.chat_id, mediaFileId, { caption: msgText, parse_mode: 'Markdown' });
