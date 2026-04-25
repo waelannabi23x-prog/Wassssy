@@ -24,7 +24,7 @@ async function handleNewMember(bot, chatId, userId, firstName) {
 
     // رسالة ترحيب مخصصة أو افتراضية
     // تاريخ ووقت الانضمام
-    const now = new Date();
+    const now = new Date(Date.now() + 60*60*1000); // UTC+1 الجزائر
     const joinDate = now.toLocaleDateString('en-GB').replace(/\//g, '/');
     const joinTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     const specName = spec?.name || '';
