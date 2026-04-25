@@ -173,7 +173,7 @@ const rateLimit = function(ctx, next) {
   else {
     u.c++;
     if (u.c > 6) {
-      if (u.c === 7) return ctx.reply('⚠️ إبطاء قليلاً...').catch(() => {});
+      if (u.c === 7) return; // تجاهل بدون رسالة
       return;
     }
   }
