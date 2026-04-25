@@ -730,6 +730,22 @@ bot.on(['photo', 'video', 'audio', 'voice'], async ctx => {
   if (s?.type === 'mg_tpl_content') return manage.handleText(ctx, s);
 });
 
+bot.on('photo', async ctx => {
+  try {
+    const s = global.getState(ctx.uid);
+    if (s?.type === 'set_welcome_image') {
+      const fileId = ctx.message.photo[ctx.message.photo.length-1].file_id;
+      const { setWelcomeImage } = require('./handlers/group_admin');
+      const { all: dbAll } = require('./database/db');
+      const groups = await dbAll('SELECT chat_id FROM group_chats').catch(()=>[]);
+      for (const g of groups) await setWelcomeImage(ctx, g.chat_id, fileId).catch(()=>{});
+      await setWelcomeImage(ctx, 0, fileId).catch(()=>{});
+      await global.delState(ctx.uid);
+      return ctx.reply('✅ تم تعيين صورة الترحيب لكل القروبات! (' + groups.length + ' قروب)').catch(()=>{});
+    }
+  } catch(e) { console.error('[Photo Handler]', e.message); }
+});
+
 bot.on('text', async ctx => { try {
   if (ctx.message.text.startsWith('/')) return;
   const uid = ctx.uid, s = global.getState(uid); if (!s) return;
