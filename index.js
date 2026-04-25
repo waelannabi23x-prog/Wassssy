@@ -140,7 +140,7 @@ bot.use(async (ctx, next) => {
     // لو في poll state نسمح بالرسالة تعبر
     const _pollState = global.getState && global.getState(ctx.from?.id);
     if (_pollState?.type === 'poll_create') return next();
-    if (ctx.message && !['/search', '/setsp', '/dlt', '/done', '/cancel', '/new', '/top', '/all', '/tag', '/mute', '/unmute', '/ai', '/reset', '/start', '/help', '/stats', '/poll', '/polls'].some(p => _tcmd === p || t.startsWith(p))) {
+    if (ctx.message && !['/search', '/setsp', '/dlt', '/done', '/cancel', '/new', '/top', '/all', '/tag', '/mute', '/unmute', '/ai', '/reset', '/start', '/help', '/stats', '/poll', '/polls', '/setwelcome', '/setwelcomemsg', '/clearwelcome'].some(p => _tcmd === p || t.startsWith(p))) {
       if (ctx.from && !ctx.from.is_bot) {
         const { run } = require('./database/db');
         run('INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at) VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP) ON CONFLICT(chat_id,user_id) DO UPDATE SET first_name=EXCLUDED.first_name,updated_at=CURRENT_TIMESTAMP',
@@ -370,6 +370,39 @@ bot.command('polls', async ctx => {
   polls.forEach((p, i) => { text += `${i+1}. ${p.question} — /delpoll_${p.id}
 `; });
   return ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => {});
+});
+
+bot.command('setwelcome', async ctx => {
+  if (!['supergroup','group'].includes(ctx.chat?.type)) return;
+  let isGroupAdmin = ctx.isOwner;
+  if (!isGroupAdmin) {
+    try { const m = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id); isGroupAdmin = ['administrator','creator'].includes(m?.status); } catch(_) {}
+  }
+  if (!isGroupAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(()=>{});
+  await global.setState(ctx.uid, { type: 'set_welcome_image', chatId: ctx.chat.id });
+  ctx.reply('📸 أرسل الصورة التي تريدها لرسالة الترحيب:').catch(()=>{});
+  setTimeout(() => ctx.deleteMessage().catch(()=>{}), 3000);
+});
+
+bot.command('setwelcomemsg', async ctx => {
+  if (!['supergroup','group'].includes(ctx.chat?.type)) return;
+  let isGroupAdmin = ctx.isOwner;
+  if (!isGroupAdmin) {
+    try { const m = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id); isGroupAdmin = ['administrator','creator'].includes(m?.status); } catch(_) {}
+  }
+  if (!isGroupAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(()=>{});
+  await global.setState(ctx.uid, { type: 'set_welcome_msg', chatId: ctx.chat.id });
+  ctx.reply('✏️ أرسل نص رسالة الترحيب:\nاستخدم {name} لاسم العضو و {spec} للتخصص').catch(()=>{});
+  setTimeout(() => ctx.deleteMessage().catch(()=>{}), 3000);
+});
+
+bot.command('clearwelcome', async ctx => {
+  if (!['supergroup','group'].includes(ctx.chat?.type)) return;
+  if (!ctx.isOwner && !ctx.isAdmin) return;
+  const { clearWelcome } = require('./handlers/group_admin');
+  await clearWelcome(ctx.chat.id);
+  ctx.reply('✅ تم مسح إعدادات الترحيب').catch(()=>{});
+  setTimeout(() => ctx.deleteMessage().catch(()=>{}), 3000);
 });
 
 bot.command('all', async ctx => {

@@ -12,36 +12,53 @@ async function handleNewMember(bot, chatId, userId, firstName) {
       [chatId, userId, '', firstName || 'عضو']
     ).catch(() => {});
 
-    // اجلب اسم التخصص
-    const grp = await get('SELECT specialty_id FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null);
+    // اجلب إعدادات الترحيب + التخصص
+    const [grp, welcomeSettings] = await Promise.all([
+      get('SELECT specialty_id FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null),
+      get('SELECT image_file_id, message FROM group_welcome WHERE chat_id=$1', [chatId]).catch(() => null)
+    ]);
     const spec = grp?.specialty_id ? await get('SELECT name FROM specialties WHERE id=$1', [grp.specialty_id]).catch(() => null) : null;
 
     const name = firstName || 'عضو';
-    const specLine = spec ? `\n🎓 التخصص: *${spec.name}*` : '';
+    const specLine = spec ? '\n🎓 التخصص: *' + spec.name + '*' : '';
 
-    const welcome =
-`👋 *أهلاً وسهلاً يا ${name}!*${specLine}
+    // رسالة ترحيب مخصصة أو افتراضية
+    const welcomeMsg = welcomeSettings?.message
+      ? welcomeSettings.message.replace('{name}', name).replace('{spec}', spec?.name || '')
+      : '👋 *أهلاً وسهلاً يا ' + name + '!*' + specLine + '\n\n━━━━━━━━━━━━━━━\n📚 *كيف تستخدم البوت؟*\n\n🔍 /search اسم الملف\n📂 /new — آخر الملفات\n🏆 /top — الأكثر تحميلاً\n━━━━━━━━━━━━━━━\n💡 ابحث مباشرة بكتابة اسم المادة';
 
-━━━━━━━━━━━━━━━
-📚 *كيف تستخدم البوت؟*
-
-🔍 للبحث عن ملف:
-\`/search اسم الملف\`
-
-📂 آخر الملفات المضافة:
-\`/new\`
-
-🏆 الأكثر تحميلاً:
-\`/top\`
-━━━━━━━━━━━━━━━
-💡 يمكنك البحث مباشرة بكتابة اسم المادة`;
-
-    await bot.telegram.sendMessage(chatId, welcome, { parse_mode: 'Markdown' }).catch(e => {
-      console.error('[Welcome]', e.message);
-    });
+    if (welcomeSettings?.image_file_id) {
+      await bot.telegram.sendPhoto(chatId, welcomeSettings.image_file_id, {
+        caption: welcomeMsg,
+        parse_mode: 'Markdown'
+      }).catch(e => console.error('[Welcome Photo]', e.message));
+    } else {
+      await bot.telegram.sendMessage(chatId, welcomeMsg, { parse_mode: 'Markdown' }).catch(e => {
+        console.error('[Welcome]', e.message);
+      });
+    }
   } catch(e) {
     console.error('[Welcome]', e.message);
   }
+}
+
+// ── إعداد صورة الترحيب ──────────────────────────
+async function setWelcomeImage(ctx, chatId, fileId) {
+  await run(
+    'INSERT INTO group_welcome(chat_id, image_file_id, updated_at) VALUES($1,$2,CURRENT_TIMESTAMP) ON CONFLICT(chat_id) DO UPDATE SET image_file_id=$2, updated_at=CURRENT_TIMESTAMP',
+    [chatId, fileId]
+  );
+}
+
+async function setWelcomeMessage(ctx, chatId, message) {
+  await run(
+    'INSERT INTO group_welcome(chat_id, message, updated_at) VALUES($1,$2,CURRENT_TIMESTAMP) ON CONFLICT(chat_id) DO UPDATE SET message=$2, updated_at=CURRENT_TIMESTAMP',
+    [chatId, message]
+  );
+}
+
+async function clearWelcome(chatId) {
+  await run('DELETE FROM group_welcome WHERE chat_id=$1', [chatId]);
 }
 
 // ══════════════════════════════════════════════
@@ -204,4 +221,4 @@ async function handleMemberLeft(chatId, userId) {
   }
 }
 
-module.exports = { handleNewMember, handleMemberLeft, showAllMembers, tagAll, muteAll, unmuteAll };
+module.exports = { handleNewMember, handleMemberLeft, showAllMembers, tagAll, muteAll, unmuteAll, setWelcomeImage, setWelcomeMessage, clearWelcome };
