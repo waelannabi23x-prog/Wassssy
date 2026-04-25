@@ -1,50 +1,93 @@
+'use strict';
 const { all } = require('../database/db');
-const { cacheGet, cacheSet } = require('./cache');
 const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
 
 let _botUsername = null;
 async function getBotUsername(bot) {
   if (_botUsername) return _botUsername;
-  var me = await bot.telegram.getMe();
-  _botUsername = me.username;
+  _botUsername = (await bot.telegram.getMe()).username;
   return _botUsername;
 }
 
 async function notifyGroupsNewFile(bot, fileInfo) {
   if (!bot || !fileInfo || !fileInfo.specialty_id) return;
   try {
-    var groups = await all(
-      'SELECT chat_id, title FROM group_chats WHERE specialty_id=$1 AND notify_new_files=1',
+    const groups = await all(
+      'SELECT chat_id FROM group_chats WHERE specialty_id=$1 AND notify_new_files=1',
       [fileInfo.specialty_id]
     );
     if (!groups.length) return;
-    var username = await getBotUsername(bot);
-    for (var gi = 0; gi < groups.length; gi++) {
-      var group = groups[gi];
+    const username = await getBotUsername(bot);
+
+    for (const group of groups) {
       try {
-        var members = await all(
-          'SELECT user_id, username, first_name FROM group_members WHERE chat_id=$1 LIMIT 30',
+        // اجلب أعضاء للمنشن
+        const members = await all(
+          'SELECT user_id, username, first_name FROM group_members WHERE chat_id=$1 LIMIT 20',
           [group.chat_id]
         );
-        var msg = '📚 *ملف جديد في تخصصك!*\n\n';
-        msg += '📄 *' + escMd(fileInfo.title) + '*\n';
-        msg += '📁 ' + escMd(fileInfo.cat_name || '') + ' | 📖 ' + escMd(fileInfo.sub_name || '') + '\n\n';
-        if (members.length) {
-          msg += members.map(function(m) {
-            return m.username ? '@' + m.username : '[' + escMd(m.first_name || 'عضو') + '](tg://user?id=' + m.user_id + ')';
-          }).join(' ') + '\n\n';
+
+        const mentions = members.map(m =>
+          m.username ? '@' + m.username :
+          '[' + escMd(m.first_name||'عضو') + '](tg://user?id=' + m.user_id + ')'
+        ).join(' ');
+
+        const caption =
+          '🆕 *ملف جديد!*\n\n' +
+          '📄 *' + escMd(fileInfo.title) + '*\n' +
+          '📁 ' + escMd(fileInfo.cat_name||'') + ' | 📖 ' + escMd(fileInfo.sub_name||'') + '\n\n' +
+          (mentions ? mentions + '\n\n' : '') +
+          '👆 اضغط للتحميل';
+
+        const btn = { inline_keyboard: [[{
+          text: '⬇️ ' + (fileInfo.title||'').substring(0,25),
+          url: 'https://t.me/' + username + '?start=file_' + fileInfo.id
+        }]]};
+
+        const extra = { parse_mode: 'Markdown', reply_markup: btn };
+
+        // أرسل حسب نوع الملف
+        const ftype = fileInfo.file_type || 'document';
+        const fid = fileInfo.file_id;
+
+        if (ftype === 'photo' && fid) {
+          await bot.telegram.sendPhoto(group.chat_id, fid, { caption, ...extra }).catch(()=>{});
+        } else if (ftype === 'video' && fid) {
+          await bot.telegram.sendVideo(group.chat_id, fid, { caption, ...extra }).catch(()=>{});
+        } else if (ftype === 'link') {
+          await bot.telegram.sendMessage(group.chat_id, caption + '\n\n🔗 ' + fid, extra).catch(()=>{});
+        } else if (fid) {
+          await bot.telegram.sendDocument(group.chat_id, fid, { caption, ...extra }).catch(()=>{});
+        } else {
+          await bot.telegram.sendMessage(group.chat_id, caption, extra).catch(()=>{});
         }
-        msg += '👆 اضغط للتحميل';
-        await bot.telegram.sendMessage(group.chat_id, msg, {
-          parse_mode: 'Markdown',
-          reply_markup: { inline_keyboard: [[{
-            text: 'تحميل ' + (fileInfo.title || '').substring(0, 20),
-            url: 'https://t.me/' + username + '?start=file_' + fileInfo.id
-          }]]}
-        });
-      } catch(e) {}
+
+        await new Promise(r => setTimeout(r, 500));
+      } catch(e) { console.error('[Notify]', e.message); }
     }
-  } catch(e) {}
+  } catch(e) { console.error('[NotifyGroups]', e.message); }
 }
 
-module.exports = { notifyGroupsNewFile };
+// إشعار مخصص مع وسائط من لوحة الإدارة
+async function notifyGroupsCustom(bot, groups, text, mediaFileId, mediaType) {
+  let sent = 0, fail = 0;
+  for (const g of groups) {
+    try {
+      const extra = { parse_mode: 'Markdown' };
+      if (mediaType === 'photo' && mediaFileId) {
+        await bot.telegram.sendPhoto(g.chat_id, mediaFileId, { caption: text, ...extra });
+      } else if (mediaType === 'video' && mediaFileId) {
+        await bot.telegram.sendVideo(g.chat_id, mediaFileId, { caption: text, ...extra });
+      } else if (mediaType === 'document' && mediaFileId) {
+        await bot.telegram.sendDocument(g.chat_id, mediaFileId, { caption: text, ...extra });
+      } else {
+        await bot.telegram.sendMessage(g.chat_id, text, extra);
+      }
+      sent++;
+    } catch(_) { fail++; }
+    await new Promise(r => setTimeout(r, 600));
+  }
+  return { sent, fail };
+}
+
+module.exports = { notifyGroupsNewFile, notifyGroupsCustom };
