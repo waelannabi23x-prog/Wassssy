@@ -85,10 +85,16 @@ async function clearWelcome(chatId) {
 // ══════════════════════════════════════════════
 async function showAllMembers(ctx, chatId) {
   try {
-    const members = await all(
-      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 ORDER BY updated_at DESC LIMIT 200',
-      [chatId]
-    ).catch(() => []);
+    const { cacheGet, cacheSet } = require('../utils/cache');
+    const cacheKey = 'grp_members_' + chatId;
+    let members = cacheGet(cacheKey);
+    if (!members) {
+      members = await all(
+        'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 ORDER BY updated_at DESC LIMIT 200',
+        [chatId]
+      ).catch(() => []);
+      cacheSet(cacheKey, members, 300000); // 5 دقائق
+    }
 
     if (!members.length) {
       return ctx.reply(
@@ -230,6 +236,8 @@ async function unmuteAll(ctx, chatId) {
 
 async function handleMemberLeft(chatId, userId) {
   try {
+    const { cacheClear } = require('../utils/cache');
+    cacheClear('grp_members_' + chatId);
     await run(
       'DELETE FROM group_members WHERE chat_id=$1 AND user_id=$2',
       [chatId, userId]
