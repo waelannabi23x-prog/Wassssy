@@ -261,19 +261,6 @@ bot.command('search', async ctx => {
 bot.command('profile', ctx => userH.showProfile(ctx));
 bot.command('stats', ctx => userH.showStats(ctx));
 
-bot.command('done', async ctx => {
-  const s = global.getState(ctx.uid); if (!s) return;
-  if (s.type === 'mg_bundle_files') { await global.delState(ctx.uid); return ctx.reply('✅ تم حفظ الحزمة بـ ' + (s.fileCount || 0) + ' ملف').catch(() => {}); }
-  if (s.type === 'mg_bulk_files') {
-    const up = s.uploaded || [], fl = s.failed || [];
-    await global.delState(ctx.uid);
-    cacheClearPrefix('files_cat_' + s.catId); cacheClearPrefix('showfiles_' + s.catId);
-    let msg = '✅ تم الرفع: ' + up.length + ' ملف'; if (fl.length) msg += ' | ❌ فشل: ' + fl.length;
-    if (up.length) msg += '\n' + up.map(t => '+ ' + t).join('\n');
-    if (fl.length) msg += '\n' + fl.map(t => '✗ ' + t).join('\n');
-    return ctx.reply(msg, { ...kbBuild([[kbBtn('📂 عرض الملفات', 'mg_fls_' + s.spId + '_' + s.yrId + '_' + s.smId + '_' + s.sbId + '_' + s.catId)]]) }).catch(() => {});
-  }
-});
 
 bot.command('mygroups', ctx => tools.listGroups(ctx));
 bot.command('leavegroup', ctx => tools.leaveGroup(ctx));
