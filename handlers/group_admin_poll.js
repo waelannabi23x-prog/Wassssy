@@ -96,6 +96,9 @@ function buildPollButtons(pollId, options) {
     { text: '📊 النتائج', callback_data: `poll_results_${pollId}` },
     { text: '🔄 تحديث', callback_data: `poll_refresh_${pollId}` }
   ]);
+  rows.push([
+    { text: '🔒 إنهاء التصويت', callback_data: `poll_close_${pollId}` }
+  ]);
   return rows;
 }
 
@@ -104,6 +107,10 @@ async function castVote(ctx, pollId, optionId) {
   try {
     const uid = ctx.from.id;
 
+    // تحقق من إغلاق التصويت
+    const pollCheck = await get('SELECT is_closed FROM polls WHERE id=$1', [pollId]);
+    if (pollCheck?.is_closed) return ctx.answerCbQuery('🔒 التصويت مغلق!', { show_alert: true }).catch(() => {});
+
     // تحقق من التصويت المسبق
     const existing = await get(
       'SELECT option_id FROM poll_votes WHERE poll_id=$1 AND user_id=$2',
@@ -111,15 +118,7 @@ async function castVote(ctx, pollId, optionId) {
     );
 
     if (existing) {
-      if (existing.option_id === optionId) {
-        return ctx.answerCbQuery('✅ لقد صوّت بالفعل لهذا الخيار', { show_alert: true }).catch(() => {});
-      }
-      // غيّر الصوت
-      await run('UPDATE poll_votes SET option_id=$1, voted_at=CURRENT_TIMESTAMP WHERE poll_id=$2 AND user_id=$3',
-        [optionId, pollId, uid]);
-      await run('UPDATE poll_options SET votes=votes-1 WHERE id=$1', [existing.option_id]);
-      await run('UPDATE poll_options SET votes=votes+1 WHERE id=$1', [optionId]);
-      ctx.answerCbQuery('🔄 تم تغيير صوتك!').catch(() => {});
+      return ctx.answerCbQuery('🚫 لقد صوّت مسبقاً ولا يمكن تغيير الصوت!', { show_alert: true }).catch(() => {});
     } else {
       // صوت جديد
       await run('INSERT INTO poll_votes(poll_id, option_id, user_id) VALUES($1,$2,$3)',
@@ -203,7 +202,24 @@ async function deletePoll(ctx, pollId) {
   await run('DELETE FROM polls WHERE id=$1', [pollId]);
 }
 
+async function closePoll(ctx, pollId) {
+  try {
+    ctx.answerCbQuery('').catch(() => {});
+    // تحقق صلاحيات
+    const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id).catch(() => null);
+    const isAdmin = ctx.from.id === parseInt(process.env.OWNER_ID) ||
+                   ['administrator','creator'].includes(member?.status);
+    if (!isAdmin) return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(() => {});
+
+    await run('UPDATE polls SET is_closed=1 WHERE id=$1', [pollId]);
+    await refreshPollMessage(ctx, pollId);
+    ctx.reply('🔒 تم إغلاق التصويت!').catch(() => {});
+  } catch(e) {
+    console.error('[Close Poll]', e.message);
+  }
+}
+
 module.exports = {
   createPoll, sendPoll, castVote, refreshPollMessage,
-  showPollResults, resetPoll, deletePoll, buildPollText, buildPollButtons
+  showPollResults, resetPoll, deletePoll, closePoll, buildPollText, buildPollButtons
 };

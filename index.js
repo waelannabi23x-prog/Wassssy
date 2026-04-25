@@ -569,6 +569,9 @@ bot.on('callback_query', async ctx => {
     if (data.startsWith('poll_results_')) {
       return poll.showPollResults(ctx, parseInt(data.replace('poll_results_','')));
     }
+    if (data.startsWith('poll_close_')) {
+      return poll.closePoll(ctx, parseInt(data.replace('poll_close_','')));
+    }
     if (data.startsWith('poll_refresh_')) {
       ctx.answerCbQuery('🔄').catch(()=>{});
       return poll.refreshPollMessage(ctx, parseInt(data.replace('poll_refresh_','')));
