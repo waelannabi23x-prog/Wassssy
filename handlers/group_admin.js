@@ -23,9 +23,28 @@ async function handleNewMember(bot, chatId, userId, firstName) {
     const specLine = spec ? '\n🎓 التخصص: *' + spec.name + '*' : '';
 
     // رسالة ترحيب مخصصة أو افتراضية
+    // تاريخ ووقت الانضمام
+    const now = new Date();
+    const joinDate = now.toLocaleDateString('en-GB').replace(/\//g, '/');
+    const joinTime = now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    const specName = spec?.name || '';
+
+    const defaultMsg =
+'❋═══════════════════❋\n' +
+'🎉 نورت قروبنا يـ *' + name + '*\n' +
+'❋═══════════════════❋\n\n' +
+'° : اسمك  ⟸  『' + name + '』\n' +
+'° : ايديك  ⟸  『' + userId + '』\n' +
+(specName ? '° : تخصصك  ⟸  『' + specName + '』\n' : '') +
+'\n┌─────────────────┐\n' +
+'° : تاريخ انضمامك 🗓  :  ' + joinDate + '\n' +
+'° : الساعة 🕐  :  ' + joinTime + '\n' +
+'└─────────────────┘\n\n' +
+'❋═══════════════════❋';
+
     const welcomeMsg = welcomeSettings?.message
-      ? welcomeSettings.message.replace('{name}', name).replace('{spec}', spec?.name || '')
-      : '👋 *أهلاً وسهلاً يا ' + name + '!*' + specLine + '\n\n━━━━━━━━━━━━━━━\n📚 *كيف تستخدم البوت؟*\n\n🔍 /search اسم الملف\n📂 /new — آخر الملفات\n🏆 /top — الأكثر تحميلاً\n━━━━━━━━━━━━━━━\n💡 ابحث مباشرة بكتابة اسم المادة';
+      ? welcomeSettings.message.replace('{name}', name).replace('{spec}', specName).replace('{id}', userId).replace('{date}', joinDate).replace('{time}', joinTime)
+      : defaultMsg;
 
     if (welcomeSettings?.image_file_id) {
       await bot.telegram.sendPhoto(chatId, welcomeSettings.image_file_id, {
