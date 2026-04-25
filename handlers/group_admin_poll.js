@@ -24,7 +24,7 @@ async function sendPoll(ctx, chatId, pollId) {
     const options = await all('SELECT * FROM poll_options WHERE poll_id=$1 ORDER BY position', [pollId]);
     if (!poll || !options.length) return;
     const text = buildPollText(poll, options);
-    const rows = buildPollButtons(pollId, options, poll.is_closed);
+    const rows = buildPollButtons(pollId, options, poll.is_closed, true);
     let sentMsg;
     if (poll.media_file_id) {
       const extra = { caption: text, parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } };
@@ -61,20 +61,24 @@ function buildBar(pct) {
 }
 
 // ── أزرار التصويت ────────────────────────────────
-function buildPollButtons(pollId, options, isClosed) {
+function buildPollButtons(pollId, options, isClosed, isAdmin) {
   const rows = options.map(opt => [{
     text: `${opt.emoji} ${opt.option_text} (${opt.votes||0})`,
     callback_data: isClosed ? 'poll_closed_notice' : `vote_${pollId}_${opt.id}`
   }]);
-  if (!isClosed) {
-    rows.push([
-      { text: '📊 النتائج', callback_data: `poll_results_${pollId}` },
-      { text: '🔄 تحديث', callback_data: `poll_refresh_${pollId}` }
-    ]);
-    rows.push([{ text: '🔒 إنهاء التصويت', callback_data: `poll_close_${pollId}` }]);
-  } else {
-    rows.push([{ text: '📊 النتائج النهائية', callback_data: `poll_results_${pollId}` }]);
-    rows.push([{ text: '🗑 حذف', callback_data: `poll_delete_${pollId}` }, { text: '🔄 تصفير', callback_data: `poll_reset_${pollId}` }]);
+  rows.push([
+    { text: '📊 النتائج', callback_data: `poll_results_${pollId}` },
+    { text: '🔄 تحديث', callback_data: `poll_refresh_${pollId}` }
+  ]);
+  if (isAdmin) {
+    if (!isClosed) {
+      rows.push([{ text: '🔒 إنهاء التصويت', callback_data: `poll_close_${pollId}` }]);
+    } else {
+      rows.push([
+        { text: '🗑 حذف', callback_data: `poll_delete_${pollId}` },
+        { text: '🔄 تصفير', callback_data: `poll_reset_${pollId}` }
+      ]);
+    }
   }
   return rows;
 }
@@ -100,8 +104,17 @@ async function refreshPollMessage(ctx, pollId) {
     const poll = await get('SELECT * FROM polls WHERE id=$1', [pollId]);
     const options = await all('SELECT * FROM poll_options WHERE poll_id=$1 ORDER BY position', [pollId]);
     if (!poll || !poll.message_id) return;
+    // تحقق من صلاحيات المستخدم الحالي
+    const OWNER_ID = parseInt(process.env.OWNER_ID||'0');
+    let isAdmin = ctx.from?.id === OWNER_ID;
+    if (!isAdmin) {
+      try {
+        const m = await ctx.telegram.getChatMember(poll.chat_id, ctx.from.id);
+        isAdmin = ['administrator','creator'].includes(m?.status);
+      } catch(_) {}
+    }
     const text = buildPollText(poll, options);
-    const rows = buildPollButtons(pollId, options, poll.is_closed);
+    const rows = buildPollButtons(pollId, options, poll.is_closed, isAdmin);
     if (poll.media_file_id) {
       await ctx.telegram.editMessageCaption(poll.chat_id, poll.message_id, null, text, {
         parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows }
@@ -117,7 +130,7 @@ async function refreshPollMessage(ctx, pollId) {
 // ── النتائج التفصيلية — تحديث نفس الرسالة ────────
 async function showPollResults(ctx, pollId) {
   try {
-    ctx.answerCbQuery('').catch(()=>{});
+    ctx.answerCbQuery('📊 تم التحديث').catch(()=>{});
     await refreshPollMessage(ctx, pollId);
   } catch(e) { console.error('[Results]', e.message); }
 }
