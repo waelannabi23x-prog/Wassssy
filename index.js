@@ -172,10 +172,7 @@ const rateLimit = function(ctx, next) {
   if (!u || now - u.t > 10000) { u = {c: 1, t: now}; _floodMap.set(uid, u); }
   else {
     u.c++;
-    if (u.c > 6) {
-      if (u.c === 7) return; // تجاهل بدون رسالة
-      return;
-    }
+    if (u.c > 15) return; // بلوك بعد 15 ضغطة فقط
   }
   return next();
 };
