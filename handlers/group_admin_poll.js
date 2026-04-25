@@ -1,35 +1,20 @@
-
-// ═══════════════════════════════════════════════════
-// 🗳️ نظام التصويت الاحترافي
-// ═══════════════════════════════════════════════════
-
+'use strict';
 const { run, all, get } = require('../database/db');
-const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
 
 // ── إنشاء تصويت ──────────────────────────────────
 async function createPoll(ctx, chatId, question, options, mediaFileId, mediaType) {
   try {
-    // احفظ التصويت في DB
     const poll = await get(
-      `INSERT INTO polls(chat_id, created_by, question, media_file_id, media_type, created_at)
-       VALUES($1,$2,$3,$4,$5,CURRENT_TIMESTAMP) RETURNING id`,
+      'INSERT INTO polls(chat_id,created_by,question,media_file_id,media_type,created_at) VALUES($1,$2,$3,$4,$5,CURRENT_TIMESTAMP) RETURNING id',
       [chatId, ctx.from.id, question, mediaFileId||null, mediaType||null]
     );
     const pollId = poll.id;
-
-    // احفظ الخيارات
     for (let i = 0; i < options.length; i++) {
-      await run(
-        'INSERT INTO poll_options(poll_id, option_text, emoji, position) VALUES($1,$2,$3,$4)',
-        [pollId, options[i].text, options[i].emoji||'🔵', i+1]
-      );
+      await run('INSERT INTO poll_options(poll_id,option_text,emoji,position) VALUES($1,$2,$3,$4)',
+        [pollId, options[i].text, options[i].emoji||'🔵', i+1]);
     }
-
     return pollId;
-  } catch(e) {
-    console.error('[Poll Create]', e.message);
-    return null;
-  }
+  } catch(e) { console.error('[Poll Create]', e.message); return null; }
 }
 
 // ── إرسال التصويت للقروب ─────────────────────────
@@ -38,67 +23,59 @@ async function sendPoll(ctx, chatId, pollId) {
     const poll = await get('SELECT * FROM polls WHERE id=$1', [pollId]);
     const options = await all('SELECT * FROM poll_options WHERE poll_id=$1 ORDER BY position', [pollId]);
     if (!poll || !options.length) return;
-
     const text = buildPollText(poll, options);
-    const rows = buildPollButtons(pollId, options);
-
+    const rows = buildPollButtons(pollId, options, poll.is_closed);
     let sentMsg;
     if (poll.media_file_id) {
       const extra = { caption: text, parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } };
-      if (poll.media_type === 'photo') sentMsg = await ctx.telegram.sendPhoto(chatId, poll.media_file_id, extra).catch(() => null);
-      else if (poll.media_type === 'video') sentMsg = await ctx.telegram.sendVideo(chatId, poll.media_file_id, extra).catch(() => null);
-      else sentMsg = await ctx.telegram.sendDocument(chatId, poll.media_file_id, extra).catch(() => null);
+      if (poll.media_type === 'photo') sentMsg = await ctx.telegram.sendPhoto(chatId, poll.media_file_id, extra).catch(()=>null);
+      else if (poll.media_type === 'video') sentMsg = await ctx.telegram.sendVideo(chatId, poll.media_file_id, extra).catch(()=>null);
+      else sentMsg = await ctx.telegram.sendDocument(chatId, poll.media_file_id, extra).catch(()=>null);
     } else {
-      sentMsg = await ctx.telegram.sendMessage(chatId, text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } }).catch(() => null);
+      sentMsg = await ctx.telegram.sendMessage(chatId, text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } }).catch(()=>null);
     }
-
-    if (sentMsg) {
-      await run('UPDATE polls SET message_id=$1 WHERE id=$2', [sentMsg.message_id, pollId]);
-    }
-
+    if (sentMsg) await run('UPDATE polls SET message_id=$1 WHERE id=$2', [sentMsg.message_id, pollId]);
     return sentMsg;
-  } catch(e) {
-    console.error('[Send Poll]', e.message);
-  }
+  } catch(e) { console.error('[Send Poll]', e.message); }
 }
 
 // ── بناء نص التصويت ──────────────────────────────
 function buildPollText(poll, options) {
   const totalVotes = options.reduce((s, o) => s + (o.votes||0), 0);
-  let text = `📊 *${poll.question}*\n\n`;
-
-  options.forEach(opt => {
+  const status = poll.is_closed ? '🔒 *مغلق*' : '🟢 *نشط*';
+  let text = `📊 *${poll.question}*\n${status}\n\n`;
+  options.forEach((opt, i) => {
     const votes = opt.votes || 0;
     const pct = totalVotes > 0 ? Math.round(votes / totalVotes * 100) : 0;
     const bar = buildBar(pct);
-    text += `${opt.emoji} *${opt.option_text}*\n`;
-    text += `${bar} ${pct}% (${votes} صوت)\n\n`;
+    const crown = (i === 0 && totalVotes > 0 && votes > 0) ? '👑 ' : '';
+    text += `${crown}${opt.emoji} *${opt.option_text}*\n${bar} ${pct}% — ${votes} صوت\n\n`;
   });
-
-  text += `━━━━━━━━━━━━\n`;
-  text += `👥 إجمالي الأصوات: *${totalVotes}*`;
+  text += `━━━━━━━━━━━━\n👥 إجمالي الأصوات: *${totalVotes}*`;
   return text;
 }
 
-// ── شريط التقدم ──────────────────────────────────
 function buildBar(pct) {
   const filled = Math.round(pct / 10);
   return '█'.repeat(filled) + '░'.repeat(10 - filled);
 }
 
 // ── أزرار التصويت ────────────────────────────────
-function buildPollButtons(pollId, options) {
+function buildPollButtons(pollId, options, isClosed) {
   const rows = options.map(opt => [{
     text: `${opt.emoji} ${opt.option_text} (${opt.votes||0})`,
-    callback_data: `vote_${pollId}_${opt.id}`
+    callback_data: isClosed ? 'poll_closed_notice' : `vote_${pollId}_${opt.id}`
   }]);
-  rows.push([
-    { text: '📊 النتائج', callback_data: `poll_results_${pollId}` },
-    { text: '🔄 تحديث', callback_data: `poll_refresh_${pollId}` }
-  ]);
-  rows.push([
-    { text: '🔒 إنهاء التصويت', callback_data: `poll_close_${pollId}` }
-  ]);
+  if (!isClosed) {
+    rows.push([
+      { text: '📊 النتائج', callback_data: `poll_results_${pollId}` },
+      { text: '🔄 تحديث', callback_data: `poll_refresh_${pollId}` }
+    ]);
+    rows.push([{ text: '🔒 إنهاء التصويت', callback_data: `poll_close_${pollId}` }]);
+  } else {
+    rows.push([{ text: '📊 النتائج النهائية', callback_data: `poll_results_${pollId}` }]);
+    rows.push([{ text: '🗑 حذف', callback_data: `poll_delete_${pollId}` }, { text: '🔄 تصفير', callback_data: `poll_reset_${pollId}` }]);
+  }
   return rows;
 }
 
@@ -106,33 +83,15 @@ function buildPollButtons(pollId, options) {
 async function castVote(ctx, pollId, optionId) {
   try {
     const uid = ctx.from.id;
-
-    // تحقق من إغلاق التصويت
     const pollCheck = await get('SELECT is_closed FROM polls WHERE id=$1', [pollId]);
-    if (pollCheck?.is_closed) return ctx.answerCbQuery('🔒 التصويت مغلق!', { show_alert: true }).catch(() => {});
-
-    // تحقق من التصويت المسبق
-    const existing = await get(
-      'SELECT option_id FROM poll_votes WHERE poll_id=$1 AND user_id=$2',
-      [pollId, uid]
-    );
-
-    if (existing) {
-      return ctx.answerCbQuery('🚫 لقد صوّت مسبقاً ولا يمكن تغيير الصوت!', { show_alert: true }).catch(() => {});
-    } else {
-      // صوت جديد
-      await run('INSERT INTO poll_votes(poll_id, option_id, user_id) VALUES($1,$2,$3)',
-        [pollId, optionId, uid]);
-      await run('UPDATE poll_options SET votes=votes+1 WHERE id=$1', [optionId]);
-      ctx.answerCbQuery('✅ تم تسجيل صوتك!').catch(() => {});
-    }
-
-    // تحديث الرسالة
+    if (pollCheck?.is_closed) return ctx.answerCbQuery('🔒 التصويت مغلق!', { show_alert: true }).catch(()=>{});
+    const existing = await get('SELECT option_id FROM poll_votes WHERE poll_id=$1 AND user_id=$2', [pollId, uid]);
+    if (existing) return ctx.answerCbQuery('🚫 صوّت مسبقاً ولا يمكن التغيير!', { show_alert: true }).catch(()=>{});
+    await run('INSERT INTO poll_votes(poll_id,option_id,user_id) VALUES($1,$2,$3)', [pollId, optionId, uid]);
+    await run('UPDATE poll_options SET votes=votes+1 WHERE id=$1', [optionId]);
+    ctx.answerCbQuery('✅ تم تسجيل صوتك!').catch(()=>{});
     await refreshPollMessage(ctx, pollId);
-  } catch(e) {
-    console.error('[Vote]', e.message);
-    ctx.answerCbQuery('❌ خطأ').catch(() => {});
-  }
+  } catch(e) { console.error('[Vote]', e.message); ctx.answerCbQuery('❌ خطأ').catch(()=>{}); }
 }
 
 // ── تحديث رسالة التصويت ──────────────────────────
@@ -141,85 +100,62 @@ async function refreshPollMessage(ctx, pollId) {
     const poll = await get('SELECT * FROM polls WHERE id=$1', [pollId]);
     const options = await all('SELECT * FROM poll_options WHERE poll_id=$1 ORDER BY position', [pollId]);
     if (!poll || !poll.message_id) return;
-
     const text = buildPollText(poll, options);
-    const rows = buildPollButtons(pollId, options);
-
+    const rows = buildPollButtons(pollId, options, poll.is_closed);
     if (poll.media_file_id) {
       await ctx.telegram.editMessageCaption(poll.chat_id, poll.message_id, null, text, {
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: rows }
-      }).catch(() => {});
+        parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows }
+      }).catch(()=>{});
     } else {
       await ctx.telegram.editMessageText(poll.chat_id, poll.message_id, null, text, {
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: rows }
-      }).catch(() => {});
+        parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows }
+      }).catch(()=>{});
     }
-  } catch(e) {
-    console.error('[Refresh Poll]', e.message);
-  }
+  } catch(e) { console.error('[Refresh Poll]', e.message); }
 }
 
-// ── عرض النتائج التفصيلية ────────────────────────
+// ── النتائج التفصيلية — تحديث نفس الرسالة ────────
 async function showPollResults(ctx, pollId) {
   try {
-    ctx.answerCbQuery('').catch(() => {});
-    const poll = await get('SELECT * FROM polls WHERE id=$1', [pollId]);
-    const options = await all('SELECT * FROM poll_options WHERE poll_id=$1 ORDER BY votes DESC', [pollId]);
-    const totalVotes = options.reduce((s, o) => s + (o.votes||0), 0);
-
-    let text = `📊 *نتائج: ${poll.question}*\n\n`;
-    options.forEach((opt, i) => {
-      const votes = opt.votes || 0;
-      const pct = totalVotes > 0 ? Math.round(votes / totalVotes * 100) : 0;
-      const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : '▫️';
-      text += `${medal} ${opt.emoji} *${opt.option_text}*\n`;
-      text += `   ${buildBar(pct)} ${pct}% — ${votes} صوت\n\n`;
-    });
-    text += `━━━━━━━━━━━━\n👥 المجموع: *${totalVotes}* صوت`;
-
-    await ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => {});
-  } catch(e) {
-    console.error('[Results]', e.message);
-  }
+    ctx.answerCbQuery('').catch(()=>{});
+    await refreshPollMessage(ctx, pollId);
+  } catch(e) { console.error('[Results]', e.message); }
 }
 
-// ── تصفير الأصوات ─────────────────────────────────
-async function resetPoll(pollId) {
-  await run('UPDATE poll_options SET votes=0 WHERE poll_id=$1', [pollId]);
-  await run('DELETE FROM poll_votes WHERE poll_id=$1', [pollId]);
+// ── إغلاق التصويت ────────────────────────────────
+async function closePoll(ctx, pollId) {
+  try {
+    ctx.answerCbQuery('').catch(()=>{});
+    const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id).catch(()=>null);
+    const isAdmin = ctx.from.id === parseInt(process.env.OWNER_ID) ||
+                   ['administrator','creator'].includes(member?.status);
+    if (!isAdmin) return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(()=>{});
+    await run('UPDATE polls SET is_closed=1 WHERE id=$1', [pollId]);
+    await refreshPollMessage(ctx, pollId);
+  } catch(e) { console.error('[Close Poll]', e.message); }
+}
+
+// ── تصفير الأصوات ────────────────────────────────
+async function resetPoll(ctx, pollId) {
+  try {
+    ctx.answerCbQuery('✅ تم التصفير').catch(()=>{});
+    await run('UPDATE poll_options SET votes=0 WHERE poll_id=$1', [pollId]);
+    await run('DELETE FROM poll_votes WHERE poll_id=$1', [pollId]);
+    await run('UPDATE polls SET is_closed=0 WHERE id=$1', [pollId]);
+    await refreshPollMessage(ctx, pollId);
+  } catch(e) { console.error('[Reset Poll]', e.message); }
 }
 
 // ── حذف تصويت ────────────────────────────────────
 async function deletePoll(ctx, pollId) {
-  const poll = await get('SELECT * FROM polls WHERE id=$1', [pollId]);
-  if (poll?.message_id) {
-    await ctx.telegram.deleteMessage(poll.chat_id, poll.message_id).catch(() => {});
-  }
-  await run('DELETE FROM poll_votes WHERE poll_id=$1', [pollId]);
-  await run('DELETE FROM poll_options WHERE poll_id=$1', [pollId]);
-  await run('DELETE FROM polls WHERE id=$1', [pollId]);
-}
-
-async function closePoll(ctx, pollId) {
   try {
-    ctx.answerCbQuery('').catch(() => {});
-    // تحقق صلاحيات
-    const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id).catch(() => null);
-    const isAdmin = ctx.from.id === parseInt(process.env.OWNER_ID) ||
-                   ['administrator','creator'].includes(member?.status);
-    if (!isAdmin) return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(() => {});
-
-    await run('UPDATE polls SET is_closed=1 WHERE id=$1', [pollId]);
-    await refreshPollMessage(ctx, pollId);
-    ctx.reply('🔒 تم إغلاق التصويت!').catch(() => {});
-  } catch(e) {
-    console.error('[Close Poll]', e.message);
-  }
+    ctx.answerCbQuery('🗑 تم الحذف').catch(()=>{});
+    const poll = await get('SELECT * FROM polls WHERE id=$1', [pollId]);
+    if (poll?.message_id) await ctx.telegram.deleteMessage(poll.chat_id, poll.message_id).catch(()=>{});
+    await run('DELETE FROM poll_votes WHERE poll_id=$1', [pollId]);
+    await run('DELETE FROM poll_options WHERE poll_id=$1', [pollId]);
+    await run('DELETE FROM polls WHERE id=$1', [pollId]);
+  } catch(e) { console.error('[Delete Poll]', e.message); }
 }
 
-module.exports = {
-  createPoll, sendPoll, castVote, refreshPollMessage,
-  showPollResults, resetPoll, deletePoll, closePoll, buildPollText, buildPollButtons
-};
+module.exports = { createPoll, sendPoll, castVote, refreshPollMessage, showPollResults, resetPoll, deletePoll, closePoll, buildPollText, buildPollButtons };

@@ -569,6 +569,9 @@ bot.on('callback_query', async ctx => {
     if (data.startsWith('poll_results_')) {
       return poll.showPollResults(ctx, parseInt(data.replace('poll_results_','')));
     }
+    if (data === 'poll_closed_notice') return ctx.answerCbQuery('🔒 التصويت مغلق!', { show_alert: true }).catch(()=>{});
+    if (data.startsWith('poll_reset_')) { return poll.resetPoll(ctx, parseInt(data.replace('poll_reset_',''))); }
+    if (data.startsWith('poll_delete_')) { return poll.deletePoll(ctx, parseInt(data.replace('poll_delete_',''))); }
     if (data.startsWith('poll_close_')) {
       return poll.closePoll(ctx, parseInt(data.replace('poll_close_','')));
     }
