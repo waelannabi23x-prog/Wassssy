@@ -732,7 +732,8 @@ bot.on(['photo', 'video', 'audio', 'voice'], async ctx => {
 
 bot.on('photo', async ctx => {
   try {
-    const s = global.getState(ctx.uid);
+    const uid = ctx.from?.id;
+    const s = uid ? global.getState(uid) : null;
     if (s?.type === 'set_welcome_image') {
       const fileId = ctx.message.photo[ctx.message.photo.length-1].file_id;
       const { setWelcomeImage } = require('./handlers/group_admin');
@@ -740,7 +741,7 @@ bot.on('photo', async ctx => {
       const groups = await dbAll('SELECT chat_id FROM group_chats').catch(()=>[]);
       for (const g of groups) await setWelcomeImage(ctx, g.chat_id, fileId).catch(()=>{});
       await setWelcomeImage(ctx, 0, fileId).catch(()=>{});
-      await global.delState(ctx.uid);
+      await global.delState(uid);
       return ctx.reply('✅ تم تعيين صورة الترحيب لكل القروبات! (' + groups.length + ' قروب)').catch(()=>{});
     }
   } catch(e) { console.error('[Photo Handler]', e.message); }
