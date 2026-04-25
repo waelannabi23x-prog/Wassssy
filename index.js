@@ -630,6 +630,29 @@ bot.on('callback_query', async ctx => {
 });
 
 bot.on('message', async (ctx, next) => {
+  // Photo handler for setwelcome
+  if (ctx.message?.photo) {
+    const s = global.getState(ctx.uid);
+    if (s?.type === 'set_welcome_image') {
+      const fileId = ctx.message.photo[ctx.message.photo.length-1].file_id;
+      const { setWelcomeImage } = require('./handlers/group_admin');
+      const { all: dbAll } = require('./database/db');
+      const groups = await dbAll('SELECT chat_id FROM group_chats').catch(()=>[]);
+      for (const g of groups) await setWelcomeImage(ctx, g.chat_id, fileId).catch(()=>{});
+      await setWelcomeImage(ctx, 0, fileId).catch(()=>{});
+      await global.delState(ctx.uid);
+      return ctx.reply('✅ تم تعيين صورة الترحيب لـ ' + groups.length + ' قروب!').catch(()=>{});
+    }
+    // Poll creation with photo
+    const ps = global.getState(ctx.uid);
+    if (ps?.type === 'poll_create' && ps.step === 'question') {
+      const question = ctx.message.caption || '';
+      if (!question) return ctx.reply('⚠️ أضف caption للصورة كسؤال التصويت').catch(()=>{});
+      const mediaFileId = ctx.message.photo[ctx.message.photo.length-1].file_id;
+      await global.setState(ctx.uid, { type: 'poll_create', step: 'options', chatId: ps.chatId, question, mediaFileId, mediaType: 'photo', options: [] });
+      return ctx.reply('✅ السؤال: ' + question + '\n\n📝 أرسل الخيارات واحداً تلو الآخر.\nاكتب /done عند الانتهاء').catch(()=>{});
+    }
+  }
   if (ctx.chat?.type === 'private' && ctx.from?.id === OWNER_ID && ctx.message?.text?.startsWith('!')) return ownerH.handle(ctx, ctx.message.text);
   if (ctx.chat?.type !== 'private') {
     if (ctx.from && !ctx.from.is_bot) {
@@ -728,23 +751,6 @@ bot.on(['photo', 'video', 'audio', 'voice'], async ctx => {
   if (s?.type === 'mg_bundle_files') return manage.handleBundleFileUpload(ctx);
   if (s?.type === 'mg_file') return manage.handleFileUpload(ctx);
   if (s?.type === 'mg_tpl_content') return manage.handleText(ctx, s);
-});
-
-bot.on('photo', async ctx => {
-  try {
-    const uid = ctx.from?.id;
-    const s = uid ? global.getState(uid) : null;
-    if (s?.type === 'set_welcome_image') {
-      const fileId = ctx.message.photo[ctx.message.photo.length-1].file_id;
-      const { setWelcomeImage } = require('./handlers/group_admin');
-      const { all: dbAll } = require('./database/db');
-      const groups = await dbAll('SELECT chat_id FROM group_chats').catch(()=>[]);
-      for (const g of groups) await setWelcomeImage(ctx, g.chat_id, fileId).catch(()=>{});
-      await setWelcomeImage(ctx, 0, fileId).catch(()=>{});
-      await global.delState(uid);
-      return ctx.reply('✅ تم تعيين صورة الترحيب لكل القروبات! (' + groups.length + ' قروب)').catch(()=>{});
-    }
-  } catch(e) { console.error('[Photo Handler]', e.message); }
 });
 
 bot.on('text', async ctx => { try {
