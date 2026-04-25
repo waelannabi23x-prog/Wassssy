@@ -203,6 +203,16 @@ async function handleText(ctx,state){
   const uid=ctx.uid;const text=ctx.message.text?.trim()||ctx.message.caption?.trim()||'';
   if(text==='/cancel'){clearState(uid);return ctx.reply('تم الإلغاء.',build([back('mg_menu')]));}
   const done=(msg,cb)=>{clearState(uid);ctx.reply(msg,{parse_mode:'Markdown',...build([[btn('◀️ رجوع',cb)]])});};
+  
+  // احفظ الوسائط في الـ state
+  if(state.type==='mg_notify_groups_msg'){
+    const msg=ctx.message;
+    if(msg.photo){state.mediaFileId=msg.photo[msg.photo.length-1].file_id;state.mediaType='photo';}
+    else if(msg.video){state.mediaFileId=msg.video.file_id;state.mediaType='video';}
+    else if(msg.document){state.mediaFileId=msg.document.file_id;state.mediaType='document';}
+    await global.setState(uid,state);
+  }
+
   try{
     switch(state.type){
       case 'mg_add_sp':await content.addSpec(text);done('✅ تم إضافة *'+escMd(text)+'*!','mg_content');break;
