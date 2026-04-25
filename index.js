@@ -185,10 +185,9 @@ bot.catch((err, ctx) => {
 });
 
 bot.command('start', async ctx => {
-  // ترحيب في القروب
+  // /start في القروب → احذف الرسالة فقط
   if (ctx.chat.type === 'supergroup' || ctx.chat.type === 'group') {
-    const { handleNewMember } = require('./handlers/group_admin');
-    await handleNewMember(bot, ctx.chat.id, ctx.from.id, ctx.from.first_name);
+    ctx.deleteMessage().catch(() => {});
     return;
   } if (startHandler.clearAiMode) await startHandler.clearAiMode(ctx.uid); return startHandler(ctx); });
 bot.command(['admin', 'owner', 'manage'], ctx => { if (!ctx.isAdmin) return ctx.reply('🚫 ليس لديك صلاحية.').catch(() => {}); return manage.mainMenu(ctx); });
