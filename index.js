@@ -373,27 +373,36 @@ bot.command('polls', async ctx => {
 });
 
 bot.command('setwelcome', async ctx => {
-  if (!['supergroup','group'].includes(ctx.chat?.type)) return;
-  let isGroupAdmin = ctx.isOwner;
-  if (!isGroupAdmin) {
-    try { const m = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id); isGroupAdmin = ['administrator','creator'].includes(m?.status); } catch(_) {}
+  if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(()=>{});
+  // يشتغل في الخاص فقط
+  if (ctx.chat?.type !== 'private') {
+    try {
+      await ctx.telegram.sendMessage(ctx.from.id, '📸 أرسل الصورة التي تريدها لرسالة الترحيب لكل القروبات:');
+      await global.setState(ctx.uid, { type: 'set_welcome_image', chatId: 'all' });
+    } catch(e) {
+      await ctx.reply('⚠️ افتح البوت في الخاص أولاً').catch(()=>{});
+    }
+    setTimeout(() => ctx.deleteMessage().catch(()=>{}), 3000);
+    return;
   }
-  if (!isGroupAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(()=>{});
-  await global.setState(ctx.uid, { type: 'set_welcome_image', chatId: ctx.chat.id });
-  ctx.reply('📸 أرسل الصورة التي تريدها لرسالة الترحيب:').catch(()=>{});
-  setTimeout(() => ctx.deleteMessage().catch(()=>{}), 3000);
+  await global.setState(ctx.uid, { type: 'set_welcome_image', chatId: 'all' });
+  return ctx.reply('📸 أرسل الصورة التي تريدها لرسالة الترحيب لكل القروبات:').catch(()=>{});
 });
 
 bot.command('setwelcomemsg', async ctx => {
-  if (!['supergroup','group'].includes(ctx.chat?.type)) return;
-  let isGroupAdmin = ctx.isOwner;
-  if (!isGroupAdmin) {
-    try { const m = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id); isGroupAdmin = ['administrator','creator'].includes(m?.status); } catch(_) {}
+  if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(()=>{});
+  if (ctx.chat?.type !== 'private') {
+    try {
+      await ctx.telegram.sendMessage(ctx.from.id, '✏️ أرسل نص رسالة الترحيب:\nاستخدم {name} لاسم العضو و {spec} للتخصص');
+      await global.setState(ctx.uid, { type: 'set_welcome_msg', chatId: 'all' });
+    } catch(e) {
+      await ctx.reply('⚠️ افتح البوت في الخاص أولاً').catch(()=>{});
+    }
+    setTimeout(() => ctx.deleteMessage().catch(()=>{}), 3000);
+    return;
   }
-  if (!isGroupAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(()=>{});
-  await global.setState(ctx.uid, { type: 'set_welcome_msg', chatId: ctx.chat.id });
-  ctx.reply('✏️ أرسل نص رسالة الترحيب:\nاستخدم {name} لاسم العضو و {spec} للتخصص').catch(()=>{});
-  setTimeout(() => ctx.deleteMessage().catch(()=>{}), 3000);
+  await global.setState(ctx.uid, { type: 'set_welcome_msg', chatId: 'all' });
+  return ctx.reply('✏️ أرسل نص رسالة الترحيب:\nاستخدم {name} لاسم العضو و {spec} للتخصص').catch(()=>{});
 });
 
 bot.command('clearwelcome', async ctx => {

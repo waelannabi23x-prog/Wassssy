@@ -15,7 +15,7 @@ async function handleNewMember(bot, chatId, userId, firstName) {
     // اجلب إعدادات الترحيب + التخصص
     const [grp, welcomeSettings] = await Promise.all([
       get('SELECT specialty_id FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null),
-      get('SELECT image_file_id, message FROM group_welcome WHERE chat_id=$1', [chatId]).catch(() => null)
+      get('SELECT image_file_id, message FROM group_welcome WHERE chat_id=$1 OR chat_id=0 ORDER BY chat_id DESC LIMIT 1', [chatId]).catch(() => null)
     ]);
     const spec = grp?.specialty_id ? await get('SELECT name FROM specialties WHERE id=$1', [grp.specialty_id]).catch(() => null) : null;
 
