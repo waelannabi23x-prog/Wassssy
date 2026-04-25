@@ -93,7 +93,19 @@ async function showAllMembers(ctx, chatId) {
         'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 ORDER BY updated_at DESC LIMIT 200',
         [chatId]
       ).catch(() => []);
-      cacheSet(cacheKey, members, 300000); // 5 دقائق
+      // أضف الأدمنز من Telegram
+      try {
+        const admins = await ctx.telegram.getChatAdministrators(chatId);
+        for (const a of admins) {
+          if (a.user.is_bot) continue;
+          const exists = members.find(m => m.user_id == a.user.id);
+          if (!exists) {
+            members.push({ user_id: a.user.id, first_name: (a.user.first_name||'Admin') + ' 👑' });
+            await run('INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at) VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP) ON CONFLICT(chat_id,user_id) DO UPDATE SET first_name=EXCLUDED.first_name', [chatId, a.user.id, a.user.username||'', a.user.first_name||'Admin']).catch(()=>{});
+          }
+        }
+      } catch(_) {}
+      cacheSet(cacheKey, members, 300000);
     }
 
     if (!members.length) {
