@@ -138,23 +138,22 @@ async function showUsers(ctx, page=0) {
     await Promise.all([usersDb.getAll(page, PS), usersDb.count()])
       .then(([l, t]) => { cacheSet(_uk, {list:l, total:t}, 30000); return [l, t]; });
 
-  let text = '\ud83d\udc65 *\u0627\u0644\u0645\u0633\u062a\u062e\u062f\u0645\u0648\u0646 (' + total + ')*\n';
-  text += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n';
+  let text = '👥 *المستخدمون (' + total + ')*\n━━━━━━━━━━\n\n';
 
   list.forEach((u, i) => {
     const num = page * PS + i + 1;
-    const name = escMd(u.first_name || '\u0645\u062c\u0647\u0648\u0644');
+    const name = escMd(u.first_name || 'مجهول');
     const username = u.username ? ' @' + escMd(u.username) : '';
-    const banned = u.is_banned ? ' \ud83d\udeab' : '';
+    const banned = u.is_banned ? ' 🚫' : '';
     const joined = u.joined_at ? new Date(u.joined_at).toLocaleDateString('en-GB') : '?';
     const active = u.last_active ? new Date(u.last_active).toLocaleDateString('en-GB') : '?';
     text += num + '. *' + name + '*' + username + banned + '\n';
-    text += '   \ud83d\uddd3 ' + joined + '  \u2022  \ud83d\udd50 ' + active + '\n\n';
+    text += '   🗓 ' + joined + '  •  🕐 ' + active + '\n\n';
   });
 
   const rows = list.map(u => [
-    btn('\ud83d\udc64 ' + (u.first_name || u.id).toString().substring(0, 20), 'mg_profile_' + u.id),
-    btn(u.is_banned ? '\u2705 \u0631\u0641\u0639 \u0627\u0644\u062d\u0638\u0631' : '\ud83d\udeab \u062d\u0638\u0631', (u.is_banned ? 'mg_unban_' : 'mg_ban_') + u.id)
+    btn('👤 ' + (u.first_name || u.id).toString().substring(0, 20), 'mg_profile_' + u.id),
+    btn(u.is_banned ? '✅ رفع الحظر' : '🚫 حظر', (u.is_banned ? 'mg_unban_' : 'mg_ban_') + u.id)
   ]);
 
   const nav = [];
