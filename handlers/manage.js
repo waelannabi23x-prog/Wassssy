@@ -131,7 +131,41 @@ async function showAnalytics(ctx){
 
 async function showLogs(ctx){const _lk='admin_logs';const _lc=cacheGet(_lk);const logs=_lc||await interactions.getLogs(20);if(!_lc) cacheSet(_lk,logs,60000);let text='📜 *آخر السجلات*\n\n';if(logs.length) logs.forEach(l=>{text+='• '+(l.first_name||'ID:'+l.user_id)+': '+l.action+(l.details?' — '+l.details:'')+'\n';});else text+='_لا توجد سجلات._';return eos(ctx,text,{parse_mode:'Markdown',...build([back('mg_menu')])});}
 
-async function showUsers(ctx,page=0){const _uk='admin_users_'+page;const _uc=cacheGet(_uk);const [list,total]=_uc?[_uc.list,_uc.total]:await Promise.all([usersDb.getAll(page,PS),usersDb.count()]).then(([l,t])=>{cacheSet(_uk,{list:l,total:t},30000);return[l,t];});let text='👥 *المستخدمون ('+total+')*\n\n';list.forEach((u,i)=>{const j=u.joined_at?new Date(u.joined_at).toLocaleDateString("en-GB"):"?";const a=u.last_active?new Date(u.last_active).toLocaleDateString("en-GB"):"?";text+=(page*PS+i+1)+". "+escMd(u.first_name)+(u.username?" @"+escMd(u.username):" ID:"+u.id)+(u.is_banned?" 🚫":"")+"\n   📅 "+j+" | 🕐 "+a+"\n";});const rows=list.map(u=>[btn('👤 '+(u.first_name||u.id),'mg_profile_'+u.id),btn(u.is_banned?'✅':'🚫',(u.is_banned?'mg_unban_':'mg_ban_')+u.id)]);const nav=[];if(page>0) nav.push(btn('⬅️','mg_users_p'+(page-1)));nav.push(btn((page+1)+'/'+Math.ceil(total/PS),'noop'));if((page+1)*PS<total) nav.push(btn('➡️','mg_users_p'+(page+1)));if(nav.length) rows.push(nav);rows.push(back('mg_menu'));return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});}
+async function showUsers(ctx, page=0) {
+  const _uk = 'admin_users_' + page;
+  const _uc = cacheGet(_uk);
+  const [list, total] = _uc ? [_uc.list, _uc.total] :
+    await Promise.all([usersDb.getAll(page, PS), usersDb.count()])
+      .then(([l, t]) => { cacheSet(_uk, {list:l, total:t}, 30000); return [l, t]; });
+
+  let text = '\ud83d\udc65 *\u0627\u0644\u0645\u0633\u062a\u062e\u062f\u0645\u0648\u0646 (' + total + ')*\n';
+  text += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n';
+
+  list.forEach((u, i) => {
+    const num = page * PS + i + 1;
+    const name = escMd(u.first_name || '\u0645\u062c\u0647\u0648\u0644');
+    const username = u.username ? ' @' + escMd(u.username) : '';
+    const banned = u.is_banned ? ' \ud83d\udeab' : '';
+    const joined = u.joined_at ? new Date(u.joined_at).toLocaleDateString('en-GB') : '?';
+    const active = u.last_active ? new Date(u.last_active).toLocaleDateString('en-GB') : '?';
+    text += num + '. *' + name + '*' + username + banned + '\n';
+    text += '   \ud83d\uddd3 ' + joined + '  \u2022  \ud83d\udd50 ' + active + '\n\n';
+  });
+
+  const rows = list.map(u => [
+    btn('\ud83d\udc64 ' + (u.first_name || u.id).toString().substring(0, 20), 'mg_profile_' + u.id),
+    btn(u.is_banned ? '\u2705 \u0631\u0641\u0639 \u0627\u0644\u062d\u0638\u0631' : '\ud83d\udeab \u062d\u0638\u0631', (u.is_banned ? 'mg_unban_' : 'mg_ban_') + u.id)
+  ]);
+
+  const nav = [];
+  if (page > 0) nav.push(btn('\u2b05\ufe0f', 'mg_users_p' + (page-1)));
+  nav.push(btn((page+1) + '/' + Math.ceil(total/PS), 'noop'));
+  if ((page+1)*PS < total) nav.push(btn('\u27a1\ufe0f', 'mg_users_p' + (page+1)));
+  if (nav.length) rows.push(nav);
+  rows.push(back('mg_menu'));
+
+  return eos(ctx, text, { parse_mode: 'Markdown', ...build(rows) });
+}
 
 async function showUserProfile(ctx,userId){const [user,dlCount,favCount,spRow,lastFile]=await Promise.all([usersDb.getById(userId),interactions.getUserDownloadCount(userId),require('../database/db').get('SELECT COUNT(*) as c FROM favorites WHERE user_id=$1',[userId]).then(r=>r?.c||0),usersDb.getSpecialty(userId),interactions.getLastFile(userId)]);if(!user) return ctx.reply('❌ المستخدم غير موجود.');const spId=spRow?.specialty_id;const sp=spId&&spId!=0?await content.getSpec(spId):null;const text='👤 *بروفايل المستخدم*\n\n🆔 ID: `'+userId+'`\n👋 الاسم: '+escMd(user.first_name||'؟')+' '+(user.last_name?escMd(user.last_name):'')+'\n'+(user.username?'📛 @'+escMd(user.username)+'\n':'')+'📅 انضم: '+(user.joined_at?new Date(user.joined_at).toLocaleDateString('en-GB'):'؟')+'\n🕐 آخر نشاط: '+(user.last_active?new Date(user.last_active).toLocaleDateString('en-GB'):'؟')+'\n🎓 التخصص: *'+escMd(sp?sp.name:'غير محدد')+'*\n🚫 محظور: '+(user.is_banned?'نعم':'لا')+'\n\n📊 *النشاط:*\n⬇️ التحميلات: *'+dlCount+'*\n⭐ المفضلة: *'+favCount+'*'+(lastFile?'\n📄 آخر ملف: *'+escMd(lastFile.title)+'*':'');const rows=[[btn(user.is_banned?'✅ إلغاء الحظر':'🚫 حظر',(user.is_banned?'mg_unban_':'mg_ban_')+userId)],[back('mg_users')[0]]];return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});}
 const ALL_PERMS=['upload','delete','add_content','view_users','full'];
