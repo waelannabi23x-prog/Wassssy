@@ -433,6 +433,7 @@ bot.command('all', async ctx => {
   require('./utils/cache').cacheClear('grp_members_' + ctx.chat.id);
   require('./utils/cache').cacheClear('grp_members_' + ctx.chat.id);
   try { const { showAllMembers } = require('./handlers/group_admin'); await showAllMembers(ctx, ctx.chat.id); }
+});
   catch(e) { ctx.reply('❌ ' + e.message).catch(() => {}); }
 bot.command('tag', async ctx => {
   if (!['supergroup','group'].includes(ctx.chat?.type)) return;
@@ -1011,7 +1012,5 @@ const _mem = setInterval(() => {
   if (h > 480) { logger.error('[Mem CRITICAL] restarting'); process.emit('SIGTERM'); }
 }, 60000);
 _mem.unref();
-
-}
 
 launch();
