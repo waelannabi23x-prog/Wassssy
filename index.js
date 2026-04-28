@@ -140,6 +140,7 @@ bot.use(async (ctx, next) => {
     // لو في poll state نسمح بالرسالة تعبر
     const _pollState = global.getState && global.getState(ctx.from?.id);
     if (_pollState?.type === 'poll_create') return next();
+    if (_pollState?.type === 'ai_mode_group') return next();
     if (ctx.message && !['/search', '/setsp', '/dlt', '/done', '/cancel', '/new', '/top', '/all', '/tag', '/mute', '/unmute', '/ai', '/reset', '/start', '/help', '/stats', '/poll', '/polls', '/setwelcome', '/setwelcomemsg', '/clearwelcome'].some(p => _tcmd === p || t.startsWith(p))) {
       if (ctx.from && !ctx.from.is_bot) {
         const { run } = require('./database/db');
@@ -278,7 +279,26 @@ bot.command('dlt', async ctx => {
     if (m) setTimeout(() => ctx.deleteMessage(m.message_id).catch(() => {}), 3000);
   } catch(e) { logger.error('[dlt]', e.message); }
 });
-bot.command('ai', async ctx => { await global.setState(ctx.uid, { type: 'ai_mode' }); return ctx.reply('🤖 وضع المساعد الذكي مفعل!\n\nاكتب أي سؤال.\n/start للرجوع.').catch(() => {}); });
+bot.command('ai', async ctx => {
+  // في القروب — يرد مباشرة على الرسالة التالية
+  if (['supergroup','group'].includes(ctx.chat?.type)) {
+    let isAdmin = ctx.isOwner;
+    if (!isAdmin) {
+      try {
+        const m = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+        isAdmin = ['administrator','creator'].includes(m?.status);
+      } catch(_) {}
+    }
+    if (!isAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(()=>{});
+    await global.setState(ctx.uid, { type: 'ai_mode_group', chatId: ctx.chat.id });
+    const msg = await ctx.reply('🤖 المساعد الذكي مفعل!\nاكتب سؤالك:').catch(()=>null);
+    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(()=>{}), 5000);
+    ctx.deleteMessage().catch(()=>{});
+    return;
+  }
+  await global.setState(ctx.uid, { type: 'ai_mode' });
+  return ctx.reply('🤖 وضع المساعد الذكي مفعل!\n\nاكتب أي سؤال.\n/start للرجوع.').catch(() => {});
+});
 bot.command('reset', ctx => { resetChat(ctx.uid); return ctx.reply('🔄 تم مسح سياق المحادثة.').catch(() => {}); });
 bot.command('promote', ctx => tools.batchPromote(ctx));
 bot.command('cancel', async ctx => { if (global.getState(ctx.uid)) { await global.delState(ctx.uid); return ctx.reply('❌ تم الإلغاء.').catch(() => {}); } });
@@ -849,6 +869,12 @@ ${opts.length >= 2 ? 'اكتب /done للإنشاء أو أضف المزيد' : 
       return;
     }
 
+    // AI في القروب
+    if (s.type === 'ai_mode_group' && ['supergroup','group'].includes(ctx.chat?.type)) {
+      ctx.deleteMessage().catch(()=>{});
+      const aiReply = await require('./handlers/ai_chat').handleAiChat(ctx, txt);
+      return;
+    }
     if (await handleAiChat(ctx, txt)) return;
   }
   if (s.type === 'mg_file') return manage.handleFileUpload(ctx);
