@@ -145,10 +145,7 @@ async function showUsers(ctx, page=0) {
     const name = escMd(u.first_name || 'مجهول');
     const username = u.username ? ' @' + escMd(u.username) : '';
     const banned = u.is_banned ? ' 🚫' : '';
-    const joined = u.joined_at ? new Date(u.joined_at).toLocaleDateString('en-GB') : '?';
-    const active = u.last_active ? new Date(u.last_active).toLocaleDateString('en-GB') : '?';
     text += num + '. *' + name + '*' + username + banned + '\n';
-    text += '   🗓 ' + joined + '  •  🕐 ' + active + '\n\n';
   });
 
   const rows = list.map(u => [
