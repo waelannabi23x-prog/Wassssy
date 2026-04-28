@@ -95,13 +95,13 @@ async function showAllMembers(ctx, chatId) {
       ).catch(() => []);
       // أضف الأدمنز من Telegram
       try {
-        const admins = await ctx.telegram.getChatAdministrators(chatId);
+        const admins = await ctx.telegram.getChatAdministrators(chatId).catch(()=>[]);
         for (const a of admins) {
-          if (a.user.is_bot) continue;
-          const exists = members.find(m => m.user_id == a.user.id);
+          if (!a?.user || a.user.is_bot) continue;
+          const exists = members.find(m => String(m.user_id) === String(a.user.id));
           if (!exists) {
             members.push({ user_id: a.user.id, first_name: (a.user.first_name||'Admin') + ' 👑' });
-            await run('INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at) VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP) ON CONFLICT(chat_id,user_id) DO UPDATE SET first_name=EXCLUDED.first_name', [chatId, a.user.id, a.user.username||'', a.user.first_name||'Admin']).catch(()=>{});
+            run('INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at) VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP) ON CONFLICT(chat_id,user_id) DO UPDATE SET first_name=EXCLUDED.first_name', [chatId, a.user.id, a.user.username||'', a.user.first_name||'Admin']).catch(()=>{});
           }
         }
       } catch(_) {}
