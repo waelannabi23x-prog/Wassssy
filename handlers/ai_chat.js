@@ -148,6 +148,7 @@ async function handleAiChat(ctx, text) {
     });
     return true;
   } catch (e) {
+    console.error('[AI Error]', e.message);
     await ctx.reply('⚠️ حصل مشكلة تقنية، جرب من جديد.', {
       reply_markup: { inline_keyboard: [[{ text: '🏠 القائمة', callback_data: 'main_menu' }]] }
     });
