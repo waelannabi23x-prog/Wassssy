@@ -123,7 +123,7 @@ async function handleAiChat(ctx, text) {
   ];
 
   try {
-    const reply = await aiChat(messages, 400, 0.7);
+    const reply = await aiChat(messages);
 
     // ✅ حفظ التاريخ مع حد أقصى
     history.push({ role: 'user',      content: text  });
