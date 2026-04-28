@@ -4,7 +4,7 @@ const GROQ_API_KEY = process.env.GROQ_API_KEY || '';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 async function aiChat(messages, model) {
-  model = model || 'llama3-8b-8192';
+  model = model || 'llama-3.3-70b-versatile';
   if (!GROQ_API_KEY) throw new Error('GROQ_API_KEY not set');
 
   const res = await fetch(GROQ_URL, {
