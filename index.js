@@ -811,7 +811,17 @@ bot.on(['photo', 'video', 'audio', 'voice'], async ctx => {
 
 bot.on('text', async ctx => { try {
   if (ctx.message.text.startsWith('/')) return;
-  const uid = ctx.uid, s = global.getState(uid); if (!s) return;
+  const uid = ctx.uid, s = global.getState(uid);
+  
+  // AI في القروب - يشتغل حتى بدون state آخر
+  if (!s || s.type === 'ai_mode_group') {
+    if (s?.type === 'ai_mode_group' && ['supergroup','group'].includes(ctx.chat?.type)) {
+      ctx.deleteMessage().catch(()=>{});
+      await require('./handlers/ai_chat').handleAiChat(ctx, ctx.message.text.trim());
+      return;
+    }
+    if (!s) return;
+  }
   const txt = ctx.message.text.trim();
   // Poll creation flow — يشتغل في أي وضع
   const pollState = global.getState(ctx.uid);
@@ -869,12 +879,6 @@ ${opts.length >= 2 ? 'اكتب /done للإنشاء أو أضف المزيد' : 
       return;
     }
 
-    // AI في القروب
-    if (s.type === 'ai_mode_group' && ['supergroup','group'].includes(ctx.chat?.type)) {
-      ctx.deleteMessage().catch(()=>{});
-      const aiReply = await require('./handlers/ai_chat').handleAiChat(ctx, txt);
-      return;
-    }
     if (await handleAiChat(ctx, txt)) return;
   }
   if (s.type === 'mg_file') return manage.handleFileUpload(ctx);
