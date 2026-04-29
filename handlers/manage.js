@@ -274,15 +274,18 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
         const msgText='📣 *إشعار*\n\n'+text;
         const mFileId=state.mediaFileId||null;
         const mType=state.mediaType||null;
-        for(const g of groups){
-          try{
-            if(mType==='photo'&&mFileId) await ctx.telegram.sendPhoto(g.chat_id,mFileId,{caption:msgText,parse_mode:'Markdown'});
-            else if(mType==='video'&&mFileId) await ctx.telegram.sendVideo(g.chat_id,mFileId,{caption:msgText,parse_mode:'Markdown'});
-            else if(mType==='document'&&mFileId) await ctx.telegram.sendDocument(g.chat_id,mFileId,{caption:msgText,parse_mode:'Markdown'});
-            else await ctx.telegram.sendMessage(g.chat_id,msgText,{parse_mode:'Markdown'});
-            gSent++;
-          }catch(_){gFail++;}
-          await new Promise(r=>setTimeout(r,600));
+        // إرسال بـ chunks لتسريع الـ broadcast
+        const CHUNK = 5;
+        for(let ci=0;ci<groups.length;ci+=CHUNK){
+          const chunk = groups.slice(ci,ci+CHUNK);
+          const results = await Promise.allSettled(chunk.map(async g=>{
+            if(mType==='photo'&&mFileId) return ctx.telegram.sendPhoto(g.chat_id,mFileId,{caption:msgText,parse_mode:'Markdown'});
+            else if(mType==='video'&&mFileId) return ctx.telegram.sendVideo(g.chat_id,mFileId,{caption:msgText,parse_mode:'Markdown'});
+            else if(mType==='document'&&mFileId) return ctx.telegram.sendDocument(g.chat_id,mFileId,{caption:msgText,parse_mode:'Markdown'});
+            else return ctx.telegram.sendMessage(g.chat_id,msgText,{parse_mode:'Markdown'});
+          }));
+          results.forEach(r=>r.status==='fulfilled'?gSent++:gFail++);
+          if(ci+CHUNK<groups.length) await new Promise(r=>setTimeout(r,1000));
         }
         ctx.reply('✅ أُرسل لـ *'+gSent+'* قروب'+(gFail?' | ❌ '+gFail:''),{parse_mode:'Markdown',...build([back('mg_menu')])});
         break;}

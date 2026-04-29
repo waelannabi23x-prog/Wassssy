@@ -9,7 +9,7 @@ const { getBotKnowledge } = require('../utils/ai_knowledge');
 // 🛡️ Rate Limiter — 5 رسائل/دقيقة
 // ══════════════════════════════════════
 const _aiRl    = new Map();
-const AI_MAX   = 5;
+const AI_MAX   = 10;
 const AI_WINDOW = 60000;
 
 function checkAiLimit(uid) {
