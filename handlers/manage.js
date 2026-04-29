@@ -142,10 +142,10 @@ async function showUsers(ctx, page=0) {
 
   list.forEach((u, i) => {
     const num = page * PS + i + 1;
-    const name = escMd(u.first_name || 'مجهول');
-    const username = u.username ? ' @' + escMd(u.username) : '';
+    const name = escMd((u.first_name || 'مجهول').substring(0,20));
+    const username = u.username ? ' @' + u.username.substring(0,15) : '';
     const banned = u.is_banned ? ' 🚫' : '';
-    text += num + '. *' + name + '*' + username + banned + '\n';
+    text += num + '. ' + name + username + banned + '\n';
   });
 
   const rows = list.map(u => [
