@@ -1,10 +1,15 @@
 'use strict';
 // LRU cache — O(1) get/set/evict via Map insertion-order
 const store = new Map();
-const MAX = 40000;
+const MAX = 50000;
 const TTL = {
-  SEARCH: 300000, FILE: 600000, CONTENT: 21600000,
-  RATING: 3600000, USER: 300000, AI: 1800000, STATIC: 86400000,
+  SEARCH:  600000,   // 10min  (was 5min)
+  FILE:   1800000,   // 30min  (was 10min)
+  CONTENT: 86400000, // 24h    (was 6h)
+  RATING:  7200000,  // 2h     (was 1h)
+  USER:    600000,   // 10min  (was 5min)
+  AI:      3600000,  // 1h     (was 30min)
+  STATIC:  86400000, // 24h
 };
 
 function cacheGet(key) {

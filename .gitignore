@@ -11,3 +11,7 @@ logs/
 *.backup
 *.db
 .env
+
+search-svc
+*.bak.*
+*.bak

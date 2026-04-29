@@ -51,7 +51,7 @@ const safeInt = v => { var n = parseInt(v); return isNaN(n) ? 0 : n; };
 const CFG = {
   rlWindow: 10000, rlMax: 25,
   cbDedupMax: 500, cbDedupTTL: 20000,
-  grpFlushMs: 15000, grpBufMax: 2000,
+  grpFlushMs: 8000, grpBufMax: 2000,
   stateTTL: 3600000, cleanupMs: 3600000,
   botMsgsPerChat: 100, maxChatsTracked: 150,
 };
@@ -974,6 +974,30 @@ bot.on('my_chat_member', async ctx => {
   }
 });
 
+bot.command('leaderboard', async ctx => {
+  try {
+    const { getLeaderboard, getUserRank } = require('./database/points');
+    const [top, rank] = await Promise.all([getLeaderboard(10), getUserRank(ctx.uid)]);
+    if (!top.length) return ctx.reply('🏆 لا توجد نقاط بعد! حمّل ملفاً للبدء 🚀').catch(() => {});
+    const medals = ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
+    let text = '🏆 *لوحة الشرف — أفضل الطلاب*\n━━━━━━━━━━━━━━━━\n\n';
+    top.forEach((u, i) => {
+      const name = (u.first_name || u.username || 'طالب').substring(0, 20);
+      text += medals[i] + ' *' + name + '*\n';
+      text += '   📥 ' + (u.downloads_count||0) + ' · ⭐ ' + u.total_points + ' نقطة\n\n';
+    });
+    text += '\n📊 مرتبتك: *#' + rank + '*';
+    await ctx.reply(text, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: [[
+        { text: '🔄 تحديث', callback_data: 'leaderboard_refresh' },
+        { text: '🏠 القائمة', callback_data: 'main_menu' }
+      ]] }
+    });
+  } catch(e) { ctx.reply('❌ حدث خطأ').catch(() => {}); }
+});
+
+
 async function launch() {
   logger.info('🚀 Study Bot v5.0 — Enterprise Edition');
   try {
@@ -1017,6 +1041,8 @@ setupGroupCommands(bot);
     logger.warn('⚠️ No WEBHOOK_URL - using polling');
     bot.launch({ drop_pending_updates: true });
   }
+    // ✅ Pre-fetch bot info (avoid lazy getMe() on first user request)
+    try { const _me = await bot.telegram.getMe(); _botUn = _me.username; global._cachedBotId = _me.id; logger.info('✅ Bot: @' + _botUn); } catch(_) {}
     global.__bot = bot; // _clearSearchCache set in handlers/group.js // startSmartWarmup(); // disabled: cacheWarmup sufficient
     logger.info('🚀 Ready');
   } catch(e) { logger.error('[Launch]', e.message); setTimeout(launch, 10000); }

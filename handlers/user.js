@@ -98,6 +98,11 @@ async function showProgress(ctx) {
 }
 
 async function showProfile(ctx) {
+  // Inject points data
+  const uid = ctx.uid;
+  let ptsData = null;
+  try { const {getPoints, getUserRank} = require('../database/points'); ptsData = { pts: await getPoints(uid), rank: await getUserRank(uid) }; } catch(_) {}
+
   var uid=ctx.uid,lang=getLang(uid);
   var [user,dlCount,favCount,spRow,lastFile]=await Promise.all([usersDb.getById(uid),interactions.getUserDownloadCount(uid),get('SELECT COUNT(*) as c FROM favorites WHERE user_id=$1',[uid]).then(r=>r?r.c:0),usersDb.getSpecialty(uid),interactions.getLastFile(uid)]);
   var spId=spRow?spRow.specialty_id:null;

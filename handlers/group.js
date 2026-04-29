@@ -3,14 +3,14 @@ const { cacheGet, cacheSet, cacheClearPrefix, cacheClear } = require('../utils/c
 const filesDb = require('../database/files');
 const { parseQuery, scoreFile } = require('../utils/searchParser');
 const SEARCH_SVC = process.env.SEARCH_SERVICE_URL || 'http://localhost:3001';
-const USE_GO_SEARCH = false;
+const USE_GO_SEARCH = process.env.DISABLE_GO_SEARCH !== "1";
 function _getCached(key){return cacheGet('gsrc_'+key);}
 function _setCached(key,data){cacheSet('gsrc_'+key,data,300000);}
 async function _goSearch(q,limit){
   if(!USE_GO_SEARCH)return null;
   try{
     const ctrl=new AbortController();
-    const tid=setTimeout(()=>ctrl.abort(),600);
+    const tid=setTimeout(()=>ctrl.abort(),1500);
     const res=await fetch(`${SEARCH_SVC}/search?q=${encodeURIComponent(q)}&limit=${limit}`,{signal:ctrl.signal});
     clearTimeout(tid);
     if(res.ok)return await res.json();
@@ -36,7 +36,7 @@ async function smartSearch(rawQ,limit){
     .sort((a,b)=>b.s-a.s)
     .slice(0,limit)
     .map(x=>x.f);
-  _setCached(cacheKey,final);
+  _setCached(cacheKey,final,900000);
   return final;
 }
 function invalidateSearchCache(){

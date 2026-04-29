@@ -6,17 +6,19 @@ nixPkgs = ["nodejs_20", "go_1_22"]
 
 [build.nixpacksPlan.phases.build]
 cmds = [
-  "npm install --production",
-  "cd go-search && go mod download && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='-s -w' -o ../search-svc . && cd .."
+  "npm install --production --ignore-scripts",
+  "cd go-search && go mod download && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags='-s -w' -trimpath -o ../search-svc . && cd .."
 ]
 
 [deploy]
-startCommand = "sh -c '(DATABASE_URL=$DATABASE_URL SEARCH_PORT=3001 ./search-svc &) && node --max-old-space-size=512 --optimize-for-size --expose-gc index.js'"
+# ✅ --expose-gc: يفعل GC اليدوي | --optimize-for-size: يقلل RAM
+# ✅ Go service يبدأ أولاً وينتظر 1.5s ثم Node
+startCommand = "sh -c '(DATABASE_URL=$DATABASE_URL SEARCH_PORT=3001 ./search-svc &) && sleep 1.5 && node --max-old-space-size=460 --optimize-for-size --expose-gc --gc-interval=200 index.js'"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 region = "europe-west4"
 
 [deploy.healthcheck]
 path = "/health"
-intervalSeconds = 30
-timeoutSeconds = 10
+intervalSeconds = 25
+timeoutSeconds  = 8

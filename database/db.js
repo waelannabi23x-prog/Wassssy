@@ -27,13 +27,14 @@ function getPg() {
     pgPool = new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
-      max: 30, min: 8,
+      max: 15, min: 3,  // Railway-safe (PostgreSQL max ~25 connections)
       idleTimeoutMillis: 60000,
       connectionTimeoutMillis: 5000,
       statement_timeout: 10000,
       query_timeout: 10000,
       allowExitOnIdle: false,
       keepAlive: true,
+      keepAliveInitialDelayMillis: 5000,
       keepAliveInitialDelayMillis: 10000
     });
     pgPool.on('error', function(err) { logger.error('PG pool error:', err.message); });
@@ -50,7 +51,7 @@ function getPg() {
       if (total >= 18)  logger.warn('[Pool] near limit: ' + total + '/20 connections');
     }, 30000).unref();
 
-    logger.info('✅ PostgreSQL (pool max=15)');
+    logger.info('✅ PostgreSQL (pool max=' + pgPool.options.max + ')');
     return pgPool;
   } catch (e) { return null; }
 }
@@ -219,10 +220,6 @@ async function initSchema() {
     "CREATE TABLE IF NOT EXISTS polls (id SERIAL PRIMARY KEY, chat_id BIGINT NOT NULL, created_by BIGINT, question TEXT NOT NULL, media_file_id TEXT, media_type TEXT, message_id BIGINT, is_closed INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     "CREATE TABLE IF NOT EXISTS poll_options (id SERIAL PRIMARY KEY, poll_id INTEGER NOT NULL, option_text TEXT NOT NULL, emoji TEXT DEFAULT '🔵', votes INTEGER DEFAULT 0, position INTEGER DEFAULT 1)",
     "CREATE TABLE IF NOT EXISTS poll_votes (poll_id INTEGER NOT NULL, option_id INTEGER NOT NULL, user_id BIGINT NOT NULL, voted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(poll_id, user_id))",
-    "CREATE TABLE IF NOT EXISTS group_welcome(chat_id BIGINT PRIMARY KEY, image_file_id TEXT, message TEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
-    "CREATE TABLE IF NOT EXISTS polls (id SERIAL PRIMARY KEY, chat_id BIGINT NOT NULL, created_by BIGINT, question TEXT NOT NULL, media_file_id TEXT, media_type TEXT, message_id BIGINT, is_closed INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
-    "CREATE TABLE IF NOT EXISTS poll_options (id SERIAL PRIMARY KEY, poll_id INTEGER NOT NULL, option_text TEXT NOT NULL, emoji TEXT DEFAULT '🔵', votes INTEGER DEFAULT 0, position INTEGER DEFAULT 1)",
-    "CREATE TABLE IF NOT EXISTS poll_votes (poll_id INTEGER NOT NULL, option_id INTEGER NOT NULL, user_id BIGINT NOT NULL, voted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(poll_id, user_id))",
     "CREATE TABLE IF NOT EXISTS ai_history (id SERIAL PRIMARY KEY, user_id BIGINT NOT NULL, role TEXT NOT NULL, content TEXT NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     "CREATE TABLE IF NOT EXISTS group_chats (chat_id BIGINT PRIMARY KEY, title TEXT, specialty_id INTEGER DEFAULT 0, notify_new_files INTEGER DEFAULT 1, joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     "CREATE TABLE IF NOT EXISTS cache_store (key TEXT PRIMARY KEY, value TEXT, expires_at BIGINT)",
@@ -230,6 +227,7 @@ async function initSchema() {
     "CREATE TABLE IF NOT EXISTS group_members (chat_id BIGINT, user_id BIGINT, username TEXT, first_name TEXT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, PRIMARY KEY(chat_id, user_id))",
     "CREATE TABLE IF NOT EXISTS reports (id SERIAL PRIMARY KEY, file_id INTEGER NOT NULL, user_id BIGINT NOT NULL, reason TEXT, status TEXT DEFAULT 'pending', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     "CREATE TABLE IF NOT EXISTS comments (id SERIAL PRIMARY KEY, file_id INTEGER NOT NULL, user_id BIGINT NOT NULL, text TEXT NOT NULL, is_deleted INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS user_points (user_id BIGINT PRIMARY KEY, total_points INTEGER DEFAULT 0, downloads_count INTEGER DEFAULT 0, ratings_count INTEGER DEFAULT 0, comments_count INTEGER DEFAULT 0, streak_days INTEGER DEFAULT 0, last_activity_date DATE, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     "CREATE TABLE IF NOT EXISTS group_notify_log (id SERIAL PRIMARY KEY, file_id INTEGER NOT NULL, chat_id BIGINT NOT NULL, sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE(file_id, chat_id))",
   ];
 
@@ -266,6 +264,22 @@ async function initSchema() {
     "CREATE INDEX IF NOT EXISTS idx_user_states_updated_at ON user_states(updated_at DESC)",
     "CREATE INDEX IF NOT EXISTS idx_cache_store_expires_at ON cache_store(expires_at)",
     "CREATE INDEX IF NOT EXISTS idx_gnl_file ON group_notify_log(file_id)",
+    "CREATE INDEX IF NOT EXISTS idx_user_points_total ON user_points(total_points DESC)",
+    "CREATE INDEX IF NOT EXISTS idx_users_banned ON users(is_banned) WHERE is_banned=1",
+    "CREATE INDEX IF NOT EXISTS idx_sched_msgs_send_at ON scheduled_messages(send_at) WHERE sent=0",
+    "CREATE INDEX IF NOT EXISTS idx_poll_votes_poll_option ON poll_votes(poll_id, option_id)",
+    "CREATE INDEX IF NOT EXISTS idx_group_chats_specialty ON group_chats(specialty_id)",
+    "CREATE INDEX IF NOT EXISTS idx_files_downloads_cat ON files(category_id, downloads DESC) WHERE is_deleted=0",
+    "CREATE INDEX IF NOT EXISTS idx_files_uploaded_cat ON files(category_id, uploaded_at DESC) WHERE is_deleted=0",
+    "CREATE INDEX IF NOT EXISTS idx_subjects_semester_id ON subjects(semester_id, id) WHERE is_deleted=0",
+    "CREATE INDEX IF NOT EXISTS idx_semesters_year_id ON semesters(year_id, id) WHERE is_deleted=0",
+    "CREATE INDEX IF NOT EXISTS idx_years_specialty_id ON years(specialty_id, id) WHERE is_deleted=0",
+    "CREATE INDEX IF NOT EXISTS idx_comments_user ON comments(user_id)",
+    "CREATE INDEX IF NOT EXISTS idx_history_user_file ON history(user_id, file_id)",
+    "CREATE INDEX IF NOT EXISTS idx_reports_status ON reports(status)",
+    "CREATE INDEX IF NOT EXISTS idx_group_members_chat ON group_members(chat_id)",
+    "CREATE INDEX IF NOT EXISTS idx_poll_options_poll ON poll_options(poll_id)",
+    "CREATE INDEX IF NOT EXISTS idx_poll_votes_option ON poll_votes(option_id)",
   ];
 
   for (var ii = 0; ii < indexes.length; ii++) {

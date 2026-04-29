@@ -1,8 +1,8 @@
 'use strict';
 
-const { aiChat } = require('../utils/glm_client');
-const filesDb = require('../database/files');
-const { smartSearch } = require('./group');
+const { aiChat }        = require('../utils/glm_client');
+const { all, run }      = require('../database/db');
+const { smartSearch }   = require('./group');
 const { getBotKnowledge } = require('../utils/ai_knowledge');
 
 // ══════════════════════════════════════
@@ -27,23 +27,44 @@ setInterval(() => {
     while (v.length && now - v[0] > AI_WINDOW) v.shift();
     if (!v.length) _aiRl.delete(k);
   }
-}, 300000);
+}, 300000).unref();
 
 // ══════════════════════════════════════
-// 💬 تاريخ المحادثة (حقيقي الآن)
+// 💬 Hybrid Memory + DB — تاريخ دائم
 // ══════════════════════════════════════
-const _aiHistory  = new Map();
-const _aiTimers   = new Map(); // timers منفصلة بدل property على Map
-const HIST_MAX    = 10; // أقصى 10 أزواج سؤال/جواب
-// Cleanup idle histories every 30 min (unused > 2h)
+const _aiHistory = new Map();
+const _aiTimers  = new Map();
+const HIST_MAX   = 10;
+
 setInterval(() => {
   const cut = Date.now() - 7200000;
   for (const [k, v] of _aiHistory) if (!v._ts || v._ts < cut) _aiHistory.delete(k);
 }, 1800000).unref();
 
-// ✅ resetChat تفعل شيئاً حقيقياً الآن
+// ✅ يحمل التاريخ من DB بعد restart
+async function loadHistoryFromDB(uid) {
+  try {
+    const rows = await all(
+      'SELECT role, content FROM ai_history WHERE user_id=$1 ORDER BY created_at ASC LIMIT $2',
+      [uid, HIST_MAX * 2]
+    );
+    return rows.map(r => ({ role: r.role, content: r.content }));
+  } catch(_) { return []; }
+}
+
+// ✅ يحفظ كل رسالة في DB (fire-and-forget)
+function saveToDB(uid, role, content) {
+  run(
+    'INSERT INTO ai_history(user_id,role,content) VALUES($1,$2,$3)',
+    [uid, role, content.substring(0, 2000)]
+  ).catch(() => {});
+}
+
+// ✅ resetChat: يمسح الذاكرة + DB
 async function resetChat(uid) {
   _aiHistory.delete(uid);
+  if (_aiTimers.get(uid)) { clearTimeout(_aiTimers.get(uid)); _aiTimers.delete(uid); }
+  try { await run('DELETE FROM ai_history WHERE user_id=$1', [uid]); } catch(_) {}
 }
 
 // ══════════════════════════════════════
@@ -71,9 +92,9 @@ const SYSTEM_PERSONA = `أنت "داوي" — صاحب كول وذكي في قر
 - استعمل أمثلة من الجامعة الجزائرية
 - ما تقولش أبدا "لا أستطيع"`;
 
-async function smartSearchForAI(query,limit){
-  limit=limit||4;
-  try{return await smartSearch(query,limit);}catch(e){return[];}
+async function smartSearchForAI(query, limit) {
+  limit = limit || 4;
+  try { return await smartSearch(query, limit); } catch(e) { return []; }
 }
 
 function classifyIntent(text) {
@@ -97,15 +118,14 @@ async function handleAiChat(ctx, text) {
   ctx.sendChatAction('typing').catch(() => {});
   const intent = classifyIntent(text);
 
-  // بحث ملفات مباشر
   if (intent === 'FILE_SEARCH') {
     const files = await smartSearchForAI(text, 5);
     if (files.length > 0) {
       const rows = files.slice(0, 5).map(f => [
-        { text: '📄 ' + f.title.substring(0, 35) + ' · ' + (f.sub_name||''), callback_data: 'preview_' + f.id + '_0_0_0_0_0' }
+        { text: '📄 ' + f.title.substring(0, 35) + ' · ' + (f.sub_name || ''), callback_data: 'preview_' + f.id + '_0_0_0_0_0' }
       ]);
       rows.push([{ text: '🔍 بحث يدوي', callback_data: 'search_prompt' }, { text: '🏠', callback_data: 'main_menu' }]);
-      const fileListStr = files.map(f => '- ' + f.title + ' (' + f.sub_name + ')').join('\n');
+      const fileListStr = files.map(f => '- ' + f.title + ' (' + (f.sub_name || '') + ')').join('\n');
       await ctx.reply('🔍 لقيت هاذو الملفات:\n\n' + fileListStr + '\n\nاضغط على اللي تبيه:', {
         reply_markup: { inline_keyboard: rows }
       });
@@ -113,39 +133,44 @@ async function handleAiChat(ctx, text) {
     }
   }
 
-  // RAG context للشرح والحل
   let ragContext = '';
   if (intent === 'CONCEPT_EXPLAIN' || intent === 'PROBLEM_SOLVING') {
     const relevantFiles = await smartSearchForAI(text, 2);
-    if (relevantFiles.length > 0) {
+    if (relevantFiles.length > 0)
       ragContext = '\n[ملاحظة: عندك ملفات متعلقة: ' + relevantFiles.map(f => f.title).join(', ') + ']';
-    }
   }
 
-  // ✅ استخدام تاريخ المحادثة الحقيقي
-  const history = _aiHistory.get(uid) || [];
+  // ✅ Hybrid: memory أولاً، لو ما فيها نحمل من DB
+  let history = _aiHistory.get(uid);
+  if (!history) {
+    history = await loadHistoryFromDB(uid);
+    if (history.length) { history._ts = Date.now(); _aiHistory.set(uid, history); }
+    else history = [];
+  }
 
   let botK = '';
   try { botK = await getBotKnowledge(); } catch(_) {}
-  const kPrefix = botK ? ('\n\n[' + '\u0645\u0639\u0631\u0641\u0629' + '\u0627\u0644\u0628\u0648\u062A]:\n' + botK.substring(0,1500)) : '';
+  const kPrefix = botK ? ('\n\n[معرفة البوت]:\n' + botK.substring(0, 1500)) : '';
   const sysContent = SYSTEM_PERSONA + kPrefix + ragContext;
   const messages = [
     { role: 'system', content: sysContent },
-    ...history,
+    ...history.filter(m => m.role && m.content),
     { role: 'user', content: text }
   ];
 
   try {
     const reply = await aiChat(messages);
 
-    // ✅ حفظ التاريخ مع حد أقصى
+    // ✅ حفظ في Memory + DB
     history.push({ role: 'user',      content: text  });
     history.push({ role: 'assistant', content: reply });
     if (history.length > HIST_MAX * 2) history.splice(0, 2);
     history._ts = Date.now();
     _aiHistory.set(uid, history);
+    saveToDB(uid, 'user', text);
+    saveToDB(uid, 'assistant', reply);
 
-    // ✅ تنظيف تلقائي بعد ساعة خمول
+    // تنظيف تلقائي بعد ساعة خمول
     if (_aiTimers.get(uid)) clearTimeout(_aiTimers.get(uid));
     _aiTimers.set(uid, setTimeout(() => {
       _aiHistory.delete(uid);

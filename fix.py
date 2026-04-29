@@ -1,9 +1,0 @@
-with open('handlers/manage.js', 'r', encoding='utf-8') as f:
-    c = f.read()
-    # استبدال كامل لـ handleText
-    old = "if(data==='mg_content') return showContent(ctx);"
-    new = "if(data==='mg_content') return showContent(ctx);\n      case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([back('mg_menu')]));\n      case 'mg_spy_id':{var tid=parseInt(text);if(isNaN(tid)){clearState(uid);return ctx.reply('❌ ID غير صحيح.');}clearState(uid);var u=await usersDb.getById(tid);if(!u)return ctx.reply('❌ غير موجود.');var sp=await usersDb.getSpecialty(tid);var spN=sp&&sp.specialty_id?(await content.getSpec(sp.specialty_id))?.name:null;var st=global.userStates[tid]:null;return ctx.reply('🕵️ *'+escMd(u.first_name||'?')+'*\n━━━━\n🆔 `'+tid+'`\n📛 '+(u.username?'@'+escMd(u.username):'لا يوجد')+'\n🎓 '+escMd(spN||'غير محدد')+'\n'+(st?'🔄 *'+st.type+'*':'⬜ فاضي'),{parse_mode:'Markdown'});}\n      case 'mg_stress_count':{var cnt=Math.min(parseInt(text)||50,200);if(isNaN(cnt)){clearState(uid);return ctx.reply('❌');}clearState(uid);await ctx.reply('Testing '+cnt+'...');var sM=process.memoryUsage().heapUsed/1024/1024;var sT=Date.now();for(var i=0;i<cnt;i++){ctx.telegram.sendMessage(ctx.chat.id,'T').catch(function(){});}var eT=Date.now();var eM=process.memoryUsage().heapUsed/1024/1024;return ctx.reply('Result: *'+cnt+'*\n⏱️ الرسائل: *'+(eT-sT)+'ms*\n💾 الرام: *'+(eM-sM).toFixed(2)+' MB*',{parse_mode:'Markdown'});}\n      case 'mg_db_test':{setState(uid,{type:'mg_db_test'});return ctx.reply('🧬 اختبار داتابيز...');var st=Date.now();for(var i=0;i<20;i++){await usersDb.count();}var dbT=Date.now()-st;return ctx.reply('✅ اختبار داتابيس\n⏱️ الوقت: *'+dbT+'ms*',{parse_mode:'Markdown'});}\n"
-    c = c.replace(old, new)
-with open('handlers/manage.js', 'w', encoding='utf-8') as f:
-    f.write(c)
-print('✅ Done!')

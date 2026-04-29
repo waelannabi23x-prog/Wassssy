@@ -85,15 +85,20 @@ async function authMiddleware(ctx, next) {
   }
 
   if (global.maintenanceMode && !ctx.isOwner && !ctx.isAdmin) {
-    // ✅ رسالة صيانة احترافية مع وقت العودة
-    const { getSetting } = require('../database/db');
-    const endTime = await getSetting('maintenance_end').catch(() => null);
-    let msg = global.maintenanceMsg || '🔧 البوت تحت الصيانة حالياً لتحسين الخدمة.';
-    if (endTime) msg += `\n\n⏱ الوقت المتوقع للعودة: ${endTime}`;
-    msg += '\n\nنعتذر عن الإزعاج 🙏';
-    return ctx.reply(msg).catch(() => {});
+    // ✅ كاش 60 ثانية لتجنب DB query على كل طلب
+    if (!global._maintMsgCache || Date.now() - global._maintMsgCache.ts > 60000) {
+      const { getSetting } = require('../database/db');
+      const endTime = await getSetting('maintenance_end').catch(() => null);
+      let msg = global.maintenanceMsg || '🔧 البوت تحت الصيانة حالياً لتحسين الخدمة.';
+      if (endTime) msg += `\n\n⏱ الوقت المتوقع للعودة: ${endTime}`;
+      msg += '\n\nنعتذر عن الإزعاج 🙏';
+      global._maintMsgCache = { msg, ts: Date.now() };
+    }
+    return ctx.reply(global._maintMsgCache.msg).catch(() => {});
   }
 
+  // 🎮 Daily login bonus (+1 نقطة)
+  try { const {checkDailyLogin}=require('../database/points'); checkDailyLogin(uid).catch(()=>{}); } catch(_){}
   return next();
 }
 

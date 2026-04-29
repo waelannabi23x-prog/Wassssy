@@ -50,7 +50,9 @@ const addHistory = (uid, fid) => {
     const cut = now - 10000;
     for (const [kk, ts] of _histDedup) if (ts < cut) _histDedup.delete(kk);
   }
-  return run('INSERT INTO history(user_id,file_id) VALUES($1,$2)', [uid, fid]);
+  const _p = run('INSERT INTO history(user_id,file_id) VALUES($1,$2)', [uid, fid]);
+  try { const {awardPoints}=require('./points'); awardPoints(uid,'download').catch(()=>{}); } catch(_){}
+  return _p;
 };
 
 const getHistory = (uid, n = 15) => all(J + ' JOIN history h ON h.file_id=f.id WHERE h.user_id=$1 AND f.is_deleted=0 ORDER BY h.viewed_at DESC LIMIT $2', [uid, n]);
