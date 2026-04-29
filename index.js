@@ -141,7 +141,7 @@ bot.use(async (ctx, next) => {
     const _pollState = global.getState && global.getState(ctx.from?.id);
     if (_pollState?.type === 'poll_create') return next();
     if (_pollState?.type === 'ai_mode_group') return next();
-    if (ctx.message && !['/search', '/setsp', '/dlt', '/done', '/cancel', '/new', '/top', '/all', '/tag', '/mute', '/unmute', '/ai', '/reset', '/start', '/help', '/stats', '/poll', '/polls', '/setwelcome', '/setwelcomemsg', '/clearwelcome'].some(p => _tcmd === p || t.startsWith(p))) {
+    if (ctx.message && !['/search', '/setsp', '/dlt', '/done', '/cancel', '/new', '/top', '/all', '/tag', '/mute', '/unmute', '/ai', '/reset', '/start', '/help', '/stats', '/poll', '/polls', '/setwelcome', '/setwelcomemsg', '/clearwelcome', '/whisper'].some(p => _tcmd === p || t.startsWith(p))) {
       if (ctx.from && !ctx.from.is_bot) {
         const { run } = require('./database/db');
         run('INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at) VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP) ON CONFLICT(chat_id,user_id) DO UPDATE SET first_name=EXCLUDED.first_name,updated_at=CURRENT_TIMESTAMP',
@@ -352,6 +352,36 @@ bot.command('top', async ctx => {
     if (m) { GrpMsgs.add(ctx.chat.id,m.message_id); setTimeout(()=>ctx.deleteMessage(m.message_id).catch(()=>{}),90000); }
   } catch(e) { logger.error('[/top]',e.message); }
 });
+bot.command('whisper', async ctx => {
+  if (!['supergroup','group'].includes(ctx.chat?.type)) return;
+  const replyMsg = ctx.message.reply_to_message;
+  if (!replyMsg) {
+    const e = await ctx.reply('\u26a0\ufe0f اعمل reply على رسالة الشخص اللي تبي تهمسلو').catch(()=>null);
+    if (e) setTimeout(()=>ctx.deleteMessage(e.message_id).catch(()=>{}),4000);
+    return ctx.deleteMessage().catch(()=>{});
+  }
+  const targetUser = replyMsg.from;
+  if (!targetUser || targetUser.is_bot) return ctx.deleteMessage().catch(()=>{});
+  const msg = ctx.message.text.replace(/^\/whisper\S*\s*/,'').trim();
+  if (!msg) {
+    const e = await ctx.reply('\u26a0\ufe0f اكتب الرسالة بعد /whisper').catch(()=>null);
+    if (e) setTimeout(()=>ctx.deleteMessage(e.message_id).catch(()=>{}),4000);
+    return ctx.deleteMessage().catch(()=>{});
+  }
+  ctx.deleteMessage().catch(()=>{});
+  try {
+    await ctx.telegram.sendMessage(targetUser.id,
+      '\ud83e\udd2b *\u0647\u0645\u0633\u0629 \u0633\u0631\u064a\u0629*\n\n\ud83d\udc64 \u0645\u0646: *' + (ctx.from.first_name||'\u0634\u062e\u0635') + '*\n\ud83d\udc65 \u0627\u0644\u0642\u0631\u0648\u0628: *' + (ctx.chat.title||'') + '*\n\n\ud83d\udcac ' + msg,
+      {parse_mode:'Markdown'}
+    );
+    const n = await ctx.reply('\ud83e\udd2b \u062a\u0645 \u0625\u0631\u0633\u0627\u0644 \u0647\u0645\u0633\u0629 \u0644\u0640 ' + (targetUser.first_name||'\u0627\u0644\u0639\u0636\u0648')).catch(()=>null);
+    if (n) setTimeout(()=>ctx.deleteMessage(n.message_id).catch(()=>{}),4000);
+  } catch(e) {
+    const err = await ctx.reply('\u26a0\ufe0f ' + (targetUser.first_name||'\u0627\u0644\u0639\u0636\u0648') + ' \u0644\u0645 \u064a\u0641\u062a\u062d \u0627\u0644\u0628\u0648\u062a \u0641\u064a \u0627\u0644\u062e\u0627\u0635').catch(()=>null);
+    if (err) setTimeout(()=>ctx.deleteMessage(err.message_id).catch(()=>{}),4000);
+  }
+});
+
 bot.command('poll', async ctx => {
   if (!['supergroup','group'].includes(ctx.chat?.type)) return;
   let isGroupAdmin = ctx.isOwner;
