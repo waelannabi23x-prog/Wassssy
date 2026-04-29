@@ -50,7 +50,7 @@ function getPg() {
       if (total >= 18)  logger.warn('[Pool] near limit: ' + total + '/20 connections');
     }, 30000).unref();
 
-    logger.info('✅ PostgreSQL (pool max=20)');
+    logger.info('✅ PostgreSQL (pool max=15)');
     return pgPool;
   } catch (e) { return null; }
 }
