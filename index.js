@@ -31,6 +31,7 @@ const { cacheWarmup, cacheClear, cacheClearPrefix } = require('./utils/cache');
 const { setLang } = require('./utils/i18n');
 const { startScheduler } = require('./utils/scheduler');
 const { handleAiChat, resetChat } = require('./handlers/ai_chat');
+const { isMentioned, isReplyToBot, getSocialReply } = require('./utils/groupTriggers');
 const poll = require('./handlers/group_admin_poll');
 const { handleOwnerAI } = require('./handlers/ai_owner');
 const setupGroupCommands = require('./handlers/group_commands');
