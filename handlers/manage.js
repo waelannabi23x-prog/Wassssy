@@ -138,9 +138,9 @@ async function showUsers(ctx, page=0) {
     await Promise.all([usersDb.getAll(page, PS), usersDb.count()])
       .then(([l, t]) => { cacheSet(_uk, {list:l, total:t}, 30000); return [l, t]; });
 
-  let text = '👥 *المستخدمون (' + total + ')*\n━━━━━━━━━━\n\n';
+  let text = '👥 *المستخدمون (' + total + ')*\n━━━━━━━━━━\n\n'; const MAX_USERS_DISPLAY = 20;
 
-  list.forEach((u, i) => {
+  list.slice(0, MAX_USERS_DISPLAY).forEach((u, i) => {
     const num = page * PS + i + 1;
     const name = escMd((u.first_name || 'مجهول').substring(0,20));
     const username = u.username ? ' @' + u.username.substring(0,15) : '';
@@ -301,12 +301,11 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
 }
 async function handleCallback(ctx,data){
   const uid=ctx.uid;
-
-
+  try{
   if(data==='mg_content') return showContent(ctx);
   if(data==='mg_analytics') return showAnalytics(ctx);
   if(data==='mg_logs') return showLogs(ctx);
-  if(data==='mg_users'){const p=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);if(!p.includes('full')&&!p.includes('view_users')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});return showUsers(ctx);}
+  if(data==='mg_users'){try{const p=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);if(!p.includes('full')&&!p.includes('view_users')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});return await showUsers(ctx);}catch(e){console.error('[mg_users]',e.message);return ctx.reply('❌ خطأ: '+e.message).catch(()=>{});}}
   if(data==='mg_admins') return showAdmins(ctx);
   if(data==='mg_trash') return showTrash(ctx);
   if(data==='mg_search_prompt'){setState(uid,{type:'mg_admin_search'});return ctx.reply('🔍 بحث:\nأدخل اسم ملف أو مستخدم:');}
