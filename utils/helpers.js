@@ -12,10 +12,13 @@ async function eos(ctx, text, extra) {
     // نص عادي → عدّل في مكانه
     if (msg && msg.text) {
       try { return await ctx.editMessageText(text, extra); } catch (e) {
-        if ((e.description || '').indexOf('not modified') !== -1) return;
+        var desc = e.description || e.message || '';
+        if (desc.indexOf('not modified') !== -1) return;
+        // فشل التعديل — ارسل رسالة جديدة بدون حذف
+        return ctx.reply(text, extra).catch(function(){});
       }
     }
-    // ميديا (صورة/ملف/فيديو) → احذف وابعث جديدة نظيفة
+    // ميديا → احذف وابعث جديدة
     ctx.deleteMessage().catch(function(){});
     return ctx.reply(text, extra).catch(function(){});
   }

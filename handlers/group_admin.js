@@ -108,14 +108,28 @@ async function showAllMembers(ctx, chatId) {
       cacheSet(cacheKey, members, 300000);
     }
 
+    // اجلب أدمنز Telegram وأضفهم
+    try {
+      const tgAdmins = await ctx.telegram.getChatAdministrators(chatId).catch(()=>[]);
+      for (const a of tgAdmins) {
+        if (!a?.user || a.user.is_bot) continue;
+        if (!members.find(m => String(m.user_id) === String(a.user.id))) {
+          members.push({ user_id: a.user.id, first_name: (a.user.first_name||'Admin') + ' 👑' });
+        }
+      }
+    } catch(_) {}
+
+    const tgCount = await ctx.telegram.getChatMembersCount(chatId).catch(()=>0);
+
     if (!members.length) {
       return ctx.reply(
-        '📭 *لا يوجد أعضاء مسجلين بعد*\n\nسيتم تسجيلهم تلقائياً عند دخولهم القادم',
+        '📭 *لا يوجد أعضاء مسجلين بعد*\n\n💡 الأعضاء يُسجَّلون تلقائياً عند إرسال أي رسالة في القروب\n👥 إجمالي الأعضاء حسب Telegram: *' + tgCount + '*',
         { parse_mode: 'Markdown' }
       ).catch(() => {});
     }
 
-    let text = `👥 *الأعضاء: ${members.length}*\n━━━━━━━━━━━━\n\n`;
+    const tgTotal = await ctx.telegram.getChatMembersCount(chatId).catch(()=>0);
+    let text = `👥 *الأعضاء المسجلين: ${members.length}* (إجمالي القروب: ${tgTotal})\n━━━━━━━━━━━━\n\n`;
     members.slice(0, 50).forEach((m, i) => {
       text += `${i + 1}. ${m.first_name || 'مجهول'}\n`;
     });
