@@ -2,7 +2,7 @@
 builder = "nixpacks"
 
 [build.nixpacksPlan.phases.setup]
-nixPkgs = ["nodejs_20", "go_1_22"]
+nixPkgs = ["nodejs_20", "go_1_22", "python3"]
 
 [build.nixpacksPlan.phases.build]
 cmds = [
