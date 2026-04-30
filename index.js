@@ -41,11 +41,13 @@ const startHandler = require('./handlers/start');
 const browse = require('./handlers/browse');
 const userH = require('./handlers/user');
 const manage = require('./handlers/manage');
+const { getAdminCached } = require('./utils/adminCache');
 
 const TOKEN = process.env.BOT_TOKEN;
 if (!TOKEN) { logger.error('FATAL: BOT_TOKEN missing'); process.exit(1); }
 const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
+if (!WEBHOOK_SECRET) logger.warn('⚠️  WEBHOOK_SECRET not set — webhook is unprotected! Set it in Railway env vars.');
 const PORT = process.env.PORT || 3000;
 
 const safeInt = v => { var n = parseInt(v); return isNaN(n) ? 0 : n; };
@@ -283,13 +285,7 @@ bot.command('dlt', async ctx => {
 bot.command('ai', async ctx => {
   // في القروب — يرد مباشرة على الرسالة التالية
   if (['supergroup','group'].includes(ctx.chat?.type)) {
-    let isAdmin = ctx.isOwner;
-    if (!isAdmin) {
-      try {
-        const m = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
-        isAdmin = ['administrator','creator'].includes(m?.status);
-      } catch(_) {}
-    }
+    const isAdmin = ctx.isOwner || await getAdminCached(ctx.telegram, ctx.chat.id, ctx.from.id);
     if (!isAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(()=>{});
     await global.setState(ctx.uid, { type: 'ai_mode_group', chatId: ctx.chat.id });
     const msg = await ctx.reply('🤖 المساعد الذكي مفعل!\nاكتب سؤالك:').catch(()=>null);
@@ -385,13 +381,7 @@ bot.command('whisper', async ctx => {
 
 bot.command('poll', async ctx => {
   if (!['supergroup','group'].includes(ctx.chat?.type)) return;
-  let isGroupAdmin = ctx.isOwner;
-  if (!isGroupAdmin) {
-    try {
-      const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
-      isGroupAdmin = ['administrator','creator'].includes(member.status);
-    } catch(_) {}
-  }
+  const isGroupAdmin = ctx.isOwner || await getAdminCached(ctx.telegram, ctx.chat.id, ctx.from.id);
   if (!isGroupAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
 
   const chatId = ctx.chat.id;
@@ -487,39 +477,21 @@ bot.command('all', async ctx => {
 });
 bot.command('tag', async ctx => {
   if (!['supergroup','group'].includes(ctx.chat?.type)) return;
-  let isGroupAdmin = ctx.isOwner;
-  if (!isGroupAdmin) {
-    try {
-      const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
-      isGroupAdmin = ['administrator','creator'].includes(member.status);
-    } catch(_) {}
-  }
+  const isGroupAdmin = ctx.isOwner || await getAdminCached(ctx.telegram, ctx.chat.id, ctx.from.id);
   if (!isGroupAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
   try { const { tagAll } = require('./handlers/group_admin'); await tagAll(ctx, ctx.chat.id); }
   catch(e) { ctx.reply('❌').catch(() => {}); }
 });
 bot.command('mute', async ctx => {
   if (!['supergroup','group'].includes(ctx.chat?.type)) return;
-  let isGroupAdmin = ctx.isOwner;
-  if (!isGroupAdmin) {
-    try {
-      const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
-      isGroupAdmin = ['administrator','creator'].includes(member.status);
-    } catch(_) {}
-  }
+  const isGroupAdmin = ctx.isOwner || await getAdminCached(ctx.telegram, ctx.chat.id, ctx.from.id);
   if (!isGroupAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
   try { const { muteAll } = require('./handlers/group_admin'); await muteAll(ctx, ctx.chat.id); }
   catch(e) { ctx.reply('❌').catch(() => {}); }
 });
 bot.command('unmute', async ctx => {
   if (!['supergroup','group'].includes(ctx.chat?.type)) return;
-  let isGroupAdmin = ctx.isOwner;
-  if (!isGroupAdmin) {
-    try {
-      const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
-      isGroupAdmin = ['administrator','creator'].includes(member.status);
-    } catch(_) {}
-  }
+  const isGroupAdmin = ctx.isOwner || await getAdminCached(ctx.telegram, ctx.chat.id, ctx.from.id);
   if (!isGroupAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
   try { const { unmuteAll } = require('./handlers/group_admin'); await unmuteAll(ctx, ctx.chat.id); }
   catch(e) { ctx.reply('❌').catch(() => {}); }
@@ -707,14 +679,17 @@ bot.on('message', async (ctx, next) => {
       const groups = s.spId === '0' ? await dbAll('SELECT chat_id FROM group_chats') : await dbAll('SELECT chat_id FROM group_chats WHERE specialty_id=$1', [s.spId]);
       let gSent = 0, gFail = 0;
       const msgText = text;
-      for (const g of groups) {
-        try {
-          if (mediaType === 'photo') await ctx.telegram.sendPhoto(g.chat_id, mediaFileId, { caption: msgText, parse_mode: 'Markdown' });
-          else if (mediaType === 'video') await ctx.telegram.sendVideo(g.chat_id, mediaFileId, { caption: msgText, parse_mode: 'Markdown' });
-          else if (mediaType === 'document') await ctx.telegram.sendDocument(g.chat_id, mediaFileId, { caption: msgText, parse_mode: 'Markdown' });
-          gSent++;
-        } catch(_) { gFail++; }
-        await new Promise(r => setTimeout(r, 600));
+      // ✅ Parallel batches of 20 with 1s delay — 20x faster than serial 600ms
+      const BATCH = 20;
+      for (let bi = 0; bi < groups.length; bi += BATCH) {
+        const chunk = groups.slice(bi, bi + BATCH);
+        const results = await Promise.allSettled(chunk.map(g => {
+          if (mediaType === 'photo') return ctx.telegram.sendPhoto(g.chat_id, mediaFileId, { caption: msgText, parse_mode: 'Markdown' });
+          if (mediaType === 'video') return ctx.telegram.sendVideo(g.chat_id, mediaFileId, { caption: msgText, parse_mode: 'Markdown' });
+          return ctx.telegram.sendDocument(g.chat_id, mediaFileId, { caption: msgText, parse_mode: 'Markdown' });
+        }));
+        results.forEach(r => r.status === 'fulfilled' ? gSent++ : gFail++);
+        if (bi + BATCH < groups.length) await new Promise(r => setTimeout(r, 1000));
       }
       await global.delState(ctx.uid);
       return ctx.reply('✅ أُرسل لـ *' + gSent + '* قروب' + (gFail ? ' | ❌ ' + gFail : ''), { parse_mode: 'Markdown' }).catch(() => {});
@@ -882,34 +857,6 @@ bot.on('text', async ctx => { try {
   if (s.type === 'ai_mode' && ctx.chat?.type === 'private') {
     if (txt.length > 1000) return ctx.reply('⚠️ الحد 1000 حرف.').catch(() => {});
     if (ctx.isOwner && await handleOwnerAI(ctx, txt, null, null)) return;
-    const pollState2 = null; // already handled above
-    if (pollState?.type === 'poll_create') {
-      const step = pollState.step;
-      const chatId = pollState.chatId;
-
-      if (step === 'question') {
-        const question = ctx.message.caption || ctx.message.text || '';
-        const mediaFileId = ctx.message.photo ? ctx.message.photo[ctx.message.photo.length-1].file_id :
-                           ctx.message.video ? ctx.message.video.file_id : null;
-        const mediaType = ctx.message.photo ? 'photo' : ctx.message.video ? 'video' : null;
-        await global.setState(ctx.uid, { type: 'poll_create', step: 'options', chatId, question, mediaFileId, mediaType, options: [] });
-        return ctx.reply('✅ *السؤال:* ' + question + '\n\n📝 الآن أرسل *خيارات التصويت* واحداً تلو الآخر.\nمثال: 🔴 صعبة\n\nاكتب /done عند الانتهاء (2-8 خيارات)', { parse_mode: 'Markdown' }).catch(() => {});
-      }
-
-      if (step === 'options') {
-        const optText = (ctx.message.text || '').trim();
-        const emoji = optText.match(/^(\p{Emoji})/u)?.[1] || '🔵';
-        const text = optText.replace(/^(\p{Emoji}\s*)/u, '').trim() || optText;
-        const opts = pollState.options || [];
-        opts.push({ emoji, text });
-        await global.setState(ctx.uid, { ...pollState, options: opts });
-        return ctx.reply(`✅ الخيار ${opts.length}: ${emoji} ${text}
-
-${opts.length >= 2 ? 'اكتب /done للإنشاء أو أضف المزيد' : 'أضف خياراً آخر على الأقل'}`, { parse_mode: 'Markdown' }).catch(() => {});
-      }
-      return;
-    }
-
     if (await handleAiChat(ctx, txt)) return;
   }
   if (s.type === 'mg_file') return manage.handleFileUpload(ctx);
@@ -1095,7 +1042,7 @@ _cln.unref();
 const _mem = setInterval(() => {
   const h = process.memoryUsage().heapUsed / 1048576;
   if (h > 440) { logger.warn('[Mem] ' + h.toFixed(0) + 'MB'); if (global.gc) global.gc(); }
-  if (h > 480) { logger.error('[Mem CRITICAL] restarting'); process.emit('SIGTERM'); }
+  if (h > 490) { logger.error('[Mem CRITICAL] restarting'); process.emit('SIGTERM'); }
 }, 60000);
 _mem.unref();
 

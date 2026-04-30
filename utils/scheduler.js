@@ -119,6 +119,7 @@ async function processGroupNotifications() {
           'INSERT INTO group_notify_log(file_id, chat_id, sent_at) VALUES($1, $2, CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING',
           [r.id, r.chat_id]
         ).catch(() => {});
+        await sleep(300); // ✅ max ~3 msgs/sec — safe for Telegram group limits
       } catch (_) {}
     }
   } catch (_) {}
