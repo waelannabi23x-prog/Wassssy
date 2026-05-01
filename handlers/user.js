@@ -6,9 +6,10 @@ const interactions = require('../database/interactions');
 const usersDb      = require('../database/users');
 const content      = require('../database/content');
 const { build, btn, back } = require('../utils/keyboard');
-const { eos, formatDate } = require('../utils/helpers');
+const { eos, formatDate, escMd } = require('../utils/helpers');
 const { t, getLang } = require('../utils/i18n');
 const { cacheGet, cacheSet, cacheClear, cacheClearPrefix } = require('../utils/cache');
+const { getPoints, getUserRank } = require('../database/points');
 
 async function showLatest(ctx) {
   var k = 'latest_15', list = cacheGet(k);
@@ -87,8 +88,7 @@ async function showProgress(ctx) {
   var op=tf?Math.round(ts/tf*100):0;
   var bar=(s,t)=>{var p=t?Math.round(s/t*100):0,f=Math.round(p/10);return'['+'█'.repeat(f)+'░'.repeat(10-f)+'] '+p+'%';};
   var medal=p=>p>=100?'🏆':p>=75?'🥇':p>=50?'🥈':p>=25?'🥉':'📚';
-  var escMd=require('../utils/helpers').escMd;
-  var text='📊 *تقدمك في '+(sp?escMd(sp.name):''+'')+'*\n━━━━━━━━━━━━━━━━\n\n';
+    var text='📊 *تقدمك في '+(sp?escMd(sp.name):''+'')+'*\n━━━━━━━━━━━━━━━━\n\n';
   subjects.forEach(s=>{var seen=parseInt(s.seen),total=parseInt(s.total),p=total?Math.round(seen/total*100):0;text+=medal(p)+' *'+(s.sub_name||'')+'*\n`'+bar(seen,total)+'`\n📄 '+seen+'/'+total+' ملف\n\n';});
   text+='━━━━━━━━━━━━━━━━\n🎯 *الإجمالي: '+ts+'/'+tf+' ملف*\n`'+bar(ts,tf)+'`';
   if(op>=75)text+='\n\n🔥 *أداء ممتاز! استمر!*';else if(op>=50)text+='\n\n💪 *في المنتصف! لا تتوقف!*';
@@ -101,14 +101,13 @@ async function showProfile(ctx) {
   // Inject points data
   const uid = ctx.uid;
   let ptsData = null;
-  try { const {getPoints, getUserRank} = require('../database/points'); ptsData = { pts: await getPoints(uid), rank: await getUserRank(uid) }; } catch(_) {}
+  try { ptsData = { pts: await getPoints(uid), rank: await getUserRank(uid) }; } catch(_) {}
 
   var lang=getLang(uid);
   var [user,dlCount,favCount,spRow,lastFile]=await Promise.all([usersDb.getById(uid),interactions.getUserDownloadCount(uid),get('SELECT COUNT(*) as c FROM favorites WHERE user_id=$1',[uid]).then(r=>r?r.c:0),usersDb.getSpecialty(uid),interactions.getLastFile(uid)]);
   var spId=spRow?spRow.specialty_id:null;
   var sp=spId&&spId!=0?await content.getSpec(spId):null;
-  var escMd=require('../utils/helpers').escMd;
-  var text='👤 *ملفك الشخصي*\n\n🆔 ID: `'+uid+'`\n👋 الاسم: '+(user?user.first_name||'غير معروف':'غير معروف')+'\n';
+    var text='👤 *ملفك الشخصي*\n\n🆔 ID: `'+uid+'`\n👋 الاسم: '+(user?user.first_name||'غير معروف':'غير معروف')+'\n';
   if(user&&user.username)text+='📛 @'+escMd(user.username)+'\n';
   if(ptsData&&ptsData.pts)text+='✨ النقاط: *'+(ptsData.pts.total_points||0)+'* | المركز: *#'+ptsData.rank+'*\n';
   text+='📅 انضم: '+(user&&user.joined_at?formatDate(user.joined_at):'غير معروف')+'\n';

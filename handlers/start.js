@@ -6,6 +6,8 @@ const interactions = require('../database/interactions');
 const usersDb = require('../database/users');
 const content = require('../database/content');
 const { cacheGet, cacheSet } = require('../utils/cache');
+const filesDb = require('../database/files');
+const { escMd: escMdCommon } = require('../utils/common');
 var safeInt = function(v) { var n = parseInt(v); return isNaN(n) ? 0 : n; };
 
 async function startHandler(ctx) {
@@ -16,14 +18,11 @@ async function startHandler(ctx) {
   if (payload && payload.startsWith('file_')) {
     var fid = safeInt(payload.replace('file_', ''));
     if (fid > 0) {
-      var filesDb = require('../database/files');
       var f = await filesDb.getFile(fid);
       if (f) {
-        var { build: kbBuild, btn: kbBtn } = require('../utils/keyboard');
-        var { escMd } = require('../utils/common');
         var isFav = await interactions.isFav(uid, fid).catch(function(){ return false; });
-        var cap = '📄 *' + escMd(f.title) + '*' + (f.description ? '\n📝 ' + escMd(f.description) : '') + '\n📁 ' + escMd(f.cat_name||'') + ' | 📖 ' + escMd(f.sub_name||'');
-        var kb = kbBuild([[kbBtn(isFav ? '⭐ محفوظ' : '☆ حفظ', 'fav_' + fid), kbBtn('🏠 الرئيسية', 'main_menu')]]);
+        var cap = '📄 *' + escMdCommon(f.title) + '*' + (f.description ? '\n📝 ' + escMdCommon(f.description) : '') + '\n📁 ' + escMdCommon(f.cat_name||'') + ' | 📖 ' + escMdCommon(f.sub_name||'');
+        var kb = build([[btn(isFav ? '⭐ محفوظ' : '☆ حفظ', 'fav_' + fid), btn('🏠 الرئيسية', 'main_menu')]]);
         try {
           if (f.file_type === 'photo') await ctx.replyWithPhoto(f.file_id, { caption: cap, parse_mode: 'Markdown', ...kb });
           else if (f.file_type === 'link') await ctx.reply(cap + '\n\n🔗 ' + f.file_id, { parse_mode: 'Markdown', ...kb });

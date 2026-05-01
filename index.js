@@ -176,7 +176,14 @@ const rateLimit = function(ctx, next) {
   if (!u || now - u.t > 10000) { u = {c: 1, t: now}; _floodMap.set(uid, u); }
   else {
     u.c++;
-    if (u.c > 15) return; // بلوك بعد 15 ضغطة فقط
+    if (u.c > 15) {
+      if (u.c === 16) {
+        const msg = '⏳ إبطاء قليلاً...';
+        if (ctx.callbackQuery) ctx.answerCbQuery(msg, { show_alert: false }).catch(()=>{});
+        else ctx.reply(msg).catch(()=>{});
+      }
+      return;
+    }
   }
   return next();
 };

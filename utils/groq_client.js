@@ -9,7 +9,7 @@ const QUOTA_WAIT   = 60000;
 
 function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 
-async function geminiChat(messages, maxTokens = 400, temperature = 0.7, retries = 0) {
+async function geminiChat(messages, maxTokens = 700, temperature = 0.65, retries = 0) {
   if (!GEMINI_KEY) throw new Error('No Gemini key');
   const body = {
     system_instruction: messages.find(m => m.role === 'system')
@@ -77,7 +77,7 @@ function getGroq() {
   } catch (e) { return null; }
 }
 
-function groqFallback(messages, maxTokens = 400, temperature = 0.7) {
+function groqFallback(messages, maxTokens = 700, temperature = 0.65) {
   return new Promise((resolve, reject) => {
     const g = getGroq();
     if (!g) return reject(new Error('No AI provider available'));
@@ -93,7 +93,7 @@ function groqFallback(messages, maxTokens = 400, temperature = 0.7) {
 
 // ✅ اسم واضح: aiChat بدل groqChat المضلل
 // Primary: Gemini | Fallback: Groq
-async function aiChat(messages, maxTokens = 400, temperature = 0.7) {
+async function aiChat(messages, maxTokens = 700, temperature = 0.65) {
   if (GEMINI_KEY) {
     try {
       return await geminiChat(messages, maxTokens, temperature);
