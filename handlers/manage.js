@@ -169,7 +169,14 @@ async function showUsers(ctx, page=0) {
   if (nav.length) rows.push(nav);
   rows.push(back('mg_menu'));
 
-  return eos(ctx, text, { parse_mode: 'Markdown', ...build(rows) });
+  // إرسال رسالة جديدة دائماً بدل التعديل (يحل مشكلة الصمت)
+  if (ctx.callbackQuery) ctx.deleteMessage().catch(()=>{});
+  return ctx.reply(text, { parse_mode: 'Markdown', ...build(rows) }).catch(e => {
+    console.error('[showUsers reply]', e.message);
+    // إذا فشل Markdown، ابعث بدون تنسيق
+    const plain = text.replace(/[*_`]/g, '');
+    return ctx.reply(plain, build(rows)).catch(()=>{});
+  });
 }
 
 async function showUserProfile(ctx,userId){const [user,dlCount,favCount,spRow,lastFile]=await Promise.all([usersDb.getById(userId),interactions.getUserDownloadCount(userId),require('../database/db').get('SELECT COUNT(*) as c FROM favorites WHERE user_id=$1',[userId]).then(r=>r?.c||0),usersDb.getSpecialty(userId),interactions.getLastFile(userId)]);if(!user) return ctx.reply('❌ المستخدم غير موجود.');const spId=spRow?.specialty_id;const sp=spId&&spId!=0?await content.getSpec(spId):null;const text='👤 *بروفايل المستخدم*\n\n🆔 ID: `'+userId+'`\n👋 الاسم: '+escMd(user.first_name||'؟')+' '+(user.last_name?escMd(user.last_name):'')+'\n'+(user.username?'📛 @'+escMd(user.username)+'\n':'')+'📅 انضم: '+(user.joined_at?new Date(user.joined_at).toLocaleDateString('en-GB'):'؟')+'\n🕐 آخر نشاط: '+(user.last_active?new Date(user.last_active).toLocaleDateString('en-GB'):'؟')+'\n🎓 التخصص: *'+escMd(sp?sp.name:'غير محدد')+'*\n🚫 محظور: '+(user.is_banned?'نعم':'لا')+'\n\n📊 *النشاط:*\n⬇️ التحميلات: *'+dlCount+'*\n⭐ المفضلة: *'+favCount+'*'+(lastFile?'\n📄 آخر ملف: *'+escMd(lastFile.title)+'*':'');const rows=[[btn(user.is_banned?'✅ إلغاء الحظر':'🚫 حظر',(user.is_banned?'mg_unban_':'mg_ban_')+userId)],[back('mg_users')[0]]];return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});}
