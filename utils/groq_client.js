@@ -5,7 +5,7 @@ const logger = require('./logger');
 const GEMINI_KEY   = process.env.GEMINI_KEY;
 const GROQ_KEY     = process.env.GROQ_API_KEY;
 const MAX_RETRIES  = 2;
-const QUOTA_WAIT   = 60000;
+const QUOTA_WAIT   = 5000;
 
 function wait(ms) { return new Promise(r => setTimeout(r, ms)); }
 

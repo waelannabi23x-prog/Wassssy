@@ -27,7 +27,7 @@ function getPg() {
     pgPool = new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
-      max: 15, min: 3,  // Railway-safe (PostgreSQL max ~25 connections)
+      max: 15, min: 2,  // Railway-safe (PostgreSQL max ~25 connections)
       idleTimeoutMillis: 60000,
       connectionTimeoutMillis: 5000,
       statement_timeout: 10000,

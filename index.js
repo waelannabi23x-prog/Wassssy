@@ -1053,4 +1053,12 @@ const _mem = setInterval(() => {
 }, 60000);
 _mem.unref();
 
+// Memory watchdog
+const _memW = setInterval(() => {
+  const h = process.memoryUsage().heapUsed / 1048576;
+  if (h > 440) { if (global.gc) global.gc(); }
+  if (h > 480) { process.emit('SIGTERM'); }
+}, 60000);
+_memW.unref();
+
 launch();
