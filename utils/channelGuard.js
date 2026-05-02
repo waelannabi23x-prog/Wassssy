@@ -30,6 +30,10 @@ async function checkChannel(bot, userId, channelId) {
 
 // ── التحقق من كل القنوات ─────────────────────────
 async function checkAllChannels(bot, userId) {
+  // Cache 10 دقائق عشان ما يتحقق كل ضغطة
+  const cacheKey = 'sub_ok_' + userId;
+  const cached = cacheGet(cacheKey);
+  if (cached === true) return { ok: true, missing: [] };
   const channels = await getChannels();
   if (!channels.length) return { ok: true, missing: [] };
   
@@ -46,7 +50,9 @@ async function checkAllChannels(bot, userId) {
   );
   
   const missing = results.filter(ch => !ch.subscribed);
-  return { ok: missing.length === 0, missing };
+  const ok = missing.length === 0;
+  if (ok) cacheSet('sub_ok_' + userId, true, 600000); // 10 دقائق
+  return { ok, missing };
 }
 
 // ── إضافة قناة ───────────────────────────────────
@@ -89,4 +95,9 @@ function buildSubscribeMessage(missingChannels, userName) {
   return { text, buttons };
 }
 
-module.exports = { getChannels, checkAllChannels, addChannel, removeChannel, buildSubscribeMessage };
+function clearSubCache(userId) {
+  const { cacheClear } = require('./cache');
+  cacheClear('sub_ok_' + userId);
+}
+
+module.exports = { getChannels, checkAllChannels, addChannel, removeChannel, buildSubscribeMessage, clearSubCache };

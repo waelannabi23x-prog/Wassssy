@@ -99,21 +99,42 @@ async function authMiddleware(ctx, next) {
 
   // 🔐 تحقق من الاشتراك في القنوات المطلوبة
   try {
-    const { checkAllChannels, buildSubscribeMessage } = require('../utils/channelGuard');
-    const { ok, missing } = await checkAllChannels({ telegram: ctx.telegram }, uid);
-    if (!ok) {
-      // استثن callback_data=check_subscription عشان يقدر يتحقق
+    // الأدمن والأونر معفيون
+    if (!ctx.isOwner && !ctx.isAdmin) {
       const cbData = ctx.callbackQuery?.data;
-      if (cbData === 'check_subscription' || cbData?.startsWith('del_channel_')) return next();
-      // استثن الأوامر الإدارية
-      const cmd = ctx.message?.text?.split(' ')[0];
-      if (ctx.isOwner || ctx.isAdmin) return next();
-      const name = ctx.from?.first_name || 'صديقي';
-      const { text, buttons } = buildSubscribeMessage(missing, name);
-      return ctx.reply(text, {
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: buttons }
-      }).catch(() => {});
+      // عند الضغط على تحقق — امسح cache وتحقق من جديد
+      if (cbData === 'check_subscription') {
+        const { clearSubCache } = require('../utils/channelGuard');
+        clearSubCache(uid);
+      }
+      // استثن فقط del_channel_ من الأدمن
+      if (!cbData?.startsWith('del_channel_')) {
+        const { checkAllChannels, buildSubscribeMessage } = require('../utils/channelGuard');
+        const { ok, missing } = await checkAllChannels({ telegram: ctx.telegram }, uid);
+        if (!ok) {
+          const name = ctx.from?.first_name || 'صديقي';
+          const { text, buttons } = buildSubscribeMessage(missing, name);
+          if (cbData) {
+            // callback — عدّل الرسالة أو رد
+            ctx.answerCbQuery('').catch(()=>{});
+            return ctx.editMessageText(text, {
+              parse_mode: 'Markdown',
+              reply_markup: { inline_keyboard: buttons }
+            }).catch(() => ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(()=>{}));
+          }
+          return ctx.reply(text, {
+            parse_mode: 'Markdown',
+            reply_markup: { inline_keyboard: buttons }
+          }).catch(()=>{});
+        }
+        // مشترك — لو كان callback تحقق، افتح البوت
+        if (cbData === 'check_subscription') {
+          ctx.answerCbQuery('✅ تم التحقق!').catch(()=>{});
+          await ctx.deleteMessage().catch(()=>{});
+          const startHandler = require('../handlers/start');
+          return startHandler(ctx);
+        }
+      }
     }
   } catch(_) {}
 
