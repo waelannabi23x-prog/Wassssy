@@ -131,14 +131,20 @@ async function authMiddleware(ctx, next) {
         if (cbData === 'check_subscription') {
           ctx.answerCbQuery('✅ مرحباً بك! 🎉').catch(()=>{});
           await ctx.deleteMessage().catch(()=>{});
-          // استدعي startHandler مباشرة
           try {
             const startHandler = require('../handlers/start');
+            // استدعي showMainMenu مباشرة بدل startHandler
+            if (startHandler.showMainMenu) {
+              const uName = ctx.from?.first_name || 'Student';
+              return await startHandler.showMainMenu(ctx, uName);
+            }
             return await startHandler(ctx);
           } catch(e) {
-            await ctx.reply('مرحباً! اكتب /start للبدء').catch(()=>{});
+            // fallback — أرسل رسالة بسيطة مع زر
+            return ctx.reply('✅ تم التحقق! مرحباً بك', {
+              reply_markup: { inline_keyboard: [[{ text: '🏠 القائمة الرئيسية', callback_data: 'main_menu' }]] }
+            }).catch(()=>{});
           }
-          return;
         }
       }
     }
