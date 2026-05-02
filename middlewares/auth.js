@@ -129,10 +129,15 @@ async function authMiddleware(ctx, next) {
         }
         // مشترك — لو كان callback تحقق، افتح البوت
         if (cbData === 'check_subscription') {
-          ctx.answerCbQuery('✅ تم التحقق! مرحباً بك 🎉').catch(()=>{});
+          ctx.answerCbQuery('✅ مرحباً بك! 🎉').catch(()=>{});
           await ctx.deleteMessage().catch(()=>{});
-          // أرسل /start جديد عشان يشتغل صح في private context
-          await ctx.telegram.sendMessage(uid, '/start').catch(()=>{});
+          // استدعي startHandler مباشرة
+          try {
+            const startHandler = require('../handlers/start');
+            return await startHandler(ctx);
+          } catch(e) {
+            await ctx.reply('مرحباً! اكتب /start للبدء').catch(()=>{});
+          }
           return;
         }
       }

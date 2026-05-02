@@ -422,15 +422,25 @@ bot.command('polls', async ctx => {
 // ── إدارة القنوات المطلوبة للاشتراك ──────────────
 bot.command('addchannel', async ctx => {
   if (!ctx.isOwner) return;
-  // /addchannel @channel_username اسم القناة
-  const parts = ctx.message.text.replace('/addchannel','').trim().split(' ');
+  const parts = ctx.message.text.replace('/addchannel','').replace(/@\w+\s*/,'').trim().split(' ');
   const channelId = parts[0]; // @username أو -100xxx
-  const channelName = parts.slice(1, -1).join(' ') || channelId;
-  const channelUrl = parts[parts.length - 1];
-  if (!channelId) return ctx.reply('⚠️ استخدام: /addchannel @channel اسم_القناة https://t.me/channel').catch(()=>{});
+  const channelUrl = parts[parts.length - 1]?.startsWith('http') ? parts[parts.length - 1] : null;
+  const channelName = parts.slice(1, channelUrl ? -1 : undefined).join(' ') || null;
+  if (!channelId) return ctx.reply('⚠️ استخدام:\n/addchannel @channel اسم_القناة https://t.me/channel').catch(()=>{});
+  
+  // جلب الاسم الحقيقي من Telegram
+  let realName = channelName;
+  try {
+    const chat = await ctx.telegram.getChat(channelId);
+    realName = channelName || chat.title || chat.username || channelId;
+  } catch(e) {
+    realName = channelName || channelId;
+  }
+  
+  const url = channelUrl || ('https://t.me/' + channelId.replace('@','').replace('-100',''));
   const { addChannel } = require('./utils/channelGuard');
-  await addChannel(channelId, channelName, channelUrl.startsWith('http') ? channelUrl : 'https://t.me/' + channelId.replace('@',''));
-  ctx.reply('✅ تمت إضافة القناة: ' + channelName).catch(()=>{});
+  await addChannel(channelId, realName, url);
+  ctx.reply('✅ تمت إضافة: *' + realName + '*', { parse_mode: 'Markdown' }).catch(()=>{});
 });
 
 bot.command('channels', async ctx => {
