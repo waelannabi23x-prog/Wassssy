@@ -97,10 +97,10 @@ async function authMiddleware(ctx, next) {
     return ctx.reply(global._maintMsgCache.msg).catch(() => {});
   }
 
-  // 🔐 تحقق من الاشتراك في القنوات المطلوبة
+  // 🔐 تحقق من الاشتراك في القنوات المطلوبة (الخاص فقط)
   try {
-    // الأدمن والأونر معفيون
-    if (!ctx.isOwner && !ctx.isAdmin) {
+    const chatType = ctx.chat?.type;
+    if (!ctx.isOwner && !ctx.isAdmin && chatType === 'private') {
       const cbData = ctx.callbackQuery?.data;
       // عند الضغط على تحقق — امسح cache وتحقق من جديد
       if (cbData === 'check_subscription') {

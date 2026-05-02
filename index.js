@@ -420,6 +420,15 @@ bot.command('polls', async ctx => {
 });
 
 // ── إدارة القنوات المطلوبة للاشتراك ──────────────
+bot.command('clearchannels', async ctx => {
+  if (!ctx.isOwner) return;
+  const { run } = require('./database/db');
+  const { cacheClear } = require('./utils/cache');
+  await run('UPDATE required_channels SET is_active=0').catch(()=>{});
+  cacheClear('required_channels');
+  ctx.reply('✅ تم تعطيل كل القنوات — البوت بدون تحقق الآن').catch(()=>{});
+});
+
 bot.command('addchannel', async ctx => {
   if (!ctx.isOwner) return;
   const parts = ctx.message.text.replace('/addchannel','').replace(/@\w+\s*/,'').trim().split(' ');
