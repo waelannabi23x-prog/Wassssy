@@ -75,16 +75,7 @@ function saveDB() {
 }
 
 function getSqlite() {
-  if (sqliteDb) return sqliteDb;
-  try {
-    const Database = require('better-sqlite3');
-    sqliteDb = new Database(DB_PATH);
-    sqliteDb.pragma('journal_mode = WAL');
-    sqliteDb.pragma('cache_size = 10000');
-    sqliteDb.pragma('synchronous = NORMAL');
-    logger.info('✅ SQLite');
-    return sqliteDb;
-  } catch (e) { return null; }
+  return null; // PostgreSQL only — SQLite disabled
 }
 
 const pgCache = new Map();
