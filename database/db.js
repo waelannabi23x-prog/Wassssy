@@ -35,6 +35,7 @@ function getPg() {
       allowExitOnIdle: false,
       keepAlive: true,
       keepAliveInitialDelayMillis: 5000,
+      application_name: 'edumaster_bot',
     });
     pgPool.on('error', function(err) { logger.error('PG pool error:', err.message); });
     pgPool.on('connect', function() {});

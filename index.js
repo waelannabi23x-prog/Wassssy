@@ -1044,6 +1044,18 @@ const _cln = setInterval(async () => {
     
   } catch(_) {}
 }, CFG.cleanupMs);
+
+// VACUUM أسبوعي لتنظيف الـ DB وتحسين الأداء
+const _vacuum = setInterval(async () => {
+  try {
+    const pg = getPg();
+    if (pg) {
+      await pg.query('VACUUM ANALYZE users, files, history, group_members, poll_votes');
+      logger.info('[DB] VACUUM ANALYZE done');
+    }
+  } catch(e) { logger.error('[VACUUM]', e.message); }
+}, 7 * 24 * 60 * 60 * 1000); // كل أسبوع
+_vacuum.unref();
 _cln.unref();
 
 const _mem = setInterval(() => {
