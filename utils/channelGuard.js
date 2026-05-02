@@ -3,6 +3,13 @@ const { get, all, run } = require('../database/db');
 const { cacheGet, cacheSet, cacheClear } = require('./cache');
 
 // ── جلب القنوات المطلوبة ─────────────────────────
+async function getChannelInfo(bot, channelId) {
+  try {
+    const chat = await bot.telegram.getChat(channelId);
+    return chat.title || chat.username || channelId;
+  } catch(e) { return null; }
+}
+
 async function getChannels() {
   const cached = cacheGet('required_channels');
   if (cached) return cached;
@@ -27,10 +34,15 @@ async function checkAllChannels(bot, userId) {
   if (!channels.length) return { ok: true, missing: [] };
   
   const results = await Promise.all(
-    channels.map(async ch => ({
-      ...ch,
-      subscribed: await checkChannel(bot, userId, ch.channel_id)
-    }))
+    channels.map(async ch => {
+      const subscribed = await checkChannel(bot, userId, ch.channel_id);
+      // جلب اسم حقيقي لو الاسم المحفوظ هو ID
+      let realName = ch.channel_name;
+      if (!realName || realName.startsWith('-') || /^-?\d+$/.test(realName)) {
+        realName = await getChannelInfo(bot, ch.channel_id).catch(()=>null) || ch.channel_name;
+      }
+      return { ...ch, channel_name: realName, subscribed };
+    })
   );
   
   const missing = results.filter(ch => !ch.subscribed);

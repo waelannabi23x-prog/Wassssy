@@ -688,7 +688,8 @@ bot.on('callback_query', async ctx => {
       if (ok) {
         // ✅ مشترك — احذف رسالة الاشتراك وافتح البوت
         await ctx.deleteMessage().catch(()=>{});
-        return startHandler(ctx);
+        // إرسال /start من جديد عشان يشتغل صح
+        return ctx.reply('/start').then(() => startHandler(ctx)).catch(() => startHandler(ctx));
       }
       // ❌ لسا ما اشترك — عدّل نفس الرسالة
       const { text, buttons } = buildSubscribeMessage(missing, ctx.from?.first_name);
