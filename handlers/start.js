@@ -11,6 +11,23 @@ const { escMd: escMdCommon } = require('../utils/common');
 var safeInt = function(v) { var n = parseInt(v); return isNaN(n) ? 0 : n; };
 
 async function startHandler(ctx) {
+  // ── تحقق من الاشتراك ──────────────────────────
+  try {
+    const { checkAllChannels, buildSubscribeMessage } = require('../utils/channelGuard');
+    const bot = ctx.telegram ? { telegram: ctx.telegram } : null;
+    if (bot) {
+      const { ok, missing } = await checkAllChannels({ telegram: ctx.telegram }, ctx.uid);
+      if (!ok) {
+        const name = ctx.from?.first_name || 'صديقي';
+        const { text, buttons } = buildSubscribeMessage(missing, name);
+        return ctx.reply(text, {
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: buttons }
+        }).catch(() => {});
+      }
+    }
+  } catch(e) {}
+  // ─────────────────────────────────────────────
   var uid = ctx.uid;
   var name = ctx.from ? ctx.from.first_name || 'Student' : 'Student';
   var rawText = ctx.message ? ctx.message.text || '' : '';

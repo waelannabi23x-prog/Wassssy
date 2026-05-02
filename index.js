@@ -419,6 +419,42 @@ bot.command('polls', async ctx => {
   return ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => {});
 });
 
+// ── إدارة القنوات المطلوبة للاشتراك ──────────────
+bot.command('addchannel', async ctx => {
+  if (!ctx.isOwner) return;
+  // /addchannel @channel_username اسم القناة
+  const parts = ctx.message.text.replace('/addchannel','').trim().split(' ');
+  const channelId = parts[0]; // @username أو -100xxx
+  const channelName = parts.slice(1, -1).join(' ') || channelId;
+  const channelUrl = parts[parts.length - 1];
+  if (!channelId) return ctx.reply('⚠️ استخدام: /addchannel @channel اسم_القناة https://t.me/channel').catch(()=>{});
+  const { addChannel } = require('./utils/channelGuard');
+  await addChannel(channelId, channelName, channelUrl.startsWith('http') ? channelUrl : 'https://t.me/' + channelId.replace('@',''));
+  ctx.reply('✅ تمت إضافة القناة: ' + channelName).catch(()=>{});
+});
+
+bot.command('channels', async ctx => {
+  if (!ctx.isOwner) return;
+  const { getChannels, removeChannel } = require('./utils/channelGuard');
+  const channels = await getChannels();
+  if (!channels.length) return ctx.reply('📭 لا توجد قنوات مضافة').catch(()=>{});
+  let text = '📢 *القنوات المطلوبة:*
+
+';
+  channels.forEach((ch, i) => {
+    text += (i+1) + '. *' + (ch.channel_name||ch.channel_id) + '*
+';
+    text += '   ID: `' + ch.channel_id + '`
+';
+    text += '   🔗 ' + (ch.channel_url||'—') + '
+
+';
+  });
+  const rows = channels.map(ch => [{ text: '🗑 حذف: ' + (ch.channel_name||ch.channel_id), callback_data: 'del_channel_' + ch.id }]);
+  rows.push([{ text: '❌ إلغاء', callback_data: 'noop' }]);
+  ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } }).catch(()=>{});
+});
+
 bot.command('setwelcome', async ctx => {
   if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(()=>{});
   // يشتغل في الخاص فقط
@@ -641,6 +677,31 @@ bot.on('callback_query', async ctx => {
     if (data.startsWith('poll_results_')) {
       return poll.showPollResults(ctx, parseInt(data.replace('poll_results_','')));
     }
+    // تحقق من الاشتراك
+    if (data.startsWith('del_channel_')) {
+      if (!ctx.isOwner) return ctx.answerCbQuery('🚫').catch(()=>{});
+      const { removeChannel } = require('./utils/channelGuard');
+      await removeChannel(parseInt(data.replace('del_channel_','')));
+      ctx.answerCbQuery('✅ تم الحذف').catch(()=>{});
+      ctx.deleteMessage().catch(()=>{});
+      return;
+    }
+
+    if (data === 'check_subscription') {
+      ctx.answerCbQuery('').catch(()=>{});
+      const { checkAllChannels, buildSubscribeMessage } = require('./utils/channelGuard');
+      const { ok, missing } = await checkAllChannels({ telegram: ctx.telegram }, ctx.uid);
+      if (ok) {
+        await ctx.deleteMessage().catch(()=>{});
+        return startHandler(ctx);
+      }
+      const { text, buttons } = buildSubscribeMessage(missing, ctx.from?.first_name);
+      return ctx.editMessageText(text, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: buttons }
+      }).catch(() => ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }));
+    }
+
     if (data === 'poll_closed_notice') return ctx.answerCbQuery('🔒 التصويت مغلق!', { show_alert: true }).catch(()=>{});
     if (data.startsWith('leave_grp_')) {
       const chatId = parseInt(data.replace('leave_grp_',''));
