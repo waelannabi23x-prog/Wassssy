@@ -132,31 +132,40 @@ async function showAnalytics(ctx){
 async function showLogs(ctx){const _lk='admin_logs';const _lc=cacheGet(_lk);const logs=_lc||await interactions.getLogs(20);if(!_lc) cacheSet(_lk,logs,60000);let text='📜 *آخر السجلات*\n\n';if(logs.length) logs.forEach(l=>{text+='• '+(l.first_name||'ID:'+l.user_id)+': '+l.action+(l.details?' — '+l.details:'')+'\n';});else text+='_لا توجد سجلات._';return eos(ctx,text,{parse_mode:'Markdown',...build([back('mg_menu')])});}
 
 async function showUsers(ctx, page=0) {
-  const _uk = 'admin_users_' + page;
+  const PAGE_SIZE = 8; // أقل أزرار = أسرع + Telegram لا يرفض
+  const _uk = 'admin_users7_' + page;
   const _uc = cacheGet(_uk);
-  const [list, total] = _uc ? [_uc.list, _uc.total] :
-    await Promise.all([usersDb.getAll(page, PS), usersDb.count()])
-      .then(([l, t]) => { cacheSet(_uk, {list:l, total:t}, 30000); return [l, t]; });
+  let list, total;
+  if (_uc) { list = _uc.list; total = _uc.total; }
+  else {
+    [list, total] = await Promise.all([
+      usersDb.getAll(page, PAGE_SIZE),
+      usersDb.countActive ? usersDb.countActive() : usersDb.count()
+    ]);
+    cacheSet(_uk, { list, total }, 30000);
+  }
 
-  let text = '👥 *المستخدمون (' + total + ')*\n━━━━━━━━━━\n\n'; const MAX_USERS_DISPLAY = 20;
+  const pages = Math.ceil(total / PAGE_SIZE) || 1;
+  let text = '👥 *النشطون خلال 7 أيام (' + total + ')*\n━━━━━━━━━━\n\n';
 
-  list.slice(0, MAX_USERS_DISPLAY).forEach((u, i) => {
-    const num = page * PS + i + 1;
-    const name = escMd((u.first_name || 'مجهول').substring(0,20));
-    const username = u.username ? ' @' + u.username.substring(0,15) : '';
+  list.forEach((u, i) => {
+    const num = page * PAGE_SIZE + i + 1;
+    const name = escMd((u.first_name || 'مجهول').substring(0, 18));
+    const username = u.username ? ' @' + u.username.substring(0, 12) : '';
     const banned = u.is_banned ? ' 🚫' : '';
-    text += num + '. ' + name + username + banned + '\n';
+    const days = u.last_active ? Math.floor((Date.now() - new Date(u.last_active)) / 86400000) : '?';
+    text += num + '. ' + name + username + banned + ' _(' + days + 'د)_\n';
   });
 
   const rows = list.map(u => [
-    btn('👤 ' + (u.first_name || u.id).toString().substring(0, 20), 'mg_profile_' + u.id),
-    btn(u.is_banned ? '✅ رفع الحظر' : '🚫 حظر', (u.is_banned ? 'mg_unban_' : 'mg_ban_') + u.id)
+    btn('👤 ' + (u.first_name || u.id).toString().substring(0, 18), 'mg_profile_' + u.id),
+    btn(u.is_banned ? '✅ رفع' : '🚫 حظر', (u.is_banned ? 'mg_unban_' : 'mg_ban_') + u.id)
   ]);
 
   const nav = [];
-  if (page > 0) nav.push(btn('\u2b05\ufe0f', 'mg_users_p' + (page-1)));
-  nav.push(btn((page+1) + '/' + Math.ceil(total/PS), 'noop'));
-  if ((page+1)*PS < total) nav.push(btn('\u27a1\ufe0f', 'mg_users_p' + (page+1)));
+  if (page > 0) nav.push(btn('⬅️', 'mg_users_p' + (page - 1)));
+  nav.push(btn((page + 1) + '/' + pages, 'noop'));
+  if ((page + 1) * PAGE_SIZE < total) nav.push(btn('➡️', 'mg_users_p' + (page + 1)));
   if (nav.length) rows.push(nav);
   rows.push(back('mg_menu'));
 
