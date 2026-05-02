@@ -438,17 +438,11 @@ bot.command('channels', async ctx => {
   const { getChannels, removeChannel } = require('./utils/channelGuard');
   const channels = await getChannels();
   if (!channels.length) return ctx.reply('📭 لا توجد قنوات مضافة').catch(()=>{});
-  let text = '📢 *القنوات المطلوبة:*
-
-';
+  let text = '\ud83d\udce2 *\u0627\u0644\u0642\u0646\u0648\u0627\u062a \u0627\u0644\u0645\u0637\u0644\u0648\u0628\u0629:*\n\n';
   channels.forEach((ch, i) => {
-    text += (i+1) + '. *' + (ch.channel_name||ch.channel_id) + '*
-';
-    text += '   ID: `' + ch.channel_id + '`
-';
-    text += '   🔗 ' + (ch.channel_url||'—') + '
-
-';
+    text += (i+1) + '. *' + (ch.channel_name||ch.channel_id) + '*\n';
+    text += '   ID: `' + ch.channel_id + '`\n';
+    text += '   ' + (ch.channel_url||'-') + '\n\n';
   });
   const rows = channels.map(ch => [{ text: '🗑 حذف: ' + (ch.channel_name||ch.channel_id), callback_data: 'del_channel_' + ch.id }]);
   rows.push([{ text: '❌ إلغاء', callback_data: 'noop' }]);

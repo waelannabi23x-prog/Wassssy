@@ -97,6 +97,26 @@ async function authMiddleware(ctx, next) {
     return ctx.reply(global._maintMsgCache.msg).catch(() => {});
   }
 
+  // 🔐 تحقق من الاشتراك في القنوات المطلوبة
+  try {
+    const { checkAllChannels, buildSubscribeMessage } = require('../utils/channelGuard');
+    const { ok, missing } = await checkAllChannels({ telegram: ctx.telegram }, uid);
+    if (!ok) {
+      // استثن callback_data=check_subscription عشان يقدر يتحقق
+      const cbData = ctx.callbackQuery?.data;
+      if (cbData === 'check_subscription' || cbData?.startsWith('del_channel_')) return next();
+      // استثن الأوامر الإدارية
+      const cmd = ctx.message?.text?.split(' ')[0];
+      if (ctx.isOwner || ctx.isAdmin) return next();
+      const name = ctx.from?.first_name || 'صديقي';
+      const { text, buttons } = buildSubscribeMessage(missing, name);
+      return ctx.reply(text, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: buttons }
+      }).catch(() => {});
+    }
+  } catch(_) {}
+
   // 🎮 Daily login bonus (+1 نقطة)
   try { const {checkDailyLogin}=require('../database/points'); checkDailyLogin(uid).catch(()=>{}); } catch(_){}
   return next();
