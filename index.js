@@ -686,14 +686,17 @@ bot.on('callback_query', async ctx => {
       const { checkAllChannels, buildSubscribeMessage } = require('./utils/channelGuard');
       const { ok, missing } = await checkAllChannels({ telegram: ctx.telegram }, ctx.uid);
       if (ok) {
+        // ✅ مشترك — احذف رسالة الاشتراك وافتح البوت
         await ctx.deleteMessage().catch(()=>{});
         return startHandler(ctx);
       }
+      // ❌ لسا ما اشترك — عدّل نفس الرسالة
       const { text, buttons } = buildSubscribeMessage(missing, ctx.from?.first_name);
+      ctx.answerCbQuery('❌ لم تشترك بعد!', { show_alert: true }).catch(()=>{});
       return ctx.editMessageText(text, {
         parse_mode: 'Markdown',
         reply_markup: { inline_keyboard: buttons }
-      }).catch(() => ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }));
+      }).catch(()=>{});
     }
 
     if (data === 'poll_closed_notice') return ctx.answerCbQuery('🔒 التصويت مغلق!', { show_alert: true }).catch(()=>{});

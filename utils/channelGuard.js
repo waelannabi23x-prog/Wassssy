@@ -55,25 +55,25 @@ async function removeChannel(id) {
 // ── بناء رسالة الاشتراك ──────────────────────────
 function buildSubscribeMessage(missingChannels, userName) {
   const name = userName || 'صديقي';
-  let text = `👋 *أهلاً ${name}!*\n\n`;
-  text += `🔐 *للوصول للبوت يجب الاشتراك في:*\n\n`;
-  
+  let text = '👋 *أهلاً ' + name + '!*\n\n';
+  text += '━━━━━━━━━━━━━━━━\n';
+  text += '🔐 *للدخول للبوت اشترك في:*\n\n';
+
   missingChannels.forEach((ch, i) => {
-    text += `${i + 1}. 📢 *${ch.channel_name || 'القناة'}*\n`;
+    const chName = ch.channel_name && !ch.channel_name.startsWith('-') ? ch.channel_name : 'القناة';
+    text += (i + 1) + '. 📣 *' + chName + '*\n';
   });
-  
-  text += `\n✅ بعد الاشتراك اضغط **تحقق من الاشتراك**`;
-  
-  const buttons = missingChannels.map(ch => ([{
-    text: `📢 ${ch.channel_name || 'اشترك الآن'}`,
-    url: ch.channel_url
-  }]));
-  
-  buttons.push([{
-    text: '✅ تحقق من الاشتراك',
-    callback_data: 'check_subscription'
-  }]);
-  
+
+  text += '\n━━━━━━━━━━━━━━━━\n';
+  text += '_اشترك ثم اضغط تحقق ✅_';
+
+  const buttons = missingChannels.map(ch => {
+    const chName = ch.channel_name && !ch.channel_name.startsWith('-') ? ch.channel_name : 'اشترك الآن 📣';
+    return [{ text: '📣 ' + chName, url: ch.channel_url }];
+  });
+
+  buttons.push([{ text: '✅ تحققت من الاشتراك', callback_data: 'check_subscription' }]);
+
   return { text, buttons };
 }
 
