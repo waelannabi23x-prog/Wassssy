@@ -154,7 +154,7 @@ async function showUsers(ctx, page=0) {
     const username = u.username ? ' @' + u.username.substring(0, 12) : '';
     const banned = u.is_banned ? ' 🚫' : '';
     const days = u.last_active ? Math.floor((Date.now() - new Date(u.last_active)) / 86400000) : '?';
-    text += num + '. ' + name + username + banned + ' _(' + days + 'د)_\n';
+    text += num + '. ' + name + username + banned + ' (' + days + 'd)\n';
   });
 
   const rows = list.map(u => [
