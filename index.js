@@ -216,10 +216,7 @@ bot.command('addadmin', async ctx => {
   const targetId = reply.from.id;
   const targetName = reply.from.first_name || targetId;
   await adminsDb.add(targetId, ctx.uid, 'upload,add_content');
-  ctx.reply('✅ تمت إضافة *' + targetName + '* كمشرف
-🔑 الصلاحيات: رفع ملفات + إدارة محتوى
-
-يمكنك تعديل صلاحياته من لوحة الإداريين', { parse_mode: 'Markdown' }).catch(()=>{});
+  ctx.reply('\u2705 \u062a\u0645\u062a \u0625\u0636\u0627\u0641\u0629 ' + targetName + ' \u0643\u0645\u0634\u0631\u0641 \u0628\u0646\u062c\u0627\u062d', { parse_mode: 'Markdown' }).catch(()=>{});
 });
 
 // حذف مشرف
