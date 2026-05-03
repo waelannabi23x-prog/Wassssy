@@ -110,11 +110,10 @@ async function authMiddleware(ctx, next) {
         const res = await guard.checkAllChannels({ telegram: ctx.telegram }, uid);
         if (res.ok) {
           await ctx.deleteMessage().catch(()=>{});
+          // افتح القائمة مباشرة
+          const startHandler = require('../handlers/start');
           const name = ctx.from && ctx.from.first_name ? ctx.from.first_name : 'Student';
-          await ctx.telegram.sendMessage(uid, 'مرحبا ' + name + ' \u2705 تم التحقق!', {
-            reply_markup: { inline_keyboard: [[{ text: '\ud83c\udfe0 القائمة الرئيسية', callback_data: 'main_menu' }]] }
-          }).catch(()=>{});
-          return;
+          return startHandler.showMainMenu(ctx, name);
         }
         ctx.answerCbQuery('لم تشترك بعد!', { show_alert: true }).catch(()=>{});
         const { text, buttons } = guard.buildSubscribeMessage(res.missing, ctx.from && ctx.from.first_name);
