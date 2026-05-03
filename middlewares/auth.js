@@ -131,20 +131,16 @@ async function authMiddleware(ctx, next) {
         if (cbData === 'check_subscription') {
           ctx.answerCbQuery('✅ مرحباً بك! 🎉').catch(()=>{});
           await ctx.deleteMessage().catch(()=>{});
-          try {
-            const startHandler = require('../handlers/start');
-            // استدعي showMainMenu مباشرة بدل startHandler
-            if (startHandler.showMainMenu) {
-              const uName = ctx.from?.first_name || 'Student';
-              return await startHandler.showMainMenu(ctx, uName);
-            }
-            return await startHandler(ctx);
-          } catch(e) {
-            // fallback — أرسل رسالة بسيطة مع زر
-            return ctx.reply('✅ تم التحقق! مرحباً بك', {
+          // أرسل رسالة ترحيب مع زر القائمة
+          const uName = ctx.from?.first_name || 'Student';
+          await ctx.telegram.sendMessage(uid,
+            '👋 *أهلاً ' + uName + '!*\n✅ تم التحقق من اشتراكك بنجاح!\n\nاضغط على القائمة للبدء 👇',
+            {
+              parse_mode: 'Markdown',
               reply_markup: { inline_keyboard: [[{ text: '🏠 القائمة الرئيسية', callback_data: 'main_menu' }]] }
-            }).catch(()=>{});
-          }
+            }
+          ).catch(()=>{});
+          return;
         }
       }
     }
