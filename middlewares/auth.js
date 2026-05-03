@@ -105,18 +105,19 @@ async function authMiddleware(ctx, next) {
       const guard = require('../utils/channelGuard');
 
       if (cbData === 'check_subscription') {
+        // ⚡ أجب فوراً + امسح الكاش + افحص من جديد
+        ctx.answerCbQuery('🔄 جاري التحقق...').catch(()=>{});
         guard.clearSubCache(uid);
-        ctx.answerCbQuery('').catch(()=>{});
         const res = await guard.checkAllChannels({ telegram: ctx.telegram }, uid);
         if (res.ok) {
           await ctx.deleteMessage().catch(()=>{});
-          // افتح القائمة مباشرة
           const startHandler = require('../handlers/start');
-          const name = ctx.from && ctx.from.first_name ? ctx.from.first_name : 'Student';
+          const name = ctx.from?.first_name || 'Student';
           return startHandler.showMainMenu(ctx, name);
         }
-        ctx.answerCbQuery('لم تشترك بعد!', { show_alert: true }).catch(()=>{});
-        const { text, buttons } = guard.buildSubscribeMessage(res.missing, ctx.from && ctx.from.first_name);
+        // ✅ لم يشترك — أعد عرض القنوات المتبقية فقط
+        ctx.answerCbQuery('❌ لم تشترك بعد في كل القنوات!', { show_alert: true }).catch(()=>{});
+        const { text, buttons } = guard.buildSubscribeMessage(res.missing, ctx.from?.first_name);
         return ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } })
           .catch(() => ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(()=>{}));
       }

@@ -30,28 +30,32 @@ async function checkChannel(bot, userId, channelId) {
 
 // ── التحقق من كل القنوات ─────────────────────────
 async function checkAllChannels(bot, userId) {
-  // Cache 10 دقائق عشان ما يتحقق كل ضغطة
   const cacheKey = 'sub_ok_' + userId;
   const cached = cacheGet(cacheKey);
   if (cached === true) return { ok: true, missing: [] };
+
   const channels = await getChannels();
   if (!channels.length) return { ok: true, missing: [] };
-  
+
   const results = await Promise.all(
     channels.map(async ch => {
-      const subscribed = await checkChannel(bot, userId, ch.channel_id);
-      // جلب اسم حقيقي لو الاسم المحفوظ هو ID
-      let realName = ch.channel_name;
-      if (!realName || realName.startsWith('-') || /^-?\d+$/.test(realName)) {
-        realName = await getChannelInfo(bot, ch.channel_id).catch(()=>null) || ch.channel_name;
+      const nameKey = 'chname_' + ch.channel_id;
+      let realName = cacheGet(nameKey);
+      if (!realName) {
+        realName = ch.channel_name;
+        if (!realName || realName.startsWith('-') || /^-?[0-9]+$/.test(realName)) {
+          realName = await getChannelInfo(bot, ch.channel_id).catch(()=>null) || ch.channel_id;
+        }
+        cacheSet(nameKey, realName, 86400000);
       }
+      const subscribed = await checkChannel(bot, userId, ch.channel_id);
       return { ...ch, channel_name: realName, subscribed };
     })
   );
-  
+
   const missing = results.filter(ch => !ch.subscribed);
   const ok = missing.length === 0;
-  if (ok) cacheSet('sub_ok_' + userId, true, 600000); // 10 دقائق
+  if (ok) cacheSet(cacheKey, true, 180000);
   return { ok, missing };
 }
 
@@ -73,24 +77,28 @@ async function removeChannel(id) {
 // ── بناء رسالة الاشتراك ──────────────────────────
 function buildSubscribeMessage(missingChannels, userName) {
   const name = userName || 'صديقي';
-  let text = '👋 *أهلاً ' + name + '!*\n\n';
+  const total = missingChannels.length;
+  let text = '🔐 *' + name + '، مرحباً!*\n\n';
   text += '━━━━━━━━━━━━━━━━\n';
-  text += '🔐 *للدخول للبوت اشترك في:*\n\n';
+  text += '📋 *يجب الاشتراك في ' + (total === 1 ? 'هذه القناة' : 'هذه القنوات') + ':*\n\n';
 
   missingChannels.forEach((ch, i) => {
-    const chName = ch.channel_name && !ch.channel_name.startsWith('-') ? ch.channel_name : 'القناة';
+    const chName = ch.channel_name && !ch.channel_name.startsWith('-') && !/^-?\d+$/.test(ch.channel_name)
+      ? ch.channel_name : 'القناة ' + (i + 1);
     text += (i + 1) + '. 📣 *' + chName + '*\n';
   });
 
   text += '\n━━━━━━━━━━━━━━━━\n';
-  text += '_اشترك ثم اضغط تحقق ✅_';
+  text += '1️⃣ اضغط على القناة واشترك\n';
+  text += '2️⃣ ارجع وأضغط ✅ تحقق';
 
   const buttons = missingChannels.map(ch => {
-    const chName = ch.channel_name && !ch.channel_name.startsWith('-') ? ch.channel_name : 'اشترك الآن 📣';
+    const chName = ch.channel_name && !ch.channel_name.startsWith('-') && !/^-?\d+$/.test(ch.channel_name)
+      ? ch.channel_name : 'اشترك الآن 📣';
     return [{ text: '📣 ' + chName, url: ch.channel_url }];
   });
 
-  buttons.push([{ text: '✅ تحققت من الاشتراك', callback_data: 'check_subscription' }]);
+  buttons.push([{ text: '✅ تحققت — اضغط هنا', callback_data: 'check_subscription' }]);
 
   return { text, buttons };
 }
