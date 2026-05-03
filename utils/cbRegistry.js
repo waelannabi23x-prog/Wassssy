@@ -7,12 +7,11 @@ const store   = new Map(); // key → {data, ts}
 const reverse = new Map(); // data → key  (O(1) dedup)
 const TTL      = 3600000;  // 1 hour
 const MAX_SIZE = 2000;      // max 2000 entries — prevents spam
-const CHARS    = 'abcdefghijklmnopqrstuvwxyz0123456789';
+let _counter = 0;
 
 function _genKey() {
-  let k = '';
-  for (let i = 0; i < 6; i++) k += CHARS[Math.floor(Math.random() * CHARS.length)];
-  return 'r_' + k;
+  _counter = (_counter + 1) & 0xFFFFFF; // 16M before wrap
+  return 'r_' + _counter.toString(36).padStart(5, '0');
 }
 
 // Store long data → returns short key (≤8 chars)
@@ -26,7 +25,7 @@ function reg(data) {
     store.delete(oldest[0]); reverse.delete(oldest[1].data);
   }
   let key;
-  do { key = _genKey(); } while (store.has(key));
+  key = _genKey();
   store.set(key, { data, ts: Date.now() }); reverse.set(data, key);
   return key;
 }

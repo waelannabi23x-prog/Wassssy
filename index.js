@@ -47,7 +47,14 @@ const TOKEN = process.env.BOT_TOKEN;
 if (!TOKEN) { logger.error('FATAL: BOT_TOKEN missing'); process.exit(1); }
 const WEBHOOK_URL = process.env.WEBHOOK_URL || '';
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
-if (!WEBHOOK_SECRET) logger.warn('⚠️  WEBHOOK_SECRET not set — webhook is unprotected! Set it in Railway env vars.');
+if (!WEBHOOK_SECRET) {
+  if (WEBHOOK_URL) {
+    logger.error('🚨 FATAL: WEBHOOK_SECRET not set — refusing to start with unprotected webhook!');
+    process.exit(1);
+  } else {
+    logger.warn('⚠️  WEBHOOK_SECRET not set — OK for polling mode only.');
+  }
+}
 const PORT = process.env.PORT || 3000;
 
 const safeInt = v => { var n = parseInt(v); return isNaN(n) ? 0 : n; };
@@ -62,8 +69,6 @@ const { setState: _setState, delState: _delState, getState: _getState } = requir
 global.setState = _setState;
 global.delState = _delState;
 global.getState = _getState;
-// userStates shim — handlers that read global.getState() use getState() instead
-global.userStates = {}; // kept for back-compat, actual state lives in redis.js _mem
 
 
 const app = express();
@@ -123,7 +128,7 @@ const MGColl = {
 const GrpMsgs = {
   _m: Object.create(null),
   add(c, m) { if (!this._m[c]) this._m[c] = []; this._m[c].push(m); if (this._m[c].length > CFG.botMsgsPerChat) this._m[c] = this._m[c].slice(-CFG.botMsgsPerChat); },
-  all(c) { return [...new Set(this._m[c] || [])]; },
+  all(c) { return this._m[c] ? [...new Set(this._m[c])] : []; },
   clear(c) { this._m[c] = []; },
   prune() { const k = Object.keys(this._m); if (k.length > CFG.maxChatsTracked) k.slice(0, k.length - CFG.maxChatsTracked).forEach(x => delete this._m[x]); },
 };
@@ -585,9 +590,6 @@ bot.command('help', ctx => ctx.reply(
 ).catch(() => {}));
 
 const exactR = new Map([
-  ['tag_all_', (ctx, d) => { const { tagAll } = require('./handlers/group_admin'); return tagAll(ctx, parseInt(d.replace('tag_all_',''))); }],
-  ['mute_all_', (ctx, d) => { const { muteAll } = require('./handlers/group_admin'); return muteAll(ctx, parseInt(d.replace('mute_all_',''))); }],
-  ['unmute_all_', (ctx, d) => { const { unmuteAll } = require('./handlers/group_admin'); return unmuteAll(ctx, parseInt(d.replace('unmute_all_',''))); }],
 
   ['noop', () => {}],
   ['main_menu', ctx => startHandler(ctx)],
@@ -689,7 +691,7 @@ const prefR = [
 ];
 
 
-// O(1) callback prefix dispatcher — built from prefR at startup
+// O(n) callback prefix dispatcher — built from prefR at startup (n=~25, negligible)
 let _prefixMap = null;
 function _getPrefixHandler(data) {
   if (!_prefixMap) {
@@ -1144,6 +1146,12 @@ const _vacuum = setInterval(async () => {
 _vacuum.unref();
 _cln.unref();
 
+// Purge expired cache entries every 10 minutes
+const _cachePurge = setInterval(() => {
+  try { require('./utils/cache').cachePurgeExpired(); } catch(_) {}
+}, 600000);
+_cachePurge.unref();
+
 const _mem = setInterval(() => {
   const h = process.memoryUsage().heapUsed / 1048576;
   if (h > 440) { logger.warn('[Mem] ' + h.toFixed(0) + 'MB'); if (global.gc) global.gc(); }
@@ -1151,12 +1159,5 @@ const _mem = setInterval(() => {
 }, 60000);
 _mem.unref();
 
-// Memory watchdog
-const _memW = setInterval(() => {
-  const h = process.memoryUsage().heapUsed / 1048576;
-  if (h > 440) { if (global.gc) global.gc(); }
-  if (h > 480) { process.emit('SIGTERM'); }
-}, 60000);
-_memW.unref();
 
 launch();
