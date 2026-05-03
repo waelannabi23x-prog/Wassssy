@@ -16,7 +16,7 @@ const ALL_PERMS = {
 };
 
 const getAll = () => all(
-  'SELECT a.*,u.first_name,u.username FROM admins a LEFT JOIN users u ON a.user_id=u.id ORDER BY a.id'
+  'SELECT a.*,u.first_name,u.username FROM admins a LEFT JOIN users u ON a.user_id=u.id ORDER BY a.user_id'
 );
 
 const setSpecialty = (uid, spId) => {
