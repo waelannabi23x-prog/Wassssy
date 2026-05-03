@@ -202,7 +202,7 @@ bot.catch((err, ctx) => {
 
 bot.command('start', async ctx => {
   // /start في القروب → احذف الرسالة فقط
-  if (ctx.chat.type === 'supergroup' || ctx.chat.type === 'group') {
+  if (ctx.chat?.type === 'supergroup' || ctx.chat?.type === 'group') {
     ctx.deleteMessage().catch(() => {});
     return;
   } if (startHandler.clearAiMode) await startHandler.clearAiMode(ctx.uid); return startHandler(ctx); });
