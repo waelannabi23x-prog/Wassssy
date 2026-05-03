@@ -56,43 +56,35 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
   var uid = ctx.uid;
   var backCb = catId !== 0 ? 'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId : 'main_menu';
 
-  // Step 1: Transform preview → ⏳ (instant feedback)
+  // ⚡ PARALLEL: ⏳ animation + DB fetch at same time → ~300ms faster
   ctx.answerCbQuery('').catch(function(){});
-  var loadEdited = false;
-  try {
-    await ctx.editMessageText('⏳', { reply_markup: { inline_keyboard: [] } });
-    loadEdited = true;
-  } catch(_) {}
-
-  // Step 2: Telegram upload indicator
   ctx.sendChatAction('upload_document').catch(function(){});
+  var results = await Promise.all([
+    ctx.editMessageText('⏳', { reply_markup: { inline_keyboard: [] } }).catch(function(){}),
+    filesDb.getFile(fid)
+  ]);
+  var f = results[1];
 
-  // Step 3: Get file data
-  var f = await filesDb.getFile(fid);
   if (!f) {
-    if (loadEdited) ctx.editMessageText('❌ ' + t(uid,'not_found'), { reply_markup: { inline_keyboard: [[{text:'🏠',callback_data:'main_menu'}]] } }).catch(function(){});
-    else ctx.reply(t(uid,'not_found')).catch(function(){});
+    ctx.editMessageText('❌ ' + t(uid,'not_found'), { reply_markup: { inline_keyboard: [[{text:'🏠',callback_data:'main_menu'}]] } }).catch(function(){});
     return;
   }
 
-  // Step 4: Parallel background work
-  var bgRes = await Promise.all([
-    interactions.getSimilar(fid, 4),
-    interactions.isFav(uid, fid),
-    filesDb.incDownloads(fid).catch(function(){}),
-    interactions.addHistory(uid, fid).catch(function(){}),
-    interactions.addLog(uid, 'download', f.title).catch(function(){})
-  ]);
-  var similar = bgRes[0], fav = bgRes[1];
+  // ⚡ fire-and-forget background — don't block file delivery
+  filesDb.incDownloads(fid);
+  interactions.addHistory(uid, fid).catch(function(){});
+  interactions.addLog(uid, 'download', f.title).catch(function(){});
+
+  // isFav needed for keyboard — usually cache hit = instant
+  var fav = await interactions.isFav(uid, fid).catch(function(){ return false; });
 
   var caption = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 '+escMd(f.description)+'\n':'')+'📁 '+escMd(f.cat_name||'عام')+' | 📖 '+escMd(f.sub_name||'عام');
   var kb = build([[btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid)],[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]]);
 
   try {
-    // Step 5: Delete ⏳ — file arrives clean with no clutter
     ctx.deleteMessage().catch(function(){});
 
-    // Step 6: Send the actual file
+    // ⚡ Send file immediately — don't wait for similar
     if (f.file_type === 'link')
       await ctx.reply(caption+'\n\n🔗 '+f.file_id, { parse_mode:'Markdown', ...kb });
     else if (f.file_type === 'photo')
@@ -100,13 +92,16 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
     else
       await ctx.replyWithDocument(f.file_id, { caption, parse_mode:'Markdown', ...kb });
 
-    // Step 7: Similar files — auto-delete after 25s (no clutter)
-    if (similar.length) {
-      var simRows = similar.map(sf => [btn('📄 '+sf.title.substring(0,30)+' · '+sf.sub_name,'preview_'+sf.id+'_0_0_0_0_0')]);
+    // ⚡ Similar files AFTER delivery — background, never blocks user
+    interactions.getSimilar(fid, 4).then(function(similar) {
+      if (!similar || !similar.length) return;
+      var simRows = similar.map(function(sf){ return [btn('📄 '+sf.title.substring(0,30)+' · '+(sf.sub_name||''),'preview_'+sf.id+'_0_0_0_0_0')]; });
       simRows.push([btn('🏠','main_menu')]);
-      var simMsg = await ctx.reply('📎 *ملفات قد تهمك:*', { parse_mode:'Markdown', ...build(simRows) }).catch(function(){});
-      if (simMsg) setTimeout(function(){ ctx.telegram.deleteMessage(ctx.chat.id, simMsg.message_id).catch(function(){}); }, 25000);
-    }
+      ctx.reply('📎 *ملفات قد تهمك:*', { parse_mode:'Markdown', ...build(simRows) }).then(function(simMsg){
+        if (simMsg) setTimeout(function(){ ctx.telegram.deleteMessage(ctx.chat.id, simMsg.message_id).catch(function(){}); }, 25000);
+      }).catch(function(){});
+    }).catch(function(){});
+
   } catch(e) {
     ctx.reply('❌ تعذر إرسال الملف. حاول مجدداً.').catch(function(){});
   }

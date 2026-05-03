@@ -7,21 +7,22 @@ var formatDate = common.formatDate;
 async function eos(ctx, text, extra) {
   extra = extra || {};
   if (ctx.callbackQuery) {
-    // ✅ أجب فوراً عشان الـ spinner يوقف - أسرع استجابة
+    // ⚡ answerCbQuery fire-and-forget — stops spinner instantly
     ctx.answerCbQuery('').catch(function(){});
     var msg = ctx.callbackQuery.message;
-    // نص عادي → عدّل في مكانه
     if (msg && msg.text) {
+      // ⚡ editMessageText — fastest path, in-place update
       try { return await ctx.editMessageText(text, extra); } catch (e) {
         var desc = e.description || e.message || '';
         if (desc.indexOf('not modified') !== -1) return;
-        // فشل التعديل — ارسل رسالة جديدة بدون حذف
         return ctx.reply(text, extra).catch(function(){});
       }
     }
-    // ميديا → احذف وابعث جديدة
-    ctx.deleteMessage().catch(function(){}); // fire-and-forget
-    return ctx.reply(text, extra).catch(function(){});
+    // ⚡ media → delete+reply in parallel
+    var delP = ctx.deleteMessage().catch(function(){});
+    var repP = ctx.reply(text, extra).catch(function(){});
+    await Promise.all([delP, repP]);
+    return;
   }
   return ctx.reply(text, extra).catch(function(){});
 }
