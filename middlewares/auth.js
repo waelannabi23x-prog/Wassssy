@@ -102,46 +102,36 @@ async function authMiddleware(ctx, next) {
     const chatType = ctx.chat?.type;
     if (!ctx.isOwner && !ctx.isAdmin && chatType === 'private') {
       const cbData = ctx.callbackQuery?.data;
-      // عند الضغط على تحقق — امسح cache وتحقق من جديد
-      // زر تحقق — تحقق مباشرة
+      const guard = require('../utils/channelGuard');
+
       if (cbData === 'check_subscription') {
-        const { clearSubCache, checkAllChannels, buildSubscribeMessage } = require('../utils/channelGuard');
-        clearSubCache(uid);
+        guard.clearSubCache(uid);
         ctx.answerCbQuery('').catch(()=>{});
-        const { ok, missing } = await checkAllChannels({ telegram: ctx.telegram }, uid);
-        if (ok) {
-          // ✅ مشترك — احذف رسالة التحقق وابعث الترحيب
+        const res = await guard.checkAllChannels({ telegram: ctx.telegram }, uid);
+        if (res.ok) {
           await ctx.deleteMessage().catch(()=>{});
-          const uName = ctx.from?.first_name || 'Student';
-          await ctx.telegram.sendMessage(uid,
-            '\u2705 *\u062a\u0645 \u0627\u0644\u062a\u062d\u0642\u0642 \u0628\u0646\u062c\u0627\u062d!*\n\n\ud83d\udc4b \u0623\u0647\u0644\u0627\u064b ' + uName + '\u060c \u0645\u0631\u062d\u0628\u0627\u064b \u0628\u0643!\n\n\u0627\u0636\u063a\u0637 \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0644\u0644\u0628\u062f\u0621 \ud83d\udc47',
-            { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '🏠 ابدأ الآن', callback_data: 'main_menu' }]] } }
-          ).catch(()=>{});
+          const name = ctx.from && ctx.from.first_name ? ctx.from.first_name : 'Student';
+          await ctx.telegram.sendMessage(uid, 'مرحبا ' + name + ' \u2705 تم التحقق!', {
+            reply_markup: { inline_keyboard: [[{ text: '\ud83c\udfe0 القائمة الرئيسية', callback_data: 'main_menu' }]] }
+          }).catch(()=>{});
           return;
         }
-        // ❌ لم يشترك بعد
-        ctx.answerCbQuery('❌ لم تشترك بعد!', { show_alert: true }).catch(()=>{});
-        const { text, buttons } = buildSubscribeMessage(missing, ctx.from?.first_name);
-        return ctx.editMessageText(text, {
-          parse_mode: 'Markdown',
-          reply_markup: { inline_keyboard: buttons }
-        }).catch(() => ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(()=>{}));
+        ctx.answerCbQuery('لم تشترك بعد!', { show_alert: true }).catch(()=>{});
+        const { text, buttons } = guard.buildSubscribeMessage(res.missing, ctx.from && ctx.from.first_name);
+        return ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } })
+          .catch(() => ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(()=>{}));
       }
 
-      // باقي الطلبات — تحقق من الاشتراك
-      if (!cbData?.startsWith('del_channel_')) {
-        const cached = require('../utils/cache').cacheGet('sub_ok_' + uid);
-        if (!cached) {
-          const { checkAllChannels, buildSubscribeMessage } = require('../utils/channelGuard');
-          const { ok, missing } = await checkAllChannels({ telegram: ctx.telegram }, uid);
-          if (!ok) {
-            const { text, buttons } = buildSubscribeMessage(missing, ctx.from?.first_name);
+      if (!cbData || !cbData.startsWith('del_channel_')) {
+        const subCached = require('../utils/cache').cacheGet('sub_ok_' + uid);
+        if (!subCached) {
+          const res2 = await guard.checkAllChannels({ telegram: ctx.telegram }, uid);
+          if (!res2.ok) {
+            const { text, buttons } = guard.buildSubscribeMessage(res2.missing, ctx.from && ctx.from.first_name);
+            if (cbData) ctx.answerCbQuery('').catch(()=>{});
             if (cbData) {
-              ctx.answerCbQuery('').catch(()=>{});
-              return ctx.editMessageText(text, {
-                parse_mode: 'Markdown',
-                reply_markup: { inline_keyboard: buttons }
-              }).catch(() => ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(()=>{}));
+              return ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } })
+                .catch(() => ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(()=>{}));
             }
             return ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(()=>{});
           }
