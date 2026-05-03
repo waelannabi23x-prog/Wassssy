@@ -52,6 +52,7 @@ async function _flushDownloads(){
 const incDownloads=id=>{
   _dlBuf.set(id,(_dlBuf.get(id)||0)+1);
   if(!_dlTimer){_dlTimer=setTimeout(()=>{_dlTimer=null;_flushDownloads();},10000);if(_dlTimer.unref)_dlTimer.unref();}
+  return Promise.resolve();
 };
 const softDelete=async id=>{if(global._clearSearchCache)global._clearSearchCache();var f=await get('SELECT category_id FROM files WHERE id=$1',[id]);await run('UPDATE files SET is_deleted=1 WHERE id=$1',[id]);cacheClear('file_'+id);cacheClear('prev_static_'+id);cacheClear('similar_'+id);if(f)invalidateFilesCache(f.category_id);};
 const restore=async id=>{if(global._clearSearchCache)global._clearSearchCache();var f=await get('SELECT category_id FROM files WHERE id=$1',[id]);await run('UPDATE files SET is_deleted=0 WHERE id=$1',[id]);cacheClear('file_'+id);if(f)invalidateFilesCache(f.category_id);};
