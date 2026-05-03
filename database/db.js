@@ -5,17 +5,9 @@ const logger = require('../utils/logger');
 
 // يحول '123' لـ 123 فقط — لا يمس النصوص
 function sanitizeParams(params) {
-  var out = [];
-  for (var i = 0; i < params.length; i++) {
-    var p = params[i];
-    // فقط أرقام صغيرة (< 10 خانات) — IDs تيليجرام BIGINT لا نلمسها
-    if (typeof p === 'string' && /^\d+$/.test(p) && p.length <= 9) {
-      out.push(parseInt(p, 10));
-    } else {
-      out.push(p);
-    }
-  }
-  return out;
+  // ✅ لا نحول أي شيء — pg يتعامل مع الأنواع مباشرة
+  // IDs تيليجرام الجديدة 10+ خانات تفيض من INTEGER
+  return params;
 }
 
 let pgPool = null;
