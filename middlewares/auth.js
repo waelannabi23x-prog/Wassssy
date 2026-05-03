@@ -114,11 +114,8 @@ async function authMiddleware(ctx, next) {
           await ctx.deleteMessage().catch(()=>{});
           const uName = ctx.from?.first_name || 'Student';
           await ctx.telegram.sendMessage(uid,
-            '✅ *تم التحقق بنجاح!*
-
-👋 أهلاً ' + uName + '، مرحباً بك في البوت!
-
-اضغط القائمة للبدء 👇',
+          await ctx.telegram.sendMessage(uid,
+            '\u2705 *\u062a\u0645 \u0627\u0644\u062a\u062d\u0642\u0642 \u0628\u0646\u062c\u0627\u062d!*\n\n\ud83d\udc4b \u0623\u0647\u0644\u0627\u064b ' + uName + '\u060c \u0645\u0631\u062d\u0628\u0627\u064b \u0628\u0643!\n\n\u0627\u0636\u063a\u0637 \u0627\u0644\u0642\u0627\u0626\u0645\u0629 \u0644\u0644\u0628\u062f\u0621 \ud83d\udc47',
             { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '🏠 ابدأ الآن', callback_data: 'main_menu' }]] } }
           ).catch(()=>{});
           return;
