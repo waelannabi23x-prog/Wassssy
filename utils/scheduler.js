@@ -110,17 +110,22 @@ async function processGroupNotifications() {
     }
     const un = _bot._cachedUsername || null;
 
-    for (const r of recent) {
-      try {
-        const label = '📄 ' + r.title.substring(0, 30) + (r.sub_name ? ' · ' + r.sub_name : '');
-        const kb = un ? { reply_markup: { inline_keyboard: [[{ text: '⬇️ تحميل', url: 'https://t.me/' + un + '?start=file_' + r.id }]] } } : {};
-        await _bot.telegram.sendMessage(r.chat_id, '📢 *ملف جديد*\n\n' + label, { parse_mode: 'Markdown', ...kb });
-        await run(
-          'INSERT INTO group_notify_log(file_id, chat_id, sent_at) VALUES($1, $2, CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING',
-          [r.id, r.chat_id]
-        ).catch(() => {});
-        await sleep(300); // ✅ max ~3 msgs/sec — safe for Telegram group limits
-      } catch (_) {}
+    // ✅ Parallel batches of 5 with 1s gap — ~5x faster, stays within Telegram limits
+    const NOTIFY_BATCH = 5;
+    for (let bi = 0; bi < recent.length; bi += NOTIFY_BATCH) {
+      const chunk = recent.slice(bi, bi + NOTIFY_BATCH);
+      await Promise.allSettled(chunk.map(async r => {
+        try {
+          const label = '📄 ' + r.title.substring(0, 30) + (r.sub_name ? ' · ' + r.sub_name : '');
+          const kb = un ? { reply_markup: { inline_keyboard: [[{ text: '⬇️ تحميل', url: 'https://t.me/' + un + '?start=file_' + r.id }]] } } : {};
+          await _bot.telegram.sendMessage(r.chat_id, '📢 *ملف جديد*\n\n' + label, { parse_mode: 'Markdown', ...kb });
+          await run(
+            'INSERT INTO group_notify_log(file_id, chat_id, sent_at) VALUES($1, $2, CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING',
+            [r.id, r.chat_id]
+          ).catch(() => {});
+        } catch (_) {}
+      }));
+      if (bi + NOTIFY_BATCH < recent.length) await sleep(1000);
     }
   } catch (_) {}
 }

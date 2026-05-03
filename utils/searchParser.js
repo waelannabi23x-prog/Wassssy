@@ -47,13 +47,19 @@ const ALIASES = {
   'حل':['correction','corrigé','solution'],
   'ملخص':['résumé','resume'],
 };
-function normalize(s){return(s||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^\w\s\u0600-\u06ff]/g,' ').replace(/\s+/g,' ').trim();}
+const _RX_DIAC  = /[\u0300-\u036f]/g;
+const _RX_PUNCT = /[^\w\s\u0600-\u06ff]/g;
+const _RX_SPACE = /\s+/g;
+const _RX_SANIT = /[%;\\<>'"]/g;
+const _RX_SPLIT = /[\s,_\-.]+/;
+const _RX_NUMTK = /^([a-zA-Z\u0600-\u06ff]+)(\d+)$/;
+function normalize(s){return(s||'').toLowerCase().normalize('NFD').replace(_RX_DIAC,'').replace(_RX_PUNCT,' ').replace(_RX_SPACE,' ').trim();}
 function parseQuery(rawQ){
   if(!rawQ)return{terms:[],raw:''};
-  const q=rawQ.replace(/[%;\\<>'"]/g,'').trim().slice(0,100);
+  const q=rawQ.replace(_RX_SANIT,'').trim().slice(0,100);
   const tokens=[];
-  for(const tok of q.split(/[\s,_\-\.]+/).filter(t=>t.length>=1)){
-    const m=tok.match(/^([a-zA-Z\u0600-\u06ff]+)(\d+)$/);
+  for(const tok of q.split(_RX_SPLIT).filter(t=>t.length>=1)){
+    const m=tok.match(_RX_NUMTK);
     if(m){tokens.push(m[1].toLowerCase(),m[2]);}
     else tokens.push(tok.toLowerCase());
   }
@@ -68,19 +74,18 @@ function parseQuery(rawQ){
   return{terms,raw:tokens.join(' ')};
 }
 function scoreFile(file,terms){
-  const n=s=>normalize(s||'');
-  const title=n(file.title),sub=n(file.sub_name||''),cat=n(file.cat_name||'');
+  const title=normalize(file.title),sub=normalize(file.sub_name||''),cat=normalize(file.cat_name||'');
   const full=title+' '+sub+' '+cat;
+  // precompute normalized terms once
+  const nterms=terms.map(t=>normalize(t)).filter(Boolean);
   let score=0;
-  for(const term of terms){
-    const t=normalize(term);
-    if(!t)continue;
+  for(const t of nterms){
     if(title===t){score+=30;continue;}
     if(title.includes(t)){score+=title.startsWith(t)?12:7;}
     if(sub.includes(t)){score+=4;}
     if(cat.includes(t)){score+=2;}
   }
-  if(terms.length>1&&terms.every(t=>full.includes(normalize(t))))score+=15;
+  if(nterms.length>1&&nterms.every(t=>full.includes(t)))score+=15;
   score+=Math.min(Math.log10((file.downloads||0)+1)*2,4);
   return score;
 }

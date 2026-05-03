@@ -52,11 +52,11 @@ async function loadHistoryFromDB(uid) {
   } catch(_) { return []; }
 }
 
-// ✅ يحفظ كل رسالة في DB (fire-and-forget)
-function saveToDB(uid, role, content) {
+// ✅ يحفظ رسالتين (user+assistant) في INSERT واحد
+function saveToDB(uid, userText, assistantText) {
   run(
-    'INSERT INTO ai_history(user_id,role,content) VALUES($1,$2,$3)',
-    [uid, role, content.substring(0, 2000)]
+    'INSERT INTO ai_history(user_id,role,content) VALUES($1,$2,$3),($4,$5,$6)',
+    [uid, 'user', userText.substring(0, 2000), uid, 'assistant', assistantText.substring(0, 2000)]
   ).catch(() => {});
 }
 
@@ -111,25 +111,18 @@ async function smartSearchForAI(query, limit) {
   try { return await smartSearch(query, limit); } catch(e) { return []; }
 }
 
+// ✅ Precompiled regexes — not rebuilt on every call
+const _RX_FILE    = /عندك|يوجد|فيه|بحث|بحث لي|شوف لي|أريد ملف|عايز ملف|حاب تاخذ|حاب تبعث|دورو|فين نلقى|ملف|cours|td|tp|exam/;
+const _RX_EXPLAIN = /اشرح|شرحلي|وش يعني|ما هو|ماذا يعني|قانون|تعريف|مفهوم|فرق بين|قارن|expliqu|c'est quoi|définition|différence/;
+const _RX_SOLVE   = /حل|صلحلي|كيفاش نحسب|نحسب|طريقة|خطوات|exercice|série|calcul|résoudre|corrig|دير لي/;
+const _RX_STUDY   = /مادة|module|matière|semestre|session|امتحان|examen|بكالوريا|licence|master|lmd|درس|محاضرة|TP|TD/;
+
 function classifyIntent(text) {
   const t = text.toLowerCase();
-
-  // بحث عن ملفات
-  if (/عندك|يوجد|فيه|بحث|بحث لي|شوف لي|أريد ملف|عايز ملف|حاب تاخذ|حاب تبعث|دورو|فين نلقى|ملف|cours|td|tp|exam/.test(t))
-    return 'FILE_SEARCH';
-
-  // شرح مفهوم أو تعريف
-  if (/اشرح|شرحلي|وش يعني|ما هو|ماذا يعني|قانون|تعريف|مفهوم|فرق بين|قارن|expliqu|c'est quoi|définition|différence/.test(t))
-    return 'CONCEPT_EXPLAIN';
-
-  // حل مسألة أو تمرين
-  if (/حل|صلحلي|كيفاش نحسب|نحسب|طريقة|خطوات|exercice|série|calcul|résoudre|corrig|دير لي/.test(t))
-    return 'PROBLEM_SOLVING';
-
-  // سؤال دراسي عام (مادة، موضوع، امتحان)
-  if (/مادة|module|matière|semestre|session|امتحان|examen|بكالوريا|licence|master|lmd|درس|محاضرة|TP|TD/.test(t))
-    return 'STUDY_QUESTION';
-
+  if (_RX_FILE.test(t))    return 'FILE_SEARCH';
+  if (_RX_EXPLAIN.test(t)) return 'CONCEPT_EXPLAIN';
+  if (_RX_SOLVE.test(t))   return 'PROBLEM_SOLVING';
+  if (_RX_STUDY.test(t))   return 'STUDY_QUESTION';
   return 'GENERAL_CHAT';
 }
 
@@ -204,8 +197,7 @@ async function handleAiChat(ctx, text) {
     if (history.length > HIST_MAX * 2) history.splice(0, 2);
     history._ts = Date.now();
     _aiHistory.set(uid, history);
-    saveToDB(uid, 'user', text);
-    saveToDB(uid, 'assistant', reply);
+    saveToDB(uid, text, reply);
 
     // تنظيف تلقائي بعد ساعة خمول
     if (_aiTimers.get(uid)) clearTimeout(_aiTimers.get(uid));

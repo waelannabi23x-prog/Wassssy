@@ -179,7 +179,7 @@ const getAvgRating = async fid => {
 // ─── Batch helpers (single query each) ───────────────────────────────────────
 const getFavBatch = async (uid, fileIds) => {
   if (!fileIds.length) return {};
-  const k = 'favbatch_' + uid + '_' + fileIds.join('_'), cv = cacheGet(k);
+  const k = 'favbatch_' + uid + '_' + fileIds.slice().sort().join(''), cv = cacheGet(k);
   if (cv) return cv;
   const ph = fileIds.map((_, i) => '$' + (i + 2)).join(',');
   const rows = await all('SELECT file_id FROM favorites WHERE user_id=$1 AND file_id IN (' + ph + ')', [uid, ...fileIds]);
