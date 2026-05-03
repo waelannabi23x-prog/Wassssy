@@ -190,13 +190,9 @@ async function showEditPerms(ctx, adminId) {
   if (!admin) return ctx.reply('❌ المشرف غير موجود').catch(()=>{});
   const currentPerms = (admin.permissions || '').split(',').map(p => p.trim());
   const name = admin.first_name || 'ID:' + adminId;
-  let text = '⚙️ *صلاحيات ' + escMd(name) + '*
-';
-  if (admin.username) text += '@' + escMd(admin.username) + '
-';
-  text += '━━━━━━━━━━━━
-
-';
+  let text = '\u2699\ufe0f *\u0635\u0644\u0627\u062d\u064a\u0627\u062a ' + escMd(name) + '*\n';
+  if (admin.username) text += '@' + escMd(admin.username) + '\n';
+  text += '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n';
   text += '_اضغط لتفعيل/تعطيل الصلاحية:_';
 
   const rows = ALL_PERMS.map(p => [{
