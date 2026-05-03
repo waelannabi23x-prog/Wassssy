@@ -103,44 +103,52 @@ async function authMiddleware(ctx, next) {
     if (!ctx.isOwner && !ctx.isAdmin && chatType === 'private') {
       const cbData = ctx.callbackQuery?.data;
       // عند الضغط على تحقق — امسح cache وتحقق من جديد
+      // زر تحقق — تحقق مباشرة
       if (cbData === 'check_subscription') {
-        const { clearSubCache } = require('../utils/channelGuard');
+        const { clearSubCache, checkAllChannels, buildSubscribeMessage } = require('../utils/channelGuard');
         clearSubCache(uid);
-      }
-      // استثن فقط del_channel_ من الأدمن
-      if (!cbData?.startsWith('del_channel_')) {
-        const { checkAllChannels, buildSubscribeMessage } = require('../utils/channelGuard');
+        ctx.answerCbQuery('').catch(()=>{});
         const { ok, missing } = await checkAllChannels({ telegram: ctx.telegram }, uid);
-        if (!ok) {
-          const name = ctx.from?.first_name || 'صديقي';
-          const { text, buttons } = buildSubscribeMessage(missing, name);
-          if (cbData) {
-            // callback — عدّل الرسالة أو رد
-            ctx.answerCbQuery('').catch(()=>{});
-            return ctx.editMessageText(text, {
-              parse_mode: 'Markdown',
-              reply_markup: { inline_keyboard: buttons }
-            }).catch(() => ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(()=>{}));
-          }
-          return ctx.reply(text, {
-            parse_mode: 'Markdown',
-            reply_markup: { inline_keyboard: buttons }
-          }).catch(()=>{});
-        }
-        // مشترك — لو كان callback تحقق، افتح البوت
-        if (cbData === 'check_subscription') {
-          ctx.answerCbQuery('✅ مرحباً بك! 🎉').catch(()=>{});
+        if (ok) {
+          // ✅ مشترك — احذف رسالة التحقق وابعث الترحيب
           await ctx.deleteMessage().catch(()=>{});
-          // أرسل رسالة ترحيب مع زر القائمة
           const uName = ctx.from?.first_name || 'Student';
           await ctx.telegram.sendMessage(uid,
-            '👋 *أهلاً ' + uName + '!*\n✅ تم التحقق من اشتراكك بنجاح!\n\nاضغط على القائمة للبدء 👇',
-            {
-              parse_mode: 'Markdown',
-              reply_markup: { inline_keyboard: [[{ text: '🏠 القائمة الرئيسية', callback_data: 'main_menu' }]] }
-            }
+            '✅ *تم التحقق بنجاح!*
+
+👋 أهلاً ' + uName + '، مرحباً بك في البوت!
+
+اضغط القائمة للبدء 👇',
+            { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '🏠 ابدأ الآن', callback_data: 'main_menu' }]] } }
           ).catch(()=>{});
           return;
+        }
+        // ❌ لم يشترك بعد
+        ctx.answerCbQuery('❌ لم تشترك بعد!', { show_alert: true }).catch(()=>{});
+        const { text, buttons } = buildSubscribeMessage(missing, ctx.from?.first_name);
+        return ctx.editMessageText(text, {
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: buttons }
+        }).catch(() => ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(()=>{}));
+      }
+
+      // باقي الطلبات — تحقق من الاشتراك
+      if (!cbData?.startsWith('del_channel_')) {
+        const cached = require('../utils/cache').cacheGet('sub_ok_' + uid);
+        if (!cached) {
+          const { checkAllChannels, buildSubscribeMessage } = require('../utils/channelGuard');
+          const { ok, missing } = await checkAllChannels({ telegram: ctx.telegram }, uid);
+          if (!ok) {
+            const { text, buttons } = buildSubscribeMessage(missing, ctx.from?.first_name);
+            if (cbData) {
+              ctx.answerCbQuery('').catch(()=>{});
+              return ctx.editMessageText(text, {
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: buttons }
+              }).catch(() => ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(()=>{}));
+            }
+            return ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(()=>{});
+          }
         }
       }
     }
