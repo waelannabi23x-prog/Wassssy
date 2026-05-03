@@ -22,8 +22,8 @@ const PS=10;
 function sanitizeInput(str, maxLen = 200) {
   if (!str) return '';
   return String(str)
-    .replace(/[<>"'`;\\\/\.]{2,}/g, '')  // strip path traversal & injection patterns
-    .replace(/[-]/g, '')           // strip control chars
+    .replace(/[\x00-\x1f\x7f]/g, '')   // strip control chars
+    .replace(/[<>"'`;]{2,}/g, '')        // strip injection patterns
     .trim()
     .substring(0, maxLen);
 }

@@ -8,13 +8,51 @@ const invalidateFilesCache=catId=>{cacheClearPrefix('files_cat_'+catId);cacheCle
 const addFile=async(catId,title,desc,fileId,fileType,uploadedBy)=>{
   var exists=await get('SELECT id FROM files WHERE category_id=$1 AND title=$2 AND is_deleted=0',[catId,title]);
   if(exists)throw new Error('exists');
-  await run('INSERT INTO files(category_id,title,description,file_id,file_type,uploaded_by) VALUES($1,$2,$3,$4,$5,$6)',[catId,title,desc,fileId,fileType,uploadedBy]);
+  const {getPg,all:_all}=require('./db');
+  const pg=getPg();
+  let newFile=null;
+  if(pg){
+    const r=await pg.query(
+      'INSERT INTO files(category_id,title,description,file_id,file_type,uploaded_by) VALUES($1,$2,$3,$4,$5,$6) RETURNING id',
+      [catId,title,desc,fileId,fileType,uploadedBy]
+    );
+    const newId=r.rows[0]?.id;
+    if(newId) newFile=await get(J+' WHERE f.id=$1',[newId]);
+  } else {
+    await run('INSERT INTO files(category_id,title,description,file_id,file_type,uploaded_by) VALUES($1,$2,$3,$4,$5,$6)',[catId,title,desc,fileId,fileType,uploadedBy]);
+    newFile=await get(J+' WHERE f.category_id=$1 AND f.title=$2 AND f.is_deleted=0 ORDER BY f.id DESC LIMIT 1',[catId,title]);
+  }
   invalidateFilesCache(catId);
   if(global._clearSearchCache)global._clearSearchCache();
-  var newFile=await get(J+' WHERE f.category_id=$1 AND f.title=$2 AND f.is_deleted=0 ORDER BY f.id DESC LIMIT 1',[catId,title]);
   return newFile;
 };
-const incDownloads=async id=>{await run('UPDATE files SET downloads=downloads+1 WHERE id=$1',[id]);cacheClear('file_'+id);};
+// ✅ Batched downloads counter — flushes every 10s
+const _dlBuf=new Map();
+let _dlTimer=null;
+async function _flushDownloads(){
+  if(!_dlBuf.size)return;
+  const entries=[..._dlBuf.entries()];_dlBuf.clear();
+  const {getPg}=require('./db');const pg=getPg();
+  if(pg){
+    // Single query with CASE WHEN for all IDs
+    const ids=entries.map(e=>e[0]);
+    const ph=ids.map((_,i)=>'$'+(i+1)).join(',');
+    const vals=entries.flatMap(e=>[e[0],e[1]]);
+    // Build: UPDATE files SET downloads=downloads+CASE id WHEN x THEN n ...
+    const cases=entries.map((e,i)=>'WHEN $'+(i*2+1)+' THEN downloads+$'+(i*2+2)).join(' ');
+    await pg.query(
+      'UPDATE files SET downloads=CASE id '+cases+' ELSE downloads END WHERE id IN ('+ph+')',
+      vals
+    ).catch(()=>{});
+  } else {
+    for(const[id,cnt]of entries) await run('UPDATE files SET downloads=downloads+$1 WHERE id=$2',[cnt,id]).catch(()=>{});
+  }
+  for(const[id]of entries)cacheClear('file_'+id);
+}
+const incDownloads=id=>{
+  _dlBuf.set(id,(_dlBuf.get(id)||0)+1);
+  if(!_dlTimer){_dlTimer=setTimeout(()=>{_dlTimer=null;_flushDownloads();},10000);if(_dlTimer.unref)_dlTimer.unref();}
+};
 const softDelete=async id=>{if(global._clearSearchCache)global._clearSearchCache();var f=await get('SELECT category_id FROM files WHERE id=$1',[id]);await run('UPDATE files SET is_deleted=1 WHERE id=$1',[id]);cacheClear('file_'+id);cacheClear('prev_static_'+id);cacheClear('similar_'+id);if(f)invalidateFilesCache(f.category_id);};
 const restore=async id=>{if(global._clearSearchCache)global._clearSearchCache();var f=await get('SELECT category_id FROM files WHERE id=$1',[id]);await run('UPDATE files SET is_deleted=0 WHERE id=$1',[id]);cacheClear('file_'+id);if(f)invalidateFilesCache(f.category_id);};
 const rename=async(id,title)=>{if(global._clearSearchCache)global._clearSearchCache();var f=await get('SELECT category_id FROM files WHERE id=$1',[id]);await run('UPDATE files SET title=$1 WHERE id=$2',[title,id]);cacheClear('file_'+id);if(f)invalidateFilesCache(f.category_id);};

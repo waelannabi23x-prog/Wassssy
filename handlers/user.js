@@ -100,11 +100,17 @@ async function showProgress(ctx) {
 async function showProfile(ctx) {
   // Inject points data
   const uid = ctx.uid;
-  let ptsData = null;
-  try { ptsData = { pts: await getPoints(uid), rank: await getUserRank(uid) }; } catch(_) {}
-
   var lang=getLang(uid);
-  var [user,dlCount,favCount,spRow,lastFile]=await Promise.all([usersDb.getById(uid),interactions.getUserDownloadCount(uid),get('SELECT COUNT(*) as c FROM favorites WHERE user_id=$1',[uid]).then(r=>r?r.c:0),usersDb.getSpecialty(uid),interactions.getLastFile(uid)]);
+  var [user,dlCount,favCount,spRow,lastFile,_pts,_rank]=await Promise.all([
+    usersDb.getById(uid),
+    interactions.getUserDownloadCount(uid),
+    get('SELECT COUNT(*) as c FROM favorites WHERE user_id=$1',[uid]).then(r=>r?r.c:0),
+    usersDb.getSpecialty(uid),
+    interactions.getLastFile(uid),
+    getPoints(uid).catch(()=>null),
+    getUserRank(uid).catch(()=>null),
+  ]);
+  var ptsData=(_pts||_rank)?{pts:_pts,rank:_rank}:null;
   var spId=spRow?spRow.specialty_id:null;
   var sp=spId&&spId!=0?await content.getSpec(spId):null;
     var text='👤 *ملفك الشخصي*\n\n🆔 ID: `'+uid+'`\n👋 الاسم: '+(user?user.first_name||'غير معروف':'غير معروف')+'\n';
