@@ -201,6 +201,36 @@ bot.command('start', async ctx => {
     ctx.deleteMessage().catch(() => {});
     return;
   } if (startHandler.clearAiMode) await startHandler.clearAiMode(ctx.uid); return startHandler(ctx); });
+// أمر سريع للمشرف يرفع ملف
+bot.command('upload', async ctx => {
+  if (!ctx.isAdmin && !ctx.isOwner) return;
+  if (!await adminsDb.hasPerm(ctx.uid, 'upload')) return ctx.reply('🚫 ليس لديك صلاحية الرفع').catch(()=>{});
+  return manage.mainMenu(ctx);
+});
+
+// إضافة مشرف بالرد على رسالته
+bot.command('addadmin', async ctx => {
+  if (!ctx.isOwner) return;
+  const reply = ctx.message.reply_to_message;
+  if (!reply) return ctx.reply('⚠️ رد على رسالة المستخدم + /addadmin').catch(()=>{});
+  const targetId = reply.from.id;
+  const targetName = reply.from.first_name || targetId;
+  await adminsDb.add(targetId, ctx.uid, 'upload,add_content');
+  ctx.reply('✅ تمت إضافة *' + targetName + '* كمشرف
+🔑 الصلاحيات: رفع ملفات + إدارة محتوى
+
+يمكنك تعديل صلاحياته من لوحة الإداريين', { parse_mode: 'Markdown' }).catch(()=>{});
+});
+
+// حذف مشرف
+bot.command('removeadmin', async ctx => {
+  if (!ctx.isOwner) return;
+  const reply = ctx.message.reply_to_message;
+  if (!reply) return ctx.reply('⚠️ رد على رسالة المستخدم + /removeadmin').catch(()=>{});
+  await adminsDb.remove(reply.from.id);
+  ctx.reply('✅ تم حذف المشرف').catch(()=>{});
+});
+
 bot.command(['admin', 'owner', 'manage'], ctx => { if (!ctx.isAdmin) return ctx.reply('🚫 ليس لديك صلاحية.').catch(() => {}); return manage.mainMenu(ctx); });
 
 bot.command('setsp', async ctx => {

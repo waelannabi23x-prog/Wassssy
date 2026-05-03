@@ -180,10 +180,35 @@ async function showUsers(ctx, page=0) {
 }
 
 async function showUserProfile(ctx,userId){const [user,dlCount,favCount,spRow,lastFile]=await Promise.all([usersDb.getById(userId),interactions.getUserDownloadCount(userId),require('../database/db').get('SELECT COUNT(*) as c FROM favorites WHERE user_id=$1',[userId]).then(r=>r?.c||0),usersDb.getSpecialty(userId),interactions.getLastFile(userId)]);if(!user) return ctx.reply('❌ المستخدم غير موجود.');const spId=spRow?.specialty_id;const sp=spId&&spId!=0?await content.getSpec(spId):null;const text='👤 *بروفايل المستخدم*\n\n🆔 ID: `'+userId+'`\n👋 الاسم: '+escMd(user.first_name||'؟')+' '+(user.last_name?escMd(user.last_name):'')+'\n'+(user.username?'📛 @'+escMd(user.username)+'\n':'')+'📅 انضم: '+(user.joined_at?new Date(user.joined_at).toLocaleDateString('en-GB'):'؟')+'\n🕐 آخر نشاط: '+(user.last_active?new Date(user.last_active).toLocaleDateString('en-GB'):'؟')+'\n🎓 التخصص: *'+escMd(sp?sp.name:'غير محدد')+'*\n🚫 محظور: '+(user.is_banned?'نعم':'لا')+'\n\n📊 *النشاط:*\n⬇️ التحميلات: *'+dlCount+'*\n⭐ المفضلة: *'+favCount+'*'+(lastFile?'\n📄 آخر ملف: *'+escMd(lastFile.title)+'*':'');const rows=[[btn(user.is_banned?'✅ إلغاء الحظر':'🚫 حظر',(user.is_banned?'mg_unban_':'mg_ban_')+userId)],[back('mg_users')[0]]];return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});}
-const ALL_PERMS=['upload','delete','add_content','view_users','full'];
+const { ALL_PERMS: PERMS_MAP } = require('../database/admins');
+const ALL_PERMS = Object.keys(PERMS_MAP);
 const PERM_LABELS={upload:'📤 رفع',delete:'🗑 حذف',add_content:'➕ إضافة محتوى',view_users:'👥 مشاهدة المستخدمين',full:'👑 كل الصلاحيات'};
 
-async function showEditPerms(ctx,adminId){const list=await adminsDb.getAll();const admin=list.find(a=>a.user_id==adminId);const currentPerms=(admin.permissions||'upload,add_content').split(',').map(p=>p.trim());const text="⚙️ صلاحيات "+(admin.first_name||adminId);const rows=ALL_PERMS.map(p=>[btn((currentPerms.includes(p)?'✅ ':'☐ ')+(PERM_LABELS[p]||p),'mg_tp_'+adminId+'_'+p)]);rows.push([btn('◀️ رجوع','mg_admins')]);return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});}
+async function showEditPerms(ctx, adminId) {
+  const list = await adminsDb.getAll();
+  const admin = list.find(a => a.user_id == adminId);
+  if (!admin) return ctx.reply('❌ المشرف غير موجود').catch(()=>{});
+  const currentPerms = (admin.permissions || '').split(',').map(p => p.trim());
+  const name = admin.first_name || 'ID:' + adminId;
+  let text = '⚙️ *صلاحيات ' + escMd(name) + '*
+';
+  if (admin.username) text += '@' + escMd(admin.username) + '
+';
+  text += '━━━━━━━━━━━━
+
+';
+  text += '_اضغط لتفعيل/تعطيل الصلاحية:_';
+
+  const rows = ALL_PERMS.map(p => [{
+    text: (currentPerms.includes(p) ? '✅ ' : '☐ ') + (PERM_LABELS[p] || p),
+    callback_data: 'mg_tp_' + adminId + '_' + p
+  }]);
+
+  // زر تخصص المشرف
+  rows.push([btn('🎓 تحديد التخصص', 'mg_admin_sp_select_' + adminId)]);
+  rows.push([btn('🗑 حذف المشرف', 'mg_da_' + adminId), btn('◀️ رجوع', 'mg_admins')]);
+  return eos(ctx, text, { parse_mode: 'Markdown', ...build(rows) });
+}
 
 async function showAdmins(ctx){const list=await adminsDb.getAll();let text='👑 *الإداريون ('+list.length+')*\n\n';const rows=list.map(a=>{const perms=(a.permissions||'upload,add_content').split(',').map(p=>PERM_LABELS[p.trim()]||p).join(' | ');text+='• '+(escMd(a.first_name||'ID:'+a.user_id))+(a.username?' @'+escMd(a.username):'')+'\n  🔑 '+perms+'\n';return [btn('⚙️ '+(a.first_name||a.user_id),'mg_ep_'+a.user_id),btn('🗑','mg_da_'+a.user_id)];});rows.push([btn('➕ إضافة مشرف','mg_add_admin')]);rows.push(back('mg_menu'));return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});}
 
