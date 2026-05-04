@@ -61,22 +61,29 @@ async function authMiddleware(ctx, next) {
 
   ctx.uid     = uid;
   ctx.isOwner = isOwner(uid);
+  // ⚡ buffer user fire-and-forget — لا ينتظر
   bufferUser(uid, ctx.from.first_name, ctx.from.last_name, ctx.from.username);
 
   if (ctx.isOwner) {
+    // ⚡ Owner fast path — لا DB لا cache لا شيء
     ctx.isAdmin    = true;
     ctx.adminPerms = ['full'];
-  } else {
-    const info     = await getAdminInfo(uid);
-    ctx.isAdmin    = info.isAdmin;
-    ctx.adminPerms = info.perms;
+    return next();
   }
 
-  if (!ctx.isOwner && !ctx.isAdmin) {
-    let banned = cacheGet('ban_' + uid);
+  // ⚡ parallel: admin check + ban check في نفس الوقت
+  const banCached = cacheGet('ban_' + uid);
+  const [info, banRow] = await Promise.all([
+    getAdminInfo(uid),
+    banCached === undefined ? get('SELECT is_banned FROM users WHERE id=$1', [uid]) : Promise.resolve(null),
+  ]);
+  ctx.isAdmin    = info.isAdmin;
+  ctx.adminPerms = info.perms;
+
+  if (!ctx.isAdmin) {
+    let banned = banCached;
     if (banned === undefined) {
-      const u = await get('SELECT is_banned FROM users WHERE id=$1', [uid]);
-      banned = u?.is_banned ? 1 : 0;
+      banned = banRow?.is_banned ? 1 : 0;
       cacheSet('ban_' + uid, banned, 300000);
     }
     if (banned === 1) {

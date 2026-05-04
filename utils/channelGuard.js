@@ -55,7 +55,7 @@ async function checkAllChannels(bot, userId) {
 
   const missing = results.filter(ch => !ch.subscribed);
   const ok = missing.length === 0;
-  if (ok) cacheSet(cacheKey, true, 180000);
+  if (ok) cacheSet(cacheKey, true, 300000); // ✅ 5 دقائق — أداء أفضل
   return { ok, missing };
 }
 

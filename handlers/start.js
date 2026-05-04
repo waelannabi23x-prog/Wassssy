@@ -56,7 +56,8 @@ async function showMainMenu(ctx, name) {
     var results = await Promise.all([interactions.getLastFile(uid), usersDb.getSpecialty(uid)]);
     var last = results[0], spRow = results[1];
     var _spId = spRow ? spRow.specialty_id : null;
-    var sp = _spId && _spId != 0 ? await content.getSpec(_spId) : null;
+    // ⚡ getSpec في نفس الوقت بدون await منفصل
+    var sp = _spId && _spId != 0 ? (cacheGet('spec_'+_spId) || await content.getSpec(_spId)) : null;
     menuData = { last: last, sp: sp };
     cacheSet(menuKey, menuData, 60000);
   }
