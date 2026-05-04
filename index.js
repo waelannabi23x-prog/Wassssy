@@ -35,6 +35,7 @@ const { isMentioned, isReplyToBot, getSocialReply } = require('./utils/groupTrig
 const poll = require('./handlers/group_admin_poll');
 const { handleOwnerAI } = require('./handlers/ai_owner');
 const setupGroupCommands = require('./handlers/group_commands');
+const million = require('./handlers/million_battle');
 const { smartSearch } = require('./handlers/group');
 const tools = require('./handlers/owner_tools');
 const startHandler = require('./handlers/start');
@@ -594,6 +595,7 @@ const exactR = new Map([
   ['noop', () => {}],
   ['main_menu', ctx => startHandler(ctx)],
   ['mg_menu',    ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', {show_alert:true}).catch(()=>{}); return manage.mainMenu(ctx); }],
+  ['mb_panel',   ctx => { if (!ctx.isOwner) return ctx.answerCbQuery('🚫',{show_alert:true}).catch(()=>{}); return million.showQuestionsPanel(ctx); }],
   ['mg_content', ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', {show_alert:true}).catch(()=>{}); return manage.handleCallback(ctx, 'mg_content'); }],
   ['browse', ctx => browse.showSpecs(ctx)],
   ['latest', ctx => userH.showLatest(ctx)],
@@ -712,6 +714,14 @@ bot.on('callback_query', async ctx => {
     if (ctx.chat?.type !== 'private' && !data.startsWith('grp_') && !data.startsWith('tag_all_') && !data.startsWith('mute_all_') && !data.startsWith('unmute_all_') && !data.startsWith('vote_') && !data.startsWith('poll_')) return ctx.answerCbQuery('👉 استخدم البوت في الخاص').catch(() => {});
     if (exactR.has(data)) return exactR.get(data)(ctx);
     // Group admin prefix callbacks
+    // ═══ Million Battle callbacks ═══
+    if (data.startsWith('mb_ans_')) {
+      const parts = data.split('_'); // mb_ans_A_gameId
+      return million.handleAnswer(ctx, parts[2], parts[3]);
+    }
+    if (data.startsWith('mb_') && ctx.isOwner) {
+      return million.handleOwnerCallback(ctx, data);
+    }
     if (data.startsWith('vote_')) {
       const parts = data.split('_');
       return poll.castVote(ctx, parseInt(parts[1]), parseInt(parts[2]));
@@ -812,6 +822,12 @@ bot.on('message', async (ctx, next) => {
   }
   if (ctx.chat?.type === 'private' && ctx.from?.id === OWNER_ID && ctx.message?.text?.startsWith('!')) return ownerH.handle(ctx, ctx.message.text);
   if (ctx.chat?.type !== 'private') {
+    // ═══ Million Battle text triggers ═══
+    const _mbTxt = ctx.message?.text?.trim();
+    if (_mbTxt && ['مليون','أنا','انا','ابدأ','ابدا'].includes(_mbTxt)) {
+      million.handleText(ctx).catch(()=>{});
+      return;
+    }
     if (ctx.from && !ctx.from.is_bot) {
       GrpBuf.add(ctx.chat.id, ctx.from.id, ctx.from.username, ctx.from.first_name);
       // سجّل في group_members تلقائياً
@@ -949,6 +965,10 @@ bot.on('text', async ctx => { try {
     return;
   }
 
+  // Million Battle owner state
+  if ((s?.type || '').startsWith('mb_') && ctx.isOwner) {
+    return million.handleOwnerState(ctx, s);
+  }
   if (s.type === 'ai_mode' && ctx.chat?.type === 'private') {
     if (txt.length > 1000) return ctx.reply('⚠️ الحد 1000 حرف.').catch(() => {});
     if (ctx.isOwner && await handleOwnerAI(ctx, txt, null, null)) return;
@@ -1045,7 +1065,8 @@ async function launch() {
   logger.info('🚀 Study Bot v5.0 — Enterprise Edition');
   try {
     await initSchema();
-  await initPersistentStates(); logger.info('✅ DB ready');
+  await initPersistentStates();
+    await million.initMillionDB().catch(e=>logger.warn('[Million]',e.message)); logger.info('✅ DB ready');
 
     try {
       const db = require('./database/db');

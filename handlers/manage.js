@@ -46,6 +46,7 @@ async function mainMenu(ctx){
   if(isOwner(ctx.uid)){
     rows.push([btn('📢 بث','mg_broadcast'),btn('👥 المستخدمون','mg_users')]);
     rows.push([btn('👑 الإداريون','mg_admins')]);
+    rows.push([btn('🎮 ألعاب القروب','mb_panel')]);
     rows.push([btn('💾 نسخ احتياطي','mg_backup'),btn(global.maintenanceMode?'🟢 إيقاف الصيانة':'🔴 وضع الصيانة','mg_maint')]);
     rows.push([btn('♻️ استعادة','mg_restore'),btn('🗑 سلة المحذوفات','mg_trash')]);
     rows.push([btn('🔔 إشعار للمستخدمين','mg_notify'),btn('📣 إشعار القروبات','mg_notify_groups')]);

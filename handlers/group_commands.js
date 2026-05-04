@@ -1,7 +1,19 @@
 'use strict';
 const { showAllMembers, tagAll, muteAll, unmuteAll } = require('./group_admin');
+const million = require('./million_battle');
 
 function setupGroupCommands(bot) {
+  // ═══ Million Battle ═══
+  bot.command('million', async ctx => {
+    if (!['supergroup','group'].includes(ctx.chat?.type)) return;
+    if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(()=>{});
+    return million.showQuestionsPanel(ctx);
+  });
+  bot.command('stopmillion', async ctx => {
+    if (!['supergroup','group'].includes(ctx.chat?.type)) return;
+    return million.stopGame(ctx);
+  });
+
   bot.command('all', async ctx => {
     if (!['supergroup','group'].includes(ctx.chat.type)) return;
     if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
