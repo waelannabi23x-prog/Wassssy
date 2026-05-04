@@ -168,12 +168,12 @@ async function nextQuestion(ctx, chatId, repeatQuestion = null) {
 
     if (playedIds.length) {
       q = await get(
-        'SELECT * FROM million_questions WHERE is_active=1 AND id != ALL($1) ORDER BY RANDOM() LIMIT 1',
+        'SELECT * FROM million_questions WHERE is_active=1 AND id != ALL($1) ORDER BY difficulty ASC, RANDOM() LIMIT 1',
         [playedIds]
       ).catch(() => null);
     } else {
       q = await get(
-        'SELECT * FROM million_questions WHERE is_active=1 ORDER BY RANDOM() LIMIT 1',
+        'SELECT * FROM million_questions WHERE is_active=1 ORDER BY difficulty ASC, RANDOM() LIMIT 1',
         []
       ).catch(() => null);
     }
