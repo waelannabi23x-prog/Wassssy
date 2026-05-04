@@ -1,6 +1,5 @@
 'use strict';
 const { all, get, run } = require('../database/db');
-const logger = require('../utils/logger');
 
 // ═══ DB INIT ═══
 async function initMillionDB() {
@@ -25,7 +24,7 @@ async function initMillionDB() {
     players TEXT DEFAULT '[]',
     played_ids TEXT DEFAULT '[]',
     current_q INTEGER DEFAULT 0,
-    prize INTEGER DEFAULT 100,
+    prize INTEGER DEFAULT 0,
     msg_id BIGINT DEFAULT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
   )`).catch(()=>{});
@@ -38,46 +37,37 @@ async function initMillionDB() {
 }
 
 // ═══ STATE ═══
-const _timers = new Map(); // chatId → timer
-const _editTimers = new Map(); // chatId → countdown timer
+const _timers     = new Map();
+const _editTimers = new Map();
 
-function getGame(chatId) {
-  return get('SELECT * FROM million_games WHERE chat_id=$1', [chatId]);
-}
+const parsePlayers = g => { try { return JSON.parse(g.players || '[]'); } catch(_) { return []; } };
+const parseIds     = g => { try { return JSON.parse(g.played_ids || '[]'); } catch(_) { return []; } };
+const getGame      = chatId => get('SELECT * FROM million_games WHERE chat_id=$1', [chatId]);
 
-function parsePlayers(g) {
-  try { return JSON.parse(g.players || '[]'); } catch(_) { return []; }
-}
-
-// ═══ START REGISTRATION ═══
+// ═══ REGISTER ═══
 async function startRegistration(ctx) {
   const chatId = ctx.chat.id;
   const userId = ctx.from.id;
   const userName = ctx.from.first_name || 'لاعب';
-
   const existing = await getGame(chatId);
   if (existing && ['registering','playing'].includes(existing.state)) return;
-
   await run('DELETE FROM million_games WHERE chat_id=$1', [chatId]).catch(()=>{});
-
   const players = [{ id: userId, name: userName }];
   await run(
     'INSERT INTO million_games(chat_id,owner_id,owner_name,state,players) VALUES($1,$2,$3,$4,$5)',
     [chatId, userId, userName, 'registering', JSON.stringify(players)]
   );
-
-  const text = buildRegisterText([{ name: userName }]);
-  const msg = await ctx.reply(text, { parse_mode: 'Markdown' }).catch(()=>null);
+  const msg = await ctx.reply(buildRegText(players, userName), { parse_mode: 'Markdown' }).catch(()=>null);
   if (msg) await run('UPDATE million_games SET msg_id=$1 WHERE chat_id=$2', [msg.message_id, chatId]);
 }
 
-function buildRegisterText(players) {
-  let t = '🎮 *Million Battle — بدأت اللعبة!*\n\n';
-  t += '✍️ اكتب *أنا* للمشاركة\n\n';
-  t += '👥 *اللاعبين:*\n';
-  if (!players.length) t += '_لا يوجد_\n';
-  else players.forEach((p, i) => { t += `${i+1}. ${p.name}\n`; });
-  t += '\n⏳ في انتظار صاحب اللعبة يكتب *ابدأ*';
+function buildRegText(players, ownerName) {
+  let t = '🎮 *Million Battle*\n';
+  t += '━━━━━━━━━━━━━━━━\n';
+  t += '✍️ اكتب *أنا* للانضمام\n\n';
+  t += '👥 *اللاعبون (' + players.length + '):*\n';
+  players.forEach((p, i) => { t += (i+1) + '. ' + p.name + '\n'; });
+  t += '\n⏳ صاحب اللعبة *' + ownerName + '* يكتب *ابدأ* للبدء';
   return t;
 }
 
@@ -85,34 +75,25 @@ function buildRegisterText(players) {
 async function joinGame(ctx) {
   const chatId = ctx.chat.id;
   const userId = ctx.from.id;
-  const userName = ctx.from.first_name || 'لاعب';
   const g = await getGame(chatId);
   if (!g || g.state !== 'registering') return;
   const players = parsePlayers(g);
-  if (players.find(p => p.id === userId)) return;
-  players.push({ id: userId, name: userName });
+  if (players.find(p => p.id === userId)) return ctx.reply('⚠️ أنت مسجل بالفعل!').catch(()=>{});
+  players.push({ id: userId, name: ctx.from.first_name || 'لاعب' });
   await run('UPDATE million_games SET players=$1 WHERE chat_id=$2', [JSON.stringify(players), chatId]);
-  if (g.msg_id) {
-    ctx.telegram.editMessageText(chatId, g.msg_id, null, buildRegisterText(players), { parse_mode: 'Markdown' }).catch(()=>{});
-  }
+  if (g.msg_id) ctx.telegram.editMessageText(chatId, g.msg_id, null, buildRegText(players, g.owner_name), { parse_mode: 'Markdown' }).catch(()=>{});
 }
 
 // ═══ START GAME ═══
 async function startGame(ctx) {
   const chatId = ctx.chat.id;
-  const userId = ctx.from.id;
   const g = await getGame(chatId);
   if (!g || g.state !== 'registering') return;
-  if (g.owner_id != userId) {
-    return ctx.reply('🚫 فقط صاحب اللعبة يقدر يبدأها').catch(()=>{});
-  }
+  if (g.owner_id != ctx.from.id && !ctx.isOwner) return ctx.reply('🚫 فقط صاحب اللعبة يقدر يبدأ').catch(()=>{});
   const players = parsePlayers(g);
-  if (players.length < 1) {
-    return ctx.reply('⚠️ لازم لاعب واحد على الأقل للبدء!').catch(()=>{});
-  }
   await run('UPDATE million_games SET state=$1 WHERE chat_id=$2', ['playing', chatId]);
   await ctx.reply(
-    `🚀 *بدأت اللعبة!*\n\n👥 عدد اللاعبين: *${players.length}*\n🔥 حظ موفق للجميع!`,
+    '🚀 *بدأت اللعبة!*\n\n👥 اللاعبون: *' + players.length + '*\n🔥 حظ موفق للجميع!',
     { parse_mode: 'Markdown' }
   ).catch(()=>{});
   await nextQuestion(ctx, chatId);
@@ -125,236 +106,199 @@ async function nextQuestion(ctx, chatId) {
   const players = parsePlayers(g);
   if (!players.length) return endGame(ctx, chatId, null);
 
-  const qNum = (g.current_q || 0) + 1;
-  const timeLimit = qNum >= 10 ? 20 : 10;
+  const qNum     = (g.current_q || 0) + 1;
+  const timeLimit = qNum >= 10 ? 20 : qNum >= 5 ? 15 : 10;
+  const prize     = Math.min(100 * qNum, 10000);
+  const playedIds = parseIds(g);
 
-  // جلب سؤال عشوائي من DB
-  // جلب الأسئلة اللي ما تم استعمالها
-  let playedIds = [];
-  try { playedIds = JSON.parse(g.played_ids || '[]'); } catch(_) {}
-  const excludeSql = playedIds.length
-    ? 'SELECT * FROM million_questions WHERE is_active=1 AND id != ALL($2) ORDER BY RANDOM() LIMIT 1'
-    : 'SELECT * FROM million_questions WHERE is_active=1 ORDER BY RANDOM() LIMIT 1';
-  const q = await get(excludeSql, playedIds.length ? [chatId, playedIds] : [chatId]).catch(()=>null);
+  // جلب سؤال غير مستخدم
+  let q = null;
+  if (playedIds.length) {
+    q = await get(
+      'SELECT * FROM million_questions WHERE is_active=1 AND id != ALL($1) ORDER BY RANDOM() LIMIT 1',
+      [playedIds]
+    ).catch(()=>null);
+  }
+  if (!q) {
+    q = await get('SELECT * FROM million_questions WHERE is_active=1 ORDER BY RANDOM() LIMIT 1').catch(()=>null);
+  }
 
   if (!q) {
-    await ctx.telegram.sendMessage(chatId, '❌ لا توجد أسئلة! أضف أسئلة من لوحة التحكم.').catch(()=>{});
+    await ctx.telegram.sendMessage(chatId, '❌ لا توجد أسئلة! أضف من لوحة التحكم.').catch(()=>{});
     return endGame(ctx, chatId, null);
   }
 
   playedIds.push(q.id);
-  await run('UPDATE million_games SET current_q=$1, prize=$2, played_ids=$3 WHERE chat_id=$4',
-    [qNum, Math.min(100 * qNum, 10000), JSON.stringify(playedIds), chatId]);
+  await run('UPDATE million_games SET current_q=$1,prize=$2,played_ids=$3 WHERE chat_id=$4',
+    [qNum, prize, JSON.stringify(playedIds), chatId]);
   await run('DELETE FROM million_answers WHERE game_id=$1', [g.id]).catch(()=>{});
 
-  const prize = Math.min(100 * qNum, 10000);
-  let text = buildQuestionText(q, qNum, players.length, prize, timeLimit);
-
   const kb = {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: '🅐', callback_data: `mb_ans_A_${g.id}` }, { text: '🅑', callback_data: `mb_ans_B_${g.id}` }],
-        [{ text: '🅒', callback_data: `mb_ans_C_${g.id}` }, { text: '🅓', callback_data: `mb_ans_D_${g.id}` }],
-      ]
-    }
+    inline_keyboard: [
+      [{ text: '🅐  ' + q.option_a, callback_data: 'mb_ans_A_' + g.id },
+       { text: '🅑  ' + q.option_b, callback_data: 'mb_ans_B_' + g.id }],
+      [{ text: '🅒  ' + q.option_c, callback_data: 'mb_ans_C_' + g.id },
+       { text: '🅓  ' + q.option_d, callback_data: 'mb_ans_D_' + g.id }],
+    ]
   };
 
+  const text = buildQText(q, qNum, players.length, prize, timeLimit);
   let qMsg = null;
+
   if (q.media_file_id && q.media_type === 'photo') {
-    qMsg = await ctx.telegram.sendPhoto(chatId, q.media_file_id, { caption: text, parse_mode: 'Markdown', ...kb }).catch(()=>null);
+    qMsg = await ctx.telegram.sendPhoto(chatId, q.media_file_id, {
+      caption: text, parse_mode: 'Markdown', reply_markup: kb
+    }).catch(()=>null);
   } else if (q.media_file_id && q.media_type === 'video') {
-    qMsg = await ctx.telegram.sendVideo(chatId, q.media_file_id, { caption: text, parse_mode: 'Markdown', ...kb }).catch(()=>null);
+    qMsg = await ctx.telegram.sendVideo(chatId, q.media_file_id, {
+      caption: text, parse_mode: 'Markdown', reply_markup: kb
+    }).catch(()=>null);
   } else {
-    qMsg = await ctx.telegram.sendMessage(chatId, text, { parse_mode: 'Markdown', ...kb }).catch(()=>null);
+    qMsg = await ctx.telegram.sendMessage(chatId, text, {
+      parse_mode: 'Markdown', reply_markup: kb
+    }).catch(()=>null);
   }
 
   if (qMsg) await run('UPDATE million_games SET msg_id=$1 WHERE chat_id=$2', [qMsg.message_id, chatId]);
 
   // countdown
   if (_editTimers.has(chatId)) clearInterval(_editTimers.get(chatId));
-  let remaining = timeLimit - 1;
+  let rem = timeLimit - 1;
   const editT = setInterval(async () => {
-    if (remaining <= 0) { clearInterval(editT); _editTimers.delete(chatId); return; }
+    if (rem <= 0) { clearInterval(editT); _editTimers.delete(chatId); return; }
     const gNow = await getGame(chatId).catch(()=>null);
     if (!gNow || gNow.state !== 'playing') { clearInterval(editT); return; }
-    const newText = buildQuestionText(q, qNum, parsePlayers(gNow).length, prize, remaining);
+    const newText = buildQText(q, qNum, parsePlayers(gNow).length, prize, rem);
     if (qMsg) {
-      if (q.media_file_id) ctx.telegram.editMessageCaption(chatId, qMsg.message_id, null, newText, { parse_mode: 'Markdown', ...kb }).catch(()=>{});
-      else ctx.telegram.editMessageText(chatId, qMsg.message_id, null, newText, { parse_mode: 'Markdown', ...kb }).catch(()=>{});
+      if (q.media_file_id) ctx.telegram.editMessageCaption(chatId, qMsg.message_id, null, newText, { parse_mode: 'Markdown', reply_markup: kb }).catch(()=>{});
+      else ctx.telegram.editMessageText(chatId, qMsg.message_id, null, newText, { parse_mode: 'Markdown', reply_markup: kb }).catch(()=>{});
     }
-    remaining--;
+    rem--;
   }, 1000);
   _editTimers.set(chatId, editT);
 
-  // timeout
   if (_timers.has(chatId)) clearTimeout(_timers.get(chatId));
   const t = setTimeout(() => processAnswers(ctx, chatId, q), timeLimit * 1000);
   _timers.set(chatId, t);
 }
 
-function buildQuestionText(q, qNum, playersLeft, prize, timeLeft) {
+function buildQText(q, qNum, playersLeft, prize, timeLeft) {
+  const diff = q.difficulty === 3 ? '🔴 صعب' : q.difficulty === 2 ? '🟡 متوسط' : '🟢 سهل';
   return (
-    `━━━━━━━━━━━━━━━━━━━━━━\n` +
-    `❓ *السؤال ${qNum}*\n\n` +
-    `${q.question}\n` +
-    `━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-    `🅐 ${q.option_a}\n🅑 ${q.option_b}\n🅒 ${q.option_c}\n🅓 ${q.option_d}\n\n` +
-    `━━━━━━━━━━━━━━━━━━━━━━\n` +
-    `💰 الجائزة: *${prize}*  ⏳ *${timeLeft}s*  👥 المتبقين: *${playersLeft}*`
+    '🎮 *Million Battle — السؤال ' + qNum + '*\n' +
+    '━━━━━━━━━━━━━━━━\n\n' +
+    '❓ ' + q.question + '\n\n' +
+    '━━━━━━━━━━━━━━━━\n' +
+    '💰 ' + prize + ' نقطة  |  ' +
+    '⏳ ' + timeLeft + 'ث  |  ' +
+    '👥 ' + playersLeft + '  |  ' + diff
   );
 }
 
-// ═══ HANDLE ANSWER ═══
+// ═══ ANSWER ═══
 async function handleAnswer(ctx, answer, gameId) {
   const userId = ctx.from.id;
-  const chatId = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+  const chatId = ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id;
   const g = await getGame(chatId);
   if (!g || g.state !== 'playing' || g.id != gameId) return ctx.answerCbQuery('❌ اللعبة انتهت').catch(()=>{});
-
   const players = parsePlayers(g);
   if (!players.find(p => p.id === userId)) return ctx.answerCbQuery('❌ أنت خارج اللعبة').catch(()=>{});
-
   const existing = await get('SELECT 1 FROM million_answers WHERE game_id=$1 AND user_id=$2', [g.id, userId]).catch(()=>null);
-  if (existing) return ctx.answerCbQuery('⚠️ جاوبت من قبل!').catch(()=>{});
-
+  if (existing) return ctx.answerCbQuery('⚠️ جاوبت مسبقاً!').catch(()=>{});
   await run('INSERT INTO million_answers(game_id,user_id,answer) VALUES($1,$2,$3)', [g.id, userId, answer]).catch(()=>{});
-  ctx.answerCbQuery(`✅ اخترت ${answer}`).catch(()=>{});
+  ctx.answerCbQuery('✅ تم تسجيل إجابتك: ' + answer).catch(()=>{});
 }
 
-// ═══ PROCESS ANSWERS ═══
+// ═══ PROCESS ═══
 async function processAnswers(ctx, chatId, q) {
   if (_timers.has(chatId)) { clearTimeout(_timers.get(chatId)); _timers.delete(chatId); }
   if (_editTimers.has(chatId)) { clearInterval(_editTimers.get(chatId)); _editTimers.delete(chatId); }
-
   const g = await getGame(chatId);
   if (!g || g.state !== 'playing') return;
-
   const players = parsePlayers(g);
-  const answers = await all('SELECT user_id, answer FROM million_answers WHERE game_id=$1', [g.id]).catch(()=>[]);
+  const answers = await all('SELECT user_id,answer FROM million_answers WHERE game_id=$1', [g.id]).catch(()=>[]);
   const correct = q.correct;
-
-  const answeredIds = new Set(answers.map(a => a.user_id.toString()));
   const correctIds = new Set(answers.filter(a => a.answer === correct).map(a => a.user_id.toString()));
-
+  const survivors = players.filter(p => correctIds.has(p.id.toString()));
   const eliminated = players.filter(p => !correctIds.has(p.id.toString()));
-  const survivors  = players.filter(p =>  correctIds.has(p.id.toString()));
+  const optMap = { A: q.option_a, B: q.option_b, C: q.option_c, D: q.option_d };
 
-  const optionEmojis = { A: '🅐', B: '🅑', C: '🅒', D: '🅓' };
-  let text = `✅ *الإجابة الصحيحة:* ${optionEmojis[correct] || correct} — ${q['option_'+correct.toLowerCase()]}\n\n`;
+  let text = '━━━━━━━━━━━━━━━━\n';
+  text += '✅ *الإجابة الصحيحة:* ' + correct + ' — ' + optMap[correct] + '\n\n';
+  if (eliminated.length) text += '❌ *خرج:* ' + eliminated.map(p => p.name).join(', ') + '\n\n';
+  if (survivors.length) text += '🔥 *متبقي:* ' + survivors.map(p => p.name).join(', ');
+  else text += '😱 *الجميع أخطأ! نكمل بكل اللاعبين*';
 
-  if (eliminated.length) {
-    text += `❌ *تم إقصاء:*\n${eliminated.map(p=>'- '+p.name).join('\n')}\n\n`;
-  }
-
-  if (!survivors.length) {
-    text += '😱 *الجميع أخطأ! نكمل باللاعبين كاملين...*';
-    await ctx.telegram.sendMessage(chatId, text, { parse_mode: 'Markdown' }).catch(()=>{});
-    // نحتفظ بكل اللاعبين ونروح للسؤال التالي
-    await run('UPDATE million_games SET players=$1 WHERE chat_id=$2', [JSON.stringify(players), chatId]);
-    setTimeout(() => nextQuestion(ctx, chatId), 3000);
-    return;
-  }
-
-  text += `🔥 *المتبقين:*\n${survivors.map(p=>'- '+p.name).join('\n')}`;
   await ctx.telegram.sendMessage(chatId, text, { parse_mode: 'Markdown' }).catch(()=>{});
-  await run('UPDATE million_games SET players=$1 WHERE chat_id=$2', [JSON.stringify(survivors), chatId]);
 
+  const next = survivors.length ? survivors : players;
+  await run('UPDATE million_games SET players=$1 WHERE chat_id=$2', [JSON.stringify(next), chatId]);
   if (survivors.length === 1) return endGame(ctx, chatId, survivors[0]);
   setTimeout(() => nextQuestion(ctx, chatId), 3000);
 }
 
-// ═══ END GAME ═══
+// ═══ END ═══
 async function endGame(ctx, chatId, winner) {
   if (_timers.has(chatId)) { clearTimeout(_timers.get(chatId)); _timers.delete(chatId); }
   if (_editTimers.has(chatId)) { clearInterval(_editTimers.get(chatId)); _editTimers.delete(chatId); }
   await run('UPDATE million_games SET state=$1 WHERE chat_id=$2', ['ended', chatId]);
-
   const g2 = await getGame(chatId);
-  const finalPrize = g2 ? g2.prize : 0;
-  const totalQ = g2 ? g2.current_q : 0;
-
+  const finalPrize = g2?.prize || 0;
   let text;
   if (winner) {
-    // ✅ منح نقاط للفائز
-    try {
-      const { awardPoints } = require('../database/points');
-      const bonusPoints = Math.floor(finalPrize / 10);
-      for (let i = 0; i < bonusPoints; i++) awardPoints(winner.id, 'rating').catch(()=>{});
-    } catch(_) {}
-
-    text = `🏆━━━━━━━━━━━━━━━━━━━━━━\n\n` +
-      `🎉 *الفائز: ${winner.name}*\n\n` +
-      `💰 الجائزة: *${finalPrize} نقطة*\n` +
-      `📊 الأسئلة: *${totalQ}*\n` +
-      `🔥 أنت بطل Million Battle!\n\n` +
-      `━━━━━━━━━━━━━━━━━━━━━━🏆`;
+    try { const { awardPoints } = require('../database/points'); for (let i=0;i<Math.floor(finalPrize/10);i++) awardPoints(winner.id,'rating').catch(()=>{}); } catch(_){}
+    text = '🏆━━━━━━━━━━━━━━━━━━━━━━\n\n🎉 *الفائز: ' + winner.name + '*\n\n💰 الجائزة: *' + finalPrize + ' نقطة*\n📊 الأسئلة: *' + (g2?.current_q||0) + '*\n\n━━━━━━━━━━━━━━━━━━━━━━🏆';
   } else {
-    text = '🤝 *لا يوجد فائز هذه الجولة!*\n\nاكتب *مليون* للعب من جديد 🎮';
+    text = '🤝 *لا يوجد فائز!*\n\nاكتب *مليون* للعب مجدداً 🎮';
   }
   await ctx.telegram.sendMessage(chatId, text, { parse_mode: 'Markdown' }).catch(()=>{});
   setTimeout(() => run('DELETE FROM million_games WHERE chat_id=$1', [chatId]).catch(()=>{}), 30000);
 }
 
-// ═══ STOP GAME (owner only) ═══
 async function stopGame(ctx) {
-  const chatId = ctx.chat.id;
-  const g = await getGame(chatId);
+  const g = await getGame(ctx.chat.id);
   if (!g) return ctx.reply('❌ لا توجد لعبة نشطة').catch(()=>{});
   if (g.owner_id != ctx.from.id && !ctx.isOwner) return ctx.reply('🚫 فقط صاحب اللعبة').catch(()=>{});
-  await endGame(ctx, chatId, null);
+  await endGame(ctx, ctx.chat.id, null);
 }
 
-// ═══ TEXT HANDLER ═══
+// ═══ TEXT TRIGGERS ═══
 async function handleText(ctx) {
   const text = (ctx.message?.text || '').trim();
-  const chatId = ctx.chat.id;
   if (text === 'مليون') return startRegistration(ctx);
   if (text === 'أنا' || text === 'انا') return joinGame(ctx);
   if (text === 'ابدأ' || text === 'ابدا') return startGame(ctx);
 }
 
-// ═══ OWNER PANEL — إدارة الأسئلة ═══
+// ═══ OWNER PANEL ═══
 async function showQuestionsPanel(ctx) {
-  const questions = await all('SELECT id, question, correct, difficulty FROM million_questions WHERE is_active=1 ORDER BY id DESC LIMIT 20').catch(()=>[]);
   const total = await get('SELECT COUNT(*) as c FROM million_questions WHERE is_active=1').catch(()=>null);
-  let text = `🎮 *Million Battle — الأسئلة*\n\n📊 إجمالي الأسئلة: *${total?.c || 0}*\n\n`;
-  if (questions.length) {
-    questions.forEach((q,i) => {
-      text += `${i+1}. ${q.question.substring(0,40)}... ✅${q.correct} ⭐${q.difficulty}\n`;
-    });
-  } else text += '_لا توجد أسئلة بعد_\n';
-
-  const kb = {
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: '➕ إضافة سؤال', callback_data: 'mb_add_q' }],
-        [{ text: '🗑 حذف سؤال', callback_data: 'mb_del_q_menu' }],
-        [{ text: '❌ إغلاق', callback_data: 'noop' }],
-      ]
-    }
-  };
-  return ctx.reply(text, { parse_mode: 'Markdown', ...kb }).catch(()=>{});
+  const qs = await all('SELECT id,question,correct,difficulty FROM million_questions WHERE is_active=1 ORDER BY id DESC LIMIT 15').catch(()=>[]);
+  let text = '🎮 *Million Battle — الأسئلة*\n━━━━━━━━━━\n📊 الإجمالي: *' + (total?.c||0) + '*\n\n';
+  qs.forEach((q,i) => { text += (i+1) + '. ' + q.question.substring(0,45) + '\n   ✅' + q.correct + ' ⭐'.repeat(q.difficulty||1) + '\n'; });
+  if (!qs.length) text += '_لا توجد أسئلة بعد_';
+  return ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [
+    [{ text: '➕ إضافة سؤال', callback_data: 'mb_add_q' }],
+    [{ text: '🗑 حذف سؤال', callback_data: 'mb_del_q_menu' }],
+    [{ text: '❌ إغلاق', callback_data: 'noop' }],
+  ]}}).catch(()=>{});
 }
 
 async function handleOwnerCallback(ctx, data) {
   if (data === 'mb_add_q') {
     await global.setState(ctx.uid, { type: 'mb_add_question', step: 'question' });
-    return ctx.reply(
-      '📝 *إضافة سؤال جديد*\n\nأرسل السؤال (أو صورة/فيديو مع السؤال كـ caption):',
-      { parse_mode: 'Markdown' }
-    ).catch(()=>{});
+    return ctx.reply('📝 أرسل السؤال (أو صورة/فيديو مع caption):').catch(()=>{});
   }
   if (data === 'mb_del_q_menu') {
-    const qs = await all('SELECT id, question FROM million_questions WHERE is_active=1 ORDER BY id DESC LIMIT 15').catch(()=>[]);
+    const qs = await all('SELECT id,question FROM million_questions WHERE is_active=1 ORDER BY id DESC LIMIT 15').catch(()=>[]);
     if (!qs.length) return ctx.answerCbQuery('لا توجد أسئلة').catch(()=>{});
-    const rows = qs.map(q => [{ text: '🗑 ' + q.question.substring(0,35), callback_data: 'mb_del_q_' + q.id }]);
+    const rows = qs.map(q => [{ text: '🗑 ' + q.question.substring(0,40), callback_data: 'mb_del_q_' + q.id }]);
     rows.push([{ text: '◀️ رجوع', callback_data: 'mb_panel' }]);
     return ctx.editMessageText('اختر السؤال للحذف:', { reply_markup: { inline_keyboard: rows } }).catch(()=>{});
   }
   if (data.startsWith('mb_del_q_')) {
-    const qId = data.replace('mb_del_q_','');
-    await run('UPDATE million_questions SET is_active=0 WHERE id=$1', [qId]).catch(()=>{});
-    await ctx.answerCbQuery('✅ تم الحذف').catch(()=>{});
+    await run('UPDATE million_questions SET is_active=0 WHERE id=$1', [data.replace('mb_del_q_','')]).catch(()=>{});
+    ctx.answerCbQuery('✅ تم الحذف').catch(()=>{});
     return showQuestionsPanel(ctx);
   }
   if (data === 'mb_panel') return showQuestionsPanel(ctx);
@@ -364,57 +308,35 @@ async function handleOwnerState(ctx, state) {
   const uid = ctx.uid;
   const text = ctx.message?.text?.trim() || '';
   const msg = ctx.message;
-
-  if (state.type === 'mb_add_question') {
-    const step = state.step;
-
-    if (step === 'question') {
-      const question = msg.caption || text;
-      const mediaFileId = msg.photo ? msg.photo[msg.photo.length-1].file_id : msg.video ? msg.video.file_id : null;
-      const mediaType = msg.photo ? 'photo' : msg.video ? 'video' : null;
-      await global.setState(uid, { ...state, step: 'option_a', question, mediaFileId, mediaType });
-      return ctx.reply('🅐 أرسل الخيار A:').catch(()=>{});
-    }
-    if (step === 'option_a') {
-      await global.setState(uid, { ...state, step: 'option_b', option_a: text });
-      return ctx.reply('🅑 أرسل الخيار B:').catch(()=>{});
-    }
-    if (step === 'option_b') {
-      await global.setState(uid, { ...state, step: 'option_c', option_b: text });
-      return ctx.reply('🅒 أرسل الخيار C:').catch(()=>{});
-    }
-    if (step === 'option_c') {
-      await global.setState(uid, { ...state, step: 'option_d', option_c: text });
-      return ctx.reply('🅓 أرسل الخيار D:').catch(()=>{});
-    }
-    if (step === 'option_d') {
-      await global.setState(uid, { ...state, step: 'correct', option_d: text });
-      return ctx.reply('✅ الإجابة الصحيحة؟ اكتب A أو B أو C أو D:').catch(()=>{});
-    }
-    if (step === 'correct') {
-      const correct = text.toUpperCase();
-      if (!['A','B','C','D'].includes(correct)) return ctx.reply('⚠️ اكتب A أو B أو C أو D فقط!').catch(()=>{});
-      await global.setState(uid, { ...state, step: 'difficulty', correct });
-      return ctx.reply('⭐ الصعوبة؟ اكتب 1 (سهل) أو 2 (متوسط) أو 3 (صعب):').catch(()=>{});
-    }
-    if (step === 'difficulty') {
-      const diff = parseInt(text) || 1;
-      await run(
-        'INSERT INTO million_questions(question,option_a,option_b,option_c,option_d,correct,media_file_id,media_type,difficulty) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',
-        [state.question, state.option_a, state.option_b, state.option_c, state.option_d, state.correct, state.mediaFileId || null, state.mediaType || null, diff]
-      );
-      await global.delState(uid);
-      return ctx.reply('✅ تم إضافة السؤال بنجاح! 🎮').catch(()=>{});
-    }
+  if (state.type !== 'mb_add_question') return;
+  const step = state.step;
+  if (step === 'question') {
+    const q = msg.caption || text;
+    if (!q) return ctx.reply('⚠️ أرسل السؤال كنص أو كـ caption').catch(()=>{});
+    const fid = msg.photo ? msg.photo[msg.photo.length-1].file_id : msg.video?.file_id || null;
+    const ftype = msg.photo ? 'photo' : msg.video ? 'video' : null;
+    await global.setState(uid, { ...state, step: 'option_a', question: q, mediaFileId: fid, mediaType: ftype });
+    return ctx.reply('🅐 الخيار A:').catch(()=>{});
+  }
+  if (step === 'option_a') { await global.setState(uid, { ...state, step: 'option_b', option_a: text }); return ctx.reply('🅑 الخيار B:').catch(()=>{}); }
+  if (step === 'option_b') { await global.setState(uid, { ...state, step: 'option_c', option_b: text }); return ctx.reply('🅒 الخيار C:').catch(()=>{}); }
+  if (step === 'option_c') { await global.setState(uid, { ...state, step: 'option_d', option_c: text }); return ctx.reply('🅓 الخيار D:').catch(()=>{}); }
+  if (step === 'option_d') { await global.setState(uid, { ...state, step: 'correct', option_d: text }); return ctx.reply('✅ الإجابة الصحيحة؟ (A/B/C/D):').catch(()=>{}); }
+  if (step === 'correct') {
+    const c = text.toUpperCase();
+    if (!['A','B','C','D'].includes(c)) return ctx.reply('⚠️ اكتب A أو B أو C أو D!').catch(()=>{});
+    await global.setState(uid, { ...state, step: 'difficulty', correct: c });
+    return ctx.reply('⭐ الصعوبة؟\n1 = سهل\n2 = متوسط\n3 = صعب').catch(()=>{});
+  }
+  if (step === 'difficulty') {
+    const diff = Math.min(Math.max(parseInt(text)||1, 1), 3);
+    await run(
+      'INSERT INTO million_questions(question,option_a,option_b,option_c,option_d,correct,media_file_id,media_type,difficulty) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',
+      [state.question, state.option_a, state.option_b, state.option_c, state.option_d, state.correct, state.mediaFileId||null, state.mediaType||null, diff]
+    );
+    await global.delState(uid);
+    return ctx.reply('✅ تم إضافة السؤال! 🎮\n\n' + state.question + '\n🅐 ' + state.option_a + '\n🅑 ' + state.option_b + '\n🅒 ' + state.option_c + '\n🅓 ' + state.option_d + '\n✅ الصحيح: ' + state.correct).catch(()=>{});
   }
 }
 
-module.exports = {
-  initMillionDB,
-  handleText,
-  handleAnswer,
-  handleOwnerCallback,
-  handleOwnerState,
-  showQuestionsPanel,
-  stopGame,
-};
+module.exports = { initMillionDB, handleText, handleAnswer, handleOwnerCallback, handleOwnerState, showQuestionsPanel, stopGame };
