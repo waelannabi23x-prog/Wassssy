@@ -106,8 +106,8 @@ async function startGame(ctx) {
     return ctx.reply('🚫 فقط صاحب اللعبة يقدر يبدأها').catch(()=>{});
   }
   const players = parsePlayers(g);
-  if (players.length < 2) {
-    return ctx.reply('⚠️ لازم لاعبين على الأقل للبدء!').catch(()=>{});
+  if (players.length < 1) {
+    return ctx.reply('⚠️ لازم لاعب واحد على الأقل للبدء!').catch(()=>{});
   }
   await run('UPDATE million_games SET state=$1 WHERE chat_id=$2', ['playing', chatId]);
   await ctx.reply(
