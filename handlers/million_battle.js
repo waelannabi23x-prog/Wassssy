@@ -42,8 +42,8 @@ async function initMillionDB() {
 // ═══════════════════════════════════════════════
 //  IN-MEMORY TIMERS
 // ═══════════════════════════════════════════════
-const _timers     = new Map(); // chatId → answer timeout
-const _editTimers = new Map(); // chatId → countdown interval
+const _timers     = new Map();
+const _editTimers = new Map();
 
 // ═══════════════════════════════════════════════
 //  HELPERS
@@ -57,7 +57,6 @@ function parsePlayers(g) {
 }
 
 function calcPrize(qNum) {
-  // 100 → 200 → ... → 10000 max
   return Math.min(100 * qNum, 10000);
 }
 
@@ -161,15 +160,13 @@ async function nextQuestion(ctx, chatId, repeatQuestion = null) {
   const players = parsePlayers(g);
   if (!players.length) return endGame(ctx, chatId, null);
 
-  let q = repeatQuestion; // إعادة نفس السؤال لو الكل غلط
+  let q = repeatQuestion;
 
   if (!q) {
-    // سؤال جديد — نتجنب المستعملة
     let playedIds = [];
     try { playedIds = JSON.parse(g.played_ids || '[]'); } catch (_) {}
 
     if (playedIds.length) {
-      // ✅ Fix: $1 فقط للـ array — لا chatId زائد
       q = await get(
         'SELECT * FROM million_questions WHERE is_active=1 AND id != ALL($1) ORDER BY RANDOM() LIMIT 1',
         [playedIds]
@@ -197,7 +194,6 @@ async function nextQuestion(ctx, chatId, repeatQuestion = null) {
     );
   }
 
-  // اجلب اللعبة بعد التحديث
   const gFresh = await getGame(chatId);
   const qNum   = gFresh.current_q;
   const prize  = gFresh.prize;
@@ -295,7 +291,7 @@ function buildAnswerKeyboard(gameId) {
 }
 
 // ═══════════════════════════════════════════════
-//  HANDLE ANSWER (callback)
+//  HANDLE ANSWER
 // ═══════════════════════════════════════════════
 async function handleAnswer(ctx, answer, gameId) {
   const userId = ctx.from.id;
@@ -355,7 +351,7 @@ async function processAnswers(ctx, chatId, q) {
   const correctEmoji = optionEmojis[correct] || correct;
   const correctText  = q[`option_${correct.toLowerCase()}`] || '';
 
-  // ── الكل غلط ← ✅ نعيد نفس السؤال ──
+  // الكل غلط → نعيد نفس السؤال
   if (!survivors.length) {
     const noWinText =
       `━━━━━━━━━━━━━━━━━━━━━━\n` +
@@ -363,12 +359,10 @@ async function processAnswers(ctx, chatId, q) {
       `😱 *الجميع أخطأ!*\n🔁 إعادة السؤال...\n` +
       `━━━━━━━━━━━━━━━━━━━━━━`;
     await ctx.telegram.sendMessage(chatId, noWinText, { parse_mode: 'Markdown' }).catch(() => {});
-    // نحتفظ بنفس اللاعبين ونعيد *نفس السؤال*
     setTimeout(() => nextQuestion(ctx, chatId, q), 3000);
     return;
   }
 
-  // ── بناء رسالة النتيجة ──
   let resultText =
     `━━━━━━━━━━━━━━━━━━━━━━\n` +
     `✅ *الإجابة الصحيحة:* ${correctEmoji} ${correctText}\n\n`;
@@ -403,11 +397,9 @@ async function endGame(ctx, chatId, winner) {
 
   let text;
   if (winner) {
-    // ✅ Fix: منح النقاط مرة واحدة بدل loop
     try {
       const { awardPoints } = require('../database/points');
       const bonusPoints = Math.max(1, Math.floor(finalPrize / 10));
-      // نسمي دورة واحدة — نكرر القيمة مش الـ call
       for (let i = 0; i < bonusPoints; i++) {
         await awardPoints(winner.id, 'rating').catch(() => {});
       }
@@ -431,7 +423,7 @@ async function endGame(ctx, chatId, winner) {
 }
 
 // ═══════════════════════════════════════════════
-//  STOP GAME (owner / admin)
+//  STOP GAME
 // ═══════════════════════════════════════════════
 async function stopGame(ctx) {
   const chatId = ctx.chat.id;
@@ -447,17 +439,17 @@ async function stopGame(ctx) {
 }
 
 // ═══════════════════════════════════════════════
-//  TEXT HANDLER (group messages)
+//  TEXT HANDLER
 // ═══════════════════════════════════════════════
 async function handleText(ctx) {
-  const text   = (ctx.message?.text || '').trim();
-  if (text === 'مليون')              return startRegistration(ctx);
-  if (text === 'أنا' || text === 'انا')  return joinGame(ctx);
+  const text = (ctx.message?.text || '').trim();
+  if (text === 'مليون')               return startRegistration(ctx);
+  if (text === 'أنا' || text === 'انا')   return joinGame(ctx);
   if (text === 'ابدأ' || text === 'ابدا') return startGame(ctx);
 }
 
 // ═══════════════════════════════════════════════
-//  OWNER PANEL — إدارة الأسئلة
+//  OWNER PANEL
 // ═══════════════════════════════════════════════
 async function showQuestionsPanel(ctx) {
   const questions = await all(
@@ -496,7 +488,6 @@ async function handleOwnerCallback(ctx, data) {
       { parse_mode: 'Markdown' }
     ).catch(() => {});
   }
-
   if (data === 'mb_del_q_menu') {
     const qs = await all(
       'SELECT id, question FROM million_questions WHERE is_active=1 ORDER BY id DESC LIMIT 15'
@@ -511,14 +502,12 @@ async function handleOwnerCallback(ctx, data) {
       reply_markup: { inline_keyboard: rows },
     }).catch(() => {});
   }
-
   if (data.startsWith('mb_del_q_')) {
     const qId = data.replace('mb_del_q_', '');
     await run('UPDATE million_questions SET is_active=0 WHERE id=$1', [qId]).catch(() => {});
     await ctx.answerCbQuery('✅ تم الحذف').catch(() => {});
     return showQuestionsPanel(ctx);
   }
-
   if (data === 'mb_panel') return showQuestionsPanel(ctx);
 }
 
