@@ -773,6 +773,10 @@ bot.on('message', async (ctx, next) => {
   // Photo/Video/Document handler
   if (ctx.message?.photo || ctx.message?.video || ctx.message?.document) {
     const s = global.getState(ctx.uid);
+    // ✅ Million Battle photo/video question
+    if (s?.type === 'mb_add_question' && s?.step === 'question') {
+      return million.handleOwnerState(ctx, s);
+    }
 
     // إشعار القروبات بوسائط
     if (s?.type === 'mg_notify_groups_msg') {
