@@ -150,6 +150,8 @@ bot.use(async (ctx, next) => {
     const _pollState = global.getState && global.getState(ctx.from?.id);
     if (_pollState?.type === 'poll_create') return next();
     if (_pollState?.type === 'ai_mode_group') return next();
+    // ✅ Million Battle triggers
+    if (['مليون','أنا','انا','ابدأ','ابدا'].includes(t.trim())) return next();
     if (ctx.message && !['/search', '/setsp', '/dlt', '/done', '/cancel', '/new', '/top', '/all', '/tag', '/mute', '/unmute', '/ai', '/reset', '/start', '/help', '/stats', '/poll', '/polls', '/setwelcome', '/setwelcomemsg', '/clearwelcome', '/whisper'].some(p => _tcmd === p || t.startsWith(p))) {
       if (ctx.from && !ctx.from.is_bot) {
         const { run } = require('./database/db');
