@@ -23,6 +23,7 @@ async function initMillionDB() {
     owner_name TEXT,
     state TEXT DEFAULT 'registering',
     players TEXT DEFAULT '[]',
+    played_ids TEXT DEFAULT '[]',
     current_q INTEGER DEFAULT 0,
     prize INTEGER DEFAULT 100,
     msg_id BIGINT DEFAULT NULL,
@@ -128,18 +129,22 @@ async function nextQuestion(ctx, chatId) {
   const timeLimit = qNum >= 10 ? 20 : 10;
 
   // جلب سؤال عشوائي من DB
-  const q = await get(
-    'SELECT * FROM million_questions WHERE is_active=1 AND id NOT IN (SELECT COALESCE((SELECT used_ids FROM million_games WHERE chat_id=$1), \'\')::text) ORDER BY RANDOM() LIMIT 1',
-    [chatId]
-  ).catch(()=>null);
+  // جلب الأسئلة اللي ما تم استعمالها
+  let playedIds = [];
+  try { playedIds = JSON.parse(g.played_ids || '[]'); } catch(_) {}
+  const excludeSql = playedIds.length
+    ? 'SELECT * FROM million_questions WHERE is_active=1 AND id != ALL($2) ORDER BY RANDOM() LIMIT 1'
+    : 'SELECT * FROM million_questions WHERE is_active=1 ORDER BY RANDOM() LIMIT 1';
+  const q = await get(excludeSql, playedIds.length ? [chatId, playedIds] : [chatId]).catch(()=>null);
 
   if (!q) {
     await ctx.telegram.sendMessage(chatId, '❌ لا توجد أسئلة! أضف أسئلة من لوحة التحكم.').catch(()=>{});
     return endGame(ctx, chatId, null);
   }
 
-  await run('UPDATE million_games SET current_q=$1, prize=$2 WHERE chat_id=$3',
-    [qNum, Math.min(100 * qNum, 10000), chatId]);
+  playedIds.push(q.id);
+  await run('UPDATE million_games SET current_q=$1, prize=$2, played_ids=$3 WHERE chat_id=$4',
+    [qNum, Math.min(100 * qNum, 10000), JSON.stringify(playedIds), chatId]);
   await run('DELETE FROM million_answers WHERE game_id=$1', [g.id]).catch(()=>{});
 
   const prize = Math.min(100 * qNum, 10000);
@@ -234,15 +239,17 @@ async function processAnswers(ctx, chatId, q) {
   const eliminated = players.filter(p => !correctIds.has(p.id.toString()));
   const survivors  = players.filter(p =>  correctIds.has(p.id.toString()));
 
-  let text = `✅ *الإجابة الصحيحة:* 🅰 ${correct} — ${q['option_'+correct.toLowerCase()]}\n\n`;
+  const optionEmojis = { A: '🅐', B: '🅑', C: '🅒', D: '🅓' };
+  let text = `✅ *الإجابة الصحيحة:* ${optionEmojis[correct] || correct} — ${q['option_'+correct.toLowerCase()]}\n\n`;
 
   if (eliminated.length) {
     text += `❌ *تم إقصاء:*\n${eliminated.map(p=>'- '+p.name).join('\n')}\n\n`;
   }
 
   if (!survivors.length) {
-    text += '😱 *الجميع أخطأ! إعادة السؤال...*';
+    text += '😱 *الجميع أخطأ! نكمل باللاعبين كاملين...*';
     await ctx.telegram.sendMessage(chatId, text, { parse_mode: 'Markdown' }).catch(()=>{});
+    // نحتفظ بكل اللاعبين ونروح للسؤال التالي
     await run('UPDATE million_games SET players=$1 WHERE chat_id=$2', [JSON.stringify(players), chatId]);
     setTimeout(() => nextQuestion(ctx, chatId), 3000);
     return;
@@ -262,11 +269,27 @@ async function endGame(ctx, chatId, winner) {
   if (_editTimers.has(chatId)) { clearInterval(_editTimers.get(chatId)); _editTimers.delete(chatId); }
   await run('UPDATE million_games SET state=$1 WHERE chat_id=$2', ['ended', chatId]);
 
+  const g2 = await getGame(chatId);
+  const finalPrize = g2 ? g2.prize : 0;
+  const totalQ = g2 ? g2.current_q : 0;
+
   let text;
   if (winner) {
-    text = `🏆━━━━━━━━━━━━━━━━━━━━━━\n\n🎉 *الفائز: ${winner.name}*\n\n💰 ربحت الجائزة الكبرى!\nأنت بطل Million Battle 🔥\n\n━━━━━━━━━━━━━━━━━━━━━━🏆`;
+    // ✅ منح نقاط للفائز
+    try {
+      const { awardPoints } = require('../database/points');
+      const bonusPoints = Math.floor(finalPrize / 10);
+      for (let i = 0; i < bonusPoints; i++) awardPoints(winner.id, 'rating').catch(()=>{});
+    } catch(_) {}
+
+    text = `🏆━━━━━━━━━━━━━━━━━━━━━━\n\n` +
+      `🎉 *الفائز: ${winner.name}*\n\n` +
+      `💰 الجائزة: *${finalPrize} نقطة*\n` +
+      `📊 الأسئلة: *${totalQ}*\n` +
+      `🔥 أنت بطل Million Battle!\n\n` +
+      `━━━━━━━━━━━━━━━━━━━━━━🏆`;
   } else {
-    text = '🤝 *لا يوجد فائز هذه الجولة!*';
+    text = '🤝 *لا يوجد فائز هذه الجولة!*\n\nاكتب *مليون* للعب من جديد 🎮';
   }
   await ctx.telegram.sendMessage(chatId, text, { parse_mode: 'Markdown' }).catch(()=>{});
   setTimeout(() => run('DELETE FROM million_games WHERE chat_id=$1', [chatId]).catch(()=>{}), 30000);

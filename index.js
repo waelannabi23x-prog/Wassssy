@@ -981,6 +981,7 @@ bot.on('text', async ctx => { try {
     if (await handleAiChat(ctx, txt)) return;
   }
   if (s.type === 'mg_file') return manage.handleFileUpload(ctx);
+  if (s?.type === 'mb_add_question') return million.handleOwnerState(ctx, s);
   if (s.type === 'mg_bulk_prefix') return manage.handleText(ctx, s);
   if (s.type === 'mg_bulk_files' && txt !== '/done') return manage.handleText(ctx, s);
   if (s.type === 'mg_tpl_link') { await global.setState(ctx.uid, { ...s, type: 'mg_tpl_content', fileId: txt }); return ctx.reply('✏️ اكتب نص الرسالة (أو skip):').catch(() => {}); }
@@ -1064,6 +1065,13 @@ bot.command('leaderboard', async ctx => {
       ]] }
     });
   } catch(e) { ctx.reply('❌ حدث خطأ').catch(() => {}); }
+});
+
+
+bot.command('stopmillion', async ctx => {
+  if (!['supergroup','group'].includes(ctx.chat?.type)) return;
+  if (!ctx.isAdmin && !ctx.isOwner) return ctx.reply('🚫 للإداريين فقط').catch(()=>{});
+  await million.stopGame(ctx);
 });
 
 
