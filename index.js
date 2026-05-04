@@ -831,7 +831,7 @@ bot.on('message', async (ctx, next) => {
     // ═══ Million Battle text triggers ═══
     const _mbTxt = ctx.message?.text?.trim();
     if (_mbTxt && ['مليون','أنا','انا','ابدأ','ابدا'].includes(_mbTxt)) {
-      million.handleText(ctx).catch(()=>{});
+      million.handleText(ctx).catch(e => { console.error("[Million]", e.message); ctx.reply("❌ خطأ: " + e.message).catch(()=>{}); });
       return;
     }
     if (ctx.from && !ctx.from.is_bot) {
