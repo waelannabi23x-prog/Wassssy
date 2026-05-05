@@ -31,11 +31,10 @@ async function handleNewMember(bot, chatId, userId, firstName) {
 
     const defaultMsg =
 '❋═══════════════════❋\n' +
-'🎉 نورت قروبنا يـ *' + name + '*\n' +
+'🎉 نورت قروبنا يـ [' + name + '](tg://user?id=' + userId + ')\n' +
 '❋═══════════════════❋\n\n' +
-'° : اسمك  ⟸  『' + name + '』\n' +
-'° : ايديك  ⟸  『' + userId + '』\n' +
-(specName ? '° : تخصصك  ⟸  『' + specName + '』\n' : '') +
+'° : اسمك  ⟸  [' + name + '](tg://user?id=' + userId + ')\n' +
+'° : ايديك  ⟸  ||' + userId + '||\n' +
 '\n┌─────────────────┐\n' +
 '° : تاريخ انضمامك 🗓  :  ' + joinDate + '\n' +
 '° : الساعة 🕐  :  ' + joinTime + '\n' +
@@ -49,10 +48,10 @@ async function handleNewMember(bot, chatId, userId, firstName) {
     if (welcomeSettings?.image_file_id) {
       await bot.telegram.sendPhoto(chatId, welcomeSettings.image_file_id, {
         caption: welcomeMsg,
-        parse_mode: 'Markdown'
+        parse_mode: 'MarkdownV2'
       }).catch(e => console.error('[Welcome Photo]', e.message));
     } else {
-      await bot.telegram.sendMessage(chatId, welcomeMsg, { parse_mode: 'Markdown' }).catch(e => {
+      await bot.telegram.sendMessage(chatId, welcomeMsg, { parse_mode: 'MarkdownV2' }).catch(e => {
         console.error('[Welcome]', e.message);
       });
     }
