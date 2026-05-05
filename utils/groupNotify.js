@@ -96,21 +96,25 @@ async function postToChannel(bot, fileInfo) {
   if (!channelId || !fileInfo) return;
   try {
     const username = await getBotUsername(bot);
-    const caption =
-      '\ud83d\udcda *' + escMd(fileInfo.title) + '*\n' +
-      (fileInfo.description ? '\ud83d\udcdd ' + escMd(fileInfo.description) + '\n' : '') +
-      '\ud83d\udcc1 ' + escMd(fileInfo.cat_name||'') + ' | \ud83d\udcd6 ' + escMd(fileInfo.sub_name||'') + '\n\n' +
-      '\u2b07\ufe0f \u0644\u0644\u062a\u062d\u0645\u064a\u0644 \ud83d\udc47';
-
+    const title = escMd(fileInfo.title || '');
+    const desc = fileInfo.description ? escMd(fileInfo.description) : '';
+    const cat = escMd(fileInfo.cat_name || '');
+    const sub = escMd(fileInfo.sub_name || '');
+    const lines = [];
+    lines.push('*' + title + '*');
+    if (desc) lines.push(desc);
+    lines.push(cat + ' | ' + sub);
+    lines.push('');
+    lines.push('للتحميل اضغط الزر');
+    const caption = lines.join('
+');
     const btn = { inline_keyboard: [[{
-      text: '⬇️ تحميل — ' + (fileInfo.title||'').substring(0,25),
+      text: 'تحميل ' + (fileInfo.title||'').substring(0,25),
       url: 'https://t.me/' + username + '?start=file_' + fileInfo.id
     }]]};
-
-    const extra = { caption, parse_mode: 'Markdown', reply_markup: btn };
+    const extra = { caption: caption, parse_mode: 'Markdown', reply_markup: btn };
     const ftype = fileInfo.file_type || 'document';
-    const fid   = fileInfo.file_id;
-
+    const fid = fileInfo.file_id;
     if (ftype === 'photo' && fid) {
       await bot.telegram.sendPhoto(channelId, fid, extra);
     } else if (ftype === 'video' && fid) {
@@ -118,13 +122,9 @@ async function postToChannel(bot, fileInfo) {
     } else if (fid) {
       await bot.telegram.sendDocument(channelId, fid, extra);
     } else {
-      await bot.telegram.sendMessage(channelId,
-      await bot.telegram.sendMessage(channelId,
-        '\ud83d\udcda *' + escMd(fileInfo.title) + '*\n\n\u2b07\ufe0f \u0644\u0644\u062a\u062d\u0645\u064a\u0644 \u0627\u0636\u063a\u0637 \u0627\u0644\u0632\u0631 \ud83d\udc47',
-        { parse_mode: 'Markdown', reply_markup: btn }
-      );
+      await bot.telegram.sendMessage(channelId, caption, { parse_mode: 'Markdown', reply_markup: btn });
     }
   } catch(e) { console.error('[Channel Post]', e.message); }
 }
 
-module.exports = { notifyGroupsNewFile, notifyGroupsCustom, postToChannel };
+module.exportsmodule.exports = { notifyGroupsNewFile, notifyGroupsCustom, postToChannel };
