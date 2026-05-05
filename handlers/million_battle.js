@@ -52,7 +52,7 @@ function parsePlayers(g) {
 }
 function calcPrize(qNum) { return Math.min(100 * qNum, 10000); }
 function timeLimit(qNum) { return qNum >= 10 ? 30 : 20; }
-function mention(p) { return `[${p.name}](tg://user?id=${p.id})`; }
+function mention(p) { return p.name; }
 
 function stopTimers(chatId) {
   if (_timers.has(chatId))     { clearTimeout(_timers.get(chatId));     _timers.delete(chatId); }
@@ -344,7 +344,7 @@ async function processAnswers(ctx, chatId, questionId) {
   await ctx.telegram.sendMessage(chatId, resultText, { parse_mode: 'Markdown' }).catch(() => {});
   await run('UPDATE million_games SET players=$1, state=$2 WHERE chat_id=$3', [JSON.stringify(survivors), 'playing', chatId]);
 
-  if (survivors.length === 1) return endGame(ctx, chatId, survivors[0]);
+  if (survivors.length === 1 && players.length > 1) return endGame(ctx, chatId, survivors[0]);
   setTimeout(() => nextQuestion(ctx, chatId), 3000);
 }
 
