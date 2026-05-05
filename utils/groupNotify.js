@@ -97,14 +97,10 @@ async function postToChannel(bot, fileInfo) {
   try {
     const username = await getBotUsername(bot);
     const caption =
-      '📚 *' + escMd(fileInfo.title) + '*
-' +
-      (fileInfo.description ? '📝 ' + escMd(fileInfo.description) + '
-' : '') +
-      '📁 ' + escMd(fileInfo.cat_name||'') + ' | 📖 ' + escMd(fileInfo.sub_name||'') + '
-
-' +
-      '⬇️ للتحميل 👇';
+      '\ud83d\udcda *' + escMd(fileInfo.title) + '*\n' +
+      (fileInfo.description ? '\ud83d\udcdd ' + escMd(fileInfo.description) + '\n' : '') +
+      '\ud83d\udcc1 ' + escMd(fileInfo.cat_name||'') + ' | \ud83d\udcd6 ' + escMd(fileInfo.sub_name||'') + '\n\n' +
+      '\u2b07\ufe0f \u0644\u0644\u062a\u062d\u0645\u064a\u0644 \ud83d\udc47';
 
     const btn = { inline_keyboard: [[{
       text: '⬇️ تحميل — ' + (fileInfo.title||'').substring(0,25),
