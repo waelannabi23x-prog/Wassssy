@@ -285,7 +285,8 @@ async function processAnswers(ctx, chatId, questionId) {
   // ✅ atomic lock — غير state لـ 'processing' لمنع الاستدعاء المزدوج
   // atomic lock
   const gCheck = await get('SELECT state FROM million_games WHERE chat_id=$1', [chatId]).catch(() => null);
-  if (!gCheck || gCheck.state !== 'playing') return;
+  if (!gCheck || !['playing','processing'].includes(gCheck.state)) return;
+  if (gCheck.state === 'processing') return; // سبقنا استدعاء ثاني
   await run('UPDATE million_games SET state=$1 WHERE chat_id=$2', ['processing', chatId]).catch(() => {});
 
   stopTimers(chatId);
