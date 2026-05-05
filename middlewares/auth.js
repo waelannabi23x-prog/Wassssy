@@ -61,17 +61,27 @@ async function authMiddleware(ctx, next) {
 
   ctx.uid     = uid;
   ctx.isOwner = isOwner(uid);
-  // ⚡ buffer user fire-and-forget — لا ينتظر
   bufferUser(uid, ctx.from.first_name, ctx.from.last_name, ctx.from.username);
 
   if (ctx.isOwner) {
-    // ⚡ Owner fast path — لا DB لا cache لا شيء
     ctx.isAdmin    = true;
     ctx.adminPerms = ['full'];
     return next();
   }
 
-  // ⚡ parallel: admin check + ban check في نفس الوقت
+  // ⚡ CALLBACK FAST PATH — كل شيء من الكاش بدون await
+  if (ctx.callbackQuery) {
+    const cachedAdmin = _admCache.get(uid);
+    const cachedBan   = cacheGet('ban_' + uid);
+    const cachedSub   = cacheGet('sub_ok_' + uid);
+    if (cachedAdmin && cachedBan !== undefined && (cachedSub || !ctx.chat || ctx.chat.type !== 'private')) {
+      ctx.isAdmin    = cachedAdmin.data.isAdmin;
+      ctx.adminPerms = cachedAdmin.data.perms;
+      if (!ctx.isAdmin && cachedBan === 1) return ctx.answerCbQuery('🚫 أنت محظور').catch(()=>{});
+      return next();
+    }
+  }
+
   const banCached = cacheGet('ban_' + uid);
   const [info, banRow] = await Promise.all([
     getAdminInfo(uid),
