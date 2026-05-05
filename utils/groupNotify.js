@@ -119,9 +119,8 @@ async function postToChannel(bot, fileInfo) {
       await bot.telegram.sendDocument(channelId, fid, extra);
     } else {
       await bot.telegram.sendMessage(channelId,
-        '📚 *' + escMd(fileInfo.title) + '*
-
-⬇️ للتحميل اضغط الزر 👇',
+      await bot.telegram.sendMessage(channelId,
+        '\ud83d\udcda *' + escMd(fileInfo.title) + '*\n\n\u2b07\ufe0f \u0644\u0644\u062a\u062d\u0645\u064a\u0644 \u0627\u0636\u063a\u0637 \u0627\u0644\u0632\u0631 \ud83d\udc47',
         { parse_mode: 'Markdown', reply_markup: btn }
       );
     }
