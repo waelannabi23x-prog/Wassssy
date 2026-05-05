@@ -126,4 +126,4 @@ async function postToChannel(bot, fileInfo) {
   } catch(e) { console.error('[Channel Post]', e.message); }
 }
 
-module.exportsmodule.exports = { notifyGroupsNewFile, notifyGroupsCustom, postToChannel };
+module.exports = { notifyGroupsNewFile, notifyGroupsCustom, postToChannel };
