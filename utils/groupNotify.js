@@ -106,8 +106,7 @@ async function postToChannel(bot, fileInfo) {
     lines.push(cat + ' | ' + sub);
     lines.push('');
     lines.push('للتحميل اضغط الزر');
-    const caption = lines.join('
-');
+    const caption = lines.join('\n');
     const btn = { inline_keyboard: [[{
       text: 'تحميل ' + (fileInfo.title||'').substring(0,25),
       url: 'https://t.me/' + username + '?start=file_' + fileInfo.id
