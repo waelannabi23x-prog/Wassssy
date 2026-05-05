@@ -67,8 +67,9 @@ async function showMainMenu(ctx, name) {
   var welcome = timeGreet + '، *' + name + '!*\n';
   if (sp) welcome += '🎓 *' + escMd(sp.name) + '*\n';
   welcome += '━━━━━━━━━━━━━━━━\n📚 منصتك الأكاديمية — اختر ما تريد:';
+  const _webAppUrl = process.env.WEBHOOK_URL ? process.env.WEBHOOK_URL + '/app' : null;
   var rows = [
-    [btn('📚 تصفح المحتوى', 'browse')],
+    _webAppUrl ? [{ text: '🚀 فتح التطبيق', web_app: { url: _webAppUrl } }] : [btn('📚 تصفح المحتوى', 'browse')],
     [btn('🔍 بحث سريع', 'search_prompt'), btn('🆕 أحدث الملفات', 'latest')],
     [btn('⭐ مفضلاتي', 'favorites'), btn('📂 آخر ما شاهدت', 'history')],
     [btn('🤖 المساعد الذكي', 'ai_prompt')],

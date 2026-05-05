@@ -78,6 +78,9 @@ app.use(express.json({ limit: '1mb' }));
 app.set('trust proxy', 1);
 
 app.get('/', (_r, res) => res.send('OK'));
+// ── Mini App ──
+app.use('/app', require('express').static('public/app'));
+app.use('/api', require('./routes/api'));
 
 
 const CBDedup = {
