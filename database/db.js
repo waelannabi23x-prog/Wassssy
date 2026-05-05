@@ -304,3 +304,4 @@ async function setSetting(key, value) {
 }
 
 module.exports = { all: all, get: get, run: run, initSchema: initSchema, getSetting: getSetting, setSetting: setSetting, saveDB: saveDB, DB_PATH: DB_PATH, getPg: getPg };
+// Million Battle tables — added dynamically

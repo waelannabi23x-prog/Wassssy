@@ -90,4 +90,46 @@ async function notifyGroupsCustom(bot, groups, text, mediaFileId, mediaType) {
   return { sent, fail };
 }
 
-module.exports = { notifyGroupsNewFile, notifyGroupsCustom };
+// ── نشر في القناة الرسمية ──────────────────────
+async function postToChannel(bot, fileInfo) {
+  const channelId = process.env.CHANNEL_ID;
+  if (!channelId || !fileInfo) return;
+  try {
+    const username = await getBotUsername(bot);
+    const caption =
+      '📚 *' + escMd(fileInfo.title) + '*
+' +
+      (fileInfo.description ? '📝 ' + escMd(fileInfo.description) + '
+' : '') +
+      '📁 ' + escMd(fileInfo.cat_name||'') + ' | 📖 ' + escMd(fileInfo.sub_name||'') + '
+
+' +
+      '⬇️ للتحميل 👇';
+
+    const btn = { inline_keyboard: [[{
+      text: '⬇️ تحميل — ' + (fileInfo.title||'').substring(0,25),
+      url: 'https://t.me/' + username + '?start=file_' + fileInfo.id
+    }]]};
+
+    const extra = { caption, parse_mode: 'Markdown', reply_markup: btn };
+    const ftype = fileInfo.file_type || 'document';
+    const fid   = fileInfo.file_id;
+
+    if (ftype === 'photo' && fid) {
+      await bot.telegram.sendPhoto(channelId, fid, extra);
+    } else if (ftype === 'video' && fid) {
+      await bot.telegram.sendVideo(channelId, fid, extra);
+    } else if (fid) {
+      await bot.telegram.sendDocument(channelId, fid, extra);
+    } else {
+      await bot.telegram.sendMessage(channelId,
+        '📚 *' + escMd(fileInfo.title) + '*
+
+⬇️ للتحميل اضغط الزر 👇',
+        { parse_mode: 'Markdown', reply_markup: btn }
+      );
+    }
+  } catch(e) { console.error('[Channel Post]', e.message); }
+}
+
+module.exports = { notifyGroupsNewFile, notifyGroupsCustom, postToChannel };

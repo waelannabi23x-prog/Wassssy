@@ -50,6 +50,7 @@ async function mainMenu(ctx){
     rows.push([btn('💾 نسخ احتياطي','mg_backup'),btn(global.maintenanceMode?'🟢 إيقاف الصيانة':'🔴 وضع الصيانة','mg_maint')]);
     rows.push([btn('♻️ استعادة','mg_restore'),btn('🗑 سلة المحذوفات','mg_trash')]);
     rows.push([btn('🔔 إشعار للمستخدمين','mg_notify'),btn('📣 إشعار القروبات','mg_notify_groups')]);
+    if(process.env.CHANNEL_ID) rows.push([btn('📢 نشر في القناة','mg_post_channel')]);
     rows.push([btn('🚩 البلاغات','mg_reports'),btn('📨 نظام الرسائل','mg_msgs')]);
     rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp')]);
   }
@@ -263,7 +264,14 @@ async function handleFileUpload(ctx){
   try{
     const newFile=await filesDb.addFile(state.catId,state.title,state.desc||'',fid,ftype,uid);
     await interactions.addLog(uid,'upload',state.title);clearState(uid);
-    if(newFile&&global.__bot) notifyGroupsNewFile(global.__bot,newFile).catch(()=>{});
+    if(newFile&&global.__bot) {
+      notifyGroupsNewFile(global.__bot,newFile).catch(()=>{});
+      // نشر في القناة الرسمية
+      if(process.env.CHANNEL_ID) {
+        const { postToChannel } = require('../utils/groupNotify');
+        postToChannel(global.__bot, newFile).catch(()=>{});
+      }
+    }
     ctx.reply('✅ *'+escMd(state.title)+'* رُفع بنجاح!',{parse_mode:'Markdown',...build([[btn('➕ رفع آخر','mg_upl_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId+'_'+state.catId)],[btn('📁 عرض الملفات','mg_fls_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId+'_'+state.catId)]])});
   }catch(e){clearState(uid);ctx.reply(e.message==='exists'?'❌ يوجد ملف بهذا الاسم!':'❌ فشل: '+e.message);}
 }
@@ -351,6 +359,10 @@ async function handleCallback(ctx,data){
   if(data==='mg_notify_groups'){const specs=await content.getSpecs();const rows=specs.map(s=>[btn('🎓 '+s.name,'mg_ng_sp_'+s.id)]);rows.push([btn('📣 كل القروبات','mg_ng_sp_0')],[btn('◀️ رجوع','mg_menu')]);return ctx.reply('📣 إشعار القروبات\n\nاختر التخصص:',{...build(rows)}).catch(e=>ctx.reply('❌ '+e.message));}
   if(data.startsWith('mg_ng_sp_')){const spId=data.replace('mg_ng_sp_','');setState(uid,{type:'mg_notify_groups_msg',spId});return ctx.reply('📝 رسالة الإشعار لـ '+(spId==='0'?'كل القروبات':'التخصص')+':\n_(أو /cancel)_',{parse_mode:'Markdown'});}
   if(data.startsWith('mg_notify_sp_')&&!data.startsWith('mg_notify_sp_msg')){const spId=data.replace('mg_notify_sp_','');setState(uid,{type:'mg_notify_sp_msg',spId});return ctx.reply('📝 رسالة الإشعار:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
+  if(data==='mg_post_channel'){
+    setState(uid,{type:'mg_channel_post'});
+    return ctx.reply('📢 أرسل المحتوى للنشر في القناة (نص أو صورة أو فيديو أو مستند مع caption):').catch(()=>{});
+  }
   if(data==='mg_msgs') return showMsgsMenu(ctx);
   if(data==='mg_templates') return showTemplates(ctx);
   if(data==='mg_add_template'){setState(uid,{type:'mg_tpl_name'});return ctx.reply('📝 *قالب جديد*\n\nاسم القالب:',{parse_mode:'Markdown',...build([[btn('❌ إلغاء','mg_templates')]])});}
