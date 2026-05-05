@@ -2,703 +2,750 @@
 <html lang="ar" dir="rtl">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <title>EduMaster</title>
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <style>
-:root {
-  --bg: #0f0f0f;
-  --card: #1a1a2e;
-  --card2: #16213e;
-  --accent: #4f8ef7;
-  --accent2: #7c3aed;
-  --gold: #f59e0b;
-  --text: #f1f5f9;
-  --text2: #94a3b8;
-  --border: #2d3748;
-  --danger: #ef4444;
-  --success: #10b981;
-  --radius: 16px;
-  --radius-sm: 10px;
+:root{
+  --bg:#07070f;--surface:#0f0f1c;--surface2:#161626;--surface3:#1e1e32;--surface4:#252540;
+  --accent:#6c8fff;--accent2:#a78bfa;--accent-glow:rgba(108,143,255,.2);
+  --gold:#fbbf24;--green:#34d399;--red:#f87171;--pink:#f472b6;
+  --text:#eeeeff;--text2:#9999bb;--text3:#55557a;
+  --border:rgba(255,255,255,.06);--border2:rgba(255,255,255,.11);--border3:rgba(108,143,255,.25);
+  --r:16px;--r-sm:12px;--r-xs:8px;
 }
-* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
-body {
-  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
-  background: var(--bg);
-  color: var(--text);
-  min-height: 100vh;
-  overflow-x: hidden;
-}
-/* ── NAV ── */
-.nav {
-  position: fixed; top:0; left:0; right:0; z-index:100;
-  background: rgba(15,15,15,0.95);
-  backdrop-filter: blur(20px);
-  border-bottom: 1px solid var(--border);
-  padding: 12px 16px;
-  display: flex; align-items:center; gap:12px;
-}
-.nav-back {
-  width:36px; height:36px; border-radius:50%;
-  background: var(--card); border:none;
-  color: var(--text); font-size:18px;
-  display:flex; align-items:center; justify-content:center;
-  cursor:pointer; transition:.2s; flex-shrink:0;
-}
-.nav-back:active { transform:scale(.9); background:var(--accent); }
-.nav-title { font-size:17px; font-weight:700; flex:1; }
-.nav-search {
-  width:36px; height:36px; border-radius:50%;
-  background: var(--card); border:none;
-  color: var(--text); font-size:16px;
-  display:flex; align-items:center; justify-content:center;
-  cursor:pointer; transition:.2s;
-}
-.nav-search:active { transform:scale(.9); }
-/* ── PAGES ── */
-.page {
-  padding: 70px 16px 90px;
-  min-height: 100vh;
-  animation: fadeIn .25s ease;
-}
-@keyframes fadeIn { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:none} }
-/* ── BOTTOM TAB ── */
-.tabs {
-  position:fixed; bottom:0; left:0; right:0; z-index:100;
-  background: rgba(15,15,15,0.97);
-  backdrop-filter: blur(20px);
-  border-top: 1px solid var(--border);
-  display: flex;
-  padding-bottom: env(safe-area-inset-bottom);
-}
-.tab {
-  flex:1; padding:10px 4px 8px;
-  display:flex; flex-direction:column; align-items:center; gap:3px;
-  background:none; border:none; color:var(--text2);
-  font-size:10px; cursor:pointer; transition:.2s;
-}
-.tab.active { color:var(--accent); }
-.tab-icon { font-size:22px; line-height:1; }
-.tab:active { transform:scale(.9); }
-/* ── HERO ── */
-.hero {
-  background: linear-gradient(135deg, var(--card2) 0%, #0d1b2a 100%);
-  border-radius: var(--radius);
-  padding: 24px 20px;
-  margin-bottom: 20px;
-  border: 1px solid var(--border);
-  position: relative;
-  overflow: hidden;
-}
-.hero::before {
-  content:'';
-  position:absolute; top:-50%; left:-50%;
-  width:200%; height:200%;
-  background: radial-gradient(circle, rgba(79,142,247,.08) 0%, transparent 60%);
-  pointer-events:none;
-}
-.hero-greeting { font-size:13px; color:var(--text2); margin-bottom:4px; }
-.hero-name { font-size:24px; font-weight:800; margin-bottom:4px; }
-.hero-sp { font-size:13px; color:var(--accent); }
-/* ── GRID CARDS ── */
-.grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:12px; }
-.grid-1 { display:grid; grid-template-columns:1fr; gap:10px; margin-bottom:12px; }
-.card {
-  background: var(--card);
-  border-radius: var(--radius);
-  padding: 18px 16px;
-  border: 1px solid var(--border);
-  cursor: pointer;
-  transition: all .2s;
-  display:flex; align-items:center; gap:12px;
-  position: relative; overflow:hidden;
-  -webkit-user-select:none;
-}
-.card:active { transform:scale(.96); background:var(--card2); }
-.card-icon { font-size:26px; flex-shrink:0; }
-.card-text { flex:1; min-width:0; }
-.card-title { font-size:14px; font-weight:700; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.card-sub { font-size:11px; color:var(--text2); margin-top:2px; }
-.card-arrow { color:var(--text2); font-size:14px; flex-shrink:0; }
-.card.accent-blue { border-color: rgba(79,142,247,.3); }
-.card.accent-blue .card-icon { filter: drop-shadow(0 0 8px rgba(79,142,247,.5)); }
-.card.accent-purple { border-color: rgba(124,58,237,.3); }
-.card.accent-purple .card-icon { filter: drop-shadow(0 0 8px rgba(124,58,237,.5)); }
-.card.accent-gold { border-color: rgba(245,158,11,.3); }
-.card.accent-gold .card-icon { filter: drop-shadow(0 0 8px rgba(245,158,11,.5)); }
-/* ── SECTION TITLE ── */
-.section-title {
-  font-size:13px; font-weight:700;
-  color:var(--text2); text-transform:uppercase;
-  letter-spacing:.5px; margin-bottom:10px; padding-right:4px;
-}
-/* ── SEARCH ── */
-.search-box {
-  position: relative; margin-bottom:16px;
-}
-.search-input {
-  width:100%; padding:13px 16px 13px 44px;
-  background: var(--card); border:1px solid var(--border);
-  border-radius: var(--radius); color:var(--text);
-  font-size:15px; outline:none;
-  transition: border-color .2s;
-  direction: rtl;
-}
-.search-input:focus { border-color: var(--accent); }
-.search-icon {
-  position:absolute; left:14px; top:50%; transform:translateY(-50%);
-  font-size:18px; color:var(--text2); pointer-events:none;
-}
-/* ── FILE CARD ── */
-.file-card {
-  background: var(--card);
-  border-radius: var(--radius-sm);
-  padding: 14px;
-  border: 1px solid var(--border);
-  cursor:pointer; transition:.2s;
-  display:flex; align-items:center; gap:12px;
-}
-.file-card:active { transform:scale(.97); }
-.file-type-icon { font-size:24px; flex-shrink:0; }
-.file-info { flex:1; min-width:0; }
-.file-title { font-size:14px; font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.file-meta { font-size:11px; color:var(--text2); margin-top:3px; }
-.file-fav { font-size:20px; padding:4px; }
-/* ── BREADCRUMB ── */
-.breadcrumb {
-  display:flex; align-items:center; gap:6px;
-  font-size:12px; color:var(--text2);
-  margin-bottom:14px; flex-wrap:wrap;
-}
-.breadcrumb span { color:var(--accent); }
-/* ── FILE PREVIEW ── */
-.preview-card {
-  background: var(--card);
-  border-radius: var(--radius);
-  padding: 20px;
-  border: 1px solid var(--border);
-  margin-bottom: 16px;
-}
-.preview-title { font-size:20px; font-weight:800; margin-bottom:8px; }
-.preview-desc { font-size:13px; color:var(--text2); margin-bottom:16px; line-height:1.6; }
-.preview-stats {
-  display:flex; gap:20px; margin-bottom:16px;
-  font-size:13px; color:var(--text2);
-}
-.preview-stat { display:flex; align-items:center; gap:5px; }
-.stars { color:var(--gold); }
-.btn-primary {
-  width:100%; padding:16px;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  border:none; border-radius: var(--radius);
-  color:#fff; font-size:16px; font-weight:700;
-  cursor:pointer; transition:.2s; margin-bottom:10px;
-}
-.btn-primary:active { transform:scale(.97); opacity:.9; }
-.btn-secondary {
-  width:100%; padding:14px;
-  background: var(--card2); border:1px solid var(--border);
-  border-radius: var(--radius);
-  color:var(--text); font-size:14px; font-weight:600;
-  cursor:pointer; transition:.2s;
-}
-.btn-secondary:active { transform:scale(.97); }
-/* ── SPEC GRID ── */
-.spec-card {
-  background: linear-gradient(135deg, var(--card), var(--card2));
-  border-radius: var(--radius);
-  padding: 18px;
-  border: 1px solid var(--border);
-  cursor:pointer; transition:.2s;
-  text-align:center;
-  display:flex; flex-direction:column; align-items:center; gap:8px;
-}
-.spec-card:active { transform:scale(.95); }
-.spec-card .icon { font-size:32px; }
-.spec-card .name { font-size:13px; font-weight:700; }
-/* ── LOADER ── */
-.loader {
-  display:flex; flex-direction:column; align-items:center; justify-content:center;
-  padding:60px 20px; gap:16px; color:var(--text2);
-}
-.spinner {
-  width:40px; height:40px;
-  border:3px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius:50%;
-  animation: spin .8s linear infinite;
-}
-@keyframes spin { to{transform:rotate(360deg)} }
-/* ── EMPTY ── */
-.empty {
-  text-align:center; padding:60px 20px; color:var(--text2);
-}
-.empty-icon { font-size:48px; margin-bottom:12px; }
-/* ── TOAST ── */
-.toast {
-  position:fixed; bottom:100px; left:50%; transform:translateX(-50%) translateY(20px);
-  background: var(--success); color:#fff;
-  padding:10px 20px; border-radius:20px;
-  font-size:14px; font-weight:600;
-  opacity:0; transition:.3s; pointer-events:none; white-space:nowrap;
-  z-index:999;
-}
-.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
-.toast.error { background: var(--danger); }
-/* ── PROFILE ── */
-.profile-avatar {
-  width:80px; height:80px; border-radius:50%;
-  background: linear-gradient(135deg, var(--accent), var(--accent2));
-  display:flex; align-items:center; justify-content:center;
-  font-size:32px; font-weight:800; margin:0 auto 16px;
-  border:3px solid var(--border);
-}
-.profile-name { font-size:22px; font-weight:800; text-align:center; margin-bottom:4px; }
-.profile-sp { font-size:13px; color:var(--accent); text-align:center; margin-bottom:20px; }
-.stats-grid { display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:20px; }
-.stat-card {
-  background: var(--card); border-radius: var(--radius-sm);
-  padding:16px; text-align:center; border:1px solid var(--border);
-}
-.stat-value { font-size:24px; font-weight:800; color:var(--accent); }
-.stat-label { font-size:11px; color:var(--text2); margin-top:4px; }
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
+html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-serif}
+#root{display:flex;flex-direction:column;height:100vh;height:100dvh}
+#header{flex-shrink:0;z-index:50}
+#content{flex:1;overflow-y:auto;overflow-x:hidden;-webkit-overflow-scrolling:touch;scroll-behavior:smooth}
+#footer{flex-shrink:0;z-index:50}
+#content::-webkit-scrollbar{width:2px}
+#content::-webkit-scrollbar-thumb{background:var(--surface4);border-radius:2px}
+
+.header-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:rgba(7,7,15,.97);backdrop-filter:blur(30px);border-bottom:1px solid var(--border);min-height:54px}
+.back-btn{display:flex;align-items:center;justify-content:center;width:36px;height:36px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:15px;cursor:pointer;transition:all .15s;flex-shrink:0}
+.back-btn:active{background:var(--accent);transform:scale(.88)}
+.back-btn.hidden{opacity:0;pointer-events:none}
+.header-title{flex:1;font-size:15px;font-weight:700;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;letter-spacing:.2px}
+.header-action{width:36px;height:36px;border-radius:50%;background:var(--surface2);border:1px solid var(--border2);color:var(--text);font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .15s;flex-shrink:0}
+.header-action:active{background:var(--accent);transform:scale(.88)}
+
+.page{padding:14px 14px 24px;animation:pageIn .22s cubic-bezier(.4,0,.2,1)}
+@keyframes pageIn{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
+.page-back{animation:pageBack .22s cubic-bezier(.4,0,.2,1)}
+@keyframes pageBack{from{opacity:0;transform:translateX(-18px)}to{opacity:1;transform:none}}
+
+.tabs{display:grid;grid-template-columns:repeat(4,1fr);background:rgba(7,7,15,.98);backdrop-filter:blur(30px);border-top:1px solid var(--border);padding:5px 0 calc(5px + env(safe-area-inset-bottom))}
+.tab-btn{display:flex;flex-direction:column;align-items:center;gap:2px;padding:6px 4px;background:none;border:none;color:var(--text3);font-size:10px;font-weight:600;cursor:pointer;transition:all .15s;letter-spacing:.3px;position:relative}
+.tab-btn.active{color:var(--accent)}
+.tab-btn.active::after{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:24px;height:2px;background:var(--accent);border-radius:0 0 4px 4px}
+.tab-icon{font-size:20px;line-height:1;transition:transform .15s}
+.tab-btn.active .tab-icon{transform:translateY(-1px)}
+
+.hero{background:linear-gradient(135deg,#12123a 0%,#0a0a1e 100%);border-radius:var(--r);padding:20px 18px;margin-bottom:14px;border:1px solid var(--border3);position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;top:-40%;right:-20%;width:240px;height:240px;border-radius:50%;background:radial-gradient(circle,rgba(108,143,255,.15) 0%,transparent 70%);pointer-events:none}
+.hero::after{content:'';position:absolute;bottom:-60%;left:-10%;width:200px;height:200px;border-radius:50%;background:radial-gradient(circle,rgba(167,139,250,.1) 0%,transparent 70%);pointer-events:none}
+.hero-tag{font-size:10px;font-weight:700;color:var(--accent);letter-spacing:1.2px;margin-bottom:5px;text-transform:uppercase}
+.hero-name{font-size:24px;font-weight:800;margin-bottom:4px;line-height:1.2}
+.hero-sp{font-size:12px;color:var(--text2);display:flex;align-items:center;gap:4px;margin-top:4px}
+
+.section{margin-bottom:18px}
+.section-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.9px;text-transform:uppercase;margin-bottom:9px;padding-right:2px;display:flex;align-items:center;gap:6px}
+.section-label::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.g2{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.g1{display:grid;gap:7px}
+
+.menu-card{background:var(--surface);border-radius:var(--r);padding:16px 14px;border:1px solid var(--border);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:11px;position:relative;overflow:hidden}
+.menu-card::before{content:'';position:absolute;inset:0;background:linear-gradient(135deg,rgba(255,255,255,.02),transparent);pointer-events:none}
+.menu-card:active{transform:scale(.96);background:var(--surface2)}
+.mc-icon{font-size:26px;flex-shrink:0}
+.mc-body{flex:1;min-width:0}
+.mc-title{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mc-sub{font-size:11px;color:var(--text2);margin-top:2px}
+.mc-arrow{color:var(--text3);font-size:16px;flex-shrink:0}
+.menu-card.blue{border-color:rgba(108,143,255,.2);background:linear-gradient(135deg,rgba(108,143,255,.07),var(--surface))}
+.menu-card.purple{border-color:rgba(167,139,250,.2);background:linear-gradient(135deg,rgba(167,139,250,.07),var(--surface))}
+.menu-card.gold{border-color:rgba(251,191,36,.2);background:linear-gradient(135deg,rgba(251,191,36,.07),var(--surface))}
+.menu-card.green{border-color:rgba(52,211,153,.2);background:linear-gradient(135deg,rgba(52,211,153,.07),var(--surface))}
+.menu-card.red{border-color:rgba(248,113,113,.2);background:linear-gradient(135deg,rgba(248,113,113,.07),var(--surface))}
+
+.spec-card{background:var(--surface);border-radius:var(--r);padding:18px 10px;border:1px solid var(--border);cursor:pointer;transition:all .15s;text-align:center;display:flex;flex-direction:column;align-items:center;gap:7px}
+.spec-card:active{transform:scale(.94);background:var(--surface2)}
+.spec-card .si{font-size:30px;line-height:1}
+.spec-card .sn{font-size:11px;font-weight:700;line-height:1.3;color:var(--text)}
+.spec-card.s0{border-color:rgba(108,143,255,.25)}
+.spec-card.s1{border-color:rgba(167,139,250,.25)}
+.spec-card.s2{border-color:rgba(251,191,36,.25)}
+.spec-card.s3{border-color:rgba(52,211,153,.25)}
+.spec-card.s4{border-color:rgba(248,113,113,.25)}
+.spec-card.s5{border-color:rgba(244,114,182,.25)}
+
+.list-item{background:var(--surface);border-radius:var(--r-sm);padding:13px 14px;border:1px solid var(--border);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:11px}
+.list-item:active{transform:scale(.97);background:var(--surface2)}
+.li-icon{font-size:20px;flex-shrink:0}
+.li-body{flex:1;min-width:0}
+.li-title{font-size:13px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.li-sub{font-size:11px;color:var(--text2);margin-top:2px}
+.li-arrow{color:var(--text3);font-size:18px;flex-shrink:0}
+
+.file-card{background:var(--surface);border-radius:var(--r-sm);padding:13px 14px;border:1px solid var(--border);cursor:pointer;transition:all .15s;display:flex;align-items:center;gap:11px}
+.file-card:active{transform:scale(.97);background:var(--surface2)}
+.fc-icon{font-size:24px;flex-shrink:0}
+.fc-body{flex:1;min-width:0}
+.fc-title{font-size:13px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.fc-meta{font-size:11px;color:var(--text2);margin-top:3px;display:flex;gap:8px;flex-wrap:wrap}
+.fc-arrow{color:var(--text3);font-size:16px;flex-shrink:0}
+
+.search-wrap{position:relative;margin-bottom:12px}
+.search-input{width:100%;padding:12px 14px 12px 44px;background:var(--surface);border:1.5px solid var(--border2);border-radius:var(--r);color:var(--text);font-size:14px;outline:none;transition:border-color .15s;direction:rtl}
+.search-input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-glow)}
+.search-icon{position:absolute;left:13px;top:50%;transform:translateY(-50%);font-size:16px;color:var(--text3)}
+.search-clear{position:absolute;right:12px;top:50%;transform:translateY(-50%);width:20px;height:20px;border-radius:50%;background:var(--surface3);border:none;color:var(--text2);font-size:11px;cursor:pointer;display:none;align-items:center;justify-content:center}
+.search-clear.show{display:flex}
+
+.preview-hero{background:linear-gradient(135deg,var(--surface2),var(--surface));border-radius:var(--r);padding:20px 18px;border:1px solid var(--border2);margin-bottom:12px}
+.prev-title{font-size:19px;font-weight:800;margin-bottom:8px;line-height:1.3}
+.prev-desc{font-size:13px;color:var(--text2);margin-bottom:12px;line-height:1.6}
+.prev-path{font-size:11px;color:var(--text3);margin-bottom:12px;display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.prev-path span{color:var(--accent)}
+.prev-stats{display:flex;gap:14px;flex-wrap:wrap;margin-bottom:10px}
+.prev-stat{font-size:12px;color:var(--text2);display:flex;align-items:center;gap:3px}
+
+.stars-row{display:flex;gap:4px;margin-bottom:12px;align-items:center}
+.star-btn{font-size:26px;cursor:pointer;transition:transform .1s;line-height:1;background:none;border:none;padding:2px}
+.star-btn:active{transform:scale(1.3)}
+.stars-label{font-size:12px;color:var(--text2);margin-right:6px}
+
+.btn{width:100%;padding:14px;border-radius:var(--r);font-size:14px;font-weight:700;border:none;cursor:pointer;transition:all .15s;display:flex;align-items:center;justify-content:center;gap:8px;margin-bottom:9px}
+.btn:active{transform:scale(.97);opacity:.9}
+.btn-primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:#fff}
+.btn-secondary{background:var(--surface2);color:var(--text);border:1px solid var(--border2)}
+.btn-fav{background:var(--surface2);color:var(--text);border:1px solid var(--border2)}
+.btn-fav.active{background:rgba(251,191,36,.12);color:var(--gold);border-color:rgba(251,191,36,.3)}
+.btn-comment{background:var(--surface2);color:var(--text);border:1px solid var(--border2)}
+
+.comments-section{margin-top:4px}
+.comments-title{font-size:12px;font-weight:700;color:var(--text3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:6px}
+.comments-title::after{content:'';flex:1;height:1px;background:var(--border)}
+.comment-box{display:flex;gap:8px;margin-bottom:12px}
+.comment-input{flex:1;padding:10px 12px;background:var(--surface);border:1px solid var(--border2);border-radius:var(--r-sm);color:var(--text);font-size:13px;outline:none;direction:rtl;resize:none;height:40px;transition:border-color .15s;font-family:inherit}
+.comment-input:focus{border-color:var(--accent);height:70px}
+.comment-send{width:38px;height:40px;border-radius:var(--r-sm);background:var(--accent);border:none;color:#fff;font-size:16px;cursor:pointer;flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:all .15s}
+.comment-send:active{transform:scale(.9)}
+.comment-item{background:var(--surface);border-radius:var(--r-sm);padding:11px 13px;border:1px solid var(--border);margin-bottom:7px}
+.comment-author{font-size:11px;font-weight:700;color:var(--accent);margin-bottom:4px}
+.comment-text{font-size:13px;line-height:1.5;color:var(--text)}
+.comment-time{font-size:10px;color:var(--text3);margin-top:4px}
+
+.stats-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:14px}
+.stat-box{background:var(--surface);border-radius:var(--r-sm);padding:14px 10px;text-align:center;border:1px solid var(--border)}
+.stat-val{font-size:24px;font-weight:800;color:var(--accent);line-height:1}
+.stat-lbl{font-size:10px;color:var(--text2);margin-top:4px}
+
+.breadcrumb{display:flex;align-items:center;gap:4px;font-size:11px;color:var(--text3);margin-bottom:11px;flex-wrap:wrap;line-height:1.8}
+.breadcrumb .sep{color:var(--text3)}
+.breadcrumb .crumb{color:var(--text2)}
+.breadcrumb .crumb:last-child{color:var(--accent);font-weight:600}
+
+.avatar{width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,var(--accent),var(--accent2));display:flex;align-items:center;justify-content:center;font-size:28px;font-weight:800;margin:0 auto 12px;box-shadow:0 0 28px var(--accent-glow)}
+.profile-name{font-size:20px;font-weight:800;text-align:center;margin-bottom:2px}
+.profile-un{font-size:12px;color:var(--text2);text-align:center;margin-bottom:3px}
+.profile-sp{font-size:12px;color:var(--accent);text-align:center;margin-bottom:16px;display:flex;align-items:center;justify-content:center;gap:4px}
+
+.fav-card{background:var(--surface);border-radius:var(--r-sm);padding:13px 14px;border:1px solid var(--border);display:flex;align-items:center;gap:11px;margin-bottom:7px;cursor:pointer;transition:all .15s}
+.fav-card:active{transform:scale(.97)}
+.fav-icon{font-size:22px;flex-shrink:0}
+.fav-body{flex:1;min-width:0}
+.fav-title{font-size:13px;font-weight:600;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.fav-meta{font-size:11px;color:var(--text2);margin-top:2px}
+.fav-del{background:none;border:none;color:var(--text3);font-size:16px;cursor:pointer;padding:4px;flex-shrink:0}
+
+.loader{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:70px 20px;gap:12px;color:var(--text2)}
+.spin{width:32px;height:32px;border:2px solid var(--border2);border-top-color:var(--accent);border-radius:50%;animation:spin .65s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+.loader-text{font-size:12px}
+
+.empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 20px;gap:9px;color:var(--text2);text-align:center}
+.empty-icon{font-size:44px}
+.empty-text{font-size:13px;font-weight:600}
+.empty-sub{font-size:11px;color:var(--text3)}
+
+#toast{position:fixed;bottom:88px;left:50%;transform:translateX(-50%) translateY(10px);background:var(--surface3);color:var(--text);padding:9px 18px;border-radius:22px;font-size:12px;font-weight:600;white-space:nowrap;z-index:999;border:1px solid var(--border2);opacity:0;transition:all .25s;pointer-events:none;box-shadow:0 6px 24px rgba(0,0,0,.4)}
+#toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+#toast.ok{background:rgba(52,211,153,.18);border-color:var(--green);color:var(--green)}
+#toast.err{background:rgba(248,113,113,.18);border-color:var(--red);color:var(--red)}
+
+.badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;border-radius:9px;background:var(--red);color:#fff;font-size:10px;font-weight:700;padding:0 5px;margin-right:3px}
 </style>
 </head>
 <body>
-
-<div class="toast" id="toast"></div>
-
-<!-- NAV -->
-<div class="nav" id="nav">
-  <button class="nav-back" id="navBack" onclick="goBack()" style="display:none">◀️</button>
-  <div class="nav-title" id="navTitle">📚 EduMaster</div>
-  <button class="nav-search" onclick="showPage('search')">🔍</button>
+<div id="root">
+  <div id="header">
+    <div class="header-bar">
+      <button class="back-btn hidden" id="backBtn" onclick="NAV.back()">◀</button>
+      <div class="header-title" id="headerTitle">📚 EduMaster</div>
+      <button class="header-action" onclick="NAV.tab('search')">🔍</button>
+    </div>
+  </div>
+  <div id="content"></div>
+  <div id="footer">
+    <div class="tabs">
+      <button class="tab-btn active" id="tab-home" onclick="NAV.tab('home')">
+        <span class="tab-icon">🏠</span>الرئيسية
+      </button>
+      <button class="tab-btn" id="tab-browse" onclick="NAV.tab('browse')">
+        <span class="tab-icon">📚</span>تصفح
+      </button>
+      <button class="tab-btn" id="tab-search" onclick="NAV.tab('search')">
+        <span class="tab-icon">🔍</span>بحث
+      </button>
+      <button class="tab-btn" id="tab-profile" onclick="NAV.tab('profile')">
+        <span class="tab-icon">👤</span>حسابي
+      </button>
+    </div>
+  </div>
 </div>
-
-<!-- PAGES -->
-<div id="app"></div>
-
-<!-- TABS -->
-<div class="tabs">
-  <button class="tab active" id="tab-home" onclick="showPage('home')">
-    <span class="tab-icon">🏠</span>الرئيسية
-  </button>
-  <button class="tab" id="tab-browse" onclick="showPage('browse')">
-    <span class="tab-icon">📚</span>تصفح
-  </button>
-  <button class="tab" id="tab-search" onclick="showPage('search')">
-    <span class="tab-icon">🔍</span>بحث
-  </button>
-  <button class="tab" id="tab-profile" onclick="showPage('profile')">
-    <span class="tab-icon">👤</span>حسابي
-  </button>
-</div>
+<div id="toast"></div>
 
 <script>
 const tg = window.Telegram.WebApp;
-tg.ready();
-tg.expand();
-tg.setHeaderColor('#0f0f0f');
-tg.setBackgroundColor('#0f0f0f');
+tg.ready(); tg.expand();
+tg.setHeaderColor('#07070f');
+tg.setBackgroundColor('#07070f');
+const TG_USER = tg.initDataUnsafe?.user || {};
+const INIT_DATA = tg.initData;
 
-const initData = tg.initData;
-const user = tg.initDataUnsafe?.user || {};
+const API = {
+  async call(path, method='GET', body=null) {
+    const opts = { method, headers: { 'x-init-data': INIT_DATA, 'Content-Type': 'application/json' } };
+    if (body) opts.body = JSON.stringify(body);
+    const r = await fetch('/api' + path, opts);
+    if (!r.ok) throw new Error(await r.text());
+    return r.json();
+  },
+  get: p => API.call(p),
+  post: (p, b) => API.call(p, 'POST', b),
+};
 
-// ── State ──────────────────────────────────────────
-const history = [];
-let currentPage = 'home';
-let profileData = null;
-
-// ── API ────────────────────────────────────────────
-async function api(path, method='GET', body=null) {
-  const opts = {
-    method,
-    headers: { 'x-init-data': initData, 'Content-Type': 'application/json' }
-  };
-  if (body) opts.body = JSON.stringify(body);
-  const res = await fetch('/api' + path, opts);
-  if (!res.ok) throw new Error(await res.text());
-  return res.json();
+const CACHE = {};
+async function cached(key, fn, ttl=300000) {
+  const now = Date.now();
+  if (CACHE[key] && now - CACHE[key].ts < ttl) return CACHE[key].v;
+  const v = await fn();
+  CACHE[key] = { v, ts: now };
+  return v;
 }
 
-// ── Toast ─────────────────────────────────────────
-function showToast(msg, type='') {
-  const t = document.getElementById('toast');
-  t.textContent = msg;
-  t.className = 'toast ' + type + ' show';
-  setTimeout(() => t.className = 'toast ' + type, 2500);
-}
+const STACK = [];
+let _currentTab = 'home';
+let _isBack = false;
 
-// ── Navigation ────────────────────────────────────
-function setTab(name) {
-  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  const el = document.getElementById('tab-' + name);
-  if (el) el.classList.add('active');
-}
-
-function setNavTitle(title, showBack=false) {
-  document.getElementById('navTitle').textContent = title;
-  document.getElementById('navBack').style.display = showBack ? 'flex' : 'none';
-}
-
-function pushHistory(page, args) {
-  history.push({ page, args });
-}
-
-function goBack() {
-  if (history.length > 0) {
+const NAV = {
+  tab(name) {
+    tg.HapticFeedback.selectionChanged();
+    _currentTab = name;
+    STACK.length = 0;
+    _isBack = false;
+    document.querySelectorAll('.tab-btn').forEach(t => t.classList.remove('active'));
+    document.getElementById('tab-' + name)?.classList.add('active');
+    const titles = { home: '📚 EduMaster', browse: '📚 تصفح', search: '🔍 بحث', profile: '👤 حسابي' };
+    setHeader(titles[name] || name, false);
+    PAGES[name]?.();
+  },
+  go(name, params={}, title='') {
     tg.HapticFeedback.impactOccurred('light');
-    const prev = history.pop();
-    showPageDirect(prev.page, prev.args, false);
-  }
+    STACK.push({ name: STACK.length ? STACK[STACK.length-1].name : _currentTab, params: {}, title: document.getElementById('headerTitle').textContent });
+    _isBack = false;
+    if (title) setHeader(title, true);
+    PAGES[name]?.(params);
+  },
+  back() {
+    if (!STACK.length) return;
+    tg.HapticFeedback.impactOccurred('light');
+    const prev = STACK.pop();
+    _isBack = true;
+    setHeader(prev.title, STACK.length > 0);
+    PAGES[prev.name]?.(prev.params);
+  },
+};
+
+function setHeader(title, showBack) {
+  document.getElementById('headerTitle').textContent = title;
+  document.getElementById('backBtn').classList.toggle('hidden', !showBack);
 }
 
-function showPage(page, args={}, addHistory=true) {
-  tg.HapticFeedback.impactOccurred('light');
-  if (addHistory && currentPage !== page) pushHistory(currentPage, {});
-  showPageDirect(page, args, addHistory);
+function render(html) {
+  const el = document.getElementById('content');
+  el.innerHTML = `<div class="page${_isBack ? ' page-back' : ''}">${html}</div>`;
+  el.scrollTo(0, 0);
 }
 
-function showPageDirect(page, args={}, addHistory=true) {
-  currentPage = page;
-  if (['home','browse','search','profile'].includes(page)) {
-    history.length = 0;
-    setNavTitle(page==='home'?'📚 EduMaster':page==='browse'?'📚 تصفح':page==='search'?'🔍 بحث':'👤 حسابي', false);
-    setTab(page);
-  }
-  const renders = {
-    home: renderHome, browse: renderBrowse,
-    search: renderSearch, profile: renderProfile,
-    years: () => renderYears(args.spId, args.spName),
-    semesters: () => renderSemesters(args.yrId, args.yrName, args.spId),
-    subjects: () => renderSubjects(args.smId, args.smName, args.yrId, args.spId),
-    categories: () => renderCategories(args.sbId, args.sbName, args.smId, args.yrId, args.spId),
-    files: () => renderFiles(args.catId, args.catName),
-    filePreview: () => renderFilePreview(args.fileId),
-  };
-  const fn = renders[page];
-  if (fn) fn();
+function loader() {
+  render(`<div class="loader"><div class="spin"></div><div class="loader-text">جاري التحميل...</div></div>`);
 }
 
-// ── Loader ────────────────────────────────────────
-function setLoader() {
-  document.getElementById('app').innerHTML = `
-    <div class="page"><div class="loader">
-      <div class="spinner"></div>
-      <div>جاري التحميل...</div>
-    </div></div>`;
+function empty(icon='📭', text='لا يوجد محتوى', sub='') {
+  return `<div class="empty"><div class="empty-icon">${icon}</div><div class="empty-text">${text}</div>${sub ? `<div class="empty-sub">${sub}</div>` : ''}</div>`;
 }
 
-// ── HOME ──────────────────────────────────────────
-async function renderHome() {
-  const hour = new Date().getHours();
-  const greet = hour<12?'🌅 صباح النور':hour<17?'☀️ مساء الخير':'🌙 مساء النور';
-  const name = user.first_name || 'طالب';
+function esc(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/'/g,'&#39;');
+}
 
-  let spName = '';
-  try {
-    if (!profileData) profileData = await api('/profile');
-    spName = profileData.specialty?.name || '';
-  } catch(_){}
+let _toastT;
+function toast(msg, type='') {
+  clearTimeout(_toastT);
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = 'toast show ' + type;
+  _toastT = setTimeout(() => el.className = 'toast', 2400);
+}
 
-  document.getElementById('app').innerHTML = `
-  <div class="page">
-    <div class="hero">
-      <div class="hero-greeting">${greet}</div>
-      <div class="hero-name">${name} 👋</div>
-      ${spName ? `<div class="hero-sp">🎓 ${spName}</div>` : ''}
-    </div>
+function starsHtml(avg, cnt) {
+  const full = Math.round(avg || 0);
+  let s = '';
+  for (let i = 1; i <= 5; i++) s += `<span style="color:${i <= full ? '#fbbf24' : '#55557a'};font-size:18px">★</span>`;
+  return `${s} <span style="font-size:11px;color:var(--text2)">(${cnt || 0})</span>`;
+}
 
-    <div class="section-title">الأقسام الرئيسية</div>
-    <div class="grid-2">
-      <div class="card accent-blue" onclick="showPage('browse')">
-        <span class="card-icon">📚</span>
-        <div class="card-text"><div class="card-title">تصفح</div><div class="card-sub">كل الملفات</div></div>
+let _profile = null;
+
+const PAGES = {
+  async home() {
+    const h = new Date().getHours();
+    const greet = h < 12 ? '🌅 صباح النور' : h < 17 ? '☀️ مساء الخير' : '🌙 مساء النور';
+    const name = TG_USER.first_name || 'طالب';
+    let spName = '';
+    try {
+      if (!_profile) _profile = await cached('profile', () => API.get('/profile'), 120000);
+      spName = _profile.specialty?.name || '';
+    } catch(_) {}
+    render(`
+      <div class="hero">
+        <div class="hero-tag">EduMaster Platform</div>
+        <div class="hero-name">${greet}،<br>${esc(name)} 👋</div>
+        ${spName ? `<div class="hero-sp">🎓 <span style="color:var(--accent)">${esc(spName)}</span></div>` : ''}
       </div>
-      <div class="card accent-purple" onclick="showPage('search')">
-        <span class="card-icon">🔍</span>
-        <div class="card-text"><div class="card-title">بحث</div><div class="card-sub">ابحث سريع</div></div>
-      </div>
-    </div>
-    <div class="grid-2">
-      <div class="card accent-gold" onclick="loadLatest()">
-        <span class="card-icon">🆕</span>
-        <div class="card-text"><div class="card-title">الجديد</div><div class="card-sub">آخر الملفات</div></div>
-      </div>
-      <div class="card" onclick="showPage('profile')">
-        <span class="card-icon">👤</span>
-        <div class="card-text"><div class="card-title">حسابي</div><div class="card-sub">إحصائياتي</div></div>
-      </div>
-    </div>
-  </div>`;
-}
-
-// ── BROWSE ────────────────────────────────────────
-async function renderBrowse() {
-  setNavTitle('📚 اختر تخصصك', false);
-  setLoader();
-  try {
-    const specs = await api('/specialties');
-    const icons = ['💻','🏥','📐','⚗️','📊','🔬','⚙️','🎨','📖','🌍','🎓','🔭'];
-    let rows = '';
-    for (let i=0; i<specs.length; i+=2) {
-      rows += '<div class="grid-2">';
-      rows += `<div class="spec-card" onclick="showPage('years',{spId:${specs[i].id},spName:'${escHtml(specs[i].name)}'})">
-        <div class="icon">${icons[i%icons.length]}</div>
-        <div class="name">${escHtml(specs[i].name)}</div>
-      </div>`;
-      if (specs[i+1]) rows += `<div class="spec-card" onclick="showPage('years',{spId:${specs[i+1].id},spName:'${escHtml(specs[i+1].name)}'})">
-        <div class="icon">${icons[(i+1)%icons.length]}</div>
-        <div class="name">${escHtml(specs[i+1].name)}</div>
-      </div>`;
-      rows += '</div>';
-    }
-    document.getElementById('app').innerHTML = `<div class="page">${rows}</div>`;
-  } catch(e) { showToast('خطأ في التحميل','error'); }
-}
-
-async function renderYears(spId, spName) {
-  setNavTitle('📅 ' + spName, true);
-  setLoader();
-  try {
-    const years = await api('/years/' + spId);
-    let html = `<div class="page"><div class="breadcrumb">🎓 <span>${escHtml(spName)}</span></div><div class="grid-1">`;
-    years.forEach(y => {
-      html += `<div class="card" onclick="showPage('semesters',{yrId:${y.id},yrName:'${escHtml(y.name)}',spId:${spId}})">
-        <span class="card-icon">📅</span>
-        <div class="card-text"><div class="card-title">${escHtml(y.name)}</div></div>
-        <span class="card-arrow">›</span></div>`;
-    });
-    html += '</div></div>';
-    document.getElementById('app').innerHTML = html;
-  } catch(e) { showToast('خطأ','error'); }
-}
-
-async function renderSemesters(yrId, yrName, spId) {
-  setNavTitle('📆 ' + yrName, true);
-  setLoader();
-  try {
-    const sems = await api('/semesters/' + yrId);
-    let html = `<div class="page"><div class="grid-2">`;
-    sems.forEach(s => {
-      html += `<div class="spec-card" onclick="showPage('subjects',{smId:${s.id},smName:'${escHtml(s.name)}',yrId:${yrId},spId:${spId}})">
-        <div class="icon">📆</div>
-        <div class="name">${escHtml(s.name)}</div>
-      </div>`;
-    });
-    html += '</div></div>';
-    document.getElementById('app').innerHTML = html;
-  } catch(e) { showToast('خطأ','error'); }
-}
-
-async function renderSubjects(smId, smName, yrId, spId) {
-  setNavTitle('📖 ' + smName, true);
-  setLoader();
-  try {
-    const subs = await api('/subjects/' + smId);
-    let html = `<div class="page"><div class="grid-2">`;
-    subs.forEach(s => {
-      html += `<div class="spec-card" onclick="showPage('categories',{sbId:${s.id},sbName:'${escHtml(s.name)}',smId:${smId},yrId:${yrId},spId:${spId}})">
-        <div class="icon">📖</div>
-        <div class="name">${escHtml(s.name)}</div>
-      </div>`;
-    });
-    html += '</div></div>';
-    document.getElementById('app').innerHTML = html;
-  } catch(e) { showToast('خطأ','error'); }
-}
-
-async function renderCategories(sbId, sbName, smId, yrId, spId) {
-  setNavTitle('📁 ' + sbName, true);
-  setLoader();
-  try {
-    const cats = await api('/categories/' + sbId);
-    let html = `<div class="page"><div class="grid-2">`;
-    const catIcons = {'cours':'📝','td':'✏️','tp':'🔬','exam':'📋','ds':'📝','correction':'✅'};
-    cats.forEach(c => {
-      const icon = Object.keys(catIcons).find(k => c.name.toLowerCase().includes(k));
-      html += `<div class="spec-card" onclick="showPage('files',{catId:${c.id},catName:'${escHtml(c.name)}'})">
-        <div class="icon">${catIcons[icon]||'📁'}</div>
-        <div class="name">${escHtml(c.name)}</div>
-      </div>`;
-    });
-    html += '</div></div>';
-    document.getElementById('app').innerHTML = html;
-  } catch(e) { showToast('خطأ','error'); }
-}
-
-async function renderFiles(catId, catName) {
-  setNavTitle('📄 ' + catName, true);
-  setLoader();
-  try {
-    const files = await api('/files/' + catId);
-    renderFileList(files, catName);
-  } catch(e) { showToast('خطأ','error'); }
-}
-
-function renderFileList(files, title='') {
-  if (!files.length) {
-    document.getElementById('app').innerHTML = `<div class="page"><div class="empty"><div class="empty-icon">📭</div><div>لا توجد ملفات</div></div></div>`;
-    return;
-  }
-  const typeIcon = t => t==='link'?'🔗':t==='photo'?'🖼️':'📄';
-  let html = `<div class="page"><div class="grid-1">`;
-  files.forEach(f => {
-    html += `<div class="file-card" onclick="showPage('filePreview',{fileId:${f.id}})">
-      <span class="file-type-icon">${typeIcon(f.file_type)}</span>
-      <div class="file-info">
-        <div class="file-title">${escHtml(f.title)}</div>
-        <div class="file-meta">📖 ${escHtml(f.sub_name||'')} · ⬇️ ${f.downloads||0}</div>
-      </div>
-      <span style="color:var(--text2);font-size:18px">›</span>
-    </div>`;
-  });
-  html += '</div></div>';
-  document.getElementById('app').innerHTML = html;
-}
-
-async function loadLatest() {
-  pushHistory('home', {});
-  setNavTitle('🆕 آخر الملفات', true);
-  setLoader();
-  try {
-    const files = await api('/latest');
-    renderFileList(files, 'آخر الملفات');
-  } catch(e) { showToast('خطأ','error'); }
-}
-
-// ── FILE PREVIEW ──────────────────────────────────
-async function renderFilePreview(fileId) {
-  setNavTitle('📄 ...', true);
-  setLoader();
-  try {
-    const f = await api('/file/' + fileId);
-    setNavTitle('📄 ' + f.title.substring(0,25), true);
-    const stars = '⭐'.repeat(Math.round(f.rating?.avg||0)) + '☆'.repeat(5-Math.round(f.rating?.avg||0));
-    document.getElementById('app').innerHTML = `
-    <div class="page">
-      <div class="preview-card">
-        <div class="preview-title">${escHtml(f.title)}</div>
-        ${f.description ? `<div class="preview-desc">${escHtml(f.description)}</div>` : ''}
-        <div style="font-size:13px;color:var(--text2);margin-bottom:12px">
-          📁 ${escHtml(f.cat_name||'')} | 📖 ${escHtml(f.sub_name||'')}
-        </div>
-        <div class="preview-stats">
-          <span class="preview-stat">⬇️ ${f.downloads||0} تحميل</span>
-          <span class="preview-stat stars">${stars}</span>
-          <span class="preview-stat">💬 ${f.comments||0}</span>
+      <div class="section">
+        <div class="section-label">الرئيسية</div>
+        <div class="g2">
+          <div class="menu-card blue" onclick="NAV.tab('browse')">
+            <span class="mc-icon">📚</span>
+            <div class="mc-body"><div class="mc-title">تصفح</div><div class="mc-sub">كل الملفات</div></div>
+          </div>
+          <div class="menu-card purple" onclick="NAV.tab('search')">
+            <span class="mc-icon">🔍</span>
+            <div class="mc-body"><div class="mc-title">بحث</div><div class="mc-sub">ابحث بسرعة</div></div>
+          </div>
         </div>
       </div>
-      <button class="btn-primary" onclick="sendFile(${f.id})">
-        ⬇️ تحميل الملف
-      </button>
-      <button class="btn-secondary" id="favBtn" onclick="toggleFav(${f.id},${f.fav})">
-        ${f.fav ? '⭐ محفوظ' : '☆ حفظ في المفضلة'}
-      </button>
-    </div>`;
-  } catch(e) { showToast('خطأ في تحميل الملف','error'); }
-}
+      <div class="section">
+        <div class="section-label">اكتشف</div>
+        <div class="g1">
+          <div class="menu-card gold" onclick="loadLatest()">
+            <span class="mc-icon">🆕</span>
+            <div class="mc-body"><div class="mc-title">آخر الملفات</div><div class="mc-sub">أحدث ما أُضيف</div></div>
+            <span class="mc-arrow">›</span>
+          </div>
+          <div class="menu-card green" onclick="loadFavorites()">
+            <span class="mc-icon">⭐</span>
+            <div class="mc-body"><div class="mc-title">المفضلة</div><div class="mc-sub">ملفاتك المحفوظة</div></div>
+            <span class="mc-arrow">›</span>
+          </div>
+          <div class="menu-card red" onclick="NAV.tab('profile')">
+            <span class="mc-icon">👤</span>
+            <div class="mc-body"><div class="mc-title">حسابي</div><div class="mc-sub">إحصائياتي وتاريخي</div></div>
+            <span class="mc-arrow">›</span>
+          </div>
+        </div>
+      </div>`);
+  },
 
-async function sendFile(fileId) {
-  tg.HapticFeedback.notificationOccurred('success');
-  showToast('⏳ جاري الإرسال...');
+  async browse() {
+    loader();
+    try {
+      const specs = await cached('specs', () => API.get('/specialties'), 3600000);
+      const icons = ['💻','🏥','📐','⚗️','📊','🔬','⚙️','🎨','📖','🌍','🎓','🔭','🧮','🏗️','💡','🧬'];
+      let rows = '';
+      for (let i = 0; i < specs.length; i += 2) {
+        const cls1 = 's' + (i % 6), cls2 = 's' + ((i + 1) % 6);
+        rows += `<div class="g2">
+          <div class="spec-card ${cls1}" onclick="NAV.go('years',{spId:${specs[i].id},spName:'${esc(specs[i].name)}'},'📅 ${esc(specs[i].name)}')">
+            <div class="si">${icons[i % icons.length]}</div>
+            <div class="sn">${esc(specs[i].name)}</div>
+          </div>`;
+        if (specs[i + 1]) {
+          rows += `<div class="spec-card ${cls2}" onclick="NAV.go('years',{spId:${specs[i+1].id},spName:'${esc(specs[i+1].name)}'},'📅 ${esc(specs[i+1].name)}')">
+            <div class="si">${icons[(i + 1) % icons.length]}</div>
+            <div class="sn">${esc(specs[i + 1].name)}</div>
+          </div>`;
+        }
+        rows += `</div>`;
+      }
+      render(`<div class="section"><div class="section-label">اختر تخصصك</div>${rows}</div>`);
+    } catch(e) { toast('خطأ في التحميل', 'err'); }
+  },
+
+  async years({ spId, spName }) {
+    loader();
+    setHeader('📅 ' + spName, true);
+    try {
+      const years = await cached('years_' + spId, () => API.get('/years/' + spId), 3600000);
+      const items = years.map(y => `
+        <div class="list-item" onclick="NAV.go('semesters',{yrId:${y.id},yrName:'${esc(y.name)}',spId:${spId},spName:'${esc(spName)}'},'📆 ${esc(y.name)}')">
+          <span class="li-icon">📅</span>
+          <div class="li-body"><div class="li-title">${esc(y.name)}</div></div>
+          <span class="li-arrow">›</span>
+        </div>`).join('');
+      render(`
+        <div class="breadcrumb">🎓 <span class="crumb">${esc(spName)}</span></div>
+        <div class="g1">${items || empty()}</div>`);
+    } catch(e) { toast('خطأ', 'err'); }
+  },
+
+  async semesters({ yrId, yrName, spId, spName }) {
+    loader();
+    setHeader('📆 ' + yrName, true);
+    try {
+      const sems = await cached('sems_' + yrId, () => API.get('/semesters/' + yrId), 3600000);
+      let rows = '';
+      for (let i = 0; i < sems.length; i += 2) {
+        rows += '<div class="g2">';
+        rows += `<div class="spec-card s${i%6}" onclick="NAV.go('subjects',{smId:${sems[i].id},smName:'${esc(sems[i].name)}',yrId:${yrId},yrName:'${esc(yrName)}',spId:${spId},spName:'${esc(spName)}'},'📖 ${esc(sems[i].name)}')"><div class="si">📆</div><div class="sn">${esc(sems[i].name)}</div></div>`;
+        if (sems[i + 1]) {
+          rows += `<div class="spec-card s${(i+1)%6}" onclick="NAV.go('subjects',{smId:${sems[i+1].id},smName:'${esc(sems[i+1].name)}',yrId:${yrId},yrName:'${esc(yrName)}',spId:${spId},spName:'${esc(spName)}'},'📖 ${esc(sems[i+1].name)}')"><div class="si">📆</div><div class="sn">${esc(sems[i+1].name)}</div></div>`;
+        }
+        rows += '</div>';
+      }
+      render(`
+        <div class="breadcrumb">🎓 <span class="crumb">${esc(spName)}</span> <span class="sep">›</span> <span class="crumb">${esc(yrName)}</span></div>
+        ${rows || empty()}`);
+    } catch(e) { toast('خطأ', 'err'); }
+  },
+
+  async subjects({ smId, smName, yrId, yrName, spId, spName }) {
+    loader();
+    setHeader('📖 ' + smName, true);
+    try {
+      const subs = await cached('subs_' + smId, () => API.get('/subjects/' + smId), 3600000);
+      let rows = '';
+      for (let i = 0; i < subs.length; i += 2) {
+        rows += '<div class="g2">';
+        rows += `<div class="spec-card s${i%6}" onclick="NAV.go('categories',{sbId:${subs[i].id},sbName:'${esc(subs[i].name)}',smId:${smId},smName:'${esc(smName)}',yrId:${yrId},yrName:'${esc(yrName)}',spId:${spId},spName:'${esc(spName)}'},'📁 ${esc(subs[i].name)}')"><div class="si">📖</div><div class="sn">${esc(subs[i].name)}</div></div>`;
+        if (subs[i + 1]) {
+          rows += `<div class="spec-card s${(i+1)%6}" onclick="NAV.go('categories',{sbId:${subs[i+1].id},sbName:'${esc(subs[i+1].name)}',smId:${smId},smName:'${esc(smName)}',yrId:${yrId},yrName:'${esc(yrName)}',spId:${spId},spName:'${esc(spName)}'},'📁 ${esc(subs[i+1].name)}')"><div class="si">📖</div><div class="sn">${esc(subs[i+1].name)}</div></div>`;
+        }
+        rows += '</div>';
+      }
+      render(`
+        <div class="breadcrumb">🎓 <span class="crumb">${esc(spName)}</span> <span class="sep">›</span> <span class="crumb">${esc(yrName)}</span> <span class="sep">›</span> <span class="crumb">${esc(smName)}</span></div>
+        ${rows || empty()}`);
+    } catch(e) { toast('خطأ', 'err'); }
+  },
+
+  async categories({ sbId, sbName, smId, smName, yrId, yrName, spId, spName }) {
+    loader();
+    setHeader('📁 ' + sbName, true);
+    try {
+      const cats = await cached('cats_' + sbId, () => API.get('/categories/' + sbId), 3600000);
+      const catIcon = n => {
+        n = n.toLowerCase();
+        if (n.includes('cours')) return '📝';
+        if (n.includes('td') || n.includes('serie')) return '✏️';
+        if (n.includes('tp')) return '🔬';
+        if (n.includes('exam') || n.includes('ds')) return '📋';
+        if (n.includes('corr')) return '✅';
+        return '📁';
+      };
+      let rows = '';
+      for (let i = 0; i < cats.length; i += 2) {
+        const p1 = { catId: cats[i].id, catName: esc(cats[i].name), sbId, sbName: esc(sbName), smId, smName: esc(smName), yrId, yrName: esc(yrName), spId, spName: esc(spName) };
+        rows += '<div class="g2">';
+        rows += `<div class="spec-card s${i%6}" onclick='NAV.go("files",${JSON.stringify(p1)},"📄 ${esc(cats[i].name)}")'><div class="si">${catIcon(cats[i].name)}</div><div class="sn">${esc(cats[i].name)}</div></div>`;
+        if (cats[i + 1]) {
+          const p2 = { ...p1, catId: cats[i+1].id, catName: esc(cats[i+1].name) };
+          rows += `<div class="spec-card s${(i+1)%6}" onclick='NAV.go("files",${JSON.stringify(p2)},"📄 ${esc(cats[i+1].name)}")'><div class="si">${catIcon(cats[i+1].name)}</div><div class="sn">${esc(cats[i+1].name)}</div></div>`;
+        }
+        rows += '</div>';
+      }
+      render(`
+        <div class="breadcrumb"><span class="crumb">${esc(spName)}</span> <span class="sep">›</span> <span class="crumb">${esc(yrName)}</span> <span class="sep">›</span> <span class="crumb">${esc(smName)}</span> <span class="sep">›</span> <span class="crumb">${esc(sbName)}</span></div>
+        ${rows || empty()}`);
+    } catch(e) { toast('خطأ', 'err'); }
+  },
+
+  async files({ catId, catName, sbName, smName, yrName, spName }) {
+    loader();
+    setHeader('📄 ' + catName, true);
+    try {
+      const files = await cached('files_' + catId, () => API.get('/files/' + catId), 600000);
+      const typeIcon = t => t === 'link' ? '🔗' : t === 'photo' ? '🖼️' : '📄';
+      const items = files.map(f => `
+        <div class="file-card" onclick='NAV.go("preview",{fileId:${f.id}},"📄 ${esc(f.title.substring(0,25))}")'>
+          <span class="fc-icon">${typeIcon(f.file_type)}</span>
+          <div class="fc-body">
+            <div class="fc-title">${esc(f.title)}</div>
+            <div class="fc-meta"><span>📖 ${esc(f.sub_name || '')}</span><span>⬇️ ${f.downloads || 0}</span>${f.rating_avg ? `<span>${starsHtml(f.rating_avg, f.rating_cnt)}</span>` : ''}</div>
+          </div>
+          <span class="fc-arrow">›</span>
+        </div>`).join('');
+      const breadcrumb = [spName, yrName, smName, sbName, catName].filter(Boolean);
+      render(`
+        <div class="breadcrumb">${breadcrumb.map((b, i) => `<span class="crumb">${esc(b)}</span>${i < breadcrumb.length - 1 ? '<span class="sep">›</span>' : ''}`).join('')}</div>
+        <div class="g1">${items || empty('📭', 'لا توجد ملفات في هذا القسم')}</div>`);
+    } catch(e) { toast('خطأ', 'err'); }
+  },
+
+  async preview({ fileId }) {
+    loader();
+    try {
+      const f = await API.get('/file/' + fileId);
+      setHeader('📄 ' + f.title.substring(0, 22), true);
+      let comments = [];
+      try { comments = await API.get('/comments/' + fileId); } catch(_) {}
+      const commentsHtml = comments.length
+        ? comments.map(c => `
+          <div class="comment-item">
+            <div class="comment-author">👤 ${esc(c.first_name || 'مجهول')}</div>
+            <div class="comment-text">${esc(c.text)}</div>
+            <div class="comment-time">${new Date(c.created_at).toLocaleDateString('ar')}</div>
+          </div>`).join('')
+        : `<div style="color:var(--text3);font-size:12px;text-align:center;padding:16px">لا توجد تعليقات بعد</div>`;
+
+      render(`
+        <div class="preview-hero">
+          <div class="prev-title">${esc(f.title)}</div>
+          ${f.description ? `<div class="prev-desc">${esc(f.description)}</div>` : ''}
+          <div class="prev-path">📁 <span>${esc(f.cat_name || '')}</span> › 📖 <span>${esc(f.sub_name || '')}</span></div>
+          <div class="prev-stats">
+            <span class="prev-stat">⬇️ ${f.downloads || 0} تحميل</span>
+            <span class="prev-stat">💬 ${comments.length} تعليق</span>
+          </div>
+          <div style="margin-top:8px">${starsHtml(f.rating?.avg, f.rating?.cnt)}</div>
+        </div>
+
+        <div style="margin-bottom:9px">
+          <div class="stars-label" style="font-size:12px;color:var(--text2);margin-bottom:6px">قيّم هذا الملف:</div>
+          <div class="stars-row">
+            ${[1,2,3,4,5].map(i => `<button class="star-btn" onclick="rateFile(${fileId},${i},${f.rating?.user||0})" id="star_${fileId}_${i}" style="color:${i<=(f.rating?.user||0)?'#fbbf24':'#55557a'}">★</button>`).join('')}
+          </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="sendFile(${f.id},this)">⬇️ تحميل الملف</button>
+        <button class="btn btn-fav${f.fav ? ' active' : ''}" id="favBtn_${f.id}" onclick="toggleFav(${f.id},${f.fav})">${f.fav ? '⭐ محفوظ في المفضلة' : '☆ حفظ في المفضلة'}</button>
+
+        <div class="comments-section">
+          <div class="comments-title">💬 التعليقات</div>
+          <div class="comment-box">
+            <textarea class="comment-input" id="cmtInput_${f.id}" placeholder="اكتب تعليقك..."></textarea>
+            <button class="comment-send" onclick="sendComment(${f.id})">➤</button>
+          </div>
+          <div id="commentsList_${f.id}">${commentsHtml}</div>
+        </div>`);
+    } catch(e) { toast('خطأ في تحميل الملف', 'err'); }
+  },
+
+  search() {
+    render(`
+      <div class="search-wrap">
+        <span class="search-icon">🔍</span>
+        <input class="search-input" id="si" type="search" placeholder="ابحث عن ملف..." autocomplete="off" oninput="doSearch(this.value)">
+        <button class="search-clear" id="sc" onclick="clearSearch()">✕</button>
+      </div>
+      <div id="sr">${empty('🔍', 'ابحث عن أي ملف', 'algo · serie · td · exam · cours...')}</div>`);
+    setTimeout(() => document.getElementById('si')?.focus(), 150);
+  },
+
+  async profile() {
+    loader();
+    try {
+      _profile = await API.get('/profile');
+      const p = _profile;
+      const initial = (TG_USER.first_name || '?')[0].toUpperCase();
+      let favs = [];
+      try { favs = await API.get('/favorites'); } catch(_) {}
+      const favsHtml = favs.slice(0, 5).map(f => `
+        <div class="fav-card" onclick='NAV.go("preview",{fileId:${f.id}},"📄 ${esc(f.title.substring(0,25))}")'>
+          <span class="fav-icon">📄</span>
+          <div class="fav-body">
+            <div class="fav-title">${esc(f.title)}</div>
+            <div class="fav-meta">⬇️ ${f.downloads || 0} · ${starsHtml(f.rating_avg, f.rating_cnt)}</div>
+          </div>
+          <button class="fav-del" onclick="event.stopPropagation();toggleFav(${f.id},true)">🗑</button>
+        </div>`).join('');
+
+      render(`
+        <div class="avatar">${initial}</div>
+        <div class="profile-name">${esc(TG_USER.first_name || '')} ${esc(TG_USER.last_name || '')}</div>
+        ${TG_USER.username ? `<div class="profile-un">@${esc(TG_USER.username)}</div>` : ''}
+        <div class="profile-sp">🎓 ${p.specialty ? esc(p.specialty.name) : 'غير محدد'}</div>
+        <div class="stats-row">
+          <div class="stat-box"><div class="stat-val">${p.dlCount || 0}</div><div class="stat-lbl">⬇️ تحميل</div></div>
+          <div class="stat-box"><div class="stat-val">${p.favCount || 0}</div><div class="stat-lbl">⭐ مفضلة</div></div>
+          <div class="stat-box"><div class="stat-val">${p.cmtCount || 0}</div><div class="stat-lbl">💬 تعليق</div></div>
+        </div>
+        ${favs.length ? `<div class="section"><div class="section-label">⭐ آخر المفضلة</div>${favsHtml}</div>` : ''}`);
+    } catch(e) { toast('خطأ', 'err'); }
+  },
+};
+
+async function sendFile(fileId, btn) {
+  const orig = btn.innerHTML;
+  btn.innerHTML = '⏳ جاري الإرسال...';
+  btn.disabled = true;
   try {
-    await api('/send/' + fileId, 'POST');
-    showToast('✅ تم الإرسال! افتح المحادثة مع البوت');
+    await API.post('/send/' + fileId);
+    toast('✅ تم الإرسال! افتح المحادثة مع البوت', 'ok');
     tg.HapticFeedback.notificationOccurred('success');
-  } catch(e) { showToast('❌ فشل الإرسال','error'); }
+    btn.innerHTML = '✅ تم الإرسال!';
+    setTimeout(() => { btn.innerHTML = orig; btn.disabled = false; }, 3000);
+  } catch(e) {
+    toast('❌ فشل الإرسال', 'err');
+    btn.innerHTML = orig;
+    btn.disabled = false;
+  }
 }
 
 async function toggleFav(fileId, isFav) {
+  tg.HapticFeedback.impactOccurred('medium');
   try {
-    const res = await api('/fav/' + fileId, 'POST');
-    const btn = document.getElementById('favBtn');
-    if (btn) btn.textContent = res.fav ? '⭐ محفوظ' : '☆ حفظ في المفضلة';
-    showToast(res.fav ? '⭐ تمت الإضافة للمفضلة' : '🗑 تمت الإزالة');
-    tg.HapticFeedback.impactOccurred('medium');
-  } catch(e) { showToast('خطأ','error'); }
+    const res = await API.post('/fav/' + fileId);
+    const btn = document.getElementById('favBtn_' + fileId);
+    if (btn) {
+      btn.classList.toggle('active', res.fav);
+      btn.textContent = res.fav ? '⭐ محفوظ في المفضلة' : '☆ حفظ في المفضلة';
+    }
+    toast(res.fav ? '⭐ أُضيف للمفضلة' : '🗑 حُذف من المفضلة', res.fav ? 'ok' : '');
+    delete CACHE['profile'];
+  } catch(e) { toast('خطأ', 'err'); }
 }
 
-// ── SEARCH ────────────────────────────────────────
-function renderSearch() {
-  setNavTitle('🔍 بحث', false);
-  document.getElementById('app').innerHTML = `
-  <div class="page">
-    <div class="search-box">
-      <span class="search-icon">🔍</span>
-      <input class="search-input" id="searchInput" type="search"
-        placeholder="ابحث عن ملف..." autocomplete="off"
-        oninput="doSearch(this.value)">
-    </div>
-    <div id="searchResults">
-      <div class="empty"><div class="empty-icon">🔍</div><div>اكتب للبحث</div></div>
-    </div>
-  </div>`;
-  setTimeout(() => document.getElementById('searchInput')?.focus(), 100);
+async function rateFile(fileId, rating, oldRating) {
+  try {
+    const res = await API.post('/rate/' + fileId, { rating });
+    tg.HapticFeedback.notificationOccurred('success');
+    toast('✅ تم تقييمك: ' + '★'.repeat(rating), 'ok');
+    for (let i = 1; i <= 5; i++) {
+      const s = document.getElementById('star_' + fileId + '_' + i);
+      if (s) s.style.color = i <= rating ? '#fbbf24' : '#55557a';
+    }
+  } catch(e) { toast('خطأ في التقييم', 'err'); }
 }
 
-let searchTimer;
-async function doSearch(q) {
-  clearTimeout(searchTimer);
+async function sendComment(fileId) {
+  const inp = document.getElementById('cmtInput_' + fileId);
+  if (!inp) return;
+  const text = inp.value.trim();
+  if (!text) { toast('اكتب تعليقاً أولاً', 'err'); return; }
+  try {
+    await API.post('/comment/' + fileId, { text });
+    toast('✅ تم إرسال تعليقك', 'ok');
+    inp.value = '';
+    tg.HapticFeedback.notificationOccurred('success');
+    const list = document.getElementById('commentsList_' + fileId);
+    if (list) {
+      const div = document.createElement('div');
+      div.className = 'comment-item';
+      div.innerHTML = `<div class="comment-author">👤 ${esc(TG_USER.first_name || 'أنت')}</div><div class="comment-text">${esc(text)}</div><div class="comment-time">الآن</div>`;
+      list.prepend(div);
+    }
+    delete CACHE['profile'];
+  } catch(e) { toast('خطأ في إرسال التعليق', 'err'); }
+}
+
+async function loadLatest() {
+  STACK.push({ name: 'home', params: {}, title: '📚 EduMaster' });
+  setHeader('🆕 آخر الملفات', true);
+  loader();
+  try {
+    const files = await API.get('/latest');
+    const typeIcon = t => t === 'link' ? '🔗' : t === 'photo' ? '🖼️' : '📄';
+    const items = files.map(f => `
+      <div class="file-card" onclick='NAV.go("preview",{fileId:${f.id}},"📄 ${esc(f.title.substring(0,25))}")'>
+        <span class="fc-icon">${typeIcon(f.file_type)}</span>
+        <div class="fc-body">
+          <div class="fc-title">${esc(f.title)}</div>
+          <div class="fc-meta"><span>📖 ${esc(f.sub_name || '')}</span><span>⬇️ ${f.downloads || 0}</span></div>
+        </div>
+        <span class="fc-arrow">›</span>
+      </div>`).join('');
+    render(`<div class="g1">${items || empty('📭', 'لا توجد ملفات')}</div>`);
+  } catch(e) { toast('خطأ', 'err'); }
+}
+
+async function loadFavorites() {
+  STACK.push({ name: 'home', params: {}, title: '📚 EduMaster' });
+  setHeader('⭐ المفضلة', true);
+  loader();
+  try {
+    const files = await API.get('/favorites');
+    const typeIcon = t => t === 'link' ? '🔗' : t === 'photo' ? '🖼️' : '📄';
+    const items = files.map(f => `
+      <div class="file-card" onclick='NAV.go("preview",{fileId:${f.id}},"📄 ${esc(f.title.substring(0,25))}")'>
+        <span class="fc-icon">${typeIcon(f.file_type)}</span>
+        <div class="fc-body">
+          <div class="fc-title">${esc(f.title)}</div>
+          <div class="fc-meta"><span>⬇️ ${f.downloads || 0}</span>${f.rating_avg ? `<span>${starsHtml(f.rating_avg,0)}</span>` : ''}</div>
+        </div>
+        <span class="fc-arrow">›</span>
+      </div>`).join('');
+    render(`<div class="g1">${items || empty('⭐', 'لا توجد مفضلة بعد', 'احفظ الملفات بالضغط على ☆')}</div>`);
+  } catch(e) { toast('خطأ', 'err'); }
+}
+
+let _st;
+function doSearch(q) {
+  const sc = document.getElementById('sc');
+  if (sc) sc.classList.toggle('show', q.length > 0);
+  clearTimeout(_st);
   if (q.length < 2) {
-    document.getElementById('searchResults').innerHTML = `<div class="empty"><div class="empty-icon">🔍</div><div>اكتب حرفين على الأقل</div></div>`;
+    document.getElementById('sr').innerHTML = empty('🔍', 'اكتب حرفين على الأقل');
     return;
   }
-  searchTimer = setTimeout(async () => {
-    document.getElementById('searchResults').innerHTML = `<div class="loader"><div class="spinner"></div></div>`;
+  document.getElementById('sr').innerHTML = `<div class="loader"><div class="spin"></div></div>`;
+  _st = setTimeout(async () => {
     try {
-      const results = await api('/search?q=' + encodeURIComponent(q));
-      if (!results.length) {
-        document.getElementById('searchResults').innerHTML = `<div class="empty"><div class="empty-icon">😕</div><div>لا نتائج لـ "${escHtml(q)}"</div></div>`;
+      const res = await API.get('/search?q=' + encodeURIComponent(q));
+      const typeIcon = t => t === 'link' ? '🔗' : t === 'photo' ? '🖼️' : '📄';
+      if (!res.length) {
+        document.getElementById('sr').innerHTML = empty('😕', `لا نتائج لـ "${esc(q)}"`, 'جرب: algo · td · exam · cours');
         return;
       }
-      const typeIcon = t => t==='link'?'🔗':t==='photo'?'🖼️':'📄';
-      let html = '<div class="grid-1">';
-      results.forEach(f => {
-        html += `<div class="file-card" onclick="showPage('filePreview',{fileId:${f.id}})">
-          <span class="file-type-icon">${typeIcon(f.file_type)}</span>
-          <div class="file-info">
-            <div class="file-title">${escHtml(f.title)}</div>
-            <div class="file-meta">📖 ${escHtml(f.sub_name||'')} · ⬇️ ${f.downloads||0}</div>
+      document.getElementById('sr').innerHTML = `<div class="g1">${res.map(f => `
+        <div class="file-card" onclick='NAV.go("preview",{fileId:${f.id}},"📄 ${esc(f.title.substring(0,25))}")'>
+          <span class="fc-icon">${typeIcon(f.file_type)}</span>
+          <div class="fc-body">
+            <div class="fc-title">${esc(f.title)}</div>
+            <div class="fc-meta"><span>📖 ${esc(f.subject_name || '')}</span><span>⬇️ ${f.downloads || 0}</span></div>
           </div>
-          <span style="color:var(--text2);font-size:18px">›</span>
-        </div>`;
-      });
-      html += '</div>';
-      document.getElementById('searchResults').innerHTML = html;
-    } catch(e) { document.getElementById('searchResults').innerHTML = `<div class="empty"><div>خطأ في البحث</div></div>`; }
-  }, 400);
+          <span class="fc-arrow">›</span>
+        </div>`).join('')}</div>`;
+    } catch(e) {
+      document.getElementById('sr').innerHTML = empty('❌', 'خطأ في البحث');
+    }
+  }, 350);
 }
 
-// ── PROFILE ───────────────────────────────────────
-async function renderProfile() {
-  setNavTitle('👤 حسابي', false);
-  setLoader();
-  try {
-    if (!profileData) profileData = await api('/profile');
-    const p = profileData;
-    const initial = (p.user.first_name||'?')[0].toUpperCase();
-    document.getElementById('app').innerHTML = `
-    <div class="page">
-      <div class="profile-avatar">${initial}</div>
-      <div class="profile-name">${escHtml(p.user.first_name||'')} ${escHtml(p.user.last_name||'')}</div>
-      ${p.user.username ? `<div style="text-align:center;color:var(--text2);margin-bottom:4px">@${p.user.username}</div>` : ''}
-      <div class="profile-sp">🎓 ${p.specialty ? escHtml(p.specialty.name) : 'غير محدد'}</div>
-      <div class="stats-grid">
-        <div class="stat-card"><div class="stat-value">${p.dlCount||0}</div><div class="stat-label">⬇️ تحميلات</div></div>
-        <div class="stat-card"><div class="stat-value">${p.favCount||0}</div><div class="stat-label">⭐ مفضلة</div></div>
-      </div>
-    </div>`;
-  } catch(e) { showToast('خطأ','error'); }
+function clearSearch() {
+  const si = document.getElementById('si');
+  if (si) { si.value = ''; si.focus(); }
+  document.getElementById('sc')?.classList.remove('show');
+  document.getElementById('sr').innerHTML = empty('🔍', 'ابحث عن أي ملف', 'algo · serie · td · exam · cours...');
 }
 
-// ── Helpers ───────────────────────────────────────
-function escHtml(s) {
-  return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
-}
+tg.BackButton.onClick(() => {
+  if (STACK.length > 0) NAV.back();
+  else tg.BackButton.hide();
+});
 
-// ── INIT ──────────────────────────────────────────
-renderHome();
+setInterval(() => {
+  if (STACK.length > 0) tg.BackButton.show();
+  else tg.BackButton.hide();
+}, 300);
+
+PAGES.home();
 </script>
 </body>
 </html>
