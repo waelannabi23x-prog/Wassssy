@@ -46,7 +46,7 @@ function parsePlayers(g) {
   try { return JSON.parse(g.players || '[]'); } catch (_) { return []; }
 }
 function calcPrize(qNum) { return Math.min(100 * qNum, 10000); }
-function timeLimit(qNum) { return qNum >= 10 ? 20 : 10; }
+function timeLimit(qNum) { return qNum >= 10 ? 30 : 20; }
 function mention(p) { return `[${p.name}](tg://user?id=${p.id})`; }
 
 async function startRegistration(ctx) {
