@@ -8,7 +8,7 @@ const interactions = require('../database/interactions');
 const usersDb = require('../database/users');
 const { smartSearch } = require('../handlers/group');
 const { cacheGet, cacheSet } = require('../utils/cache');
-const { all, get } = require('../database/db');
+const { all, get, run } = require('../database/db');
 
 // ─── Auth middleware ────────────────────────────────
 function auth(req, res, next) {
@@ -110,14 +110,14 @@ module.exports = router;
 
 router.get('/favorites', auth, async (req, res) => {
   try {
-    const rows = await db.all(`SELECT f.*, s.name as sub_name FROM favorites fv JOIN files f ON f.id=fv.file_id LEFT JOIN subjects s ON s.id=(SELECT semester_id FROM categories c JOIN subjects sb ON sb.id=c.subject_id WHERE c.id=f.category_id LIMIT 1) WHERE fv.user_id=$1 AND f.is_deleted=0 ORDER BY f.uploaded_at DESC`, [req.user.id]);
+    const rows = await all(`SELECT f.*, s.name as sub_name FROM favorites fv JOIN files f ON f.id=fv.file_id LEFT JOIN subjects s ON s.id=(SELECT semester_id FROM categories c JOIN subjects sb ON sb.id=c.subject_id WHERE c.id=f.category_id LIMIT 1) WHERE fv.user_id=$1 AND f.is_deleted=0 ORDER BY f.uploaded_at DESC`, [req.tgUser.id]);
     res.json(rows);
   } catch(e) { res.json([]); }
 });
 
 router.get('/comments/:id', auth, async (req, res) => {
   try {
-    const rows = await db.all(`SELECT c.*, u.first_name FROM comments c LEFT JOIN users u ON u.id=c.user_id WHERE c.file_id=$1 AND c.is_deleted=0 ORDER BY c.created_at DESC LIMIT 50`, [req.params.id]);
+    const rows = await all(`SELECT c.*, u.first_name FROM comments c LEFT JOIN users u ON u.id=c.user_id WHERE c.file_id=$1 AND c.is_deleted=0 ORDER BY c.created_at DESC LIMIT 50`, [req.params.id]);
     res.json(rows);
   } catch(e) { res.json([]); }
 });
@@ -126,7 +126,7 @@ router.post('/comment/:id', auth, async (req, res) => {
   try {
     const { text } = req.body;
     if (!text || text.trim().length < 1) return res.status(400).json({ error: 'empty' });
-    await db.run(`INSERT INTO comments(file_id,user_id,text) VALUES($1,$2,$3)`, [req.params.id, req.user.id, text.trim()]);
+    await run(`INSERT INTO comments(file_id,user_id,text) VALUES($1,$2,$3)`, [req.params.id, req.tgUser.id, text.trim()]);
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -135,88 +135,88 @@ router.post('/rate/:id', auth, async (req, res) => {
   try {
     const { rating } = req.body;
     if (!rating || rating < 1 || rating > 5) return res.status(400).json({ error: 'invalid' });
-    await db.run(`INSERT INTO ratings(user_id,file_id,rating) VALUES($1,$2,$3) ON CONFLICT(user_id,file_id) DO UPDATE SET rating=$3`, [req.user.id, req.params.id, rating]);
-    const avg = await db.get(`SELECT AVG(rating) as avg, COUNT(*) as cnt FROM ratings WHERE file_id=$1`, [req.params.id]);
+    await run(`INSERT INTO ratings(user_id,file_id,rating) VALUES($1,$2,$3) ON CONFLICT(user_id,file_id) DO UPDATE SET rating=$3`, [req.tgUser.id, req.params.id, rating]);
+    const avg = await get(`SELECT AVG(rating) as avg, COUNT(*) as cnt FROM ratings WHERE file_id=$1`, [req.params.id]);
     res.json({ ok: true, avg: avg.avg, cnt: avg.cnt });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 router.get('/admin/check', auth, async (req, res) => {
   const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const uid = parseInt(req.user.id);
+  const uid = parseInt(req.tgUser.id);
   const isOwner = uid === OWNER_ID;
-  const adm = await db.get('SELECT * FROM admins WHERE user_id=$1', [uid]);
+  const adm = await get('SELECT * FROM admins WHERE user_id=$1', [uid]);
   if (!isOwner && !adm) return res.status(403).json({ error: 'forbidden' });
   res.json({ ok: true, isOwner, perms: adm?.permissions || (isOwner ? 'full' : '') });
 });
 
 router.get('/admin/stats', auth, async (req, res) => {
   const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const uid = parseInt(req.user.id);
+  const uid = parseInt(req.tgUser.id);
   const isOwner = uid === OWNER_ID;
-  const adm = await db.get('SELECT * FROM admins WHERE user_id=$1', [uid]);
+  const adm = await get('SELECT * FROM admins WHERE user_id=$1', [uid]);
   if (!isOwner && !adm) return res.status(403).json({ error: 'forbidden' });
   try {
     const [users, files, downloads, favs, comments, specs, admins] = await Promise.all([
-      db.get('SELECT COUNT(*) as c FROM users WHERE is_banned=0'),
-      db.get('SELECT COUNT(*) as c FROM files WHERE is_deleted=0'),
-      db.get('SELECT COALESCE(SUM(downloads),0) as c FROM files WHERE is_deleted=0'),
-      db.get('SELECT COUNT(*) as c FROM favorites'),
-      db.get('SELECT COUNT(*) as c FROM comments WHERE is_deleted=0'),
-      db.get('SELECT COUNT(*) as c FROM specialties WHERE is_deleted=0'),
-      db.get('SELECT COUNT(*) as c FROM admins'),
+      get('SELECT COUNT(*) as c FROM users WHERE is_banned=0'),
+      get('SELECT COUNT(*) as c FROM files WHERE is_deleted=0'),
+      get('SELECT COALESCE(SUM(downloads),0) as c FROM files WHERE is_deleted=0'),
+      get('SELECT COUNT(*) as c FROM favorites'),
+      get('SELECT COUNT(*) as c FROM comments WHERE is_deleted=0'),
+      get('SELECT COUNT(*) as c FROM specialties WHERE is_deleted=0'),
+      get('SELECT COUNT(*) as c FROM admins'),
     ]);
-    const recentUsers = await db.all('SELECT id,first_name,last_name,username,last_active,joined_at FROM users ORDER BY joined_at DESC LIMIT 10');
-    const topFiles = await db.all('SELECT f.id,f.title,f.downloads,f.file_type FROM files f WHERE f.is_deleted=0 ORDER BY f.downloads DESC LIMIT 10');
-    const bannedCount = await db.get('SELECT COUNT(*) as c FROM users WHERE is_banned=1');
+    const recentUsers = await all('SELECT id,first_name,last_name,username,last_active,joined_at FROM users ORDER BY joined_at DESC LIMIT 10');
+    const topFiles = await all('SELECT f.id,f.title,f.downloads,f.file_type FROM files f WHERE f.is_deleted=0 ORDER BY f.downloads DESC LIMIT 10');
+    const bannedCount = await get('SELECT COUNT(*) as c FROM users WHERE is_banned=1');
     res.json({ users: users.c, files: files.c, downloads: downloads.c, favs: favs.c, comments: comments.c, specs: specs.c, admins: admins.c, banned: bannedCount.c, recentUsers, topFiles });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
 router.get('/admin/users', auth, async (req, res) => {
   const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const uid = parseInt(req.user.id);
+  const uid = parseInt(req.tgUser.id);
   const isOwner = uid === OWNER_ID;
-  const adm = await db.get('SELECT * FROM admins WHERE user_id=$1', [uid]);
+  const adm = await get('SELECT * FROM admins WHERE user_id=$1', [uid]);
   if (!isOwner && !adm) return res.status(403).json({ error: 'forbidden' });
   const q = req.query.q || '';
   const page = parseInt(req.query.page || '0');
   const limit = 20;
   let rows;
   if (q) {
-    rows = await db.all(`SELECT * FROM users WHERE first_name ILIKE $1 OR username ILIKE $1 OR id::text=$2 ORDER BY joined_at DESC LIMIT $3 OFFSET $4`, [`%${q}%`, q, limit, page * limit]);
+    rows = await all(`SELECT * FROM users WHERE first_name ILIKE $1 OR username ILIKE $1 OR id::text=$2 ORDER BY joined_at DESC LIMIT $3 OFFSET $4`, [`%${q}%`, q, limit, page * limit]);
   } else {
-    rows = await db.all(`SELECT * FROM users ORDER BY joined_at DESC LIMIT $1 OFFSET $2`, [limit, page * limit]);
+    rows = await all(`SELECT * FROM users ORDER BY joined_at DESC LIMIT $1 OFFSET $2`, [limit, page * limit]);
   }
   res.json(rows);
 });
 
 router.post('/admin/ban/:id', auth, async (req, res) => {
   const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const uid = parseInt(req.user.id);
+  const uid = parseInt(req.tgUser.id);
   const isOwner = uid === OWNER_ID;
   if (!isOwner) return res.status(403).json({ error: 'owner only' });
   const { ban } = req.body;
-  await db.run('UPDATE users SET is_banned=$1 WHERE id=$2', [ban ? 1 : 0, req.params.id]);
+  await run('UPDATE users SET is_banned=$1 WHERE id=$2', [ban ? 1 : 0, req.params.id]);
   res.json({ ok: true });
 });
 
 router.get('/admin/files', auth, async (req, res) => {
   const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const uid = parseInt(req.user.id);
+  const uid = parseInt(req.tgUser.id);
   const isOwner = uid === OWNER_ID;
-  const adm = await db.get('SELECT * FROM admins WHERE user_id=$1', [uid]);
+  const adm = await get('SELECT * FROM admins WHERE user_id=$1', [uid]);
   if (!isOwner && !adm) return res.status(403).json({ error: 'forbidden' });
-  const rows = await db.all(`SELECT f.*,c.name as cat_name FROM files f LEFT JOIN categories c ON c.id=f.category_id WHERE f.is_deleted=0 ORDER BY f.uploaded_at DESC LIMIT 50`);
+  const rows = await all(`SELECT f.*,c.name as cat_name FROM files f LEFT JOIN categories c ON c.id=f.category_id WHERE f.is_deleted=0 ORDER BY f.uploaded_at DESC LIMIT 50`);
   res.json(rows);
 });
 
 router.post('/admin/delfile/:id', auth, async (req, res) => {
   const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const uid = parseInt(req.user.id);
+  const uid = parseInt(req.tgUser.id);
   const isOwner = uid === OWNER_ID;
-  const adm = await db.get('SELECT * FROM admins WHERE user_id=$1', [uid]);
+  const adm = await get('SELECT * FROM admins WHERE user_id=$1', [uid]);
   if (!isOwner && !adm) return res.status(403).json({ error: 'forbidden' });
-  await db.run('UPDATE files SET is_deleted=1 WHERE id=$1', [req.params.id]);
+  await run('UPDATE files SET is_deleted=1 WHERE id=$1', [req.params.id]);
   res.json({ ok: true });
 });
