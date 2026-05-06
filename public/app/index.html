@@ -753,7 +753,7 @@ setInterval(() => {
       const btn = document.getElementById('adminBtn');
       if (btn) {
         btn.style.display = 'flex';
-        btn.onclick = () => { window.Telegram.WebApp.openLink(window.location.origin + '/admin/'); };
+        btn.onclick = () => { window.Telegram.WebApp.openLink(window.location.origin + '/admin/?initData=' + encodeURIComponent(INIT_DATA)); };
       }
     }
   } catch(_) {}

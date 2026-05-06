@@ -96,7 +96,7 @@ const tg = window.Telegram.WebApp;
 tg.ready(); tg.expand();
 tg.setHeaderColor('#05050e');
 tg.setBackgroundColor('#05050e');
-const INIT_DATA = tg.initData;
+const INIT_DATA = tg.initData || new URLSearchParams(window.location.search).get('initData') || '';
 let _isOwner = false;
 let _statsCache = null;
 let _userPage = 0;
