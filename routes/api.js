@@ -68,13 +68,18 @@ router.get('/search', auth, async (req, res) => {
 
 router.get('/profile', auth, async (req, res) => {
   const uid = req.tgUser.id;
-  const [dlCount, favCount, spRow] = await Promise.all([
+  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+  const isOwner = parseInt(uid) === OWNER_ID;
+  const adm = await get('SELECT permissions FROM admins WHERE user_id=$1', [uid]);
+  const [dlCount, favCount, cmtCount, ratingCount, spRow] = await Promise.all([
     interactions.getUserDownloadCount(uid),
     get('SELECT COUNT(*) as c FROM favorites WHERE user_id=$1', [uid]).then(r => r?.c || 0),
+    get('SELECT COUNT(*) as c FROM comments WHERE user_id=$1 AND is_deleted=0', [uid]).then(r => r?.c || 0),
+    get('SELECT COUNT(*) as c FROM ratings WHERE user_id=$1', [uid]).then(r => r?.c || 0),
     usersDb.getSpecialty(uid),
   ]);
   const sp = spRow?.specialty_id ? await content.getSpec(spRow.specialty_id) : null;
-  res.json({ user: req.tgUser, dlCount, favCount, specialty: sp });
+  res.json({ user: req.tgUser, dlCount, favCount, cmtCount, ratingCount, specialty: sp, isAdmin: isOwner || !!adm, isOwner });
 });
 
 router.get('/latest', auth, async (req, res) => {
