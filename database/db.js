@@ -19,9 +19,9 @@ function getPg() {
     pgPool = new Pool({
       connectionString: process.env.DATABASE_URL,
       ssl: { rejectUnauthorized: false },
-      max: 15, min: 2,  // Railway-safe (PostgreSQL max ~25 connections)
-      idleTimeoutMillis: 60000,
-      connectionTimeoutMillis: 5000,
+      max: 10, min: 0,  // Railway-safe (PostgreSQL max ~25 connections)
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 8000,
       statement_timeout: 10000,
       query_timeout: 10000,
       allowExitOnIdle: false,
@@ -29,7 +29,7 @@ function getPg() {
       keepAliveInitialDelayMillis: 5000,
       application_name: 'edumaster_bot',
     });
-    pgPool.on('error', function(err) { logger.error('PG pool error:', err.message); });
+    pgPool.on('error', function(err) { logger.error('[DB] Connection terminated unexpectedly'); if(err.message.includes('ECONNRESET') || err.message.includes('terminated')) { pgPool = null; } });
     pgPool.on('connect', function() {});
     pgPool.on('remove',  function() {});
     setTimeout(async function() { try { await Promise.all(Array.from({length:3}, () => pgPool.query('SELECT 1'))); } catch(_) {} }, 1000);
@@ -42,6 +42,11 @@ function getPg() {
       if (waiting > 15) logger.error('[Pool] CRITICAL pool exhausted! waiting=' + waiting);
       if (total >= 18)  logger.warn('[Pool] near limit: ' + total + '/20 connections');
     }, 30000).unref();
+
+    setInterval(function() {
+      if (!pgPool) return;
+      pgPool.query("SELECT 1").catch(function() { pgPool = null; });
+    }, 25000).unref();
 
     logger.info('✅ PostgreSQL (pool max=' + pgPool.options.max + ')');
     return pgPool;
