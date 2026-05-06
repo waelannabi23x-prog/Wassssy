@@ -186,7 +186,7 @@ html,body{height:100%;overflow:hidden;background:var(--bg);color:var(--text);fon
     <div class="header-bar">
       <button class="back-btn hidden" id="backBtn" onclick="NAV.back()">◀</button>
       <div class="header-title" id="headerTitle">📚 EduMaster</div>
-      <button class="header-action" onclick="NAV.tab('search')">🔍</button>
+      <button class="header-action" id="adminBtn" onclick="NAV.tab('search')" style="display:none">🛡️</button><button class="header-action" onclick="NAV.tab('search')">🔍</button>
     </div>
   </div>
   <div id="content"></div>
@@ -744,6 +744,20 @@ setInterval(() => {
   if (STACK.length > 0) tg.BackButton.show();
   else tg.BackButton.hide();
 }, 300);
+
+// تحقق من صلاحيات الأدمن
+(async () => {
+  try {
+    const res = await API.get('/admin/check');
+    if (res.ok) {
+      const btn = document.getElementById('adminBtn');
+      if (btn) {
+        btn.style.display = 'flex';
+        btn.onclick = () => { window.Telegram.WebApp.openLink(window.location.origin + '/admin/'); };
+      }
+    }
+  } catch(_) {}
+})();
 
 PAGES.home();
 </script>
