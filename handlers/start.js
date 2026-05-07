@@ -69,7 +69,7 @@ async function showMainMenu(ctx, name) {
   welcome += '━━━━━━━━━━━━━━━━\n📚 منصتك الأكاديمية — اختر ما تريد:';
   const _webAppUrl = process.env.WEBHOOK_URL ? process.env.WEBHOOK_URL + '/app' : null;
   var rows = [
-    _webAppUrl ? [{ text: '🚀 فتح التطبيق', web_app: { url: _webAppUrl } }] : [btn('📚 تصفح المحتوى', 'browse')],
+    _webAppUrl ? [{ text: '🚀 Let\'s Start', web_app: { url: _webAppUrl } }] : [btn('📚 تصفح المحتوى', 'browse')],
     [btn('🔍 بحث سريع', 'search_prompt'), btn('🆕 أحدث الملفات', 'latest')],
     [btn('⭐ مفضلاتي', 'favorites'), btn('📂 آخر ما شاهدت', 'history')],
     [btn('🤖 المساعد الذكي', 'ai_prompt')],
@@ -77,7 +77,8 @@ async function showMainMenu(ctx, name) {
     [btn(sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', 'change_sp')],
   ];
   if (last && last.title) rows.push([btn('▶️ استكمال: ' + last.title.substring(0, 25), 'preview_' + last.id + '_0_0_0_0_0')]);
-  if (ctx.isAdmin) rows.push([btn('🛠 لوحة الإدارة', 'mg_menu')]);
+  if (ctx.isOwner) rows.push([btn('👑 لوحة الإدارة', 'mg_menu')]);
+  else if (ctx.isAdmin) rows.push([btn('🛡️ لوحة الإدارة', 'mg_menu')]);
   return eos(ctx, welcome, { parse_mode: 'Markdown', ...build(rows) });
 }
 
