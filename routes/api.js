@@ -505,3 +505,249 @@ router.get('/admins/public', auth, async (req, res) => {
   } catch(e) { res.json([]); }
 });
 
+// ══════════════════════════════════════════════════════════════════
+// routes_missing.js — أضف هذا كاملاً في api.js قبل module.exports
+// ══════════════════════════════════════════════════════════════════
+
+// ─── ملفات حديثة حسب التخصص ──────────────────────────────────────
+router.get('/latest/specialty/:spId', auth, async (req, res) => {
+  try {
+    const spId = parseInt(req.params.spId);
+    const rows = await all(
+      `SELECT f.*, c.name as cat_name, s.name as sub_name, s.id as sub_id,
+              sem.name as sem_name, y.name as year_name,
+              COALESCE(d.cnt,0) as downloads,
+              COALESCE(r.avg,0) as rating_avg
+       FROM files f
+       JOIN categories c ON c.id = f.category_id
+       JOIN subjects s ON s.id = c.subject_id
+       JOIN semesters sem ON sem.id = s.semester_id
+       JOIN years y ON y.id = sem.year_id
+       LEFT JOIN (SELECT file_id, COUNT(*) as cnt FROM downloads GROUP BY file_id) d ON d.file_id=f.id
+       LEFT JOIN (SELECT file_id, AVG(rating)::numeric(3,1) as avg FROM ratings GROUP BY file_id) r ON r.file_id=f.id
+       WHERE y.specialty_id = $1
+       ORDER BY f.created_at DESC LIMIT 8`,
+      [spId]
+    );
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
+// ─── تحديث بروفايل المستخدم (الاسم فقط) ─────────────────────────
+router.post('/profile/update', auth, async (req, res) => {
+  try {
+    const uid = parseInt(req.tgUser.id);
+    const { first_name, last_name } = req.body;
+    if (first_name) {
+      await run(
+        'UPDATE users SET first_name=$1, last_name=$2 WHERE id=$3',
+        [first_name.trim(), (last_name||'').trim(), uid]
+      ).catch(() => {}); // silently fail if column doesn't exist
+    }
+    const { cacheClear } = require('../utils/cache');
+    cacheClear('prof_' + uid);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── تحديث التخصص ────────────────────────────────────────────────
+// (إذا لم يكن موجوداً مسبقاً)
+if (!global._hasSpecialtyRoute) {
+  global._hasSpecialtyRoute = true;
+  router.post('/profile/specialty', auth, async (req, res) => {
+    try {
+      const uid = parseInt(req.tgUser.id);
+      const { specialtyId } = req.body;
+      await run('UPDATE users SET specialty_id=$1 WHERE id=$2', [specialtyId||null, uid]);
+      const { cacheClear } = require('../utils/cache');
+      cacheClear('prof_' + uid);
+      res.json({ ok: true });
+    } catch(e) { res.status(500).json({ error: e.message }); }
+  });
+}
+
+// ─── نقاط المستخدم ───────────────────────────────────────────────
+router.get('/points/me', auth, async (req, res) => {
+  try {
+    const uid = parseInt(req.tgUser.id);
+    const pts = await require('../database/points').getPoints(uid).catch(() => null);
+    const rank = await require('../database/points').getUserRank(uid).catch(() => 999);
+    const dlC = await get('SELECT COUNT(*) as c FROM downloads WHERE user_id=$1',[uid]).catch(()=>({c:0}));
+    const cmtC = await get('SELECT COUNT(*) as c FROM comments WHERE user_id=$1',[uid]).catch(()=>({c:0}));
+    const ratC = await get('SELECT COUNT(*) as c FROM ratings WHERE user_id=$1',[uid]).catch(()=>({c:0}));
+    res.json({
+      total_points: pts?.total_points || 0,
+      streak_days: pts?.streak_days || 0,
+      downloads_count: parseInt(dlC?.c||0),
+      comments_count: parseInt(cmtC?.c||0),
+      ratings_count: parseInt(ratC?.c||0),
+      rank: rank || 999,
+    });
+  } catch(e) { res.json({ total_points:0,downloads_count:0,comments_count:0,ratings_count:0,streak_days:0,rank:999 }); }
+});
+
+router.get('/points/rank', auth, async (req, res) => {
+  try {
+    const uid = parseInt(req.tgUser.id);
+    const rank = await require('../database/points').getUserRank(uid).catch(() => 999);
+    res.json({ rank: rank || 999 });
+  } catch(e) { res.json({ rank: 999 }); }
+});
+
+router.get('/points/leaderboard', auth, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit||'20'), 50);
+    const lb = await require('../database/points').getLeaderboard(limit).catch(() => []);
+    res.json(lb);
+  } catch(e) { res.json([]); }
+});
+
+router.post('/points/daily', auth, async (req, res) => {
+  try {
+    const uid = parseInt(req.tgUser.id);
+    const awarded = await require('../database/points').checkDailyLogin(uid).catch(() => false);
+    res.json({ ok: true, awarded });
+  } catch(e) { res.json({ ok: false }); }
+});
+
+// ─── سجل التحميل ─────────────────────────────────────────────────
+router.get('/history', auth, async (req, res) => {
+  try {
+    const uid = parseInt(req.tgUser.id);
+    const rows = await all(
+      `SELECT f.*, COALESCE(d.cnt,0) as downloads, MAX(dl.downloaded_at) as last_download,
+              c.name as cat_name, s.name as sub_name
+       FROM downloads dl
+       JOIN files f ON f.id = dl.file_id
+       LEFT JOIN categories c ON c.id = f.category_id
+       LEFT JOIN subjects s ON s.id = c.subject_id
+       LEFT JOIN (SELECT file_id, COUNT(*) as cnt FROM downloads GROUP BY file_id) d ON d.file_id=f.id
+       WHERE dl.user_id = $1
+       GROUP BY f.id, c.name, s.name, d.cnt
+       ORDER BY last_download DESC LIMIT 30`,
+      [uid]
+    );
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
+// ─── لايك التعليق ────────────────────────────────────────────────
+router.post('/comment/:id/like', auth, async (req, res) => {
+  try {
+    const uid = parseInt(req.tgUser.id);
+    const cid = parseInt(req.params.id);
+    const ex = await get('SELECT 1 FROM comment_likes WHERE user_id=$1 AND comment_id=$2',[uid,cid]).catch(()=>null);
+    if (ex) {
+      await run('DELETE FROM comment_likes WHERE user_id=$1 AND comment_id=$2',[uid,cid]);
+      await run('UPDATE comments SET likes=GREATEST(0,COALESCE(likes,0)-1) WHERE id=$1',[cid]).catch(()=>{});
+      res.json({ liked: false });
+    } else {
+      await run('INSERT INTO comment_likes(user_id,comment_id) VALUES($1,$2) ON CONFLICT DO NOTHING',[uid,cid]);
+      await run('UPDATE comments SET likes=COALESCE(likes,0)+1 WHERE id=$1',[cid]).catch(()=>{});
+      res.json({ liked: true });
+    }
+  } catch(e) { res.json({ liked: false }); }
+});
+
+// ─── إضافة مشرف جديد ──────────────────────────────────────────────
+router.post('/admin/addadmin', auth, async (req, res) => {
+  const uid = parseInt(req.tgUser.id);
+  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+  if (uid !== OWNER_ID) return res.status(403).json({ error: 'owner only' });
+  const { userId, permissions } = req.body;
+  if (!userId) return res.status(400).json({ error: 'userId required' });
+  try {
+    await run(
+      'INSERT INTO admins(user_id,added_by,permissions) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET permissions=$3',
+      [parseInt(userId), uid, permissions || 'full']
+    );
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── الإعلانات العامة ────────────────────────────────────────────
+router.get('/ads', auth, async (req, res) => {
+  try {
+    const uid = parseInt(req.tgUser.id);
+    const userRow = await get('SELECT specialty_id FROM users WHERE id=$1',[uid]).catch(()=>null);
+    const spId = userRow?.specialty_id || null;
+    const rows = await all(
+      `SELECT * FROM ads WHERE is_deleted=0
+       AND (specialty_id IS NULL${spId ? ' OR specialty_id=$1' : ''})
+       ORDER BY is_pinned DESC, created_at DESC LIMIT 30`,
+      spId ? [spId] : []
+    );
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
+// ─── القنوات ─────────────────────────────────────────────────────
+router.get('/channels', auth, async (req, res) => {
+  try {
+    const rows = await all('SELECT * FROM channels WHERE is_deleted=0 ORDER BY sort_order ASC, id DESC');
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
+// ─── إنشاء إعلان ─────────────────────────────────────────────────
+router.post('/admin/ads', auth, async (req, res) => {
+  const uid = parseInt(req.tgUser.id);
+  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1',[uid]).catch(()=>null);
+  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+  const { title, body, icon, link, specialty_id, is_pinned, image_url, video_url } = req.body;
+  if (!title) return res.status(400).json({ error: 'title required' });
+  try {
+    await run(
+      `INSERT INTO ads(title,body,icon,link,specialty_id,is_pinned,created_by,image_url,video_url)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [title, body||null, icon||'📌', link||null, specialty_id||null, is_pinned?1:0, uid, image_url||null, video_url||null]
+    );
+    res.json({ ok: true });
+  } catch(e) {
+    // fallback بدون video_url إذا العمود غير موجود
+    try {
+      await run(
+        `INSERT INTO ads(title,body,icon,link,specialty_id,is_pinned,created_by,image_url)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [title, body||null, icon||'📌', link||null, specialty_id||null, is_pinned?1:0, uid, image_url||video_url||null]
+      );
+      res.json({ ok: true });
+    } catch(e2) { res.status(500).json({ error: e2.message }); }
+  }
+});
+
+router.post('/admin/ads/:id/delete', auth, async (req, res) => {
+  const uid = parseInt(req.tgUser.id);
+  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1',[uid]).catch(()=>null);
+  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+  try { await run('UPDATE ads SET is_deleted=1 WHERE id=$1',[req.params.id]); res.json({ ok:true }); }
+  catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── إنشاء قناة ──────────────────────────────────────────────────
+router.post('/admin/channels', auth, async (req, res) => {
+  const uid = parseInt(req.tgUser.id);
+  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1',[uid]).catch(()=>null);
+  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+  const { name, description, link, icon, members_count } = req.body;
+  if (!name) return res.status(400).json({ error: 'name required' });
+  try {
+    await run(
+      'INSERT INTO channels(name,description,link,icon,members_count,created_by) VALUES($1,$2,$3,$4,$5,$6)',
+      [name, description||null, link||null, icon||'📺', members_count||null, uid]
+    );
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/admin/channels/:id/delete', auth, async (req, res) => {
+  const uid = parseInt(req.tgUser.id);
+  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1',[uid]).catch(()=>null);
+  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+  try { await run('UPDATE channels SET is_deleted=1 WHERE id=$1',[req.params.id]); res.json({ ok:true }); }
+  catch(e) { res.status(500).json({ error: e.message }); }
+});
