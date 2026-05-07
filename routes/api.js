@@ -312,3 +312,196 @@ router.post('/admin/removeadmin/:id', auth, async (req, res) => {
   await run('DELETE FROM admins WHERE user_id=$1', [req.params.id]);
   res.json({ ok: true });
 });
+// ══════════════════════════════════════════════════════════════════
+// أضف هذا كاملاً في routes/api.js قبل سطر module.exports = router;
+// ══════════════════════════════════════════════════════════════════
+
+// ─── رفع صورة/فيديو من الجهاز مباشرة ────────────────────────────
+const multer = require('multer');
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 20 * 1024 * 1024 } // 20MB
+});
+
+router.post('/admin/upload-media', (req, res, next) => {
+  // Auth manual (لأن multer يتعارض مع json middleware)
+  const initData = req.headers['x-init-data'] || '';
+  if (!initData) return res.status(401).json({ error: 'unauthorized' });
+  next();
+}, upload.single('file'), async (req, res) => {
+  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+
+  // استخرج uid من header
+  let uid = 0;
+  try {
+    const params = new URLSearchParams(req.headers['x-init-data']);
+    const userStr = params.get('user');
+    if (userStr) uid = parseInt(JSON.parse(decodeURIComponent(userStr)).id);
+  } catch(_) {}
+
+  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1', [uid]).catch(() => null);
+  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+
+  try {
+    const file = req.file;
+    if (!file) return res.status(400).json({ error: 'no file' });
+
+    const isVideo = file.mimetype.startsWith('video/');
+    const bot = global.__bot;
+    if (!bot) return res.status(500).json({ error: 'bot not ready' });
+
+    // أرسل للبوت باش نحصل على file_id
+    let result;
+    if (isVideo) {
+      result = await bot.telegram.sendVideo(
+        parseInt(process.env.OWNER_ID),
+        { source: file.buffer, filename: file.originalname || 'video.mp4' },
+        { caption: '📤 رفع إعلان' }
+      );
+    } else {
+      result = await bot.telegram.sendPhoto(
+        parseInt(process.env.OWNER_ID),
+        { source: file.buffer, filename: file.originalname || 'image.jpg' },
+        { caption: '📤 رفع إعلان' }
+      );
+    }
+
+    // استخرج file_id
+    const fileId = isVideo
+      ? result.video?.file_id
+      : (result.photo?.[result.photo.length - 1]?.file_id);
+
+    if (!fileId) return res.status(500).json({ error: 'no file_id returned' });
+
+    // احصل على URL
+    const fileInfo = await bot.telegram.getFile(fileId);
+    const fileUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${fileInfo.file_path}`;
+
+    res.json({
+      ok: true,
+      file_id: fileId,
+      url: fileUrl,
+      type: isVideo ? 'video' : 'image'
+    });
+
+  } catch(e) {
+    console.error('[upload-media]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── إصلاح بروفايل المستخدم (للأونر/أدمن) ──────────────────────
+// احذف أو استبدل الـ route القديم /admin/user/:id/profile بهذا:
+router.get('/admin/user/:id/profile', auth, async (req, res) => {
+  const uid = parseInt(req.tgUser.id);
+  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1', [uid]).catch(() => null);
+  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+
+  try {
+    const targetId = req.params.id;
+
+    // ── جلب المستخدم بدون specialty join ──
+    const user = await get('SELECT * FROM users WHERE id=$1', [parseInt(targetId)]);
+    if (!user) return res.status(404).json({ error: 'not found' });
+
+    // ── جلب اسم التخصص بشكل منفصل ──
+    let specialtyName = null;
+    if (user.specialty_id) {
+      const sp = await get('SELECT name FROM specialties WHERE id=$1', [user.specialty_id]).catch(() => null);
+      specialtyName = sp?.name || null;
+    }
+
+    // ── إحصائيات ──
+    const [pts, dlC, favC, cmtC, ratC] = await Promise.all([
+      get('SELECT * FROM user_points WHERE user_id=$1', [parseInt(targetId)]).catch(() => null),
+      get('SELECT COUNT(*) as c FROM downloads WHERE user_id=$1', [parseInt(targetId)]).catch(() => ({ c: 0 })),
+      get('SELECT COUNT(*) as c FROM favorites WHERE user_id=$1', [parseInt(targetId)]).catch(() => ({ c: 0 })),
+      get('SELECT COUNT(*) as c FROM comments WHERE user_id=$1', [parseInt(targetId)]).catch(() => ({ c: 0 })),
+      get('SELECT COUNT(*) as c FROM ratings WHERE user_id=$1', [parseInt(targetId)]).catch(() => ({ c: 0 })),
+    ]);
+
+    const isAdm = await get('SELECT * FROM admins WHERE user_id=$1', [parseInt(targetId)]).catch(() => null);
+
+    res.json({
+      id: user.id,
+      first_name: user.first_name || '',
+      last_name: user.last_name || '',
+      username: user.username || null,
+      is_banned: user.is_banned || false,
+      joined_at: user.joined_at,
+      specialty_name: specialtyName,
+      total_points: pts?.total_points || 0,
+      streak_days: pts?.streak_days || 0,
+      downloads_count: parseInt(dlC?.c || 0),
+      favs_count: parseInt(favC?.c || 0),
+      comments_count: parseInt(cmtC?.c || 0),
+      ratings_count: parseInt(ratC?.c || 0),
+      is_admin: !!isAdm,
+      permissions: isAdm?.permissions || null,
+      is_owner: parseInt(targetId) === OWNER_ID,
+    });
+  } catch(e) {
+    console.error('[profile]', e.message);
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// ─── بروفايل عام (لكل مستخدم) ────────────────────────────────────
+router.get('/user/:id/profile', auth, async (req, res) => {
+  try {
+    const targetId = parseInt(req.params.id);
+    const user = await get('SELECT * FROM users WHERE id=$1', [targetId]);
+    if (!user) return res.status(404).json({ error: 'not found' });
+
+    let specialtyName = null;
+    if (user.specialty_id) {
+      const sp = await get('SELECT name FROM specialties WHERE id=$1', [user.specialty_id]).catch(() => null);
+      specialtyName = sp?.name || null;
+    }
+
+    const [pts, dlC, cmtC] = await Promise.all([
+      get('SELECT total_points, streak_days FROM user_points WHERE user_id=$1', [targetId]).catch(() => null),
+      get('SELECT COUNT(*) as c FROM downloads WHERE user_id=$1', [targetId]).catch(() => ({ c: 0 })),
+      get('SELECT COUNT(*) as c FROM comments WHERE user_id=$1', [targetId]).catch(() => ({ c: 0 })),
+    ]);
+
+    const isAdm = await get('SELECT permissions FROM admins WHERE user_id=$1', [targetId]).catch(() => null);
+    const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+
+    res.json({
+      id: user.id,
+      first_name: user.first_name || '',
+      last_name: user.last_name || '',
+      username: user.username || null,
+      joined_at: user.joined_at,
+      specialty_name: specialtyName,
+      total_points: pts?.total_points || 0,
+      streak_days: pts?.streak_days || 0,
+      downloads_count: parseInt(dlC?.c || 0),
+      comments_count: parseInt(cmtC?.c || 0),
+      is_admin: !!isAdm,
+      is_owner: targetId === OWNER_ID,
+      permissions: isAdm?.permissions || null,
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── قائمة الأدمنز العامة ─────────────────────────────────────────
+router.get('/admins/public', auth, async (req, res) => {
+  try {
+    const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+    const rows = await all(
+      `SELECT a.user_id, a.permissions, a.added_at,
+              u.first_name, u.last_name, u.username
+       FROM admins a LEFT JOIN users u ON u.id = a.user_id
+       ORDER BY a.added_at ASC`
+    );
+    const ownerUser = await get('SELECT first_name, last_name, username FROM users WHERE id=$1', [OWNER_ID]).catch(() => null);
+    const result = [];
+    if (ownerUser) result.push({ ...ownerUser, user_id: OWNER_ID, permissions: 'owner', is_owner: true });
+    result.push(...rows.filter(r => r.user_id !== OWNER_ID));
+    res.json(result);
+  } catch(e) { res.json([]); }
+});
+
