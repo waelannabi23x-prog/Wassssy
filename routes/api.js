@@ -778,6 +778,33 @@ router.get('/latest/specialty/:spId', auth, async (req, res) => {
 // ─── تحديث بروفايل المستخدم (الاسم) ─────────────────────────────
 router.post('/profile/update', auth, async (req, res) => {
   try {
+// ══════════════════════════════════════════════════════════════════
+// routes_missing_v2.js — استبدل routes_missing.js الأول بهذا
+// أضفه في api.js قبل module.exports = router;
+// ══════════════════════════════════════════════════════════════════
+
+// ─── ملفات حديثة حسب التخصص ──────────────────────────────────────
+router.get('/latest/specialty/:spId', auth, async (req, res) => {
+  try {
+    const spId = parseInt(req.params.spId);
+    const rows = await all(
+      `SELECT f.*, c.name as cat_name, s.name as sub_name
+       FROM files f
+       JOIN categories c ON c.id = f.category_id
+       JOIN subjects s ON s.id = c.subject_id
+       JOIN semesters sem ON sem.id = s.semester_id
+       JOIN years y ON y.id = sem.year_id
+       WHERE y.specialty_id = $1 AND f.is_deleted=0
+       ORDER BY f.uploaded_at DESC LIMIT 8`,
+      [spId]
+    );
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
+// ─── تحديث بروفايل المستخدم (الاسم) ─────────────────────────────
+router.post('/profile/update', auth, async (req, res) => {
+  try {
     const uid = parseInt(req.tgUser.id);
     const { first_name, last_name } = req.body;
     if (first_name) {
