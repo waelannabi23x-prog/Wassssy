@@ -170,4 +170,4 @@ async function handleSearch(ctx, query) {
   return ctx.reply('🔍 *نتائج "' + query + '"* — ' + results.length + ' نتيجة', { parse_mode: 'Markdown', ...build(rows) }).catch(function(){});
 }
 
-module.exports = { showLatest, showRecommended, showNewInSpecialty, showFavorites, toggleFav, showHistory, showProfile, showStats, handleSearch, showProgress };
+module.exports = { showLatest, showRecommended, showNewInSpecialty, showFavorites, toggleFav, showHistory, showStats, handleSearch, showProgress };

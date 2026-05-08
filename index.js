@@ -41,6 +41,7 @@ const tools = require('./handlers/owner_tools');
 const startHandler = require('./handlers/start');
 const browse = require('./handlers/browse');
 const userH = require('./handlers/user');
+const profileH = require('./handlers/profile');
 const manage = require('./handlers/manage');
 const { getAdminCached } = require('./utils/adminCache');
 
@@ -304,7 +305,7 @@ bot.command('search', async ctx => {
   return ctx.reply('\u{1F50D} \u0627\u0643\u062A\u0628 \u0643\u0644\u0645\u0629 \u0627\u0644\u0628\u062D\u062B:').catch(function(){});
 });
 
-bot.command('profile', ctx => userH.showProfile(ctx));
+bot.command('profile', ctx => profileH.showProfile(ctx));
 bot.command('stats', ctx => userH.showStats(ctx));
 
 
@@ -609,7 +610,7 @@ const exactR = new Map([
   ['recommended', ctx => userH.showRecommended(ctx)],
   ['favorites', ctx => userH.showFavorites(ctx)],
   ['history', ctx => userH.showHistory(ctx)],
-  ['profile', ctx => userH.showProfile(ctx)],
+  ['profile', ctx => profileH.showProfile(ctx)],
   ['stats', ctx => userH.showStats(ctx)],
   ['progress', ctx => userH.showProgress(ctx)],
   ['search_prompt', ctx => { global.setState(ctx.uid, { type: 'search' }); return ctx.reply('🔍 اكتب كلمة البحث:').catch(() => {}); }],
@@ -685,7 +686,7 @@ const prefR = [
   { p: 'unfav_', fn: (ctx, d) => userH.toggleFav(ctx, safeInt(d.substring(6)), true) },
   { p: 'fav_', fn: (ctx, d) => userH.toggleFav(ctx, safeInt(d.substring(4)), false) },
   { p: 'set_sp_', fn: async (ctx, d) => { await usersDb.setSpecialty(ctx.uid, safeInt(d.substring(7))); await ctx.answerCbQuery('✅ تم حفظ تخصصك').catch(() => {}); return startHandler.showMainMenu(ctx); } },
-  { p: 'lang_', fn: (ctx, d) => { setLang(ctx.uid, d.substring(5)); return userH.showProfile(ctx); } },
+  { p: 'lang_', fn: (ctx, d) => { setLang(ctx.uid, d.substring(5)); return profileH.showProfile(ctx); } },
   { p: 'rate_', fn: async (ctx, d) => { const p = d.substring(5).split('_'); await interactions.addRating(ctx.uid, p[0], parseInt(p[1])); await ctx.answerCbQuery('⭐ تم التقييم!').catch(() => {}); cacheClear('personal_'+ctx.uid+'_'+p[0]); return browse.showPreview(ctx, p[0], p[2], p[3], p[4], p[5], p[6]); } },
   { p: 'do_report_', fn: (ctx, d) => { const p = d.substring(10).split('_'); return browse.doReport(ctx, p[0], p[1], p[2], p[3], p[4], p[5], p[6]); } },
   { p: 'report_', fn: (ctx, d) => { const p = d.substring(7).split('_'); return browse.showReportMenu(ctx, p[0], p[1], p[2], p[3], p[4], p[5]); } },
@@ -1048,28 +1049,9 @@ bot.on('my_chat_member', async ctx => {
   }
 });
 
-bot.command('leaderboard', async ctx => {
-  try {
-    const { getLeaderboard, getUserRank } = require('./database/points');
-    const [top, rank] = await Promise.all([getLeaderboard(10), getUserRank(ctx.uid)]);
-    if (!top.length) return ctx.reply('🏆 لا توجد نقاط بعد! حمّل ملفاً للبدء 🚀').catch(() => {});
-    const medals = ['🥇','🥈','🥉','4️⃣','5️⃣','6️⃣','7️⃣','8️⃣','9️⃣','🔟'];
-    let text = '🏆 *لوحة الشرف — أفضل الطلاب*\n━━━━━━━━━━━━━━━━\n\n';
-    top.forEach((u, i) => {
-      const name = (u.first_name || u.username || 'طالب').substring(0, 20);
-      text += medals[i] + ' *' + name + '*\n';
-      text += '   📥 ' + (u.downloads_count||0) + ' · ⭐ ' + u.total_points + ' نقطة\n\n';
-    });
-    text += '\n📊 مرتبتك: *#' + rank + '*';
-    await ctx.reply(text, {
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: [[
-        { text: '🔄 تحديث', callback_data: 'leaderboard_refresh' },
-        { text: '🏠 القائمة', callback_data: 'main_menu' }
-      ]] }
-    });
-  } catch(e) { ctx.reply('❌ حدث خطأ').catch(() => {}); }
-});
+bot.command('leaderboard', ctx => profileH.showLeaderboard(ctx));
+bot.action('leaderboard', ctx => profileH.showLeaderboard(ctx));
+bot.action('leaderboard_refresh', ctx => profileH.showLeaderboard(ctx));
 
 
 bot.command('stopmillion', async ctx => {
