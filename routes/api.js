@@ -415,7 +415,7 @@ router.get('/admin/user/:id/profile', auth, async (req, res) => {
     // ── إحصائيات ──
     const [pts, dlC, favC, cmtC, ratC] = await Promise.all([
       get('SELECT * FROM user_points WHERE user_id=$1', [parseInt(targetId)]).catch(() => null),
-      get('SELECT COUNT(*) as c FROM downloads WHERE user_id=$1', [parseInt(targetId)]).catch(() => ({ c: 0 })),
+      get('SELECT COALESCE(downloads_count,0) as c FROM user_points WHERE user_id=$1', [parseInt(targetId)]).catch(() => ({ c: 0 })),
       get('SELECT COUNT(*) as c FROM favorites WHERE user_id=$1', [parseInt(targetId)]).catch(() => ({ c: 0 })),
       get('SELECT COUNT(*) as c FROM comments WHERE user_id=$1', [parseInt(targetId)]).catch(() => ({ c: 0 })),
       get('SELECT COUNT(*) as c FROM ratings WHERE user_id=$1', [parseInt(targetId)]).catch(() => ({ c: 0 })),
@@ -462,7 +462,7 @@ router.get('/user/:id/profile', auth, async (req, res) => {
 
     const [pts, dlC, cmtC] = await Promise.all([
       get('SELECT total_points, streak_days FROM user_points WHERE user_id=$1', [targetId]).catch(() => null),
-      get('SELECT COUNT(*) as c FROM downloads WHERE user_id=$1', [targetId]).catch(() => ({ c: 0 })),
+      get('SELECT COALESCE(downloads_count,0) as c FROM user_points WHERE user_id=$1', [targetId]).catch(() => ({ c: 0 })),
       get('SELECT COUNT(*) as c FROM comments WHERE user_id=$1', [targetId]).catch(() => ({ c: 0 })),
     ]);
 
@@ -523,7 +523,7 @@ router.get('/latest/specialty/:spId', auth, async (req, res) => {
        JOIN subjects s ON s.id = c.subject_id
        JOIN semesters sem ON sem.id = s.semester_id
        JOIN years y ON y.id = sem.year_id
-       LEFT JOIN (SELECT file_id, COUNT(*) as cnt FROM downloads GROUP BY file_id) d ON d.file_id=f.id
+       -- downloads in files.downloads column
        LEFT JOIN (SELECT file_id, AVG(rating)::numeric(3,1) as avg FROM ratings GROUP BY file_id) r ON r.file_id=f.id
        WHERE y.specialty_id = $1
        ORDER BY f.created_at DESC LIMIT 8`,
@@ -572,7 +572,7 @@ router.get('/points/me', auth, async (req, res) => {
     const uid = parseInt(req.tgUser.id);
     const pts = await require('../database/points').getPoints(uid).catch(() => null);
     const rank = await require('../database/points').getUserRank(uid).catch(() => 999);
-    const dlC = await get('SELECT COUNT(*) as c FROM downloads WHERE user_id=$1',[uid]).catch(()=>({c:0}));
+    const dlC = await get('SELECT COALESCE(downloads_count,0) as c FROM user_points WHERE user_id=$1',[uid]).catch(()=>({c:0}));
     const cmtC = await get('SELECT COUNT(*) as c FROM comments WHERE user_id=$1',[uid]).catch(()=>({c:0}));
     const ratC = await get('SELECT COUNT(*) as c FROM ratings WHERE user_id=$1',[uid]).catch(()=>({c:0}));
     res.json({
@@ -615,17 +615,14 @@ router.get('/history', auth, async (req, res) => {
   try {
     const uid = parseInt(req.tgUser.id);
     const rows = await all(
-      `SELECT f.*, COALESCE(d.cnt,0) as downloads, MAX(dl.downloaded_at) as last_download,
-              c.name as cat_name, s.name as sub_name
-       FROM downloads dl
-       JOIN files f ON f.id = dl.file_id
+      `SELECT f.*, c.name as cat_name, s.name as sub_name
+       FROM files f
        LEFT JOIN categories c ON c.id = f.category_id
        LEFT JOIN subjects s ON s.id = c.subject_id
-       LEFT JOIN (SELECT file_id, COUNT(*) as cnt FROM downloads GROUP BY file_id) d ON d.file_id=f.id
-       WHERE dl.user_id = $1
-       GROUP BY f.id, c.name, s.name, d.cnt
-       ORDER BY last_download DESC LIMIT 30`,
-      [uid]
+       WHERE f.is_deleted=0
+       ORDER BY f.downloads DESC, f.uploaded_at DESC
+       LIMIT 20`,
+      []
     );
     res.json(rows);
   } catch(e) { res.json([]); }
