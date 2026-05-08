@@ -1,0 +1,537 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>بروفايلي</title>
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800;900&display=swap" rel="stylesheet">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --bg:#0a0a12;--bg2:#0f0f1a;--bg3:#161622;--bg4:#1e1e2e;
+  --gold:#e8b84b;--gold2:#f5d06e;--goldf:rgba(232,184,75,.15);
+  --jade:#10d9a0;--sky:#4d9fff;--rose:#ff6b9d;--lav:#9d7dff;--ora:#ff9634;
+  --t0:#f0f0ff;--t1:#c0c0e0;--t2:#7070a0;
+  --r:20px;--fw:'Tajawal',sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
+html,body{height:100%;background:var(--bg);color:var(--t0);font-family:var(--fw);overflow:hidden}
+#app{height:100dvh;overflow-y:auto;overflow-x:hidden;scroll-behavior:smooth}
+#app::-webkit-scrollbar{display:none}
+
+/* ── CANVAS ── */
+#canvas{position:fixed;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;opacity:.7}
+
+/* ── PROFILE CARD ── */
+.profile-card{position:relative;z-index:1;padding:60px 20px 24px;text-align:center}
+
+/* ── AVATAR ── */
+.avatar-wrap{position:relative;width:110px;height:110px;margin:0 auto 16px}
+.avatar-ring{position:absolute;inset:-5px;border-radius:50%;border:2px solid transparent;animation:spin 8s linear infinite}
+.avatar-img{width:110px;height:110px;border-radius:50%;background:linear-gradient(135deg,#2a2a3e,#1a1a2e);display:flex;align-items:center;justify-content:center;font-size:48px;position:relative;z-index:2;overflow:hidden;border:3px solid var(--bg3)}
+.avatar-img img{width:100%;height:100%;object-fit:cover;border-radius:50%}
+.avatar-online{position:absolute;bottom:4px;right:4px;width:16px;height:16px;background:var(--jade);border-radius:50%;border:2px solid var(--bg);z-index:3}
+
+/* ── LEVEL 0 – مبتدئ ── */
+body.lvl-0 .avatar-ring{border-color:rgba(255,255,255,.1)}
+
+/* ── LEVEL 1 – نشيط ── */
+body.lvl-1 .avatar-ring{border-color:var(--jade);box-shadow:0 0 18px rgba(16,217,160,.4)}
+body.lvl-1 .avatar-wrap{filter:drop-shadow(0 0 14px rgba(16,217,160,.3))}
+
+/* ── LEVEL 2 – متقدم ── */
+body.lvl-2 .avatar-ring{border-color:#ff6a00;box-shadow:0 0 22px rgba(255,106,0,.5)}
+
+/* ── LEVEL 3 – محترف ── */
+body.lvl-3 .avatar-ring{border-image:linear-gradient(90deg,#4facfe,#00f2fe,#4facfe) 1;border-color:transparent}
+body.lvl-3 .avatar-wrap{filter:drop-shadow(0 0 18px rgba(77,172,254,.5))}
+
+/* ── LEVEL 4 – نخبة ── */
+body.lvl-4 .avatar-ring{border-color:#a855f7;box-shadow:0 0 30px rgba(168,85,247,.6);animation:spin 4s linear infinite}
+body.lvl-4 .avatar-wrap::before{content:'';position:absolute;inset:-12px;border-radius:50%;background:conic-gradient(from 0deg,#a855f7,#6366f1,#0ea5e9,#a855f7);animation:spin 6s linear infinite;opacity:.25;filter:blur(4px)}
+
+/* ── LEVEL 5 – أسطوري ── */
+body.lvl-5 .avatar-ring{border-color:var(--gold);box-shadow:0 0 35px rgba(232,184,75,.7),0 0 70px rgba(232,184,75,.3);animation:spin 3s linear infinite}
+body.lvl-5 .avatar-wrap::before{content:'';position:absolute;inset:-15px;border-radius:50%;background:radial-gradient(circle,rgba(232,184,75,.3),transparent 70%);animation:pulseGold 2s ease-in-out infinite}
+
+/* ── LEVEL 6 – أسطوري XL ── */
+body.lvl-6 .avatar-ring{border-color:var(--gold2);box-shadow:0 0 40px rgba(232,184,75,.8),0 0 80px rgba(232,184,75,.4);animation:spin 2s linear infinite}
+body.lvl-6 .avatar-wrap::before{content:'';position:absolute;inset:-20px;border-radius:50%;background:conic-gradient(from 0deg,#e8b84b,#fff7d4,#e8b84b,#c49830,#e8b84b);animation:spin 3s linear infinite;opacity:.3;filter:blur(6px)}
+body.lvl-6 .profile-card::after{content:'';position:absolute;top:0;left:-100%;width:50%;height:100%;background:linear-gradient(90deg,transparent,rgba(255,255,255,.08),transparent);animation:sweep 4s ease-in-out infinite;pointer-events:none}
+
+/* ── OWNER ── */
+body.is-owner .avatar-ring{border-color:transparent;box-shadow:0 0 50px rgba(232,184,75,.9),0 0 100px rgba(232,184,75,.4)}
+body.is-owner .avatar-wrap::before{content:'';position:absolute;inset:-25px;border-radius:50%;background:conic-gradient(from 0deg,#e8b84b,#ff9500,#e8b84b,#ffe066,#e8b84b,#c49830,#e8b84b);animation:spin 2s linear infinite;opacity:.4;filter:blur(8px)}
+body.is-owner .profile-card::after{content:'';position:absolute;top:0;left:-100%;width:60%;height:100%;background:linear-gradient(90deg,transparent,rgba(232,184,75,.12),transparent);animation:sweep 3s ease-in-out infinite;pointer-events:none}
+body.is-owner #canvas{opacity:1}
+
+@keyframes spin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes pulseGold{0%,100%{opacity:.3;transform:scale(1)}50%{opacity:.6;transform:scale(1.1)}}
+@keyframes sweep{0%{left:-100%}100%{left:200%}}
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+@keyframes popIn{0%{transform:scale(.7);opacity:0}80%{transform:scale(1.05)}100%{transform:scale(1);opacity:1}}
+
+/* ── NAME ── */
+.prof-name{font-size:24px;font-weight:800;color:var(--t0);letter-spacing:.5px;margin-bottom:4px}
+.prof-name .sparkle{color:var(--gold);font-size:14px}
+body.is-owner .prof-name{background:linear-gradient(90deg,#e8b84b,#fff7d4,#e8b84b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:shimmer 2s linear infinite;background-size:200%}
+@keyframes shimmer{0%{background-position:200%}100%{background-position:-200%}}
+.prof-username{font-size:14px;color:var(--t2);margin-bottom:14px}
+
+/* ── BADGES ── */
+.badges-row{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:12px}
+.badge{padding:5px 12px;border-radius:20px;font-size:12px;font-weight:700;border:1px solid;display:flex;align-items:center;gap:5px}
+.badge-owner{background:linear-gradient(135deg,rgba(232,184,75,.2),rgba(200,150,30,.1));border-color:var(--gold);color:var(--gold)}
+.badge-specialty{background:rgba(77,159,255,.1);border-color:rgba(77,159,255,.3);color:var(--sky)}
+.badge-admin{background:rgba(255,107,157,.1);border-color:rgba(255,107,157,.3);color:var(--rose)}
+
+/* ── LEVEL PILL ── */
+.level-pill{display:inline-flex;align-items:center;gap:8px;padding:7px 18px;border-radius:24px;margin-bottom:10px;font-weight:700;font-size:14px;border:1px solid}
+.lvl-0 .level-pill{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.1);color:var(--t1)}
+.lvl-1 .level-pill{background:rgba(16,217,160,.08);border-color:rgba(16,217,160,.3);color:var(--jade)}
+.lvl-2 .level-pill{background:rgba(255,106,0,.08);border-color:rgba(255,106,0,.3);color:#ff9a4d}
+.lvl-3 .level-pill{background:rgba(77,172,254,.08);border-color:rgba(77,172,254,.3);color:var(--sky)}
+.lvl-4 .level-pill{background:rgba(168,85,247,.08);border-color:rgba(168,85,247,.3);color:#c084fc}
+.lvl-5 .level-pill{background:rgba(232,184,75,.1);border-color:rgba(232,184,75,.4);color:var(--gold)}
+.lvl-6 .level-pill{background:linear-gradient(135deg,rgba(232,184,75,.15),rgba(255,149,0,.1));border-color:var(--gold);color:var(--gold2)}
+.is-owner .level-pill{background:linear-gradient(135deg,rgba(232,184,75,.2),rgba(255,149,0,.15));border-color:var(--gold2);color:var(--gold2);box-shadow:0 0 20px rgba(232,184,75,.3)}
+.level-label{font-size:11px;opacity:.8}
+
+/* ── XP BAR ── */
+.xp-wrap{padding:0 24px;margin-bottom:20px}
+.xp-info{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;font-size:12px;color:var(--t2)}
+.xp-info span:last-child{color:var(--t1);font-weight:700}
+.xp-track{height:8px;border-radius:4px;background:rgba(255,255,255,.07);overflow:hidden;position:relative}
+.xp-fill{height:100%;border-radius:4px;transition:width 1.2s cubic-bezier(.4,0,.2,1);position:relative;overflow:hidden}
+.xp-fill::after{content:'';position:absolute;top:0;left:-60%;width:40%;height:100%;background:rgba(255,255,255,.3);animation:xpShine 2.5s ease-in-out infinite;border-radius:4px}
+@keyframes xpShine{0%{left:-60%}100%{left:160%}}
+.lvl-0 .xp-fill{background:linear-gradient(90deg,#555,#888)}
+.lvl-1 .xp-fill{background:linear-gradient(90deg,var(--jade),#6effd0)}
+.lvl-2 .xp-fill{background:linear-gradient(90deg,#ff6a00,#ee0979)}
+.lvl-3 .xp-fill{background:linear-gradient(90deg,#4facfe,#00f2fe)}
+.lvl-4 .xp-fill{background:linear-gradient(90deg,#a855f7,#6366f1)}
+.lvl-5 .xp-fill{background:linear-gradient(90deg,var(--gold),var(--gold2))}
+.lvl-6 .xp-fill{background:linear-gradient(90deg,#e8b84b,#fff7d4,#e8b84b);background-size:200%;animation:shimmer 2s linear infinite}
+.is-owner .xp-fill{background:linear-gradient(90deg,#e8b84b,#ff9500,#ffe066,#e8b84b);background-size:300%;animation:shimmer 1.5s linear infinite}
+.xp-max{text-align:center;font-size:11px;color:var(--gold);font-weight:700;letter-spacing:2px;margin-top:6px}
+
+/* ── STATS GRID ── */
+.stats-section{padding:0 16px;margin-bottom:16px}
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+.stat-card{background:var(--bg3);border-radius:16px;padding:14px 8px;text-align:center;border:1px solid rgba(255,255,255,.06);position:relative;overflow:hidden;animation:fadeUp .5s ease both}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px;border-radius:2px 2px 0 0}
+.stat-dl::before{background:linear-gradient(90deg,var(--sky),#00c6ff)}
+.stat-cmt::before{background:linear-gradient(90deg,var(--jade),#6effd0)}
+.stat-rat::before{background:linear-gradient(90deg,#ffb347,#ffcc02)}
+.stat-str::before{background:linear-gradient(90deg,#ff6a00,#ee0979)}
+.stat-rank::before{background:linear-gradient(90deg,var(--lav),#c084fc)}
+.stat-xp::before{background:linear-gradient(90deg,var(--gold),var(--gold2))}
+.stat-val{font-size:22px;font-weight:900;line-height:1;margin-bottom:4px}
+.stat-dl .stat-val{color:var(--sky)}
+.stat-cmt .stat-val{color:var(--jade)}
+.stat-rat .stat-val{color:#ffcc02}
+.stat-str .stat-val{color:#ff9a4d}
+.stat-rank .stat-val{color:var(--lav)}
+.stat-xp .stat-val{color:var(--gold)}
+.stat-lbl{font-size:11px;color:var(--t2);font-weight:500}
+
+/* ── ACHIEVEMENTS ── */
+.ach-section{padding:0 16px;margin-bottom:16px}
+.section-title{font-size:14px;font-weight:700;color:var(--t1);margin-bottom:12px;display:flex;align-items:center;gap:8px}
+.section-title span{font-size:11px;color:var(--t2);font-weight:400}
+.ach-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}
+.ach-item{text-align:center;animation:popIn .4s ease both}
+.ach-icon{width:54px;height:54px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:22px;margin:0 auto 6px;border:2px solid;position:relative}
+.ach-icon.done{border-color:var(--gold);background:var(--goldf);box-shadow:0 0 12px rgba(232,184,75,.3)}
+.ach-icon.lock{border-color:rgba(255,255,255,.1);background:rgba(255,255,255,.03);filter:grayscale(1);opacity:.4}
+.ach-icon.done::after{content:'✓';position:absolute;bottom:-2px;right:-2px;width:16px;height:16px;background:var(--jade);border-radius:50%;font-size:9px;display:flex;align-items:center;justify-content:center;border:1px solid var(--bg);color:#000;font-weight:900;line-height:16px;text-align:center}
+.ach-lbl{font-size:10px;color:var(--t2);line-height:1.2}
+.ach-item.done .ach-lbl{color:var(--t1)}
+
+/* ── PLATFORM STATS (owner) ── */
+.platform-section{padding:0 16px;margin-bottom:16px}
+.platform-card{background:linear-gradient(135deg,rgba(232,184,75,.08),rgba(200,150,30,.05));border:1px solid rgba(232,184,75,.2);border-radius:18px;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.plat-item{text-align:center}
+.plat-val{font-size:28px;font-weight:900;color:var(--gold)}
+.plat-lbl{font-size:11px;color:var(--t2)}
+
+/* ── LOADING ── */
+#loading{position:fixed;inset:0;background:var(--bg);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:100;gap:16px}
+.spin-ring{width:50px;height:50px;border:3px solid rgba(255,255,255,.1);border-top-color:var(--gold);border-radius:50%;animation:spin .8s linear infinite}
+#loading p{color:var(--t2);font-size:14px}
+
+/* ── CROWN (owner) ── */
+.crown-wrap{position:absolute;top:-18px;left:50%;transform:translateX(-50%);font-size:28px;animation:crownFloat 2s ease-in-out infinite;z-index:5;filter:drop-shadow(0 0 8px rgba(232,184,75,.8))}
+@keyframes crownFloat{0%,100%{transform:translateX(-50%) translateY(0) rotate(-5deg)}50%{transform:translateX(-50%) translateY(-6px) rotate(5deg)}}
+
+/* ── NEXT LEVEL ── */
+.next-level{text-align:center;font-size:12px;color:var(--t2);margin-top:8px}
+.next-level b{color:var(--t1)}
+</style>
+</head>
+<body>
+<canvas id="canvas"></canvas>
+<div id="loading"><div class="spin-ring"></div><p>جاري التحميل...</p></div>
+<div id="app" style="display:none">
+
+  <!-- PROFILE CARD -->
+  <div class="profile-card" id="profileCard">
+    <div id="crownWrap"></div>
+    <div class="avatar-wrap">
+      <div class="avatar-ring"></div>
+      <div class="avatar-img" id="avatarEl">👤</div>
+      <div class="avatar-online"></div>
+    </div>
+    <div class="prof-name" id="profName">...</div>
+    <div class="prof-username" id="profUsername"></div>
+    <div class="badges-row" id="badgesRow"></div>
+    <div class="level-pill" id="levelPill">
+      <span id="levelEmoji">🌱</span>
+      <span id="levelName">مبتدئ</span>
+      <span class="level-label" id="levelXP">0 XP</span>
+    </div>
+    <div class="xp-wrap">
+      <div class="xp-info">
+        <span id="xpLabel">XP الحالي</span>
+        <span id="xpNext"></span>
+      </div>
+      <div class="xp-track"><div class="xp-fill" id="xpBar" style="width:0%"></div></div>
+      <div class="xp-max" id="xpMax" style="display:none">✦ MAX LEVEL ✦</div>
+      <div class="next-level" id="nextLevelHint"></div>
+    </div>
+  </div>
+
+  <!-- STATS -->
+  <div class="stats-section">
+    <div class="stats-grid">
+      <div class="stat-card stat-dl" style="animation-delay:.05s">
+        <div class="stat-val" id="sDl">0</div>
+        <div class="stat-lbl">📥 تحميل</div>
+      </div>
+      <div class="stat-card stat-cmt" style="animation-delay:.1s">
+        <div class="stat-val" id="sCmt">0</div>
+        <div class="stat-lbl">💬 تعليق</div>
+      </div>
+      <div class="stat-card stat-rat" style="animation-delay:.15s">
+        <div class="stat-val" id="sRat">0</div>
+        <div class="stat-lbl">⭐ تقييم</div>
+      </div>
+      <div class="stat-card stat-str" style="animation-delay:.2s">
+        <div class="stat-val" id="sStr">0</div>
+        <div class="stat-lbl">🔥 streak</div>
+      </div>
+      <div class="stat-card stat-rank" style="animation-delay:.25s">
+        <div class="stat-val" id="sRank">#—</div>
+        <div class="stat-lbl">🏅 ترتيب</div>
+      </div>
+      <div class="stat-card stat-xp" style="animation-delay:.3s">
+        <div class="stat-val" id="sXp">0</div>
+        <div class="stat-lbl">✨ XP</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- PLATFORM STATS (owner only) -->
+  <div class="platform-section" id="platformSection" style="display:none">
+    <div class="section-title">🌐 إحصائيات المنصة</div>
+    <div class="platform-card">
+      <div class="plat-item"><div class="plat-val" id="pUsers">0</div><div class="plat-lbl">👥 مستخدم</div></div>
+      <div class="plat-item"><div class="plat-val" id="pFiles">0</div><div class="plat-lbl">📁 ملف</div></div>
+    </div>
+  </div>
+
+  <!-- ACHIEVEMENTS -->
+  <div class="ach-section">
+    <div class="section-title">🏅 الإنجازات <span id="achCounter">(0/9)</span></div>
+    <div class="ach-grid" id="achGrid"></div>
+  </div>
+
+  <div style="height:40px"></div>
+</div>
+
+<script>
+const tg = window.Telegram?.WebApp;
+if(tg){tg.ready();tg.expand();}
+
+const LEVELS=[
+  {min:0,   max:499,   label:'مبتدئ',    emoji:'🌱',idx:0},
+  {min:500, max:1999,  label:'نشيط',     emoji:'⚡',idx:1},
+  {min:2000,max:4999,  label:'متقدم',    emoji:'🔥',idx:2},
+  {min:5000,max:9999,  label:'محترف',    emoji:'💎',idx:3},
+  {min:10000,max:19999,label:'نخبة',     emoji:'🌌',idx:4},
+  {min:20000,max:49999,label:'أسطوري',   emoji:'👑',idx:5},
+  {min:50000,max:Infinity,label:'أسطوري XL',emoji:'🏆',idx:6},
+];
+
+const ACHIEVEMENTS=[
+  {emoji:'📥',label:'أول تحميل',   check:(p,r)=>p.downloads_count>=1},
+  {emoji:'📦',label:'10 تحميلات', check:(p,r)=>p.downloads_count>=10},
+  {emoji:'🚀',label:'100 تحميل',  check:(p,r)=>p.downloads_count>=100},
+  {emoji:'💬',label:'أول تعليق',  check:(p,r)=>p.comments_count>=1},
+  {emoji:'👥',label:'ناشط',       check:(p,r)=>p.comments_count>=10},
+  {emoji:'🏆',label:'Top 10',     check:(p,r)=>r<=10},
+  {emoji:'💎',label:'XP 100',     check:(p,r)=>p.total_points>=100},
+  {emoji:'🔥',label:'7 أيام',     check:(p,r)=>p.streak_days>=7},
+  {emoji:'⭐',label:'مقيّم',      check:(p,r)=>p.ratings_count>=1},
+];
+
+function getLevel(xp){
+  for(let i=LEVELS.length-1;i>=0;i--) if(xp>=LEVELS[i].min) return LEVELS[i];
+  return LEVELS[0];
+}
+
+function rankMedal(r){
+  return r===1?'🥇':r===2?'🥈':r===3?'🥉':'#'+r;
+}
+
+const initData=tg?.initData||'';
+const API=async(path)=>{
+  const r=await fetch('/api'+path,{headers:{'x-init-data':initData}});
+  return r.json();
+};
+
+/* ── CANVAS EFFECTS ── */
+const canvas=document.getElementById('canvas');
+const ctx2=canvas.getContext('2d');
+let particles=[];
+let animMode=0; // 0=none,1=glow,2=fire,3=diamond,4=galaxy,5=golden,6=xlite,7=owner
+
+function resizeCanvas(){canvas.width=window.innerWidth;canvas.height=window.innerHeight;}
+resizeCanvas();
+window.addEventListener('resize',resizeCanvas);
+
+class Particle{
+  constructor(mode){
+    this.mode=mode;
+    this.reset();
+  }
+  reset(){
+    const W=canvas.width,H=canvas.height;
+    const cx=W/2,cy=H*.22;
+    if(this.mode===2){// fire
+      const a=Math.random()*Math.PI*2;
+      const r=40+Math.random()*20;
+      this.x=cx+Math.cos(a)*r*0.5;
+      this.y=cy+55+Math.random()*10;
+      this.vx=(Math.random()-.5)*1.5;
+      this.vy=-(1.5+Math.random()*2.5);
+      this.life=1;this.decay=.015+Math.random()*.02;
+      this.size=3+Math.random()*5;
+      this.hue=10+Math.random()*30;
+    } else if(this.mode===3){// diamond
+      const a=Math.random()*Math.PI*2;
+      const r=60+Math.random()*40;
+      this.x=cx+Math.cos(a)*r;
+      this.y=cy+Math.sin(a)*r*.7;
+      this.vx=(Math.random()-.5)*.4;
+      this.vy=-(Math.random()*.5);
+      this.life=Math.random();this.decay=.004+Math.random()*.006;
+      this.size=2+Math.random()*4;
+    } else if(this.mode===4){// galaxy
+      this.angle=Math.random()*Math.PI*2;
+      this.radius=50+Math.random()*60;
+      this.speed=.003+Math.random()*.005;
+      this.x=cx;this.y=cy;
+      this.life=.5+Math.random()*.5;this.decay=.003;
+      this.size=1+Math.random()*2.5;
+    } else if(this.mode>=5){// golden/owner
+      this.x=Math.random()*W;
+      this.y=-10;
+      this.vx=(Math.random()-.5)*2;
+      this.vy=1+Math.random()*3;
+      this.life=1;this.decay=.006+Math.random()*.008;
+      this.size=2+Math.random()*4;
+      this.rotate=Math.random()*Math.PI*2;
+      this.rotSpeed=(Math.random()-.5)*.1;
+    }
+  }
+  update(){
+    if(this.mode===2){
+      this.x+=this.vx;this.y+=this.vy;this.life-=this.decay;
+      this.size*=.97;
+      if(this.life<=0||this.size<.5) this.reset();
+    } else if(this.mode===3){
+      this.x+=this.vx;this.y+=this.vy;
+      this.life+=this.life<.7?.02:-(this.decay);
+      if(this.life<=0){this.reset();this.life=0;}
+    } else if(this.mode===4){
+      this.angle+=this.speed;
+      const cx2=canvas.width/2,cy2=canvas.height*.22;
+      this.x=cx2+Math.cos(this.angle)*this.radius;
+      this.y=cy2+Math.sin(this.angle)*this.radius*.6;
+      this.life-=this.decay;
+      if(this.life<=0) this.reset();
+    } else if(this.mode>=5){
+      this.x+=this.vx;this.y+=this.vy;
+      this.vy+=.05;this.life-=this.decay;
+      this.rotate+=this.rotSpeed;
+      if(this.y>canvas.height+20||this.life<=0) this.reset();
+    }
+  }
+  draw(){
+    ctx2.save();ctx2.globalAlpha=Math.max(0,this.life);
+    if(this.mode===2){
+      const g=ctx2.createRadialGradient(this.x,this.y,0,this.x,this.y,this.size);
+      g.addColorStop(0,`hsla(${this.hue},100%,80%,1)`);
+      g.addColorStop(1,`hsla(${this.hue+20},100%,50%,0)`);
+      ctx2.fillStyle=g;ctx2.beginPath();ctx2.arc(this.x,this.y,this.size,0,Math.PI*2);ctx2.fill();
+    } else if(this.mode===3){
+      ctx2.translate(this.x,this.y);ctx2.rotate(Math.PI/4);
+      ctx2.fillStyle=`rgba(100,200,255,${this.life})`;
+      ctx2.fillRect(-this.size/2,-this.size/2,this.size,this.size);
+    } else if(this.mode===4){
+      ctx2.fillStyle=`hsla(${270+this.angle*30},80%,70%,${this.life})`;
+      ctx2.beginPath();ctx2.arc(this.x,this.y,this.size,0,Math.PI*2);ctx2.fill();
+    } else if(this.mode>=5){
+      ctx2.translate(this.x,this.y);ctx2.rotate(this.rotate);
+      const c=this.mode===7?`rgba(232,184,75,${this.life})`:`rgba(232,200,80,${this.life})`;
+      ctx2.strokeStyle=c;ctx2.lineWidth=1.5;
+      ctx2.beginPath();ctx2.moveTo(0,-this.size);ctx2.lineTo(this.size*.4,0);ctx2.lineTo(0,this.size);ctx2.lineTo(-this.size*.4,0);ctx2.closePath();ctx2.stroke();
+    }
+    ctx2.restore();
+  }
+}
+
+function initParticles(mode){
+  animMode=mode;
+  particles=[];
+  const counts=[0,0,60,50,70,80,100,150];
+  const n=counts[mode]||0;
+  for(let i=0;i<n;i++) particles.push(new Particle(mode));
+}
+
+function animLoop(){
+  ctx2.clearRect(0,0,canvas.width,canvas.height);
+  particles.forEach(p=>{p.update();p.draw();});
+  requestAnimationFrame(animLoop);
+}
+animLoop();
+
+/* ── RENDER ── */
+async function loadProfile(){
+  try{
+    const [prof,pts]=await Promise.all([API('/profile'),API('/points/me')]);
+    const xp=parseInt(pts.total_points)||0;
+    const rank=parseInt(pts.rank)||999;
+    const lvl=getLevel(xp);
+    const isOwner=prof.isOwner||false;
+
+    // body class
+    document.body.classList.add('lvl-'+lvl.idx);
+    if(isOwner) document.body.classList.add('is-owner');
+
+    // canvas mode
+    if(isOwner) initParticles(7);
+    else initParticles(lvl.idx);
+
+    // crown
+    if(isOwner||lvl.idx>=5){
+      const cw=document.getElementById('crownWrap');
+      cw.innerHTML='<div class="crown-wrap">'+(isOwner?'👑':lvl.emoji)+'</div>';
+    }
+
+    // avatar
+    const av=document.getElementById('avatarEl');
+    const user=prof.user||tg?.initDataUnsafe?.user||{};
+    const fname=user.first_name||'مستخدم';
+    const lname=user.last_name||'';
+    av.textContent=fname.charAt(0).toUpperCase();
+    if(user.photo_url){
+      av.innerHTML='<img src="'+user.photo_url+'" alt="avatar" onerror="this.parentElement.textContent=\''+fname.charAt(0)+'\'">';
+    }
+
+    // name
+    const n=document.getElementById('profName');
+    if(isOwner){
+      n.innerHTML='✦ '+fname+' ✦';
+    } else if(lvl.idx>=5){
+      n.innerHTML='<span class="sparkle">✦</span> '+fname+' <span class="sparkle">✦</span>';
+    } else {
+      n.textContent=fname+(lname?' '+lname:'');
+    }
+
+    // username
+    const uname=user.username||prof.user?.username||'';
+    if(uname){document.getElementById('profUsername').textContent='@'+uname;}
+
+    // badges
+    const br=document.getElementById('badgesRow');
+    if(isOwner) br.innerHTML+='<div class="badge badge-owner">👑 مالك المنصة</div>';
+    else if(prof.isAdmin) br.innerHTML+='<div class="badge badge-admin">🛡 مشرف</div>';
+    if(prof.specialty?.name){br.innerHTML+='<div class="badge badge-specialty">🎓 '+prof.specialty.name+'</div>';}
+
+    // level pill
+    document.getElementById('levelEmoji').textContent=isOwner?'👑':lvl.emoji;
+    document.getElementById('levelName').textContent=isOwner?'أسطوري XL':lvl.label;
+    document.getElementById('levelXP').textContent='• '+xp+' XP';
+
+    // xp bar
+    const nextLvl=LEVELS[Math.min(lvl.idx+1,LEVELS.length-1)];
+    const isMax=lvl.idx===LEVELS.length-1||isOwner;
+    if(isMax){
+      document.getElementById('xpBar').style.width='100%';
+      document.getElementById('xpMax').style.display='block';
+      document.getElementById('xpNext').textContent='MAX';
+      document.getElementById('xpLabel').textContent='XP الكلي';
+    } else {
+      const pct=Math.min(Math.round(((xp-lvl.min)/(lvl.max-lvl.min+1))*100),100);
+      setTimeout(()=>{document.getElementById('xpBar').style.width=pct+'%';},300);
+      document.getElementById('xpNext').textContent=nextLvl.min.toLocaleString()+' XP';
+      const needed=nextLvl.min-xp;
+      document.getElementById('nextLevelHint').innerHTML=
+        'تحتاج <b>'+needed.toLocaleString()+' XP</b> للوصول إلى '+nextLvl.emoji+' '+nextLvl.label;
+    }
+
+    // stats
+    const dl=parseInt(pts.downloads_count)||parseInt(prof.dlCount)||0;
+    const cmt=parseInt(pts.comments_count)||parseInt(prof.cmtCount)||0;
+    const rat=parseInt(pts.ratings_count)||parseInt(prof.ratingCount)||0;
+    const str=parseInt(pts.streak_days)||0;
+    document.getElementById('sDl').textContent=dl.toLocaleString();
+    document.getElementById('sCmt').textContent=cmt.toLocaleString();
+    document.getElementById('sRat').textContent=rat.toLocaleString();
+    document.getElementById('sStr').textContent=str.toLocaleString();
+    document.getElementById('sRank').textContent=rank<=3?rankMedal(rank):'#'+rank;
+    document.getElementById('sXp').textContent=xp.toLocaleString();
+
+    // platform stats (owner)
+    if(isOwner){
+      document.getElementById('platformSection').style.display='block';
+      try{
+        const st=await fetch('/api/admin/stats',{headers:{'x-init-data':initData}}).then(r=>r.json());
+        document.getElementById('pUsers').textContent=(st.users||0).toLocaleString();
+        document.getElementById('pFiles').textContent=(st.files||0).toLocaleString();
+      } catch(_){}
+    }
+
+    // achievements
+    const ptsObj={downloads_count:dl,comments_count:cmt,ratings_count:rat,total_points:xp,streak_days:str};
+    const ag=document.getElementById('achGrid');
+    let earned=0;
+    ACHIEVEMENTS.forEach((a,i)=>{
+      const done=a.check(ptsObj,rank);
+      if(done) earned++;
+      const div=document.createElement('div');
+      div.className='ach-item'+(done?' done':'');
+      div.style.animationDelay=(i*.05+.3)+'s';
+      div.innerHTML=
+        '<div class="ach-icon '+(done?'done':'lock')+'">'+a.emoji+'</div>'+
+        '<div class="ach-lbl">'+a.label+'</div>';
+      ag.appendChild(div);
+    });
+    document.getElementById('achCounter').textContent='('+earned+'/'+ACHIEVEMENTS.length+')';
+
+    // show
+    document.getElementById('loading').style.display='none';
+    document.getElementById('app').style.display='block';
+
+  } catch(e){
+    document.getElementById('loading').innerHTML='<p style="color:#ff6b6b">خطأ في التحميل</p>';
+    console.error(e);
+  }
+}
+
+loadProfile();
+</script>
+</body>
+</html>

@@ -97,7 +97,8 @@ async function showMainMenu(ctx, name) {
 
   // ── زر التطبيق الرئيسي ──
   if (webAppUrl) {
-    rows.push([{ text: "🚀 Let's Go", web_app: { url: webAppUrl } }]);
+    rows.push([{ text: '👤 بروفايلي', web_app: { url: webAppUrl + '/profile.html' } }]);
+  rows.push([{ text: "🚀 Let's Go", web_app: { url: webAppUrl } }]);
   } else {
     rows.push([btn('📚 تصفح المحتوى', 'browse')]);
   }
