@@ -1034,3 +1034,170 @@ router.post('/xp/daily', auth, async (req, res) => {
 });
 
 module.exports = router;
+
+// ─── PROFILE UPDATE ───
+router.post('/profile/update', auth, async (req, res) => {
+  const uid = req.tgUser.id;
+  const { bio, specialty_id, owner_about } = req.body;
+  try {
+    if (bio !== undefined) {
+      await run(`INSERT INTO users(id,first_name) VALUES($1,'') ON CONFLICT(id) DO UPDATE SET bio=$2`, [uid, bio.substring(0,200)]);
+    }
+    if (specialty_id !== undefined && specialty_id > 0) {
+      await run(`INSERT INTO user_specialties(user_id,specialty_id) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET specialty_id=$2, updated_at=NOW()`, [uid, specialty_id]);
+    }
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── PUBLIC USER PROFILE ───
+router.get('/user/:id', auth, async (req, res) => {
+  try {
+    const u = await get(`SELECT u.*, us.specialty_id, s.name as specialty_name,
+      (SELECT COUNT(*) FROM history WHERE user_id=u.id) as dl_count,
+      (SELECT COUNT(*) FROM favorites WHERE user_id=u.id) as fav_count,
+      (SELECT COUNT(*) FROM comments WHERE user_id=u.id AND is_deleted=0) as cmt_count,
+      (SELECT COUNT(*) FROM ratings WHERE user_id=u.id) as rating_count,
+      (SELECT COALESCE(total_points,0) FROM user_points WHERE user_id=u.id) as xp
+      FROM users u
+      LEFT JOIN user_specialties us ON us.user_id=u.id
+      LEFT JOIN specialties s ON s.id=us.specialty_id
+      WHERE u.id=$1`, [req.params.id]);
+    if (!u) return res.status(404).json({ error: 'not found' });
+    const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+    u.is_owner = parseInt(u.id) === OWNER_ID;
+    res.json(u);
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── LEADERBOARD ───
+router.get('/leaderboard', auth, async (req, res) => {
+  try {
+    const rows = await all(`SELECT u.id, u.first_name, u.last_name, us.specialty_id,
+      s.name as specialty_name,
+      COALESCE(up.total_points,0) as total,
+      (SELECT COUNT(*) FROM history WHERE user_id=u.id) as dl_count
+      FROM users u
+      LEFT JOIN user_specialties us ON us.user_id=u.id
+      LEFT JOIN specialties s ON s.id=us.specialty_id
+      LEFT JOIN user_points up ON up.user_id=u.id
+      WHERE u.is_banned=0
+      ORDER BY COALESCE(up.total_points,0) DESC
+      LIMIT 20`);
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
+// ─── TRENDING ───
+router.get('/trending', auth, async (req, res) => {
+  try {
+    const rows = await all(`SELECT f.*, s.name as sub_name,
+      AVG(r.rating) as rating_avg, COUNT(r.rating) as rating_cnt
+      FROM files f
+      LEFT JOIN categories c ON c.id=f.category_id
+      LEFT JOIN subjects s ON s.id=c.subject_id
+      LEFT JOIN ratings r ON r.file_id=f.id
+      WHERE f.is_deleted=0
+      GROUP BY f.id, s.name
+      ORDER BY f.downloads DESC, f.uploaded_at DESC
+      LIMIT 20`);
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
+// ─── HISTORY ───
+router.get('/history', auth, async (req, res) => {
+  const uid = req.tgUser.id;
+  try {
+    const rows = await all(`SELECT f.*, s.name as sub_name, h.viewed_at
+      FROM history h
+      JOIN files f ON f.id=h.file_id
+      LEFT JOIN categories c ON c.id=f.category_id
+      LEFT JOIN subjects s ON s.id=c.subject_id
+      WHERE h.user_id=$1 AND f.is_deleted=0
+      ORDER BY h.viewed_at DESC LIMIT 30`, [uid]);
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
+// ─── NOTIFICATIONS ───
+router.get('/notifications', auth, async (req, res) => {
+  try { res.json([]); } catch(e) { res.json([]); }
+});
+router.get('/notifications/count', auth, async (req, res) => {
+  res.json({ count: 0 });
+});
+
+// ─── ADMINS PUBLIC ───
+router.get('/admins/public', auth, async (req, res) => {
+  try {
+    const rows = await all(`SELECT a.user_id, u.first_name, u.last_name, u.username,
+      s.name as specialty_name
+      FROM admins a
+      LEFT JOIN users u ON u.id=a.user_id
+      LEFT JOIN specialties s ON s.id=a.specialty_id
+      WHERE u.username IS NOT NULL AND u.username != ''
+      ORDER BY a.added_at DESC LIMIT 10`);
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
+// ─── AI CHAT ───
+router.post('/ai/chat', auth, async (req, res) => {
+  const { message } = req.body;
+  if (!message) return res.status(400).json({ error: 'no message' });
+  try {
+    const { handleOwnerAI } = require('../handlers/ai_owner');
+    const fakeCtx = {
+      uid: req.tgUser.id,
+      from: req.tgUser,
+      message: { text: message },
+      reply: (text) => { res.json({ reply: text }); }
+    };
+    await handleOwnerAI(fakeCtx, message);
+  } catch(e) {
+    res.json({ reply: 'عذراً، حدث خطأ في الاتصال بالذكاء الاصطناعي. جرب مرة أخرى.' });
+  }
+});
+
+// ─── ADS ───
+router.get('/ads', auth, async (req, res) => {
+  try {
+    const rows = await all(`SELECT * FROM message_templates WHERE type IN ('ad','pinned','specialty','channel','general') ORDER BY created_at DESC LIMIT 20`).catch(()=>[]);
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
+// ─── CHANNELS ───
+router.get('/channels', auth, async (req, res) => {
+  try {
+    const rows = await all(`SELECT * FROM required_channels WHERE is_active=1 ORDER BY id`).catch(()=>[]);
+    res.json(rows.map(r=>({...r,joined:false,is_trending:false,is_recommended:false,emoji:'📺',url:r.channel_url,name:r.channel_name,members:0})));
+  } catch(e) { res.json([]); }
+});
+
+// ─── FILE OF DAY ───
+router.get('/fotd', auth, async (req, res) => {
+  try {
+    const f = await get(`SELECT f.*, s.name as sub_name FROM files f LEFT JOIN categories c ON c.id=f.category_id LEFT JOIN subjects s ON s.id=c.subject_id WHERE f.is_deleted=0 ORDER BY f.downloads DESC LIMIT 1`);
+    res.json(f||null);
+  } catch(e) { res.json(null); }
+});
+
+// ─── LATEST by specialty ───
+router.get('/latest', auth, async (req, res) => {
+  const spId = req.query.spId;
+  try {
+    let q = `SELECT f.*, s.name as sub_name FROM files f LEFT JOIN categories c ON c.id=f.category_id LEFT JOIN subjects s ON s.id=c.subject_id`;
+    const params = [];
+    if (spId && spId !== '0') {
+      q += ` LEFT JOIN semesters sem ON sem.id=s.semester_id LEFT JOIN years y ON y.id=sem.year_id WHERE f.is_deleted=0 AND y.specialty_id=$1`;
+      params.push(spId);
+    } else {
+      q += ` WHERE f.is_deleted=0`;
+    }
+    q += ` ORDER BY f.uploaded_at DESC LIMIT 20`;
+    const rows = await all(q, params);
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});

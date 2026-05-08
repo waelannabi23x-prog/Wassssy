@@ -80,6 +80,7 @@ app.set('trust proxy', 1);
 
 app.get('/', (_r, res) => res.send('OK'));
 // ── Mini App ──
+app.use('/profile', require('express').static('public/profile'));
 app.use('/app', require('express').static('public/app'));
 app.use('/admin', require('express').static('public/admin'));
 app.use('/api', require('./routes/api'));
