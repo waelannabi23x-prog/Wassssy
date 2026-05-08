@@ -79,6 +79,8 @@ async function handleAddCallback(ctx, data) {
       await global.delState(ctx.uid);
       ctx.editMessageText('✅ *' + escMd(state.title) + '*\n📚 ' + escMd(state.chosenSubName) + ' → 📁 ' + escMd(cat[0] ? cat[0].name : ''), { parse_mode: 'Markdown' }).catch(function(){});
       await global.setState(ctx.uid, { type: 'add_mode', chatId: state.chatId });
+      // ── XP for upload ──
+      try { require('./xp').onUpload(global.__bot, ctx.uid).catch(function(){}); } catch(_) {}
     } catch(e) { ctx.editMessageText('❌ ' + (e.message === 'exists' ? 'موجود مسبقاً' : e.message)).catch(function(){}); }
   }
 }

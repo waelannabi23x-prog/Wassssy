@@ -107,11 +107,13 @@ router.post('/send/:id', auth, async (req, res) => {
     else await bot.telegram.sendDocument(uid, f.file_id, { caption: cap, parse_mode: 'Markdown' });
     filesDb.incDownloads(req.params.id);
     interactions.addHistory(uid, req.params.id).catch(() => {});
+    // ── XP: downloader gets XP ──
+    try { require('../handlers/xp').onDownload(global.__bot, parseInt(uid)).catch(()=>{}); } catch(_) {}
+    // ── XP: uploader gets passive XP ──
+    try { if(f.uploaded_by && f.uploaded_by !== parseInt(uid)) require('../handlers/xp').onFileDownloaded(global.__bot, parseInt(f.uploaded_by)).catch(()=>{}); } catch(_) {}
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
-
-module.exports = router;
 
 router.get('/favorites', auth, async (req, res) => {
   try {
@@ -132,6 +134,7 @@ router.post('/comment/:id', auth, async (req, res) => {
     const { text } = req.body;
     if (!text || text.trim().length < 1) return res.status(400).json({ error: 'empty' });
     await run(`INSERT INTO comments(file_id,user_id,text) VALUES($1,$2,$3)`, [req.params.id, req.tgUser.id, text.trim()]);
+    try { require('../handlers/xp').onComment(global.__bot, parseInt(req.tgUser.id)).catch(()=>{}); } catch(_) {}
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -142,6 +145,7 @@ router.post('/rate/:id', auth, async (req, res) => {
     if (!rating || rating < 1 || rating > 5) return res.status(400).json({ error: 'invalid' });
     await run(`INSERT INTO ratings(user_id,file_id,rating) VALUES($1,$2,$3) ON CONFLICT(user_id,file_id) DO UPDATE SET rating=$3`, [req.tgUser.id, req.params.id, rating]);
     const avg = await get(`SELECT AVG(rating) as avg, COUNT(*) as cnt FROM ratings WHERE file_id=$1`, [req.params.id]);
+    try { require('../handlers/xp').onRating(global.__bot, parseInt(req.tgUser.id)).catch(()=>{}); } catch(_) {}
     res.json({ ok: true, avg: avg.avg, cnt: avg.cnt });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
@@ -606,6 +610,10 @@ router.post('/points/daily', auth, async (req, res) => {
   try {
     const uid = parseInt(req.tgUser.id);
     const awarded = await require('../database/points').checkDailyLogin(uid).catch(() => false);
+    // Also award XP for daily login
+    if (awarded) {
+      try { require('../handlers/xp').onDailyLogin(global.__bot, uid).catch(()=>{}); } catch(_) {}
+    }
     res.json({ ok: true, awarded });
   } catch(e) { res.json({ ok: false }); }
 });
@@ -975,3 +983,54 @@ router.post('/admin/addadmin', auth, async (req, res) => {
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
+
+// ══════════════════════════════════════════════════════
+//  XP SYSTEM ROUTES
+// ══════════════════════════════════════════════════════
+const xpDb = require('../database/xp');
+
+// GET /api/xp/me — full XP data for current user
+router.get('/xp/me', auth, async (req, res) => {
+  try {
+    const uid = parseInt(req.tgUser.id);
+    const [xpData, rank] = await Promise.all([
+      xpDb.getXp(uid),
+      xpDb.getRank(uid),
+    ]);
+    res.json({ ...xpData, rank });
+  } catch(e) { res.json({ xp:0, level:1, rank:999 }); }
+});
+
+// GET /api/xp/leaderboard
+router.get('/xp/leaderboard', auth, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit||'20'), 50);
+    const lb = await xpDb.getLeaderboard(limit);
+    res.json(lb);
+  } catch(e) { res.json([]); }
+});
+
+// GET /api/xp/levels — send LEVELS array to frontend
+router.get('/xp/levels', auth, (_req, res) => {
+  res.json(xpDb.LEVELS);
+});
+
+// POST /api/xp/daily — daily login XP
+router.post('/xp/daily', auth, async (req, res) => {
+  try {
+    const uid = parseInt(req.tgUser.id);
+    // Check if already claimed today
+    const today = new Date().toISOString().slice(0,10);
+    const row = await get('SELECT updated_at FROM user_xp WHERE user_id=$1', [uid]).catch(()=>null);
+    const lastDate = row ? String(row.updated_at||'').slice(0,10) : '';
+    if (lastDate === today) return res.json({ ok: true, awarded: false, already: true });
+    const result = await xpDb.addXp(uid, 'daily_login');
+    // also send level-up msg if needed
+    if (result?.leveled_up && global.__bot) {
+      try { require('../handlers/xp').award(global.__bot, uid, 'daily_login'); } catch(_) {}
+    }
+    res.json({ ok: true, awarded: true, result });
+  } catch(e) { res.json({ ok: false }); }
+});
+
+module.exports = router;
