@@ -751,3 +751,230 @@ router.post('/admin/channels/:id/delete', auth, async (req, res) => {
   try { await run('UPDATE channels SET is_deleted=1 WHERE id=$1',[req.params.id]); res.json({ ok:true }); }
   catch(e) { res.status(500).json({ error: e.message }); }
 });
+// ══════════════════════════════════════════════════════════════════
+// routes_missing_v2.js — استبدل routes_missing.js الأول بهذا
+// أضفه في api.js قبل module.exports = router;
+// ══════════════════════════════════════════════════════════════════
+
+// ─── ملفات حديثة حسب التخصص ──────────────────────────────────────
+router.get('/latest/specialty/:spId', auth, async (req, res) => {
+  try {
+    const spId = parseInt(req.params.spId);
+    const rows = await all(
+      `SELECT f.*, c.name as cat_name, s.name as sub_name
+       FROM files f
+       JOIN categories c ON c.id = f.category_id
+       JOIN subjects s ON s.id = c.subject_id
+       JOIN semesters sem ON sem.id = s.semester_id
+       JOIN years y ON y.id = sem.year_id
+       WHERE y.specialty_id = $1 AND f.is_deleted=0
+       ORDER BY f.uploaded_at DESC LIMIT 8`,
+      [spId]
+    );
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
+// ─── تحديث بروفايل المستخدم (الاسم) ─────────────────────────────
+router.post('/profile/update', auth, async (req, res) => {
+  try {
+    const uid = parseInt(req.tgUser.id);
+    const { first_name, last_name } = req.body;
+    if (first_name) {
+      await run(
+        'UPDATE users SET first_name=$1, last_name=$2 WHERE id=$3',
+        [first_name.trim(), (last_name || '').trim(), uid]
+      ).catch(() => {});
+    }
+    const { cacheClear } = require('../utils/cache');
+    cacheClear('prof_' + uid);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── نقاط المستخدم ───────────────────────────────────────────────
+router.get('/points/me', auth, async (req, res) => {
+  try {
+    const uid = parseInt(req.tgUser.id);
+    const pts = await get('SELECT * FROM user_points WHERE user_id=$1', [uid]).catch(() => null);
+    const rank = await require('../database/points').getUserRank(uid).catch(() => 999);
+    res.json({
+      total_points: pts?.total_points || 0,
+      streak_days: pts?.streak_days || 0,
+      downloads_count: pts?.downloads_count || 0,
+      comments_count: pts?.comments_count || 0,
+      ratings_count: pts?.ratings_count || 0,
+      rank: rank || 999,
+    });
+  } catch(e) {
+    res.json({ total_points:0, downloads_count:0, comments_count:0, ratings_count:0, streak_days:0, rank:999 });
+  }
+});
+
+router.get('/points/rank', auth, async (req, res) => {
+  try {
+    const uid = parseInt(req.tgUser.id);
+    const rank = await require('../database/points').getUserRank(uid).catch(() => 999);
+    res.json({ rank: rank || 999 });
+  } catch(e) { res.json({ rank: 999 }); }
+});
+
+router.get('/points/leaderboard', auth, async (req, res) => {
+  try {
+    const limit = Math.min(parseInt(req.query.limit || '20'), 50);
+    const lb = await require('../database/points').getLeaderboard(limit).catch(() => []);
+    res.json(lb);
+  } catch(e) { res.json([]); }
+});
+
+router.post('/points/daily', auth, async (req, res) => {
+  try {
+    const uid = parseInt(req.tgUser.id);
+    await require('../database/points').checkDailyLogin(uid).catch(() => {});
+    res.json({ ok: true });
+  } catch(e) { res.json({ ok: false }); }
+});
+
+// ─── سجل التحميل (من user_points + latest files) ─────────────────
+router.get('/history', auth, async (req, res) => {
+  try {
+    // ما في جدول downloads منفصل — نرجع آخر الملفات بدلاً
+    const files = await all(
+      `SELECT f.*, c.name as cat_name, s.name as sub_name
+       FROM files f
+       LEFT JOIN categories c ON c.id = f.category_id
+       LEFT JOIN subjects s ON s.id = c.subject_id
+       WHERE f.is_deleted=0
+       ORDER BY f.downloads DESC, f.uploaded_at DESC
+       LIMIT 20`
+    );
+    res.json(files);
+  } catch(e) { res.json([]); }
+});
+
+// ─── لايك التعليق ────────────────────────────────────────────────
+router.post('/comment/:id/like', auth, async (req, res) => {
+  try {
+    const uid = parseInt(req.tgUser.id);
+    const cid = parseInt(req.params.id);
+    const ex = await get(
+      'SELECT 1 FROM comment_likes WHERE user_id=$1 AND comment_id=$2',
+      [uid, cid]
+    ).catch(() => null);
+    if (ex) {
+      await run('DELETE FROM comment_likes WHERE user_id=$1 AND comment_id=$2', [uid, cid]);
+      await run('UPDATE comments SET likes=GREATEST(0,COALESCE(likes,0)-1) WHERE id=$1', [cid]).catch(() => {});
+      res.json({ liked: false });
+    } else {
+      await run('INSERT INTO comment_likes(user_id,comment_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [uid, cid]);
+      await run('UPDATE comments SET likes=COALESCE(likes,0)+1 WHERE id=$1', [cid]).catch(() => {});
+      res.json({ liked: true });
+    }
+  } catch(e) { res.json({ liked: false }); }
+});
+
+// ─── الإعلانات ───────────────────────────────────────────────────
+router.get('/ads', auth, async (req, res) => {
+  try {
+    const rows = await all(
+      `SELECT * FROM ads WHERE is_deleted=0
+       ORDER BY is_pinned DESC, created_at DESC LIMIT 30`
+    ).catch(() => []);
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
+// ─── القنوات ─────────────────────────────────────────────────────
+router.get('/channels', auth, async (req, res) => {
+  try {
+    const rows = await all(
+      'SELECT * FROM channels WHERE is_deleted=0 ORDER BY sort_order ASC, id DESC'
+    ).catch(() => []);
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
+// ─── إنشاء إعلان ─────────────────────────────────────────────────
+router.post('/admin/ads', auth, async (req, res) => {
+  const uid = parseInt(req.tgUser.id);
+  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1', [uid]).catch(() => null);
+  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+  const { title, body, icon, link, specialty_id, is_pinned, image_url, video_url } = req.body;
+  if (!title) return res.status(400).json({ error: 'title required' });
+  try {
+    await run(
+      `INSERT INTO ads(title,body,icon,link,specialty_id,is_pinned,created_by,image_url,video_url)
+       VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
+      [title, body||null, icon||'📌', link||null, specialty_id||null,
+       is_pinned ? 1 : 0, uid, image_url||null, video_url||null]
+    );
+    res.json({ ok: true });
+  } catch(e) {
+    // fallback بدون video_url
+    try {
+      await run(
+        `INSERT INTO ads(title,body,icon,link,specialty_id,is_pinned,created_by,image_url)
+         VALUES($1,$2,$3,$4,$5,$6,$7,$8)`,
+        [title, body||null, icon||'📌', link||null, specialty_id||null,
+         is_pinned ? 1 : 0, uid, image_url||video_url||null]
+      );
+      res.json({ ok: true });
+    } catch(e2) { res.status(500).json({ error: e2.message }); }
+  }
+});
+
+router.post('/admin/ads/:id/delete', auth, async (req, res) => {
+  const uid = parseInt(req.tgUser.id);
+  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1', [uid]).catch(() => null);
+  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+  try {
+    await run('UPDATE ads SET is_deleted=1 WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── إنشاء قناة ──────────────────────────────────────────────────
+router.post('/admin/channels', auth, async (req, res) => {
+  const uid = parseInt(req.tgUser.id);
+  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1', [uid]).catch(() => null);
+  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+  const { name, description, link, icon, members_count } = req.body;
+  if (!name) return res.status(400).json({ error: 'name required' });
+  try {
+    await run(
+      'INSERT INTO channels(name,description,link,icon,members_count,created_by) VALUES($1,$2,$3,$4,$5,$6)',
+      [name, description||null, link||null, icon||'📺', members_count||null, uid]
+    );
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+router.post('/admin/channels/:id/delete', auth, async (req, res) => {
+  const uid = parseInt(req.tgUser.id);
+  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1', [uid]).catch(() => null);
+  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+  try {
+    await run('UPDATE channels SET is_deleted=1 WHERE id=$1', [req.params.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ─── إضافة مشرف ──────────────────────────────────────────────────
+router.post('/admin/addadmin', auth, async (req, res) => {
+  const uid = parseInt(req.tgUser.id);
+  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
+  if (uid !== OWNER_ID) return res.status(403).json({ error: 'owner only' });
+  const { userId, permissions } = req.body;
+  if (!userId) return res.status(400).json({ error: 'userId required' });
+  try {
+    await run(
+      'INSERT INTO admins(user_id,added_by,permissions) VALUES($1,$2,$3) ON CONFLICT(user_id) DO UPDATE SET permissions=$3',
+      [parseInt(userId), uid, permissions || 'full']
+    );
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
