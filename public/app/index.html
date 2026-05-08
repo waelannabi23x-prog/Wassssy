@@ -410,6 +410,76 @@ select.inp option{background:#0f0f18;color:#f4f4ff}
 .lsbar{width:130px;height:3px;background:var(--ink3);border-radius:2px;overflow:hidden}
 .lsfil{height:100%;background:linear-gradient(90deg,var(--jade),var(--gold));border-radius:2px;animation:lsFil 1.8s cubic-bezier(.4,0,.2,1) forwards}
 @keyframes lsFil{from{width:0}to{width:100%}}
+
+/* ═══ PROFILE ANIMATIONS ═══ */
+.prof-aura-wrap{position:relative;width:100px;height:100px;margin:0 auto 14px;flex-shrink:0}
+.prof-ring{position:absolute;inset:-6px;border-radius:50%;border:2.5px solid transparent;animation:profSpin 6s linear infinite;pointer-events:none;z-index:1}
+.prof-ring-glow{position:absolute;inset:-14px;border-radius:50%;opacity:0;pointer-events:none;z-index:0;animation:profPulse 2.5s ease-in-out infinite}
+
+/* level rings */
+.plv0 .prof-ring{border-color:rgba(255,255,255,.08)}
+.plv1 .prof-ring{border-color:#10d9a0;box-shadow:0 0 14px rgba(16,217,160,.5)}
+.plv1 .prof-ring-glow{background:radial-gradient(circle,rgba(16,217,160,.15),transparent 70%);opacity:1}
+.plv2 .prof-ring{border-color:#ff9a4d;box-shadow:0 0 18px rgba(255,106,0,.5);animation-duration:4s}
+.plv2 .prof-ring-glow{background:radial-gradient(circle,rgba(255,106,0,.15),transparent 70%);opacity:1}
+.plv3 .prof-ring{border-color:#4d9fff;box-shadow:0 0 22px rgba(77,159,255,.6);animation-duration:3s}
+.plv3 .prof-ring-glow{background:radial-gradient(circle,rgba(77,159,255,.2),transparent 70%);opacity:1}
+.plv4 .prof-ring{border-color:#a855f7;box-shadow:0 0 28px rgba(168,85,247,.7);animation-duration:2.5s}
+.plv4 .prof-ring-glow{background:radial-gradient(circle,rgba(168,85,247,.25),transparent 70%);opacity:1}
+.plv5 .prof-ring{border-color:var(--gold);box-shadow:0 0 36px rgba(232,184,75,.8),0 0 72px rgba(232,184,75,.3);animation-duration:1.5s}
+.plv5 .prof-ring-glow{background:radial-gradient(circle,rgba(232,184,75,.3),transparent 70%);opacity:1;animation-duration:1.5s}
+.powner .prof-ring{border-color:transparent;box-shadow:0 0 50px rgba(232,184,75,.9),0 0 100px rgba(232,184,75,.4)}
+.powner .prof-ring-glow{background:radial-gradient(circle,rgba(232,184,75,.35),transparent 70%);opacity:1;animation-duration:1s}
+
+/* avatar inside wrap */
+.prof-aura-wrap .av-lg{position:relative;z-index:2;margin:0 !important}
+
+/* sweep for high levels */
+.powner .prof-hero::after,.plv5 .prof-hero::after{content:'';position:absolute;top:0;left:-100%;width:50%;height:100%;background:linear-gradient(90deg,transparent,rgba(232,184,75,.08),transparent);animation:profSweep 4s ease-in-out infinite;pointer-events:none;border-radius:inherit}
+.prof-hero{position:relative;overflow:hidden}
+
+/* owner crown */
+.prof-crown{position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:26px;animation:crownBob 2s ease-in-out infinite;filter:drop-shadow(0 0 8px rgba(232,184,75,.9));z-index:5}
+@keyframes crownBob{0%,100%{transform:translateX(-50%) translateY(0) rotate(-4deg)}50%{transform:translateX(-50%) translateY(-5px) rotate(4deg)}}
+
+/* stat cards colored tops */
+.pstat{background:var(--ink2);border-radius:16px;padding:14px 8px;text-align:center;border:1px solid var(--ln);position:relative;overflow:hidden;flex:1}
+.pstat::before{content:'';position:absolute;top:0;left:0;right:0;height:2.5px;border-radius:2px 2px 0 0}
+.pstat-dl::before{background:linear-gradient(90deg,#4d9fff,#00c6ff)}
+.pstat-cmt::before{background:linear-gradient(90deg,#10d9a0,#6effd0)}
+.pstat-rat::before{background:linear-gradient(90deg,#ffb347,#ffcc02)}
+.pstat-xp::before{background:linear-gradient(90deg,#e8b84b,#f5d06e)}
+.pstat-rank::before{background:linear-gradient(90deg,#9d7dff,#c084fc)}
+.pstat-str::before{background:linear-gradient(90deg,#ff6a00,#ee0979)}
+.pstat-val{font-size:22px;font-weight:900;line-height:1;margin-bottom:3px}
+.pstat-dl .pstat-val{color:#4d9fff}
+.pstat-cmt .pstat-val{color:#10d9a0}
+.pstat-rat .pstat-val{color:#ffcc02}
+.pstat-xp .pstat-val{color:#e8b84b}
+.pstat-rank .pstat-val{color:#9d7dff}
+.pstat-str .pstat-val{color:#ff9a4d}
+.pstat-lbl{font-size:11px;color:var(--t2)}
+.pstats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:9px;margin-bottom:13px}
+
+/* owner name shimmer */
+.powner .prof-name{background:linear-gradient(90deg,#e8b84b,#fff7d4,#e8b84b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-size:200%;animation:nameShimmer 2s linear infinite}
+@keyframes nameShimmer{0%{background-position:200%}100%{background-position:-200%}}
+
+/* xp bar level colors */
+.plv1 .xpf{background:linear-gradient(90deg,#10d9a0,#6effd0)!important}
+.plv2 .xpf{background:linear-gradient(90deg,#ff6a00,#ee0979)!important}
+.plv3 .xpf{background:linear-gradient(90deg,#4facfe,#00f2fe)!important}
+.plv4 .xpf{background:linear-gradient(90deg,#a855f7,#6366f1)!important}
+.plv5 .xpf{background:linear-gradient(90deg,#e8b84b,#f5d06e)!important}
+.powner .xpf{background:linear-gradient(90deg,#e8b84b,#ff9500,#ffe066,#e8b84b)!important;background-size:200%!important;animation:nameShimmer 1.5s linear infinite!important}
+
+/* canvas particles */
+#profCanvas{position:absolute;top:0;left:0;width:100%;height:100%;pointer-events:none;z-index:0;border-radius:inherit}
+
+@keyframes profSpin{from{transform:rotate(0)}to{transform:rotate(360deg)}}
+@keyframes profPulse{0%,100%{transform:scale(1);opacity:.6}50%{transform:scale(1.08);opacity:1}}
+@keyframes profSweep{0%{left:-100%}100%{left:200%}}
+/* ═══════════════════════════ */
 </style>
 </head>
 <body>
@@ -908,37 +978,66 @@ async profile(){
     const earnedBdgs=BADGES.filter(b=>b.q(pts,myRank));
     const specs=await cached('specs',()=>API.get('/specialties'),3600000).catch(()=>[]);
     const spOpts=specs.map(s=>`<option value="${s.id}"${prof.specialty?.id==s.id?' selected':''}>${esc(s.name)}</option>`).join('');
+    const isOwner=prof.isOwner||false;
+    const lvClass=isOwner?'powner':`plv${lv.idx}`;
+    const rankMedal=myRank===1?'🥇':myRank===2?'🥈':myRank===3?'🥉':'#'+myRank;
 
     render(`
-      <div class="prof-hero">
-        <div class="av av-lg ${lv.idx>=5?'av-gold':''}" style="background:${avColor(uid)}" onclick="editProfile()">${ini}<div style="position:absolute;bottom:0;right:0;width:20px;height:20px;border-radius:50%;background:var(--jade);border:2px solid var(--ink2);display:flex;align-items:center;justify-content:center;font-size:9px">✏️</div></div>
-        <div class="prof-name">${esc(name)}</div>
-        ${prof.user?.username?`<div class="prof-un">@${esc(prof.user.username)}</div>`:''}
-        <div class="prof-sp">🎓 ${prof.specialty?esc(prof.specialty.name):'لم يحدد تخصص'}</div>
-        ${prof.isOwner?'<div class="tag tag-gold" style="margin:8px auto 0;width:fit-content">👑 مالك المنصة</div>':prof.isAdmin?'<div class="tag tag-jade" style="margin:8px auto 0;width:fit-content">🛡️ مشرف</div>':''}
-        <div style="margin-top:14px;width:100%">
-          <div class="lvbg ${lv.c}" style="margin-bottom:8px">${lv.i} ${lv.n} · ${tpts} XP</div>
-          <div style="font-size:10px;color:var(--t2);margin-bottom:5px;text-align:center">${lv.idx<LEVELS.length-1?`${nextLv.min-tpts} XP للمستوى التالي`:'المستوى الأعلى 👑'}</div>
-          <div class="xpw"><div class="xpf" style="width:${xp}%"></div></div>
+      <canvas id="profCanvas"></canvas>
+
+      <div class="prof-hero ${lvClass}" style="text-align:center;padding:48px 16px 20px;background:var(--ink1);border-radius:0 0 24px 24px;margin-bottom:14px;position:relative">
+
+        ${isOwner?'<div class="prof-crown">👑</div>':''}
+
+        <div class="prof-aura-wrap">
+          <div class="prof-ring-glow"></div>
+          <div class="prof-ring"></div>
+          <div class="av av-lg ${lv.idx>=5?'av-gold':''}" style="background:${avColor(uid)}" onclick="editProfile()">${ini}<div style="position:absolute;bottom:0;right:0;width:20px;height:20px;border-radius:50%;background:var(--jade);border:2px solid var(--ink2);display:flex;align-items:center;justify-content:center;font-size:9px">✏️</div></div>
+        </div>
+
+        <div class="prof-name" style="font-size:22px;font-weight:800;margin-bottom:3px">${isOwner?'✦ '+esc(name)+' ✦':esc(name)}</div>
+        ${prof.user?.username?`<div class="prof-un" style="color:var(--t2);font-size:13px;margin-bottom:10px">@${esc(prof.user.username)}</div>`:''}
+
+        <div style="display:flex;gap:7px;justify-content:center;flex-wrap:wrap;margin-bottom:12px">
+          ${isOwner?'<span class="tag tag-gold">👑 مالك المنصة</span>':prof.isAdmin?'<span class="tag tag-jade">🛡️ مشرف</span>':''}
+          ${prof.specialty?`<span class="tag" style="background:rgba(77,159,255,.1);border-color:rgba(77,159,255,.3);color:var(--sky)">🎓 ${esc(prof.specialty.name)}</span>`:''}
+        </div>
+
+        <div style="display:inline-flex;align-items:center;gap:8px;padding:7px 18px;border-radius:24px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);margin-bottom:12px;font-weight:700;font-size:14px">
+          <span>${lv.i}</span><span>${lv.n}</span><span style="font-size:11px;opacity:.7">· ${tpts} XP</span>
+        </div>
+
+        <div style="padding:0 16px;width:100%">
+          <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--t2);margin-bottom:6px">
+            <span>XP الحالي</span>
+            <span style="color:var(--t1);font-weight:700">${lv.idx<LEVELS.length-1?nextLv.min.toLocaleString()+' للمستوى التالي':'MAX 👑'}</span>
+          </div>
+          <div class="xpw" style="height:8px"><div class="xpf" style="width:${xp}%;transition:width 1.2s cubic-bezier(.4,0,.2,1)"></div></div>
+          ${lv.idx<LEVELS.length-1?`<div style="text-align:center;font-size:11px;color:var(--t2);margin-top:6px">تحتاج <b style="color:var(--t1)">${(nextLv.min-tpts).toLocaleString()}</b> XP للمستوى التالي</div>`:''}
         </div>
       </div>
 
-      <div class="srow">
-        <div class="sp jade"><div class="sp-v">${pts?.downloads_count||0}</div><div class="sp-l">تحميل</div></div>
-        <div class="sp gold"><div class="sp-v">${pts?.comments_count||0}</div><div class="sp-l">تعليق</div></div>
-        <div class="sp rose"><div class="sp-v">${pts?.ratings_count||0}</div><div class="sp-l">تقييم</div></div>
-      </div>
-      <div class="srow" style="margin-top:-8px">
-        <div class="sp sky"><div class="sp-v">${tpts}</div><div class="sp-l">XP</div></div>
-        <div class="sp lav"><div class="sp-v">#${myRank}</div><div class="sp-l">ترتيب</div></div>
-        <div class="sp ora"><div class="sp-v">${pts?.streak_days||0}🔥</div><div class="sp-l">يوم</div></div>
+      <div class="pstats-grid" style="padding:0 13px">
+        <div class="pstat pstat-dl"><div class="pstat-val">${(pts?.downloads_count||0).toLocaleString()}</div><div class="pstat-lbl">📥 تحميل</div></div>
+        <div class="pstat pstat-cmt"><div class="pstat-val">${(pts?.comments_count||0).toLocaleString()}</div><div class="pstat-lbl">💬 تعليق</div></div>
+        <div class="pstat pstat-rat"><div class="pstat-val">${(pts?.ratings_count||0).toLocaleString()}</div><div class="pstat-lbl">⭐ تقييم</div></div>
+        <div class="pstat pstat-str"><div class="pstat-val">${(pts?.streak_days||0).toLocaleString()}🔥</div><div class="pstat-lbl">streak يوم</div></div>
+        <div class="pstat pstat-rank"><div class="pstat-val">${rankMedal}</div><div class="pstat-lbl">🏅 ترتيب</div></div>
+        <div class="pstat pstat-xp"><div class="pstat-val">${tpts.toLocaleString()}</div><div class="pstat-lbl">✨ XP</div></div>
       </div>
 
-      <div class="sh">🏅 إنجازاتي (${earnedBdgs.length}/${BADGES.length})</div>
-      <div class="bdgs">${BADGES.map(b=>{const e=b.q(pts,myRank);return`<div class="bdg"><div class="bdg-ico ${e?'on':'off'}">${b.i}</div><div class="bdg-nm">${b.n}</div></div>`;}).join('')}</div>
+      ${isOwner?`<div style="padding:0 13px;margin-bottom:13px">
+        <div style="background:linear-gradient(135deg,rgba(232,184,75,.08),rgba(200,150,30,.05));border:1px solid rgba(232,184,75,.2);border-radius:18px;padding:16px;display:grid;grid-template-columns:1fr 1fr;gap:12px;text-align:center" id="ownerStats">
+          <div><div style="font-size:26px;font-weight:900;color:var(--gold)" id="oUsers">—</div><div style="font-size:11px;color:var(--t2)">👥 مستخدم</div></div>
+          <div><div style="font-size:26px;font-weight:900;color:var(--gold)" id="oFiles">—</div><div style="font-size:11px;color:var(--t2)">📁 ملف</div></div>
+        </div>
+      </div>`:''}
 
-      <div class="sh">تعديل بروفايلي</div>
-      <div style="background:var(--ink2);border:1px solid var(--ln);border-radius:var(--r2);padding:14px;margin-bottom:13px">
+      <div class="sh" style="padding:0 13px">🏅 إنجازاتي (${earnedBdgs.length}/${BADGES.length}) ${earnedBdgs.length===BADGES.length?'🌟':''}</div>
+      <div class="bdgs" style="padding:0 13px;margin-bottom:13px">${BADGES.map(b=>{const e=b.q(pts,myRank);return`<div class="bdg"><div class="bdg-ico ${e?'on':'off'}">${b.i}</div><div class="bdg-nm">${b.n}</div></div>`;}).join('')}</div>
+
+      <div class="sh" style="padding:0 13px">تعديل بروفايلي</div>
+      <div style="background:var(--ink2);border:1px solid var(--ln);border-radius:var(--r2);padding:14px;margin:0 13px 13px">
         <div class="lbl">الاسم الأول</div>
         <input class="inp" id="editFN" value="${esc(prof.user?.first_name||'')}" placeholder="الاسم الأول">
         <div class="lbl">الاسم الأخير</div>
@@ -948,24 +1047,77 @@ async profile(){
         <button class="btn btn-jade" style="margin-top:4px" onclick="saveProfile()">💾 حفظ التغييرات</button>
       </div>
 
-      <div class="sh">معلوماتي</div>
-      <div class="igrp">
+      <div class="sh" style="padding:0 13px">معلوماتي</div>
+      <div class="igrp" style="margin:0 13px 13px">
         <div class="irow"><span class="ikey">🆔 Telegram ID</span><span class="ival" style="font-size:10px;font-family:var(--fm)">${prof.user?.id||'—'}</span></div>
         <div class="irow"><span class="ikey">⭐ المفضلة</span><span class="ival">${prof.favCount||0} ملف</span></div>
         <div class="irow"><span class="ikey">📊 المستوى</span><span class="ival"><span class="lvbg ${lv.c}">${lv.i} ${lv.n}</span></span></div>
       </div>
 
-      <div class="sh">إجراءات</div>
-      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;padding:0 13px">
         <button class="btn btn-ghost" style="margin-bottom:0" onclick="loadHistory()">📥 سجل التحميل</button>
         <button class="btn btn-ghost" style="margin-bottom:0" onclick="loadFavs()">⭐ المفضلة</button>
         <button class="btn btn-ghost" style="margin-bottom:0" onclick="loadLeaderboard()">🏆 المتصدرون</button>
         <button class="btn btn-ghost" style="margin-bottom:0" onclick="loadAdminsList()">🛡️ فريق الإدارة</button>
       </div>
-      ${(prof.isAdmin||prof.isOwner)?`<button class="btn btn-gold" style="margin-top:9px" onclick="NAV.tab('admin')">🛡️ لوحة الإدارة</button>`:''}
+      ${(prof.isAdmin||prof.isOwner)?`<div style="padding:0 13px"><button class="btn btn-gold" style="margin-top:9px" onclick="NAV.tab('admin')">🛡️ لوحة الإدارة</button></div>`:''}
+      <div style="height:20px"></div>
     `);
-  }catch(e){toast('خطأ','err');}
+
+    // ── Canvas Particles ──
+    const canvas=document.getElementById('profCanvas');
+    if(canvas && lv.idx>=1){
+      const ctx=canvas.getContext('2d');
+      canvas.width=canvas.offsetWidth;canvas.height=canvas.offsetHeight;
+      const mode=isOwner?7:lv.idx;
+      const particles=[];
+      const N=[0,20,40,35,50,60,80,100][Math.min(mode,7)];
+      const W=canvas.width,H=canvas.height;
+      for(let i=0;i<N;i++){
+        particles.push({
+          x:Math.random()*W,y:Math.random()*H,
+          vx:(Math.random()-.5)*(mode>=5?1.5:.6),
+          vy:mode===2?-(1+Math.random()*2):(Math.random()-.5)*.6,
+          life:Math.random(),decay:.003+Math.random()*.006,
+          size:1+Math.random()*(mode>=5?4:2.5),
+          hue:mode>=5?45+Math.random()*20:mode===4?270+Math.random()*30:180+Math.random()*40
+        });
+      }
+      let running=true;
+      function anim(){
+        if(!document.getElementById('profCanvas')){running=false;return;}
+        ctx.clearRect(0,0,W,H);
+        particles.forEach(p=>{
+          p.x+=p.vx;p.y+=p.vy;p.life-=p.decay;
+          if(p.life<=0||p.x<0||p.x>W||p.y<0||p.y>H){
+            p.x=Math.random()*W;p.y=mode===2?H*.15+Math.random()*20:Math.random()*H;
+            p.life=.5+Math.random()*.5;
+          }
+          ctx.save();ctx.globalAlpha=Math.max(0,p.life)*.6;
+          ctx.fillStyle=`hsl(${p.hue},80%,70%)`;
+          ctx.beginPath();ctx.arc(p.x,p.y,p.size,0,Math.PI*2);ctx.fill();
+          ctx.restore();
+        });
+        if(running)requestAnimationFrame(anim);
+      }
+      anim();
+    }
+
+    // owner stats
+    if(isOwner){
+      API.r('GET','/admin/stats').then(st=>{
+        const u=document.getElementById('oUsers');
+        const f=document.getElementById('oFiles');
+        if(u)u.textContent=(st.users||0).toLocaleString();
+        if(f)f.textContent=(st.files||0).toLocaleString();
+      }).catch(()=>{});
+    }
+
+    if(IS_ADMIN||IS_OWNER)document.getElementById('hAdminBtn').style.display='flex';
+  }catch(e){toast('خطأ','err');console.error(e);}
 },
+
+
 
 /* ── ADMIN ── */
 admin(){
