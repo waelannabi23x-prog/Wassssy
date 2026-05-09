@@ -1201,3 +1201,135 @@ router.get('/latest', auth, async (req, res) => {
     res.json(rows);
   } catch(e) { res.json([]); }
 });
+
+// ── profile/bio ──────────────────────────────────────────────────
+router.post('/profile/bio', auth, async (req, res) => {
+  try {
+    const { bio } = req.body;
+    await run('UPDATE users SET bio=$1 WHERE id=$2', [bio||null, req.tgUser.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── profile/specialty ────────────────────────────────────────────
+router.post('/profile/specialty', auth, async (req, res) => {
+  try {
+    const { specialtyId } = req.body;
+    await run('UPDATE users SET specialty_id=$1 WHERE id=$2', [specialtyId||null, req.tgUser.id]);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── points/rank ──────────────────────────────────────────────────
+router.get('/points/rank', auth, async (req, res) => {
+  try {
+    const row = await get(
+      `SELECT COUNT(*)+1 as rank FROM user_points
+       WHERE total_points > (SELECT COALESCE(total_points,0) FROM user_points WHERE user_id=$1)`,
+      [req.tgUser.id]
+    );
+    res.json({ rank: parseInt(row?.rank||999) });
+  } catch(e) { res.json({ rank: 999 }); }
+});
+
+// ── /bundles ─────────────────────────────────────────────────────
+router.get('/bundles', auth, async (req, res) => {
+  try {
+    const rows = await all(
+      `SELECT b.*, COUNT(bf.file_id) as files_count
+       FROM bundles b LEFT JOIN bundle_files bf ON bf.bundle_id=b.id
+       GROUP BY b.id ORDER BY b.created_at DESC`
+    );
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
+router.get('/bundles/:id', auth, async (req, res) => {
+  try {
+    const b = await get('SELECT * FROM bundles WHERE id=$1', [req.params.id]);
+    if(!b) return res.status(404).json({ error: 'not found' });
+    const files = await all(
+      `SELECT f.* FROM files f
+       JOIN bundle_files bf ON bf.file_id=f.id
+       WHERE bf.bundle_id=$1 ORDER BY bf.sort_order`,
+      [req.params.id]
+    );
+    res.json({ ...b, files });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── /latest?specialty=id ─────────────────────────────────────────
+router.get('/latest', auth, async (req, res) => {
+  try {
+    const { specialty } = req.query;
+    let q = `SELECT f.*, c.name as cat_name, sub.name as sub_name,
+               COALESCE(dl.cnt,0) as downloads
+             FROM files f
+             LEFT JOIN categories c ON c.id=f.category_id
+             LEFT JOIN subjects sub ON sub.id=c.subject_id
+             LEFT JOIN (SELECT file_id, COUNT(*) as cnt FROM downloads GROUP BY file_id) dl ON dl.file_id=f.id`;
+    const params = [];
+    if(specialty) {
+      q += ` WHERE sub.specialty_id=$1`;
+      params.push(parseInt(specialty));
+    }
+    q += ` ORDER BY f.created_at DESC LIMIT 30`;
+    const rows = await all(q, params);
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
+// ── /history ─────────────────────────────────────────────────────
+router.get('/history', auth, async (req, res) => {
+  try {
+    const rows = await all(
+      `SELECT f.*, c.name as cat_name, sub.name as sub_name,
+               COALESCE(dl2.cnt,0) as downloads
+       FROM downloads dl
+       JOIN files f ON f.id=dl.file_id
+       LEFT JOIN categories c ON c.id=f.category_id
+       LEFT JOIN subjects sub ON sub.id=c.subject_id
+       LEFT JOIN (SELECT file_id, COUNT(*) as cnt FROM downloads GROUP BY file_id) dl2 ON dl2.file_id=f.id
+       WHERE dl.user_id=$1
+       ORDER BY dl.created_at DESC LIMIT 50`,
+      [req.tgUser.id]
+    );
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
+// ── /user/:id/profile (public) ───────────────────────────────────
+router.get('/user/:id/profile', auth, async (req, res) => {
+  try {
+    const uid = parseInt(req.params.id);
+    const OWNER_ID = parseInt(process.env.OWNER_ID||'0');
+    const [user, pts, dlC, cmtC, isAdm, sp] = await Promise.all([
+      get('SELECT id,first_name,last_name,username,bio,specialty_id FROM users WHERE id=$1',[uid]),
+      get('SELECT * FROM user_points WHERE user_id=$1',[uid]).catch(()=>null),
+      get('SELECT COUNT(*) as c FROM downloads WHERE user_id=$1',[uid]),
+      get('SELECT COUNT(*) as c FROM comments WHERE user_id=$1',[uid]),
+      get('SELECT permissions FROM admins WHERE user_id=$1',[uid]).catch(()=>null),
+      null,
+    ]);
+    if(!user) return res.status(404).json({ error: 'not found' });
+    let specialtyName = null;
+    if(user.specialty_id) {
+      const sp2 = await get('SELECT name FROM specialties WHERE id=$1',[user.specialty_id]).catch(()=>null);
+      specialtyName = sp2?.name||null;
+    }
+    res.json({
+      id: user.id,
+      first_name: user.first_name,
+      last_name: user.last_name,
+      username: user.username,
+      bio: user.bio||null,
+      specialty_name: specialtyName,
+      total_points: pts?.total_points||0,
+      streak_days: pts?.streak_days||0,
+      downloads_count: parseInt(dlC?.c||0),
+      comments_count: parseInt(cmtC?.c||0),
+      is_admin: !!isAdm,
+      is_owner: uid===OWNER_ID,
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
