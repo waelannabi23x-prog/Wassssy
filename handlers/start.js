@@ -67,14 +67,11 @@ async function showMainMenu(ctx, name) {
   const uid = ctx.uid;
   if (!name) name = ctx.from?.first_name || 'Student';
 
-  // ── cache بيانات المنيو دقيقة واحدة ──
+  // ── cache ──
   const menuKey = 'menu_data_' + uid;
   let menuData = cacheGet(menuKey);
   if (!menuData) {
-    const [, spRow] = await Promise.all([
-      Promise.resolve(),
-      usersDb.getSpecialty(uid)
-    ]);
+    const spRow = await usersDb.getSpecialty(uid);
     const _spId = spRow?.specialty_id || null;
     const sp = _spId && _spId != 0
       ? (cacheGet('spec_' + _spId) || await content.getSpec(_spId))
@@ -91,24 +88,58 @@ async function showMainMenu(ctx, name) {
   if (sp) welcome += '🎓 *' + escMd(sp.name) + '*\n';
   welcome += '━━━━━━━━━━━━━━━━\n📚 منصتك الأكاديمية — اختر ما تريد:';
 
-  const webAppUrl = process.env.WEBHOOK_URL ? process.env.WEBHOOK_URL + '/app' : null;
+  // ── آخر ملف للمستخدم ──
+  let lastFileBtn = null;
+  try {
+    const hist = await interactions.getHistory(uid, 1).catch(() => []);
+    if (hist?.length) {
+      const lf = hist[0];
+      const shortTitle = (lf.title || '').substring(0, 22);
+      lastFileBtn = btn('▶️ استكمال: ' + shortTitle, 'preview_' + lf.id + '_0_0_0_0_0');
+    }
+  } catch(_) {}
 
+  // ══════════════════════════════════════════
+  // الأزرار — ملونة بالـ emoji
+  // 🟥 أحمر   = التصفح الرئيسي
+  // 🟩 أخضر   = المواد والملفات
+  // 🟦 أزرق   = مميزات إضافية
+  // 🟨 أصفر   = شخصي
+  // ══════════════════════════════════════════
   const rows = [];
 
-  // ── زر التطبيق الرئيسي ──
-  if (webAppUrl) {
-    rows.push([{ text: '👤 بروفايلي', web_app: { url: webAppUrl + '/profile.html' } }]);
-  rows.push([{ text: "🚀 Let's Go", web_app: { url: webAppUrl } }]);
-  } else {
-    rows.push([btn('📚 تصفح المحتوى', 'browse')]);
-  }
+  // ── 🟥 تصفح المحتوى (أحمر — الأهم) ──
+  rows.push([btn('🟥 تصفح المحتوى 📚', 'browse')]);
 
-  // ── AI + تغيير تخصص ──
+  // ── 🟩 بحث + أحدث (أخضر — محتوى) ──
+  rows.push([
+    btn('🟩 بحث سريع 🔍', 'search_prompt'),
+    btn('🟩 أحدث الملفات 🆕', 'latest_files'),
+  ]);
+
+  // ── 🟩 مفضلة + سجل (أخضر) ──
+  rows.push([
+    btn('⭐ مفضلاتي', 'my_favs'),
+    btn('🗂️ آخر ما شاهدت', 'my_history'),
+  ]);
+
+  // ── 🤖 AI ──
   rows.push([btn('🤖 المساعد الذكي', 'ai_prompt')]);
-  rows.push([btn(sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', 'change_sp')]);
 
-  // ── لوحة الإدارة للأدمن والأونر فقط ──
-  if (ctx.isOwner) rows.push([btn('👑 لوحة الإدارة', 'mg_menu')]);
+  // ── 🟦 ملفي + إحصائيات (أزرق) ──
+  rows.push([
+    btn('🟦 ملفي 👤', 'my_profile'),
+    btn('🟦 إحصائيات 📊', 'my_stats'),
+  ]);
+
+  // ── 🟨 تغيير تخصص (أصفر) ──
+  rows.push([btn('🟨 ' + (sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي'), 'change_sp')]);
+
+  // ── آخر ملف ──
+  if (lastFileBtn) rows.push([lastFileBtn]);
+
+  // ── لوحة الإدارة ──
+  if (ctx.isOwner) rows.push([btn('🔧 لوحة الإدارة', 'mg_menu')]);
   else if (ctx.isAdmin) rows.push([btn('🛡️ لوحة الإدارة', 'mg_menu')]);
 
   return eos(ctx, welcome, { parse_mode: 'Markdown', ...build(rows) });
