@@ -1,103 +1,18 @@
-const initSqlJs = require("sql.js");
-const fs = require("fs");
-const path = require("path");
-
-const DIR = path.join(__dirname, "../data");
-if (!fs.existsSync(DIR)) fs.mkdirSync(DIR, { recursive: true });
-const FILE = path.join(DIR, "bot.db");
-
-let db;
-
-async function initDB() {
-  const SQL = await initSqlJs();
-  db = fs.existsSync(FILE)
-    ? new SQL.Database(fs.readFileSync(FILE))
-    : new SQL.Database();
-
-  db.run(`
-    CREATE TABLE IF NOT EXISTS subjects (
-      id   INTEGER PRIMARY KEY AUTOINCREMENT,
-      name TEXT NOT NULL UNIQUE,
-      icon TEXT NOT NULL DEFAULT '📘'
-    );
-    CREATE TABLE IF NOT EXISTS lessons (
-      id    INTEGER PRIMARY KEY AUTOINCREMENT,
-      sid   INTEGER NOT NULL,
-      type  TEXT NOT NULL,
-      title TEXT NOT NULL,
-      body  TEXT DEFAULT '',
-      mtype TEXT DEFAULT 'text',
-      fid   TEXT,
-      FOREIGN KEY(sid) REFERENCES subjects(id) ON DELETE CASCADE
-    );
-  `);
-  save();
-  console.log("✅ DB ready");
-}
-
-function save() {
-  fs.writeFileSync(FILE, Buffer.from(db.export()));
-}
-
-function run(sql, p = []) { db.run(sql, p); save(); }
-function get(sql, p = []) {
-  const s = db.prepare(sql); s.bind(p);
-  const r = s.step() ? s.getAsObject() : null; s.free(); return r;
-}
-function all(sql, p = []) {
-  const s = db.prepare(sql); s.bind(p);
-  const r = []; while (s.step()) r.push(s.getAsObject()); s.free(); return r;
-}
-function lid() { return get("SELECT last_insert_rowid() AS id").id; }
-
-// ── Subjects ──────────────────────────────────────────────────────────────────
-const subj = {
-  add:    (n, i="📘") => { run("INSERT INTO subjects(name,icon)VALUES(?,?)",[n,i]); return lid(); },
-  get:    (id)        => get("SELECT * FROM subjects WHERE id=?",[id]),
-  all:    ()          => all("SELECT * FROM subjects ORDER BY name"),
-  rename: (id,n)      => run("UPDATE subjects SET name=? WHERE id=?",[n,id]),
-  icon:   (id,i)      => run("UPDATE subjects SET icon=? WHERE id=?",[i,id]),
-  del:    (id)        => run("DELETE FROM subjects WHERE id=?",[id]),
-};
-
-// ── Lessons ───────────────────────────────────────────────────────────────────
-const les = {
-  add:  (sid,type,title,body,mtype,fid) => {
-    run("INSERT INTO lessons(sid,type,title,body,mtype,fid)VALUES(?,?,?,?,?,?)",
-        [sid,type,title,body||"",mtype||"text",fid||null]);
-    return lid();
-  },
-  get:    (id)        => get("SELECT * FROM lessons WHERE id=?",[id]),
-  list:   (sid,type)  => type
-    ? all("SELECT * FROM lessons WHERE sid=? AND type=? ORDER BY rowid DESC",[sid,type])
-    : all("SELECT * FROM lessons WHERE sid=? ORDER BY type,rowid DESC",[sid]),
-  rename: (id,t)      => run("UPDATE lessons SET title=? WHERE id=?",[t,id]),
-  body:   (id,b)      => run("UPDATE lessons SET body=? WHERE id=?",[b,id]),
-  del:    (id)        => run("DELETE FROM lessons WHERE id=?",[id]),
-  search: (q)         => all(
-    `SELECT l.*,s.name sname,s.icon sicon FROM lessons l
-     JOIN subjects s ON s.id=l.sid
-     WHERE l.title LIKE ? OR l.body LIKE ? LIMIT 20`,
-    [`%${q}%`,`%${q}%`]
-  ),
-  count:  (sid)       => ({
-    cours: get("SELECT COUNT(*) n FROM lessons WHERE sid=? AND type='cours'",[sid])?.n||0,
-    td:    get("SELECT COUNT(*) n FROM lessons WHERE sid=? AND type='td'",[sid])?.n||0,
-    tp:    get("SELECT COUNT(*) n FROM lessons WHERE sid=? AND type='tp'",[sid])?.n||0,
-  }),
-};
-
-// ── Stats ─────────────────────────────────────────────────────────────────────
-const stats = () => ({
-  subjects: get("SELECT COUNT(*) n FROM subjects")?.n||0,
-  total:    get("SELECT COUNT(*) n FROM lessons")?.n||0,
-  cours:    get("SELECT COUNT(*) n FROM lessons WHERE type='cours'")?.n||0,
-  td:       get("SELECT COUNT(*) n FROM lessons WHERE type='td'")?.n||0,
-  tp:       get("SELECT COUNT(*) n FROM lessons WHERE type='tp'")?.n||0,
-  rows: all(`SELECT s.icon,s.name,
-    SUM(l.type='cours') cours,SUM(l.type='td') td,SUM(l.type='tp') tp,COUNT(l.id) total
-    FROM subjects s LEFT JOIN lessons l ON l.sid=s.id
-    GROUP BY s.id ORDER BY total DESC`),
-});
-
-module.exports = { initDB, subj, les, stats };
+'use strict';
+const path=require('path');
+const logger=require('../utils/logger');
+const USE_PG=!!process.env.DATABASE_URL;
+let pgPool=null;
+function getPg(){if(pgPool)return pgPool;if(!USE_PG)return null;try{const{Pool}=require('pg');pgPool=new Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized:false},max:8,min:1,idleTimeoutMillis:30000,connectionTimeoutMillis:10000,statement_timeout:15000,keepAlive:true,keepAliveInitialDelayMillis:10000});pgPool.on('error',err=>{logger.error('[DB] '+err.message);if(err.message.includes('ECONNRESET')||err.message.includes('terminated'))pgPool=null;});setInterval(()=>{if(!pgPool)return;pgPool.query('SELECT 1').catch(()=>{pgPool=null;});},20000).unref();return pgPool;}catch(e){logger.error('[DB] pool error: '+e.message);return null;}}
+let sqliteDb=null;
+const DB_PATH=path.join(__dirname,'..','data','study_bot.db');
+async function getSQLite(){if(sqliteDb)return sqliteDb;try{const fs=require('fs');const dir=path.dirname(DB_PATH);if(!fs.existsSync(dir))fs.mkdirSync(dir,{recursive:true});}catch(_){}try{const Database=require('better-sqlite3');const db=new Database(DB_PATH);db.pragma('journal_mode = WAL');sqliteDb={type:'better',db};return sqliteDb;}catch(_){}try{const fs=require('fs');const initSqlJs=require('sql.js');const SQL=await initSqlJs();let buf=null;try{buf=fs.readFileSync(DB_PATH);}catch(_){}const db=buf?new SQL.Database(buf):new SQL.Database();const save=()=>{try{fs.writeFileSync(DB_PATH,Buffer.from(db.export()));}catch(_){}};sqliteDb={type:'sqljs',db,save};return sqliteDb;}catch(e){logger.error('[DB] no SQLite: '+e.message);return null;}}
+function toQ(sql){return sql.replace(/\$\d+/g,'?');}
+function sGet(w,sql,p=[]){const q=toQ(sql);if(w.type==='better'){try{return w.db.prepare(q).get(...p)||null;}catch(_){return null;}}try{const s=w.db.prepare(q);s.bind(p);if(s.step()){const r=s.getAsObject();s.free();return r;}s.free();return null;}catch(_){return null;}}
+function sAll(w,sql,p=[]){const q=toQ(sql);if(w.type==='better'){try{return w.db.prepare(q).all(...p);}catch(_){return[];}}try{const r=w.db.exec(q,p);if(!r.length)return[];const{columns,values}=r[0];return values.map(row=>{const obj={};columns.forEach((c,i)=>{obj[c]=row[i];});return obj;});}catch(_){return[];}}
+function sRun(w,sql,p=[]){const q=toQ(sql);if(w.type==='better'){try{w.db.prepare(q).run(...p);}catch(_){}return;}try{w.db.run(q,p);w.save();}catch(_){}}
+async function get(sql,params=[]){if(USE_PG){const pool=getPg();if(!pool)throw new Error('No pool');try{const r=await pool.query(sql,params);return r.rows[0]||null;}catch(e){logger.error('[DB] get: '+e.message);throw e;}}const w=await getSQLite();if(!w)throw new Error('No SQLite');return sGet(w,sql,params);}
+async function all(sql,params=[]){if(USE_PG){const pool=getPg();if(!pool)throw new Error('No pool');try{const r=await pool.query(sql,params);return r.rows;}catch(e){logger.error('[DB] all: '+e.message);throw e;}}const w=await getSQLite();if(!w)throw new Error('No SQLite');return sAll(w,sql,params);}
+async function run(sql,params=[]){if(USE_PG){const pool=getPg();if(!pool)throw new Error('No pool');try{await pool.query(sql,params);}catch(e){logger.error('[DB] run: '+e.message);throw e;}return;}const w=await getSQLite();if(!w)throw new Error('No SQLite');sRun(w,sql,params);}
+async function transaction(queries){if(USE_PG){const pool=getPg();const client=await pool.connect();try{await client.query('BEGIN');for(const{sql,params}of queries)await client.query(sql,params||[]);await client.query('COMMIT');}catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}return;}const w=await getSQLite();if(!w)throw new Error('No SQLite');if(w.type==='better'){const t=w.db.transaction(()=>{for(const{sql,params}of queries)sRun(w,sql,params||[]);});t();}else{for(const{sql,params}of queries)sRun(w,sql,params||[]);}}
+module.exports={get,all,run,transaction,getPg,getSQLite};
