@@ -49,7 +49,7 @@ const PORT = process.env.PORT || 3000;
 const safeInt = v => { var n = parseInt(v); return isNaN(n) ? 0 : n; };
 const CFG = {
   rlWindow: 10000, rlMax: 25,
-  cbDedupMax: 500, cbDedupTTL: 20000,
+  cbDedupMax: 2000, cbDedupTTL: 8000,
   grpFlushMs: 15000, grpBufMax: 2000,
   stateTTL: 3600000, cleanupMs: 3600000,
   botMsgsPerChat: 100, maxChatsTracked: 150,
@@ -520,14 +520,9 @@ const prefR = [
 ];
 
 
-// O(1) callback prefix dispatcher — built from prefR at startup
-let _prefixMap = null;
+// O(1) callback prefix dispatcher — pre-built at startup
+const _prefixMap = [...prefR].sort((a, b) => b.p.length - a.p.length);
 function _getPrefixHandler(data) {
-  if (!_prefixMap) {
-    // Sort by length descending so longer prefixes match first
-    const sorted = [...prefR].sort((a, b) => b.p.length - a.p.length);
-    _prefixMap = sorted;
-  }
   for (const r of _prefixMap) if (data.startsWith(r.p)) return r.fn;
   return null;
 }
@@ -535,13 +530,18 @@ function _getPrefixHandler(data) {
 bot.on('callback_query', async ctx => {
   const _raw = ctx.callbackQuery?.data, cbId = ctx.callbackQuery?.id;
   if (!_raw || CBDedup.isDupe(cbId)) return;
-  const data = cbRes(_raw); // resolve registry key → full data
+
+  // ✅ أجب فوراً — يشيل الـ loading spinner في <50ms
+  ctx.answerCbQuery('').catch(() => {});
+
+  const data = cbRes(_raw);
   try {
-    // no blanket answerCbQuery — saves 100ms per click
-    if (ctx.chat?.type !== 'private' && !data.startsWith('grp_')) return ctx.answerCbQuery('👉 استخدم البوت في الخاص').catch(() => {});
+    if (ctx.chat?.type !== 'private' && !data.startsWith('grp_')) {
+      return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(() => {});
+    }
     if (exactR.has(data)) return exactR.get(data)(ctx);
     const _h = _getPrefixHandler(data);
-  if (_h) return _h(ctx, data);
+    if (_h) return _h(ctx, data);
   } catch(e) { logger.error('[CB]', e.message, { data, uid: ctx.from?.id }); }
 });
 
