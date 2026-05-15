@@ -38,7 +38,7 @@ const _bufT = setInterval(flushUsers, 10000);
 _bufT.unref();
 
 const _admCache = new Map();
-const ADM_TTL = 3600000; // 60 min
+const ADM_TTL = 7200000; // 60 min
 
 async function getAdminInfo(uid) {
   const now = Date.now();
@@ -94,7 +94,7 @@ async function authMiddleware(ctx, next) {
     let banned = banCached;
     if (banned === undefined) {
       banned = banRow?.is_banned ? 1 : 0;
-      cacheSet('ban_' + uid, banned, 1800000); // 30min
+      cacheSet('ban_' + uid, banned, 3600000); // 30min
     }
     if (banned === 1) {
       return ctx.reply('🚫 أنت محظور من استخدام البوت.').catch(() => {});
@@ -140,6 +140,8 @@ async function authMiddleware(ctx, next) {
       }
 
       if (!cbData || !cbData.startsWith('del_channel_')) {
+          // ⚡ skip channel check for callbacks
+          if (cbData && cbData !== 'main_menu') { return next(); }
         const subCached = require('../utils/cache').cacheGet('sub_ok_' + uid);
         if (!subCached) {
           const res2 = await guard.checkAllChannels({ telegram: ctx.telegram }, uid);

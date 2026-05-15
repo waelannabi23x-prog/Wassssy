@@ -183,7 +183,7 @@ bot.command(['admin', 'owner', 'manage'], ctx => { if (!ctx.isAdmin) return ctx.
 bot.command('setsp', async ctx => {
   if (ctx.chat?.type === 'private') return ctx.reply('⚠️ للقروبات فقط.').catch(() => {});
   if (!ctx.isOwner && !ctx.isAdmin) return ctx.deleteMessage().catch(() => {});
-  await ctx.deleteMessage().catch(() => {});
+  ctx.deleteMessage().catch(()=>{});
   try {
     const specs = await dbAll('SELECT id,name FROM specialties WHERE is_deleted=0 ORDER BY id');
     if (!specs.length) return ctx.reply('❌ لا تخصصات.').catch(() => {});
@@ -268,7 +268,7 @@ bot.command('leaveall', async ctx => {
 bot.command('dlt', async ctx => {
   if (!ctx.isOwner) return ctx.deleteMessage().catch(() => {});
   if (ctx.chat?.type === 'private') return ctx.reply('⚠️ للقروبات فقط.').catch(() => {});
-  await ctx.deleteMessage().catch(() => {});
+  ctx.deleteMessage().catch(()=>{});
   try {
     const db = await dbAll('SELECT message_id FROM group_bot_msgs WHERE chat_id=$1 ORDER BY sent_at DESC LIMIT 200', [ctx.chat.id]);
     const ids = [...new Set([...db.map(r => r.message_id), ...GrpMsgs.all(ctx.chat.id)])];
@@ -292,7 +292,7 @@ bot.command('users', async ctx => {
 });
 bot.command('new', async ctx => {
   if (ctx.chat?.type === 'private') return;
-  await ctx.deleteMessage().catch(()=>{});
+  ctx.deleteMessage().catch(()=>{});
   try {
     const gc = await dbAll('SELECT specialty_id FROM group_chats WHERE chat_id=$1',[ctx.chat.id]);
     const spId = gc[0]?.specialty_id;
@@ -308,7 +308,7 @@ bot.command('new', async ctx => {
 });
 bot.command('top', async ctx => {
   if (ctx.chat?.type === 'private') return;
-  await ctx.deleteMessage().catch(()=>{});
+  ctx.deleteMessage().catch(()=>{});
   try {
     const gc = await dbAll('SELECT specialty_id FROM group_chats WHERE chat_id=$1',[ctx.chat.id]);
     const spId = gc[0]?.specialty_id;
@@ -758,6 +758,26 @@ async function launch() {
     await Promise.all([loadMaintenance(), loadAllStates().catch(() => {})]);
     logger.info('✅ Config loaded');
     await cacheWarmup(); logger.info('✅ Cache warm');
+
+  // ⚡ Preload active users into memory cache
+  try {
+    const activeUsers = await dbAll(
+      "SELECT id,is_banned FROM users WHERE last_active > NOW() - INTERVAL '7 days' LIMIT 5000"
+    );
+    if (!global._uCache) global._uCache = new Map();
+    const exp = Date.now() + 3600000;
+    activeUsers.forEach(u => global._uCache.set(u.id, {u, exp}));
+    logger.info('⚡ Preloaded ' + activeUsers.length + ' users into memory');
+  } catch(_) {}
+
+  // ⚡ Preload admins list
+  try {
+    const admins = await dbAll("SELECT user_id,permissions FROM admins");
+    if (!global._admCache) global._admCache = new Map();
+    admins.forEach(a => global._admCache.set(a.user_id, {perms: (a.permissions||'').split(','), exp: Date.now()+7200000}));
+    logger.info('⚡ Preloaded ' + admins.length + ' admins');
+  } catch(_) {}
+
     startScheduler(bot, [OWNER_ID]);
     GrpBuf.start(); MGColl.start(); logger.info('✅ Services started');
     app.use(bot.webhookCallback('/webhook/' + TOKEN, { secretToken: WEBHOOK_SECRET || undefined }));
@@ -786,6 +806,18 @@ app.listen(PORT, () => logger.info('✅ Express :' + PORT));
   }
     millionaire.register(bot);
     global.__bot = bot; // _clearSearchCache set in handlers/group.js // startSmartWarmup(); // disabled: cacheWarmup sufficient
+    
+  // ⚡ Preload banned users — no DB hit on every message
+  try {
+    const { all: _a } = require('./database/db');
+    const { cacheSet: _cs } = require('./utils/cache');
+    const banned = await _a("SELECT id FROM users WHERE is_banned=1 LIMIT 5000");
+    banned.forEach(u => _cs('ban_' + u.id, 1, 86400000)); // 24h
+    const active = await _a("SELECT id FROM users WHERE is_banned=0 AND last_active > NOW() - INTERVAL '3 days' LIMIT 10000");
+    active.forEach(u => _cs('ban_' + u.id, 0, 3600000)); // 1h
+    logger.info('⚡ Preloaded ban status: ' + (banned.length + active.length) + ' users');
+  } catch(_) {}
+
     logger.info('🚀 Ready');
   } catch(e) { logger.error('[Launch]', e.message); setTimeout(launch, 10000); }
 }
