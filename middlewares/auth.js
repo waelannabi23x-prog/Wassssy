@@ -38,7 +38,7 @@ const _bufT = setInterval(flushUsers, 10000);
 _bufT.unref();
 
 const _admCache = new Map();
-const ADM_TTL = 900000; // 15 min
+const ADM_TTL = 3600000; // 60 min
 
 async function getAdminInfo(uid) {
   const now = Date.now();
@@ -94,7 +94,7 @@ async function authMiddleware(ctx, next) {
     let banned = banCached;
     if (banned === undefined) {
       banned = banRow?.is_banned ? 1 : 0;
-      cacheSet('ban_' + uid, banned, 300000);
+      cacheSet('ban_' + uid, banned, 1800000); // 30min
     }
     if (banned === 1) {
       return ctx.reply('🚫 أنت محظور من استخدام البوت.').catch(() => {});
@@ -157,8 +157,15 @@ async function authMiddleware(ctx, next) {
     }
   } catch(_) {}
 
-  // 🎮 Daily login bonus (+1 نقطة)
-  try { const {checkDailyLogin}=require('../database/points'); checkDailyLogin(uid).catch(()=>{}); } catch(_){}
+  // 🎮 Daily login — مرة واحدة فقط بالذاكرة
+  if (!global._dlCache) global._dlCache = new Map();
+  const today = new Date().toISOString().slice(0,10);
+  const dlKey = uid + '_' + today;
+  if (!global._dlCache.has(dlKey)) {
+    global._dlCache.set(dlKey, 1);
+    if (global._dlCache.size > 50000) global._dlCache.clear(); // منع تضخم الذاكرة
+    try { const {checkDailyLogin}=require('../database/points'); checkDailyLogin(uid).catch(()=>{}); } catch(_){}
+  }
   return next();
 }
 
