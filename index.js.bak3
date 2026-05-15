@@ -322,7 +322,45 @@ bot.command('top', async ctx => {
 // ═══ Group Admin Commands ═══
 
 // ═══ Group Admin Commands ═══
-// duplicate commands removed
+bot.command('all', async ctx => {
+  if (ctx.chat.type !== 'supergroup' && ctx.chat.type !== 'group') return ctx.reply('🚫').catch(() => {});
+  try {
+    const { showAllMembers } = require('./handlers/group_admin');
+    return await showAllMembers(ctx, ctx.chat.id);
+  } catch(e) {
+    return ctx.reply('❌').catch(() => {});
+  }
+});
+
+bot.command('tag', async ctx => {
+  if (ctx.chat.type !== 'supergroup' && ctx.chat.type !== 'group') return ctx.reply('🚫').catch(() => {});
+  try {
+    const { tagAll } = require('./handlers/group_admin');
+    return await tagAll(ctx, ctx.chat.id);
+  } catch(e) {
+    return ctx.reply('❌').catch(() => {});
+  }
+});
+
+bot.command('mute', async ctx => {
+  if (ctx.chat.type !== 'supergroup' && ctx.chat.type !== 'group') return ctx.reply('🚫').catch(() => {});
+  try {
+    const { muteAll } = require('./handlers/group_admin');
+    return await muteAll(ctx, ctx.chat.id);
+  } catch(e) {
+    return ctx.reply('❌').catch(() => {});
+  }
+});
+
+bot.command('unmute', async ctx => {
+  if (ctx.chat.type !== 'supergroup' && ctx.chat.type !== 'group') return ctx.reply('🚫').catch(() => {});
+  try {
+    const { unmuteAll } = require('./handlers/group_admin');
+    return await unmuteAll(ctx, ctx.chat.id);
+  } catch(e) {
+    return ctx.reply('❌').catch(() => {});
+  }
+});
 bot.command('all', async ctx => {
   if (ctx.chat.type !== 'supergroup' && ctx.chat.type !== 'group') return;
   try {
@@ -351,7 +389,7 @@ bot.command('unmute', async ctx => {
   const { unmuteAll } = require('./handlers/group_admin');
   return await unmuteAll(ctx, ctx.chat.id).catch(e => ctx.reply('❌').catch(() => {}));
 });
-bot.command('help', ctx => ctx.reply(
+x => ctx.reply(
   '📚 *أوامر البوت*\n\n/start — الرئيسية\n/search — البحث\n/profile — شخصي\n/stats — إحصائيات\n/cancel — إلغاء\n/ai — مساعد ذكي\n/reset — مسح سياق\n\n👑 *المشرفين:*\n/admin — الإدارة',
   { parse_mode: 'Markdown' }
 ).catch(() => {}));
@@ -361,24 +399,6 @@ const exactR = new Map([
   ['mute_all_', (ctx, d) => muteAll(ctx, parseInt(d.substring(9)))],
   ['unmute_all_', (ctx, d) => unmuteAll(ctx, parseInt(d.substring(11)))],
   
-
-  ['bundle_search_prompt', async ctx => {
-    await global.setState(ctx.uid, { type: 'bundle_search' });
-    return ctx.reply('🔍 اكتب اسم الحزمة للبحث:').catch(()=>{});
-  }],
-  ['bundle_list', async ctx => {
-    try {
-      const rows = await bundlesDb.getAllBundles().catch(()=>[]);
-      if (!rows.length) return ctx.reply('📦 لا توجد حزم.').catch(()=>{});
-      const kb = rows.map(b => [kbBtn('📦 ' + b.name + (b.specialty_name ? ' · ' + b.specialty_name : ''), 'bundle_view_' + b.id)]);
-      kb.push([kbBtn('➕ حزمة جديدة', 'bundle_new')]);
-      return eos(ctx, '📦 *الحزم الدراسية* (' + rows.length + ')', { parse_mode: 'Markdown', ...kbBuild(kb) });
-    } catch(e) { return ctx.reply('❌ ' + e.message).catch(()=>{}); }
-  }],
-  ['bundle_new', async ctx => {
-    await global.setState(ctx.uid, { type: 'mg_bundle_create' });
-    return ctx.reply('📦 اكتب اسم الحزمة الجديدة:').catch(()=>{});
-  }],
   ['noop', () => {}],
   ['main_menu', ctx => startHandler(ctx)],
   ['mg_menu',    ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', {show_alert:true}).catch(()=>{}); return manage.mainMenu(ctx); }],
@@ -444,47 +464,6 @@ async function hMgTtype(ctx, d) {
 }
 
 const prefR = [
-  { p: 'bundle_view_', fn: async (ctx, d) => {
-    const bid = parseInt(d.substring(12));
-    try {
-      const b = await bundlesDb.getBundle(bid).catch(()=>null);
-      if (!b) return ctx.answerCbQuery('❌ غير موجود').catch(()=>{});
-      const files = await bundlesDb.getBundleFiles(bid).catch(()=>[]);
-      const kb = files.map(f => [kbBtn('🗑️ ' + f.title.substring(0,35), 'bundle_del_file_' + bid + '_' + f.id)]);
-      kb.push([kbBtn('➕ إضافة ملفات', 'bundle_add_files_' + bid), kbBtn('🗑️ حذف الحزمة', 'bundle_delete_' + bid)]);
-      kb.push([kbBtn('◀️ رجوع', 'bundle_list')]);
-      return eos(ctx, '📦 *' + b.name + '*\n\n' + files.length + ' ملف\n\n_اضغط على ملف لحذفه_', { parse_mode: 'Markdown', ...kbBuild(kb) });
-    } catch(e) { ctx.answerCbQuery('❌ ' + e.message, {show_alert:true}).catch(()=>{}); }
-  }},
-  { p: 'bundle_del_file_', fn: async (ctx, d) => {
-    if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', {show_alert:true}).catch(()=>{});
-    const p = d.substring(16).split('_'), bid = parseInt(p[0]), fid = parseInt(p[1]);
-    try {
-      await bundlesDb.removeBundleFile(bid, fid);
-      await ctx.answerCbQuery('✅ تم حذف الملف').catch(()=>{});
-      const files = await bundlesDb.getBundleFiles(bid).catch(()=>[]);
-      const b = await bundlesDb.getBundle(bid).catch(()=>({name:''}));
-      const kb = files.map(f => [kbBtn('🗑️ ' + f.title.substring(0,35), 'bundle_del_file_' + bid + '_' + f.id)]);
-      kb.push([kbBtn('➕ إضافة ملفات', 'bundle_add_files_' + bid), kbBtn('🗑️ حذف الحزمة', 'bundle_delete_' + bid)]);
-      kb.push([kbBtn('◀️ رجوع', 'bundle_list')]);
-      return eos(ctx, '📦 *' + b.name + '*\n\n' + files.length + ' ملف\n\n_اضغط على ملف لحذفه_', { parse_mode: 'Markdown', ...kbBuild(kb) });
-    } catch(e) { ctx.answerCbQuery('❌ ' + e.message, {show_alert:true}).catch(()=>{}); }
-  }},
-  { p: 'bundle_add_files_', fn: async (ctx, d) => {
-    if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', {show_alert:true}).catch(()=>{});
-    const bid = parseInt(d.substring(17));
-    await global.setState(ctx.uid, { type: 'mg_bundle_files', bundleId: bid, fileCount: 0 });
-    return ctx.reply('📦 أرسل الملفات الآن.\n/done للإنهاء').catch(()=>{});
-  }},
-  { p: 'bundle_delete_', fn: async (ctx, d) => {
-    if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', {show_alert:true}).catch(()=>{});
-    const bid = parseInt(d.substring(14));
-    try {
-      await bundlesDb.deleteBundle(bid);
-      await ctx.answerCbQuery('✅ تم حذف الحزمة').catch(()=>{});
-      return ctx.reply('✅ تم حذف الحزمة.').catch(()=>{});
-    } catch(e) { ctx.answerCbQuery('❌ ' + e.message, {show_alert:true}).catch(()=>{}); }
-  }},
   { p: 'grp_sp_', fn: hGrpSp },
   { p: 'grp_dl_', fn: hGrpDl },
   { p: 'sp_', fn: (ctx, d) => browse.showYears(ctx, safeInt(d.substring(3))) },
@@ -658,25 +637,6 @@ bot.on('text', async ctx => { try {
       const fCtx = Object.assign({}, ctx, { message: Object.assign({}, ctx.message, { document: sv.doc, photo: sv.photo, caption: txt }) });
       if (await tools.trySmartUpload(fCtx)) return;
     }
-  }
-  if (s.type === 'bundle_search') {
-    try {
-      const rows = await bundlesDb.searchBundles(txt).catch(()=>[]);
-      await global.delState(ctx.uid);
-      if (!rows.length) return ctx.reply('❌ لا نتائج لـ "' + txt + '"').catch(()=>{});
-      const kb = rows.map(b => [kbBtn('📦 ' + b.name, 'bundle_view_' + b.id)]);
-      return eos(ctx, '🔍 نتائج: ' + rows.length, { ...kbBuild(kb) });
-    } catch(e) { return ctx.reply('❌ ' + e.message).catch(()=>{}); }
-  }
-  if (s.type === 'mg_bundle_create') {
-    if (!ctx.isAdmin) { await global.delState(ctx.uid); return; }
-    const name = txt.trim();
-    if (!name) return ctx.reply('❌ الاسم فارغ').catch(()=>{});
-    try {
-      const b = await bundlesDb.createBundle(name, null, null);
-      await global.setState(ctx.uid, { type: 'mg_bundle_files', bundleId: b.id, fileCount: 0 });
-      return ctx.reply('✅ تم إنشاء الحزمة: *' + name + '*\n\nأرسل الملفات الآن.\n/done للإنهاء', { parse_mode: 'Markdown' }).catch(()=>{});
-    } catch(e) { return ctx.reply('❌ ' + e.message).catch(()=>{}); }
   }
   if (s.type === 'search') return userH.handleSearch(ctx, txt);
   if (s.type === 'add_comment') {

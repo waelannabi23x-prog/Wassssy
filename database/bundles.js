@@ -28,3 +28,24 @@ const getBundleCount = async catId => (await get('SELECT COUNT(*) as c FROM bund
 const renameBundle = async (id,title) => { await run('UPDATE bundles SET title=$1 WHERE id=$2',[title,id]); cacheClear('bundle_'+id); cacheClear('bundle_full_'+id); };
 const restoreBundle = async id => { const b=await get('SELECT category_id FROM bundles WHERE id=$1',[id]); await run('UPDATE bundles SET is_deleted=0 WHERE id=$1',[id]); cacheClear('bundle_'+id); if(b) cacheClear('bdls_'+b.category_id); };
 module.exports = { getBundles,getBundle,addBundle,deleteBundle,renameBundle,restoreBundle,incBundleDownloads,getBundleFiles,addBundleFile,removeBundleFile,getBundleCount };
+
+// ── إضافات جديدة ──────────────────────────────────────────────────
+
+async function getAllBundles() {
+  return all(`SELECT b.*, s.name as specialty_name, COUNT(bf.file_id) as files_count
+    FROM bundles b LEFT JOIN specialties s ON s.id=b.specialty_id
+    LEFT JOIN bundle_files bf ON bf.bundle_id=b.id
+    GROUP BY b.id, s.name ORDER BY b.created_at DESC`);
+}
+async function searchBundles(q) {
+  return all(`SELECT b.*, s.name as specialty_name FROM bundles b
+    LEFT JOIN specialties s ON s.id=b.specialty_id
+    WHERE LOWER(b.name) LIKE LOWER($1) ORDER BY b.name LIMIT 20`, ['%'+q+'%']);
+}
+
+async function createBundle(name, specialtyId, description) {
+  return get(`INSERT INTO bundles(name,specialty_id,description)
+    VALUES($1,$2,$3) RETURNING *`, [name, specialtyId||null, description||null]);
+}
+
+module.exports = { ...module.exports, getAllBundles, searchBundles, createBundle };
