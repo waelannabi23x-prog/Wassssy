@@ -886,7 +886,7 @@ function register(bot) {
   initMillionaireSchema().catch(e => logger.error('[Million:Schema] ' + e.message));
 
   // Commands
-  bot.command('million', async ctx => {
+  bot.hears('مليون فل قربو', async ctx => {
     if (ctx.chat?.type === 'private') return ctx.reply('⚠️ هذه اللعبة للقروبات فقط!').catch(()=>{});
     return startJoinPhase(ctx);
   });
