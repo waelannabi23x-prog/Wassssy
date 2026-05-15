@@ -56,34 +56,32 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
   var uid = ctx.uid;
   var backCb = catId !== 0 ? 'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId : 'main_menu';
 
-  // ⚡ PARALLEL: ⏳ animation + DB fetch at same time → ~300ms faster
+  // ⚡ ZERO-DELAY: answer + fetch + fav ALL in parallel — no waiting
   ctx.answerCbQuery('').catch(function(){});
   ctx.sendChatAction('upload_document').catch(function(){});
+  ctx.deleteMessage().catch(function(){});
+
   var results = await Promise.all([
-    ctx.editMessageText('⏳', { reply_markup: { inline_keyboard: [] } }).catch(function(){}),
-    filesDb.getFile(fid)
+    filesDb.getFile(fid),
+    interactions.isFav(uid, fid).catch(function(){ return false; }),
   ]);
-  var f = results[1];
+  var f   = results[0];
+  var fav = results[1];
 
   if (!f) {
-    ctx.editMessageText('❌ ' + t(uid,'not_found'), { reply_markup: { inline_keyboard: [[{text:'🏠',callback_data:'main_menu'}]] } }).catch(function(){});
+    ctx.reply('❌ الملف غير موجود.', { reply_markup: { inline_keyboard: [[{text:'🏠',callback_data:'main_menu'}]] } }).catch(function(){});
     return;
   }
 
-  // ⚡ fire-and-forget background — don't block file delivery
+  // ⚡ fire-and-forget — never block delivery
   filesDb.incDownloads(fid).catch(()=>{});
   interactions.addHistory(uid, fid).catch(function(){});
   interactions.addLog(uid, 'download', f.title).catch(function(){});
-
-  // isFav needed for keyboard — usually cache hit = instant
-  var fav = await interactions.isFav(uid, fid).catch(function(){ return false; });
 
   var caption = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 '+escMd(f.description)+'\n':'')+'📁 '+escMd(f.cat_name||'عام')+' | 📖 '+escMd(f.sub_name||'عام');
   var kb = build([[btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid)],[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]]);
 
   try {
-    ctx.deleteMessage().catch(function(){});
-
     // ⚡ Send file immediately — don't wait for similar
     if (f.file_type === 'link')
       await ctx.reply(caption+'\n\n🔗 '+f.file_id, { parse_mode:'Markdown', ...kb });
