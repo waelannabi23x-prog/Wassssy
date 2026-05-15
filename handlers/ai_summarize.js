@@ -98,7 +98,7 @@ function geminiExtractPdf(buffer, title) {
     req.on('error', reject);
     req.write(prompt);
     req.end();
-  };
-
+  });
+}
 
 module.exports = { handleSummarize };

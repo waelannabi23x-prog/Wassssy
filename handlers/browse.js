@@ -71,7 +71,7 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
   }
 
   // ⚡ fire-and-forget background — don't block file delivery
-  filesDb.incDownloads(fid);
+  filesDb.incDownloads(fid).catch(()=>{});
   interactions.addHistory(uid, fid).catch(function(){});
   interactions.addLog(uid, 'download', f.title).catch(function(){});
 
