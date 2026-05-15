@@ -109,18 +109,18 @@ async function showMainMenu(ctx, name) {
   const rows = [];
 
   // ── 🟥 تصفح المحتوى (أحمر — الأهم) ──
-  rows.push([btn('🟥 تصفح المحتوى 📚', 'browse')]);
+  rows.push([btn('📚 تصفح المحتوى', 'browse')]);
 
   // ── 🟩 بحث + أحدث (أخضر — محتوى) ──
   rows.push([
-    btn('🟩 بحث سريع 🔍', 'search_prompt'),
-    btn('🟩 أحدث الملفات 🆕', 'latest_files'),
+    btn('🔍 بحث سريع', 'search_prompt'),
+    btn('🆕 أحدث الملفات', 'latest'),
   ]);
 
   // ── 🟩 مفضلة + سجل (أخضر) ──
   rows.push([
-    btn('⭐ مفضلاتي', 'my_favs'),
-    btn('🗂️ آخر ما شاهدت', 'my_history'),
+    btn('⭐ مفضلاتي', 'favorites'),
+    btn('🗂 آخر ما شاهدت', 'history'),
   ]);
 
   // ── 🤖 AI ──
@@ -128,12 +128,12 @@ async function showMainMenu(ctx, name) {
 
   // ── 🟦 ملفي + إحصائيات (أزرق) ──
   rows.push([
-    btn('🟦 ملفي 👤', 'my_profile'),
-    btn('🟦 إحصائيات 📊', 'my_stats'),
+    btn('👤 ملفي', 'profile'),
+    btn('📊 إحصائياتي', 'stats'),
   ]);
 
   // ── 🟨 تغيير تخصص (أصفر) ──
-  rows.push([btn('🟨 ' + (sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي'), 'change_sp')]);
+  rows.push([btn(sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', 'change_sp')]);
 
   // ── آخر ملف ──
   if (lastFileBtn) rows.push([lastFileBtn]);
