@@ -531,14 +531,36 @@ bot.on('callback_query', async ctx => {
   const _raw = ctx.callbackQuery?.data, cbId = ctx.callbackQuery?.id;
   if (!_raw || CBDedup.isDupe(cbId)) return;
 
-  // ✅ أجب فوراً — يشيل الـ loading spinner في <50ms
-  ctx.answerCbQuery('').catch(() => {});
-
   const data = cbRes(_raw);
+
+  // ✅ 1) أجب فوراً بدون await — يشيل الـ spinner فوراً
+  // ✅ 2) في نفس الوقت تبدأ البيانات تتحضر (parallel)
+  const _ack = ctx.answerCbQuery('').catch(() => {});
+
   try {
     if (ctx.chat?.type !== 'private' && !data.startsWith('grp_')) {
       return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(() => {});
     }
+
+    // ── Pre-warm cache للـ handlers الأكثر استخداماً ──
+    const uid = ctx.uid;
+    if (data === 'browse' || data === 'main_menu') {
+      // ابدأ جلب التخصصات بالتوازي قبل ما تدخل الـ handler
+      require('./database/content').getSpecs().catch(() => {});
+    } else if (data.startsWith('browse_sp_') || data.startsWith('sp_')) {
+      const spId = parseInt(data.split('_').pop());
+      if (spId) require('./database/content').getYears(spId).catch(() => {});
+    } else if (data.startsWith('yr_') || data.startsWith('browse_yr_')) {
+      const yrId = parseInt(data.split('_').pop());
+      if (yrId) require('./database/content').getSemesters(yrId).catch(() => {});
+    } else if (data === 'favorites') {
+      require('./database/interactions').getFavorites(uid, 20).catch(() => {});
+    } else if (data === 'latest') {
+      require('./database/files').recentFiles(20).catch(() => {});
+    } else if (data === 'profile') {
+      require('./database/users').getById(uid).catch(() => {});
+    }
+
     if (exactR.has(data)) return exactR.get(data)(ctx);
     const _h = _getPrefixHandler(data);
     if (_h) return _h(ctx, data);
