@@ -14,6 +14,7 @@ const { res: cbRes, purge: cbPurge } = require('./utils/cbRegistry');
 const { initSchema, getSetting, run: dbRun, all: dbAll, getPg } = require('./database/db');
 const { authMiddleware, OWNER_ID } = require('./middlewares/auth');
 const ownerH = require('./handlers/owner');
+const million = require('./handlers/million');
 const interactions = require('./database/interactions');
 const commentsDb = require('./database/comments');
 const adminsDb = require('./database/admins');
@@ -23,6 +24,7 @@ const contentDb = require('./database/content');
 const { initPersistentStates } = require('./utils/stateManager');
 // RATE LIMITER: Integrated below
 const bundlesDb = require('./database/bundles');
+const millionaire = require('./handlers/millionaire');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { eos } = require('./utils/helpers');
 
@@ -281,6 +283,8 @@ bot.command('ai', async ctx => { await global.setState(ctx.uid, { type: 'ai_mode
 bot.command('reset', ctx => { resetChat(ctx.uid); return ctx.reply('🔄 تم مسح سياق المحادثة.').catch(() => {}); });
 bot.command('promote', ctx => tools.batchPromote(ctx));
 bot.command('cancel', async ctx => { if (global.getState(ctx.uid)) { await global.delState(ctx.uid); return ctx.reply('❌ تم الإلغاء.').catch(() => {}); } });
+bot.command('million', ctx => million.cmdMillion(ctx));
+bot.command('mtop', ctx => million.cmdTop(ctx));
 bot.command('users', async ctx => {
   if (!ctx.isOwner && !ctx.isAdmin) return ctx.reply('🚫').catch(() => {});
   if (ctx.isAdmin && !ctx.isOwner) { const p = await adminsDb.getPerms(ctx.uid).catch(() => []); if (!p.includes('full') && !p.includes('view_users')) return ctx.reply('🚫').catch(() => {}); }
@@ -444,6 +448,7 @@ async function hMgTtype(ctx, d) {
 }
 
 const prefR = [
+  { p: 'ml_', fn: (ctx, _) => million.handleCallback(bot, ctx) },
   { p: 'bundle_view_', fn: async (ctx, d) => {
     const bid = parseInt(d.substring(12));
     try {
@@ -779,6 +784,7 @@ app.listen(PORT, () => logger.info('✅ Express :' + PORT));
     logger.warn('⚠️ No WEBHOOK_URL - using polling');
     bot.launch({ drop_pending_updates: true });
   }
+    millionaire.register(bot);
     global.__bot = bot; // _clearSearchCache set in handlers/group.js // startSmartWarmup(); // disabled: cacheWarmup sufficient
     logger.info('🚀 Ready');
   } catch(e) { logger.error('[Launch]', e.message); setTimeout(launch, 10000); }
