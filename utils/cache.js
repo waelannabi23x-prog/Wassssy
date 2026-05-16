@@ -1,99 +1,148 @@
 'use strict';
-// LRU cache — O(1) get/set/evict via Map insertion-order
+
+// ── LRU In-Memory Cache — O(1) ──
 const store = new Map();
-const MAX = 50000;
-const TTL = {
-  SEARCH:  600000,   // 10min  (was 5min)
-  FILE:   1800000,   // 30min  (was 10min)
-  CONTENT: 86400000, // 24h    (was 6h)
-  RATING:  7200000,  // 2h     (was 1h)
-  USER:    600000,   // 10min  (was 5min)
-  AI:      3600000,  // 1h     (was 30min)
-  STATIC:  86400000, // 24h
+const MAX   = 50000;
+const TTL   = {
+  SEARCH:  600000,
+  FILE:    1800000,
+  CONTENT: 86400000,
+  RATING:  7200000,
+  USER:    600000,
+  AI:      3600000,
+  STATIC:  86400000,
 };
 
 function cacheGet(key) {
   const e = store.get(key);
   if (!e) return null;
   if (e.exp && Date.now() > e.exp) { store.delete(key); return null; }
-  // Move to tail = most-recently-used
-  store.delete(key);
-  store.set(key, e);
+  store.delete(key); store.set(key, e); // move to tail (LRU)
   return e.val;
 }
 
 function cacheSet(key, val, ttl) {
   ttl = ttl || TTL.FILE;
-  store.delete(key); // re-insert to tail
+  store.delete(key);
   store.set(key, { val, exp: Date.now() + ttl });
   if (store.size > MAX) _evictLRU();
 }
 
-function cacheClear(key) { store.delete(key); }
-
-function cacheClearPrefix(prefix) {
-  for (const k of store.keys())
-    if (k.startsWith(prefix)) store.delete(k);
-}
+function cacheClear(key)         { store.delete(key); }
+function cacheClearPrefix(pfx)   { for (const k of store.keys()) if (k.startsWith(pfx)) store.delete(k); }
+function cacheStats()            { return { size: store.size, max: MAX }; }
+function getCacheSize()          { return store.size; }
+function getCacheKeys()          { return Array.from(store.keys()); }
 
 function _evictLRU() {
-  // First entry = LRU (insertion-order), O(1) per delete
   const iter = store.keys();
   while (store.size > MAX) store.delete(iter.next().value);
 }
 
-// Throttled warmup — max CONC concurrent DB queries to avoid startup pressure
-async function cacheWarmup() {
-  const CONC = 5;
-  try {
-    const content = require('../database/content');
-    const specs = await content.getSpecs();
-    if (!specs?.length) return;
-
-    // Collect all tasks first, then run with concurrency limit
-    const tasks = [];
-    for (const sp of specs) {
-      tasks.push(async () => { try { await content.getYears(sp.id); } catch(_){} });
-      try {
-        const years = await content.getYears(sp.id);
-        for (const yr of (years||[])) {
-          tasks.push(async () => { try { await content.getSemesters(yr.id); } catch(_){} });
-          try {
-            const sems = await content.getSemesters(yr.id);
-            for (const sm of (sems||[])) {
-              tasks.push(async () => { try { await content.getSubjects(sm.id); } catch(_){} });
-              try {
-                const subs = await content.getSubjects(sm.id);
-                for (const sb of (subs||[]))
-                  tasks.push(async () => { try { await content.getCategories(sb.id); } catch(_){} });
-              } catch(_){}
-            }
-          } catch(_){}
-        }
-      } catch(_){}
-    }
-
-    // Run with concurrency limit
-    let i = 0;
-    async function worker() {
-      while (i < tasks.length) { const t = tasks[i++]; await t(); }
-    }
-    await Promise.all(Array.from({length: Math.min(CONC, tasks.length)}, worker));
-    _evictLRU();
-  } catch (_) {}
-}
-
-// Purge expired entries (called periodically by index.js)
 function cachePurgeExpired() {
   const now = Date.now();
   for (const [k, e] of store) if (e.exp && now > e.exp) store.delete(k);
 }
 
-function cacheStats()   { return { size: store.size, max: MAX }; }
-function getCacheSize() { return store.size; }
-function getCacheKeys() { return Array.from(store.keys()); }
+// ── Upstash Redis Layer (للكاش المهم فقط) ──
+let _upstash = null;
+
+function _getUpstash() {
+  if (_upstash) return _upstash;
+  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) return null;
+  try {
+    const { Redis } = require('@upstash/redis');
+    _upstash = new Redis({
+      url:   process.env.UPSTASH_REDIS_REST_URL,
+      token: process.env.UPSTASH_REDIS_REST_TOKEN,
+    });
+    return _upstash;
+  } catch(_) { return null; }
+}
+
+// مفاتيح مهمة تُخزَّن في Upstash (تبقى بعد restart)
+const PERSIST_PREFIXES = ['precomp_', 'ban_', 'sub_ok_'];
+
+function _shouldPersist(key) {
+  return PERSIST_PREFIXES.some(p => key.startsWith(p));
+}
+
+async function cacheGetAsync(key) {
+  const mem = cacheGet(key);
+  if (mem !== null) return mem;
+  if (!_shouldPersist(key)) return null;
+  const r = _getUpstash();
+  if (!r) return null;
+  try {
+    const val = await r.get(key);
+    if (val !== null && val !== undefined) {
+      cacheSet(key, val, TTL.CONTENT); // ضعه في الذاكرة
+      return val;
+    }
+  } catch(_) {}
+  return null;
+}
+
+async function cacheSetAsync(key, val, ttl) {
+  ttl = ttl || TTL.FILE;
+  cacheSet(key, val, ttl);
+  if (!_shouldPersist(key)) return;
+  const r = _getUpstash();
+  if (!r) return;
+  try {
+    await r.set(key, val, { ex: Math.floor(ttl / 1000) });
+  } catch(_) {}
+}
+
+// ── Warmup: يجلب من Upstash أولاً ──
+async function cacheWarmup() {
+  const r = _getUpstash();
+  if (r) {
+    try {
+      const keys = await r.keys('precomp_*');
+      if (keys.length) {
+        await Promise.all(keys.map(async k => {
+          try {
+            const val = await r.get(k);
+            if (val) cacheSet(k, val, TTL.CONTENT);
+          } catch(_) {}
+        }));
+        require('./logger').info('⚡ Warmup من Upstash: ' + keys.length + ' مفتاح');
+        return;
+      }
+    } catch(_) {}
+  }
+  // Fallback: warmup من DB
+  try {
+    const CONC = 5;
+    const content = require('../database/content');
+    const specs = await content.getSpecs();
+    if (!specs?.length) return;
+    const tasks = [];
+    for (const sp of specs) {
+      tasks.push(async () => { try { await content.getYears(sp.id); } catch(_) {} });
+      try {
+        const years = await content.getYears(sp.id);
+        for (const yr of (years || [])) {
+          tasks.push(async () => { try { await content.getSemesters(yr.id); } catch(_) {} });
+          try {
+            const sems = await content.getSemesters(yr.id);
+            for (const sm of (sems || []))
+              tasks.push(async () => { try { await content.getSubjects(sm.id); } catch(_) {} });
+          } catch(_) {}
+        }
+      } catch(_) {}
+    }
+    let i = 0;
+    const worker = async () => { while (i < tasks.length) { const t = tasks[i++]; await t(); } };
+    await Promise.all(Array.from({ length: Math.min(CONC, tasks.length) }, worker));
+    _evictLRU();
+  } catch(_) {}
+}
 
 module.exports = {
   cacheGet, cacheSet, cacheClear, cacheClearPrefix,
-  cacheWarmup, cacheStats, getCacheSize, getCacheKeys, cachePurgeExpired,
+  cacheGetAsync, cacheSetAsync,
+  cacheWarmup, cacheStats, getCacheSize, getCacheKeys,
+  cachePurgeExpired, TTL,
 };

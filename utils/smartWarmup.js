@@ -1,6 +1,6 @@
 'use strict';
 const logger = require('./logger');
-const { cacheSet, getCacheSize } = require('./cache');
+const { cacheSet, cacheSetAsync, getCacheSize } = require('./cache');
 const { getSpecs, getYears, getSemesters, getSubjects } = require('../database/content');
 const { build, btn, backMenu } = require('./keyboard');
 const escMd = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
@@ -16,7 +16,7 @@ async function startSmartWarmup() {
       const years = await getYears(sp.id);
       const rows = years.map(y => [btn('📅 ' + y.name, 'yr_' + sp.id + '_' + y.id)]);
       rows.push(backMenu('browse'));
-      cacheSet('precomp_yrs_' + sp.id, {
+      cacheSetAsync('precomp_yrs_' + sp.id, {
         text: '*' + escMd(sp.name) + '*\n\n📅 *اختر السنة:*',
         extra: { parse_mode: 'Markdown', ...build(rows) }
       }, 3600000);
@@ -30,7 +30,7 @@ async function startSmartWarmup() {
         const sems = await getSemesters(yr.id);
         const rows = sems.map(s => [btn('📆 ' + s.name, 'sm_' + sp.id + '_' + yr.id + '_' + s.id)]);
         rows.push(backMenu('yrs_' + sp.id));
-        cacheSet('precomp_sems_' + sp.id + '_' + yr.id, {
+        cacheSetAsync('precomp_sems_' + sp.id + '_' + yr.id, {
           text: '*' + escMd(sp.name) + ' › ' + escMd(yr.name) + '*\n\n📆 *اختر الفصل:*',
           extra: { parse_mode: 'Markdown', ...build(rows) }
         }, 3600000);
@@ -52,7 +52,7 @@ async function startSmartWarmup() {
             rows.push(row);
           }
           rows.push(backMenu('sms_' + sp.id + '_' + yr.id));
-          cacheSet('precomp_subs_' + sp.id + '_' + yr.id + '_' + sm.id, {
+          cacheSetAsync('precomp_subs_' + sp.id + '_' + yr.id + '_' + sm.id, {
             text: '*' + escMd(sp.name) + ' › ' + escMd(yr.name) + ' › ' + escMd(sm.name) + '*\n\n📖 *اختر المادة:*',
             extra: { parse_mode: 'Markdown', ...build(rows) }
           }, 3600000);
