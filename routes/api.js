@@ -2,6 +2,10 @@
 const express = require('express');
 const router = express.Router();
 const { verifyWebApp } = require('../utils/webapp_auth');
+const { rateLimit } = require('../utils/apiRateLimit');
+
+// ── Global rate limit: 60 req/min per user ──
+router.use(rateLimit(60, 60000));
 const content = require('../database/content');
 const filesDb = require('../database/files');
 const interactions = require('../database/interactions');
@@ -1332,4 +1336,11 @@ router.get('/user/:id/profile', auth, async (req, res) => {
       is_owner: uid===OWNER_ID,
     });
   } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
+// ── Global Error Handler ──
+router.use((err, req, res, next) => {
+  const logger = require('../utils/logger');
+  logger.error('[API]', err.message, { url: req.url, uid: req.tgUser?.id });
+  res.status(500).json({ error: 'Internal server error' });
 });

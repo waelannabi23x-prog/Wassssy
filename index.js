@@ -1,6 +1,7 @@
 'use strict';
 
 require('dotenv').config();
+require('./utils/validateEnv').validateEnv();
 
 const { Telegraf }    = require('telegraf');
 const express         = require('express');
