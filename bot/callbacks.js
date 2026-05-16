@@ -9,8 +9,8 @@ module.exports.registerCallbacks = function(bot, deps) {
   } = deps;
 
   const { run: dbRun, all: dbAll } = require('../database/db');
-  const filesDb = require('../database/files');
-  const million = require('../handlers/million');
+  const filesDb  = require('../database/files');
+  const million  = require('../handlers/million');
 
   // ── Helpers ──
   async function hGrpSp(ctx, d) {
@@ -33,9 +33,9 @@ module.exports.registerCallbacks = function(bot, deps) {
       if (!f) return ctx.answerCbQuery('❌ غير موجود').catch(() => {});
       const cap = '📄 ' + f.title + (f.sub_name ? '\n📚 ' + f.sub_name : '');
       let sm;
-      if (f.file_type === 'photo')      sm = await ctx.telegram.sendPhoto(ctx.chat.id, f.file_id, { caption: cap });
-      else if (f.file_type === 'link')  sm = await ctx.telegram.sendMessage(ctx.chat.id, cap + '\n🔗 ' + f.file_id);
-      else                               sm = await ctx.telegram.sendDocument(ctx.chat.id, f.file_id, { caption: cap });
+      if (f.file_type === 'photo')     sm = await ctx.telegram.sendPhoto(ctx.chat.id, f.file_id, { caption: cap });
+      else if (f.file_type === 'link') sm = await ctx.telegram.sendMessage(ctx.chat.id, cap + '\n🔗 ' + f.file_id);
+      else                              sm = await ctx.telegram.sendDocument(ctx.chat.id, f.file_id, { caption: cap });
       if (sm?.message_id) await dbRun('INSERT INTO group_bot_msgs(chat_id,message_id) VALUES($1,$2)', [ctx.chat.id, sm.message_id]).catch(() => {});
       ctx.answerCbQuery('✅ تم الإرسال').catch(() => {});
     } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
@@ -63,9 +63,6 @@ module.exports.registerCallbacks = function(bot, deps) {
 
   // ── Exact matches ──
   const exactR = new Map([
-    ['tag_all_',   (ctx, d) => tagAll(ctx, parseInt(d.substring(8)))],
-    ['mute_all_',  (ctx, d) => muteAll(ctx, parseInt(d.substring(9)))],
-    ['unmute_all_',(ctx, d) => unmuteAll(ctx, parseInt(d.substring(11)))],
     ['bundle_search_prompt', async ctx => {
       await global.setState(ctx.uid, { type: 'bundle_search' });
       return ctx.reply('🔍 اكتب اسم الحزمة للبحث:').catch(() => {});
@@ -87,18 +84,18 @@ module.exports.registerCallbacks = function(bot, deps) {
     ['main_menu',  ctx => startHandler(ctx)],
     ['mg_menu',    ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {}); return manage.mainMenu(ctx); }],
     ['mg_content', ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {}); return manage.handleCallback(ctx, 'mg_content'); }],
-    ['browse',         ctx => browse.showSpecs(ctx)],
-    ['latest',         ctx => userH.showLatest(ctx)],
-    ['new_in_sp',      ctx => userH.showNewInSpecialty(ctx)],
-    ['recommended',    ctx => userH.showRecommended(ctx)],
-    ['favorites',      ctx => userH.showFavorites(ctx)],
-    ['history',        ctx => userH.showHistory(ctx)],
-    ['profile',        ctx => userH.showProfile(ctx)],
-    ['stats',          ctx => userH.showStats(ctx)],
-    ['progress',       ctx => userH.showProgress(ctx)],
-    ['search_prompt',  ctx => { global.setState(ctx.uid, { type: 'search' }); return ctx.reply('🔍 اكتب كلمة البحث:').catch(() => {}); }],
-    ['ai_prompt',      ctx => { global.setState(ctx.uid, { type: 'ai_mode' }); return ctx.reply('🤖 المساعد الذكي مفعل!\n\nاكتب سؤالك:').catch(() => {}); }],
-    ['ai_reset',       ctx => { const { resetChat } = require('../handlers/ai_chat'); resetChat(ctx.uid); return ctx.reply('🔄 تم مسح سياق المحادثة.').catch(() => {}); }],
+    ['browse',          ctx => browse.showSpecs(ctx)],
+    ['latest',          ctx => userH.showLatest(ctx)],
+    ['new_in_sp',       ctx => userH.showNewInSpecialty(ctx)],
+    ['recommended',     ctx => userH.showRecommended(ctx)],
+    ['favorites',       ctx => userH.showFavorites(ctx)],
+    ['history',         ctx => userH.showHistory(ctx)],
+    ['profile',         ctx => userH.showProfile(ctx)],
+    ['stats',           ctx => userH.showStats(ctx)],
+    ['progress',        ctx => userH.showProgress(ctx)],
+    ['search_prompt',   ctx => { global.setState(ctx.uid, { type: 'search' }); return ctx.reply('🔍 اكتب كلمة البحث:').catch(() => {}); }],
+    ['ai_prompt',       ctx => { global.setState(ctx.uid, { type: 'ai_mode' }); return ctx.reply('🤖 المساعد الذكي مفعل!\n\nاكتب سؤالك:').catch(() => {}); }],
+    ['ai_reset',        ctx => { const { resetChat } = require('../handlers/ai_chat'); resetChat(ctx.uid); return ctx.reply('🔄 تم مسح سياق المحادثة.').catch(() => {}); }],
     ['clear_my_history', async ctx => {
       await dbRun('DELETE FROM history WHERE user_id=$1', [ctx.uid]).catch(() => {});
       cacheClear('lastfile_' + ctx.uid); cacheClear('rec_' + ctx.uid);
@@ -111,16 +108,17 @@ module.exports.registerCallbacks = function(bot, deps) {
     }],
   ]);
 
-  // ── Prefix matches (مرتبة من الأطول للأقصر — O(1) فعلي) ──
+  // ── Prefix matches — مرتبة من الأطول للأقصر ──
   const prefR = [
-    { p: 'bundle_del_file_', fn: async (ctx, d) => {
+    // Bundle
+    { p: 'bundle_del_file_',  fn: async (ctx, d) => {
       if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {});
       const p = d.substring(16).split('_'), bid = parseInt(p[0]), fid = parseInt(p[1]);
       try {
         await bundlesDb.removeBundleFile(bid, fid);
         await ctx.answerCbQuery('✅ تم حذف الملف').catch(() => {});
         const [files, b] = await Promise.all([bundlesDb.getBundleFiles(bid), bundlesDb.getBundle(bid)]);
-        const kb = files.map(f => [kbBtn('🗑️ ' + f.title.substring(0, 35), 'bundle_del_file_' + bid + '_' + f.id)]);
+        const kb = files.map(f => [kbBtn('🗑️ ' + f.title.substring(0,35), 'bundle_del_file_' + bid + '_' + f.id)]);
         kb.push([kbBtn('➕ إضافة ملفات', 'bundle_add_files_' + bid), kbBtn('🗑️ حذف الحزمة', 'bundle_delete_' + bid)]);
         kb.push([kbBtn('◀️ رجوع', 'bundle_list')]);
         return eos(ctx, '📦 *' + b.name + '*\n\n' + files.length + ' ملف', { parse_mode: 'Markdown', ...kbBuild(kb) });
@@ -132,58 +130,91 @@ module.exports.registerCallbacks = function(bot, deps) {
       await global.setState(ctx.uid, { type: 'mg_bundle_files', bundleId: bid, fileCount: 0 });
       return ctx.reply('📦 أرسل الملفات الآن.\n/done للإنهاء').catch(() => {});
     }},
-    { p: 'bundle_delete_', fn: async (ctx, d) => {
+    { p: 'bundle_delete_',    fn: async (ctx, d) => {
       if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(() => {});
       const bid = parseInt(d.substring(14));
       try { await bundlesDb.deleteBundle(bid); await ctx.answerCbQuery('✅ تم حذف الحزمة').catch(() => {}); return ctx.reply('✅ تم حذف الحزمة.').catch(() => {}); }
       catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
     }},
-    { p: 'bundle_view_', fn: async (ctx, d) => {
+    { p: 'bundle_view_',      fn: async (ctx, d) => {
       const bid = parseInt(d.substring(12));
       try {
         const [b, files] = await Promise.all([bundlesDb.getBundle(bid), bundlesDb.getBundleFiles(bid)]);
         if (!b) return ctx.answerCbQuery('❌ غير موجود').catch(() => {});
-        const kb = files.map(f => [kbBtn('🗑️ ' + f.title.substring(0, 35), 'bundle_del_file_' + bid + '_' + f.id)]);
+        const kb = files.map(f => [kbBtn('🗑️ ' + f.title.substring(0,35), 'bundle_del_file_' + bid + '_' + f.id)]);
         kb.push([kbBtn('➕ إضافة ملفات', 'bundle_add_files_' + bid), kbBtn('🗑️ حذف الحزمة', 'bundle_delete_' + bid)]);
         kb.push([kbBtn('◀️ رجوع', 'bundle_list')]);
         return eos(ctx, '📦 *' + b.name + '*\n\n' + files.length + ' ملف\n\n_اضغط على ملف لحذفه_', { parse_mode: 'Markdown', ...kbBuild(kb) });
       } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
     }},
+
+    // Search & Manage
     { p: 'search_del_', fn: hSearchDel },
-    { p: 'mg_ttype_',   fn: hMgTtype },
+    { p: 'mg_ttype_',   fn: hMgTtype  },
+
+    // Group Admin
     { p: 'unmute_all_', fn: (ctx, d) => unmuteAll(ctx, parseInt(d.substring(11))) },
     { p: 'mute_all_',   fn: (ctx, d) => muteAll(ctx, parseInt(d.substring(9))) },
     { p: 'tag_all_',    fn: (ctx, d) => tagAll(ctx, parseInt(d.substring(8))) },
+
+    // Report & Comments
     { p: 'do_report_',  fn: (ctx, d) => { const p = d.substring(10).split('_'); return browse.doReport(ctx, p[0], p[1], p[2], p[3], p[4], p[5], p[6]); }},
+    { p: 'add_cmt_',    fn: async (ctx, d) => {
+      const p = d.substring(8).split('_');
+      await global.setState(ctx.uid, { type: 'add_comment', fid: p[0], spId: p[1], yrId: p[2], smId: p[3], sbId: p[4], catId: p[5] });
+      return ctx.reply('✍️ اكتب تعليقك:\n_(أو /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
+    }},
+    { p: 'cmt_pg_',     fn: (ctx, d) => { const p = d.substring(7).split('_'); return browse.showComments(ctx, p[0], p[1], p[2], p[3], p[4], p[5], p[6], parseInt(p[7])); }},
+    { p: 'dcmt_',       fn: async (ctx, d) => {
+      const p = d.substring(5).split('_');
+      await commentsDb.deleteCommentAdmin(p[0]);
+      await ctx.answerCbQuery('✅ تم الحذف').catch(() => {});
+      return browse.showComments(ctx, p[1], p[2], p[3], p[4], p[5], p[6], p[7]);
+    }},
+    { p: 'report_',     fn: (ctx, d) => { const p = d.substring(7).split('_'); return browse.showReportMenu(ctx, p[0], p[1], p[2], p[3], p[4], p[5]); }},
+    { p: 'cmt_',        fn: (ctx, d) => { const p = d.substring(4).split('_'); return browse.showComments(ctx, p[0], p[1], p[2], p[3], p[4], p[5], p[6]); }},
+
+    // Navigation pages
     { p: 'yr_page_',    fn: (ctx, d) => { const p = d.substring(8).split('_'); return browse.showYears(ctx, p[0], parseInt(p[1])); }},
     { p: 'sb_page_',    fn: (ctx, d) => { const p = d.substring(8).split('_'); return browse.showSubjects(ctx, p[0], p[1], p[2], parseInt(p[3])); }},
     { p: 'ct_page_',    fn: (ctx, d) => { const p = d.substring(8).split('_'); return browse.showFiles(ctx, p[0], p[1], p[2], p[3], p[4], parseInt(p[5])); }},
-    { p: 'set_sp_',     fn: async (ctx, d) => { await usersDb.setSpecialty(ctx.uid, safeInt(d.substring(7))); await ctx.answerCbQuery('✅ تم حفظ تخصصك').catch(() => {}); return startHandler.showMainMenu(ctx); }},
-    { p: 'add_cmt_',    fn: async (ctx, d) => { const p = d.substring(8).split('_'); await global.setState(ctx.uid, { type: 'add_comment', fid: p[0], spId: p[1], yrId: p[2], smId: p[3], sbId: p[4], catId: p[5] }); return ctx.reply('✍️ اكتب تعليقك:\n_(أو /cancel)_', { parse_mode: 'Markdown' }).catch(() => {}); }},
-    { p: 'cmt_pg_',     fn: (ctx, d) => { const p = d.substring(7).split('_'); return browse.showComments(ctx, p[0], p[1], p[2], p[3], p[4], p[5], p[6], parseInt(p[7])); }},
-    { p: 'dcmt_',       fn: async (ctx, d) => { const p = d.substring(5).split('_'); await commentsDb.deleteCommentAdmin(p[0]); await ctx.answerCbQuery('✅ تم الحذف').catch(() => {}); return browse.showComments(ctx, p[1], p[2], p[3], p[4], p[5], p[6], p[7]); }},
-    { p: 'report_',     fn: (ctx, d) => { const p = d.substring(7).split('_'); return browse.showReportMenu(ctx, p[0], p[1], p[2], p[3], p[4], p[5]); }},
     { p: 'preview_',    fn: (ctx, d) => { const p = d.split('_'); return browse.showPreview(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }},
-    { p: 'unfav_',      fn: (ctx, d) => userH.toggleFav(ctx, safeInt(d.substring(6)), true) },
-    { p: 'rate_',       fn: async (ctx, d) => { const p = d.substring(5).split('_'); await interactions.addRating(ctx.uid, p[0], parseInt(p[1])); await ctx.answerCbQuery('⭐ تم التقييم!').catch(() => {}); cacheClear('personal_' + ctx.uid + '_' + p[0]); return browse.showPreview(ctx, p[0], p[2], p[3], p[4], p[5], p[6]); }},
+
+    // Specialty, Favorites, Rating
+    { p: 'set_sp_',     fn: async (ctx, d) => { await usersDb.setSpecialty(ctx.uid, safeInt(d.substring(7))); await ctx.answerCbQuery('✅ تم حفظ تخصصك').catch(() => {}); return startHandler.showMainMenu(ctx); }},
+    { p: 'unfav_',      fn: (ctx, d) => userH.toggleFav(ctx, safeInt(d.substring(6)), true)  },
+    { p: 'rate_',       fn: async (ctx, d) => {
+      const p = d.substring(5).split('_');
+      await interactions.addRating(ctx.uid, p[0], parseInt(p[1]));
+      await ctx.answerCbQuery('⭐ تم التقييم!').catch(() => {});
+      cacheClear('personal_' + ctx.uid + '_' + p[0]);
+      return browse.showPreview(ctx, p[0], p[2], p[3], p[4], p[5], p[6]);
+    }},
+
+    // Group
     { p: 'grp_sp_',     fn: hGrpSp },
     { p: 'grp_dl_',     fn: hGrpDl },
-    { p: 'bdl_',        fn: (ctx, d) => { const p = d.split('_'); return browse.sendBundle(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }},
-    { p: 'bundle_',     fn: (ctx, d) => { const p = d.split('_'); return browse.showBundle(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }},
-    { p: 'cmt_',        fn: (ctx, d) => { const p = d.substring(4).split('_'); return browse.showComments(ctx, p[0], p[1], p[2], p[3], p[4], p[5], p[6]); }},
-    { p: 'fav_',        fn: (ctx, d) => userH.toggleFav(ctx, safeInt(d.substring(4)), false) },
+
+    // Back navigation shortcuts
     { p: 'sbs_',        fn: (ctx, d) => { const p = d.substring(4).split('_'); return browse.showSubjects(ctx, p[0], p[1], p[2]); }},
     { p: 'sms_',        fn: (ctx, d) => { const p = d.substring(4).split('_'); return browse.showSemesters(ctx, p[0], p[1]); }},
     { p: 'yrs_',        fn: (ctx, d) => { const p = d.substring(4).split('_'); return browse.showYears(ctx, p[0]); }},
+    { p: 'fav_',        fn: (ctx, d) => userH.toggleFav(ctx, safeInt(d.substring(4)), false) },
+
+    // Browse navigation — الترتيب مهم (الأطول أولاً)
+    { p: 'bundle_',     fn: (ctx, d) => { const p = d.split('_'); return browse.showBundle(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }},
+    { p: 'bdl_',        fn: (ctx, d) => { const p = d.split('_'); return browse.sendBundle(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }},
     { p: 'fl_',         fn: (ctx, d) => { const p = d.split('_'); return browse.sendFile(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }},
-    { p: 'ml_',         fn: (ctx) => million.handleCallback(bot, ctx) },
+    { p: 'ml_',         fn: (ctx)    => million.handleCallback(bot, ctx) },
     { p: 'ct_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showFiles(ctx, p[1], p[2], p[3], p[4], p[5]); }},
     { p: 'sb_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showCategories(ctx, p[1], p[2], p[3], p[4]); }},
-    { p: 'sm_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showSubjects(ctx, p[1], p[2], p[3]); }},
-    { p: 'yr_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showSemesters(ctx, p[1], p[2]); }},
-    { p: 'sp_',         fn: (ctx, d) => browse.showYears(ctx, safeInt(d.substring(3))) },
+    { p: 'sm_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showSubjects(ctx, p[1], p[2], p[3]); }},   // ✅ semester → subjects
+    { p: 'yr_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showSemesters(ctx, p[1], p[2]); }},          // ✅ year → semesters
+    { p: 'sp_',         fn: (ctx, d) => browse.showYears(ctx, safeInt(d.substring(3))) },                                    // ✅ specialty → years
+
+    // Admin (آخر شيء — prefix قصير)
     { p: 'mg_',         fn: async (ctx, d) => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {}); return manage.handleCallback(ctx, d); }},
-  ].sort((a, b) => b.p.length - a.p.length);
+  ];
 
   function _getPrefixHandler(data) {
     for (const r of prefR) if (data.startsWith(r.p)) return r.fn;
@@ -196,24 +227,26 @@ module.exports.registerCallbacks = function(bot, deps) {
     if (!_raw || CBDedup.isDupe(cbId)) return;
 
     const data = cbRes(_raw);
-    ctx.answerCbQuery('').catch(() => {}); // أجب فوراً
+    ctx.answerCbQuery('').catch(() => {}); // أجب فوراً — يشيل الـ spinner
 
     try {
       if (ctx.chat?.type !== 'private' && !data.startsWith('grp_'))
         return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(() => {});
 
-      // Pre-warm cache بالتوازي
-      const uid = ctx.uid;
+      // Pre-warm بالتوازي
       if (data === 'browse' || data === 'main_menu')
         contentDb.getSpecs().catch(() => {});
       else if (data.startsWith('sp_'))
         contentDb.getYears(parseInt(data.split('_').pop())).catch(() => {});
-      else if (data.startsWith('yr_'))
+      else if (data.startsWith('yr_') && !data.startsWith('yr_page_'))
         contentDb.getSemesters(parseInt(data.split('_').pop())).catch(() => {});
+      else if (data.startsWith('sm_'))
+        contentDb.getSubjects(parseInt(data.split('_').pop())).catch(() => {});
 
       if (exactR.has(data)) return exactR.get(data)(ctx, data);
       const _h = _getPrefixHandler(data);
       if (_h) return _h(ctx, data);
+
     } catch(e) { logger.error('[CB]', e.message, { data, uid: ctx.from?.id }); }
   });
 };
