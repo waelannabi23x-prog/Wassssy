@@ -15,3 +15,13 @@ logs/
 search-svc
 *.bak.*
 *.bak
+
+# Patch & backup files
+*.bak*
+patch_*.py
+fix.py
+find_error.js
+test.js
+old_data.sql
+data/
+*.log

@@ -1,0 +1,156 @@
+'use strict';
+
+module.exports = function registerCommands(bot, deps) {
+  const {
+    startHandler, manage, userH, million, tools,
+    browse, contentDb, usersDb, bundlesDb,
+    dbAll, cacheClear, logger, OWNER_ID,
+    kbBtn, kbBuild, eos, resetChat, millionaire,
+    tagAll, muteAll, unmuteAll, showAllMembers,
+  } = deps;
+
+  bot.command('start', async ctx => {
+    if (startHandler.clearAiMode) await startHandler.clearAiMode(ctx.uid);
+    return startHandler(ctx);
+  });
+
+  bot.command(['admin', 'owner', 'manage'], ctx => {
+    if (!ctx.isAdmin) return ctx.reply('🚫 ليس لديك صلاحية.').catch(() => {});
+    return manage.mainMenu(ctx);
+  });
+
+  bot.command('setsp', async ctx => {
+    if (ctx.chat?.type === 'private') return ctx.reply('⚠️ للقروبات فقط.').catch(() => {});
+    if (!ctx.isOwner && !ctx.isAdmin) return ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(() => {});
+    try {
+      const specs = await dbAll('SELECT id,name FROM specialties WHERE is_deleted=0 ORDER BY id');
+      if (!specs.length) return ctx.reply('❌ لا تخصصات.').catch(() => {});
+      return ctx.reply('اختر تخصص القروب:', {
+        reply_markup: { inline_keyboard: specs.map(s => [{ text: '🎓 ' + s.name, callback_data: 'grp_sp_' + ctx.chat.id + '_' + s.id }]) }
+      }).catch(() => {});
+    } catch(e) { logger.error('[setsp]', e.message); }
+  });
+
+  bot.command('search', async ctx => {
+    const isGrp = ctx.chat && ctx.chat.type !== 'private';
+    const raw   = ctx.message.text.replace('/search', '').replace(/@\w+/g, '').trim();
+    if (isGrp) {
+      await ctx.deleteMessage().catch(() => {});
+      const q = (raw || '').slice(0, 80);
+      if (!q || q.length < 2) return;
+      const { smartSearch } = require('../handlers/group');
+      const res = await smartSearch(q, 5);
+      if (!res?.length) return ctx.reply('❌ لا نتائج لـ: ' + q).catch(() => {});
+      const un = await (async () => { try { const m = await bot.telegram.getMe(); return m.username; } catch(_){ return null; } })();
+      const lines = res.map((f, i) => `${i+1}. ${f.title}` + (un ? ` — [تحميل](https://t.me/${un}?start=file_${f.id})` : '')).join('\n');
+      return ctx.reply('🔍 *نتائج:*\n\n' + lines, { parse_mode: 'Markdown' }).catch(() => {});
+    }
+    await global.setState(ctx.uid, { type: 'search', query: raw || '' });
+    return ctx.reply('🔍 اكتب كلمة البحث:').catch(() => {});
+  });
+
+  bot.command('profile', ctx => userH.showProfile(ctx));
+  bot.command('stats',   ctx => userH.showStats(ctx));
+
+  bot.command('done', async ctx => {
+    const s = global.getState(ctx.uid);
+    if (!s) return;
+    if (s.type === 'mg_bundle_files') {
+      await global.delState(ctx.uid);
+      return ctx.reply('✅ تم حفظ الحزمة.').catch(() => {});
+    }
+    await global.delState(ctx.uid);
+  });
+
+  bot.command('mygroups',  ctx => tools.listGroups(ctx));
+  bot.command('leavegroup',ctx => tools.leaveGroup(ctx));
+
+  bot.command('leaveall', async ctx => {
+    if (!ctx.isOwner) return;
+    try {
+      const ch = await dbAll('SELECT chat_id FROM group_chats');
+      let l = 0;
+      for (const c of ch) { try { await ctx.telegram.leaveChat(c.chat_id); l++; } catch(_){} }
+      return ctx.reply('✅ خرجت من ' + l + ' قروب.').catch(() => {});
+    } catch(e) { logger.error('[leaveall]', e.message); }
+  });
+
+  bot.command('dlt', async ctx => {
+    if (ctx.chat?.type !== 'private') {
+      const s = global.getState(ctx.uid);
+      if (s?.type === 'mg_bundle_files') {
+        await global.delState(ctx.uid);
+        return ctx.reply('❌ تم إلغاء إضافة الملفات.').catch(() => {});
+      }
+    }
+    const msgId = ctx.message?.reply_to_message?.message_id;
+    if (msgId) return ctx.deleteMessage(msgId).catch(() => {});
+  });
+
+  bot.command('ai', async ctx => {
+    await global.setState(ctx.uid, { type: 'ai_mode' });
+    return ctx.reply('🤖 وضع المساعد الذكي مفعل!\n\nاكتب أي سؤال.\n/start للرجوع.').catch(() => {});
+  });
+
+  bot.command('reset',  ctx => { resetChat(ctx.uid); return ctx.reply('🔄 تم مسح سياق المحادثة.').catch(() => {}); });
+  bot.command('promote',ctx => tools.batchPromote(ctx));
+
+  bot.command('cancel', async ctx => {
+    if (global.getState(ctx.uid)) {
+      await global.delState(ctx.uid);
+      return ctx.reply('❌ تم الإلغاء.').catch(() => {});
+    }
+  });
+
+  bot.command('million', ctx => million.cmdMillion(ctx));
+  bot.command('mtop',    ctx => million.cmdTop(ctx));
+
+  bot.command('users', async ctx => {
+    if (!ctx.isOwner && !ctx.isAdmin) return;
+    const rows = await dbAll('SELECT COUNT(*) AS c FROM users');
+    return ctx.reply('👥 المستخدمون: ' + (rows[0]?.c || 0)).catch(() => {});
+  });
+
+  bot.command('new', async ctx => {
+    if (!ctx.isAdmin) return ctx.reply('🚫 ليس لديك صلاحية.').catch(() => {});
+    await global.setState(ctx.uid, { type: 'add_content' });
+    return ctx.reply('📝 ابدأ بإرسال اسم الملف أو الفئة.').catch(() => {});
+  });
+
+  bot.command('top', async ctx => {
+    try {
+      const rows = await dbAll('SELECT u.first_name, p.total_points FROM user_points p JOIN users u ON u.id=p.user_id ORDER BY p.total_points DESC LIMIT 10');
+      if (!rows.length) return ctx.reply('لا توجد نقاط بعد.').catch(() => {});
+      const txt = rows.map((r, i) => `${i+1}. ${r.first_name} — ${r.total_points} نقطة`).join('\n');
+      return ctx.reply('🏆 *المتصدرون:*\n\n' + txt, { parse_mode: 'Markdown' }).catch(() => {});
+    } catch(e) { logger.error('[top]', e.message); }
+  });
+
+  // ── Group Admin Commands ──
+  bot.command('all', async ctx => {
+    if (ctx.chat.type !== 'supergroup' && ctx.chat.type !== 'group') return;
+    try { return await showAllMembers(ctx, ctx.chat.id); }
+    catch(e) { return ctx.reply('❌ خطأ').catch(() => {}); }
+  });
+
+  bot.command('tag', async ctx => {
+    if (ctx.chat.type !== 'supergroup' && ctx.chat.type !== 'group') return;
+    return tagAll(ctx, ctx.chat.id).catch(() => ctx.reply('❌').catch(() => {}));
+  });
+
+  bot.command('mute', async ctx => {
+    if (ctx.chat.type !== 'supergroup' && ctx.chat.type !== 'group') return;
+    return muteAll(ctx, ctx.chat.id).catch(() => ctx.reply('❌').catch(() => {}));
+  });
+
+  bot.command('unmute', async ctx => {
+    if (ctx.chat.type !== 'supergroup' && ctx.chat.type !== 'group') return;
+    return unmuteAll(ctx, ctx.chat.id).catch(() => ctx.reply('❌').catch(() => {}));
+  });
+
+  bot.command('help', ctx => ctx.reply(
+    '📚 *أوامر البوت*\n\n/start — الرئيسية\n/search — البحث\n/profile — شخصي\n/stats — إحصائيات\n/cancel — إلغاء\n/ai — مساعد ذكي\n/reset — مسح سياق\n\n👑 *المشرفين:*\n/admin — الإدارة',
+    { parse_mode: 'Markdown' }
+  ).catch(() => {}));
+};

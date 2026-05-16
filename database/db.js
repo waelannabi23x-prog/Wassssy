@@ -1,30 +1,279 @@
 'use strict';
-const path=require('path');
-const logger=require('../utils/logger');
-const USE_PG=!!process.env.DATABASE_URL;
-let pgPool=null;
-function getPg(){if(pgPool)return pgPool;if(!USE_PG)return null;try{const{Pool}=require('pg');pgPool=new Pool({connectionString:process.env.DATABASE_URL,ssl:{rejectUnauthorized:false},max:8,min:1,idleTimeoutMillis:30000,connectionTimeoutMillis:10000,statement_timeout:15000,keepAlive:true,keepAliveInitialDelayMillis:10000});pgPool.on('error',err=>{logger.error('[DB] '+err.message);if(err.message.includes('ECONNRESET')||err.message.includes('terminated'))pgPool=null;});setInterval(()=>{if(!pgPool)return;pgPool.query('SELECT 1').catch(()=>{pgPool=null;});},20000).unref();return pgPool;}catch(e){logger.error('[DB] pool error: '+e.message);return null;}}
-let sqliteDb=null;
-const DB_PATH=path.join(__dirname,'..','data','study_bot.db');
-async function getSQLite(){if(sqliteDb)return sqliteDb;try{const fs=require('fs');const dir=path.dirname(DB_PATH);if(!fs.existsSync(dir))fs.mkdirSync(dir,{recursive:true});}catch(_){}try{const Database=require('better-sqlite3');const db=new Database(DB_PATH);db.pragma('journal_mode = WAL');sqliteDb={type:'better',db};return sqliteDb;}catch(_){}try{const fs=require('fs');const initSqlJs=require('sql.js');const SQL=await initSqlJs();let buf=null;try{buf=fs.readFileSync(DB_PATH);}catch(_){}const db=buf?new SQL.Database(buf):new SQL.Database();const save=()=>{try{fs.writeFileSync(DB_PATH,Buffer.from(db.export()));}catch(_){}};sqliteDb={type:'sqljs',db,save};return sqliteDb;}catch(e){logger.error('[DB] no SQLite: '+e.message);return null;}}
-function toQ(sql){return sql.replace(/\$\d+/g,'?');}
-function sGet(w,sql,p=[]){const q=toQ(sql);if(w.type==='better'){try{return w.db.prepare(q).get(...p)||null;}catch(_){return null;}}try{const s=w.db.prepare(q);s.bind(p);if(s.step()){const r=s.getAsObject();s.free();return r;}s.free();return null;}catch(_){return null;}}
-function sAll(w,sql,p=[]){const q=toQ(sql);if(w.type==='better'){try{return w.db.prepare(q).all(...p);}catch(_){return[];}}try{const r=w.db.exec(q,p);if(!r.length)return[];const{columns,values}=r[0];return values.map(row=>{const obj={};columns.forEach((c,i)=>{obj[c]=row[i];});return obj;});}catch(_){return[];}}
-function sRun(w,sql,p=[]){const q=toQ(sql);if(w.type==='better'){try{w.db.prepare(q).run(...p);}catch(_){}return;}try{w.db.run(q,p);w.save();}catch(_){}}
-async function get(sql,params=[]){if(USE_PG){const pool=getPg();if(!pool)throw new Error('No pool');try{const r=await pool.query(sql,params);return r.rows[0]||null;}catch(e){logger.error('[DB] get: '+e.message);throw e;}}const w=await getSQLite();if(!w)throw new Error('No SQLite');return sGet(w,sql,params);}
-async function all(sql,params=[]){if(USE_PG){const pool=getPg();if(!pool)throw new Error('No pool');try{const r=await pool.query(sql,params);return r.rows;}catch(e){logger.error('[DB] all: '+e.message);throw e;}}const w=await getSQLite();if(!w)throw new Error('No SQLite');return sAll(w,sql,params);}
-async function run(sql,params=[]){if(USE_PG){const pool=getPg();if(!pool)throw new Error('No pool');try{await pool.query(sql,params);}catch(e){logger.error('[DB] run: '+e.message);throw e;}return;}const w=await getSQLite();if(!w)throw new Error('No SQLite');sRun(w,sql,params);}
-async function transaction(queries){if(USE_PG){const pool=getPg();const client=await pool.connect();try{await client.query('BEGIN');for(const{sql,params}of queries)await client.query(sql,params||[]);await client.query('COMMIT');}catch(e){await client.query('ROLLBACK').catch(()=>{});throw e;}finally{client.release();}return;}const w=await getSQLite();if(!w)throw new Error('No SQLite');if(w.type==='better'){const t=w.db.transaction(()=>{for(const{sql,params}of queries)sRun(w,sql,params||[]);});t();}else{for(const{sql,params}of queries)sRun(w,sql,params||[]);}}
+const path   = require('path');
+const logger = require('../utils/logger');
 
-async function initSchema(){
-  const pg=getPg();
-  const T=["CREATE TABLE IF NOT EXISTS required_channels(id SERIAL PRIMARY KEY,channel_id TEXT NOT NULL UNIQUE,channel_name TEXT,channel_url TEXT,added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,is_active INTEGER DEFAULT 1)","CREATE TABLE IF NOT EXISTS users(id BIGINT PRIMARY KEY,first_name TEXT,last_name TEXT,username TEXT,is_banned INTEGER DEFAULT 0,joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS admins(user_id BIGINT PRIMARY KEY,added_by BIGINT,permissions TEXT DEFAULT 'upload,add_content',specialty_id INTEGER DEFAULT 0,added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS specialties(id SERIAL PRIMARY KEY,name TEXT NOT NULL UNIQUE,is_deleted INTEGER DEFAULT 0)","CREATE TABLE IF NOT EXISTS years(id SERIAL PRIMARY KEY,specialty_id INTEGER NOT NULL,name TEXT NOT NULL,is_deleted INTEGER DEFAULT 0)","CREATE TABLE IF NOT EXISTS semesters(id SERIAL PRIMARY KEY,year_id INTEGER NOT NULL,name TEXT NOT NULL,is_deleted INTEGER DEFAULT 0)","CREATE TABLE IF NOT EXISTS subjects(id SERIAL PRIMARY KEY,semester_id INTEGER NOT NULL,name TEXT NOT NULL,is_deleted INTEGER DEFAULT 0)","CREATE TABLE IF NOT EXISTS categories(id SERIAL PRIMARY KEY,subject_id INTEGER NOT NULL,name TEXT NOT NULL,is_deleted INTEGER DEFAULT 0)","CREATE TABLE IF NOT EXISTS files(id SERIAL PRIMARY KEY,category_id INTEGER NOT NULL,title TEXT NOT NULL,description TEXT DEFAULT '',file_id TEXT NOT NULL,file_type TEXT DEFAULT 'document',downloads INTEGER DEFAULT 0,uploaded_by BIGINT DEFAULT 0,is_deleted INTEGER DEFAULT 0,uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS favorites(user_id BIGINT,file_id INTEGER,PRIMARY KEY(user_id,file_id))","CREATE TABLE IF NOT EXISTS history(id SERIAL PRIMARY KEY,user_id BIGINT,file_id INTEGER,viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS ratings(user_id BIGINT,file_id INTEGER,rating INTEGER,PRIMARY KEY(user_id,file_id))","CREATE TABLE IF NOT EXISTS user_specialties(user_id BIGINT PRIMARY KEY,specialty_id INTEGER,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT)","CREATE TABLE IF NOT EXISTS bundles(id SERIAL PRIMARY KEY,category_id INTEGER NOT NULL,title TEXT NOT NULL,description TEXT DEFAULT '',downloads INTEGER DEFAULT 0,uploaded_by BIGINT DEFAULT 0,is_deleted INTEGER DEFAULT 0,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS bundle_files(id SERIAL PRIMARY KEY,bundle_id INTEGER NOT NULL,file_id TEXT NOT NULL,file_type TEXT DEFAULT 'document',title TEXT DEFAULT '')","CREATE TABLE IF NOT EXISTS user_states(user_id BIGINT PRIMARY KEY,state TEXT NOT NULL,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS group_chats(chat_id BIGINT PRIMARY KEY,title TEXT,specialty_id INTEGER DEFAULT 0,notify_new_files INTEGER DEFAULT 1,joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS polls(id SERIAL PRIMARY KEY,chat_id BIGINT NOT NULL,created_by BIGINT,question TEXT,media_file_id TEXT,media_type TEXT,message_id BIGINT,is_closed INTEGER DEFAULT 0,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS poll_options(id SERIAL PRIMARY KEY,poll_id INTEGER NOT NULL,option_text TEXT NOT NULL,emoji TEXT DEFAULT '🔵',votes INTEGER DEFAULT 0,position INTEGER DEFAULT 1)","CREATE TABLE IF NOT EXISTS poll_votes(poll_id INTEGER NOT NULL,option_id INTEGER NOT NULL,user_id BIGINT NOT NULL,voted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(poll_id,user_id))","CREATE TABLE IF NOT EXISTS ai_history(id SERIAL PRIMARY KEY,user_id BIGINT NOT NULL,role TEXT NOT NULL,content TEXT NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS comments(id SERIAL PRIMARY KEY,file_id INTEGER NOT NULL,user_id BIGINT NOT NULL,text TEXT NOT NULL,is_deleted INTEGER DEFAULT 0,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS reports(id SERIAL PRIMARY KEY,file_id INTEGER NOT NULL,user_id BIGINT NOT NULL,reason TEXT,status TEXT DEFAULT 'pending',created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS user_points(user_id BIGINT PRIMARY KEY,total_points INTEGER DEFAULT 0,downloads_count INTEGER DEFAULT 0,ratings_count INTEGER DEFAULT 0,comments_count INTEGER DEFAULT 0,streak_days INTEGER DEFAULT 0,last_activity_date DATE,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS group_members(chat_id BIGINT,user_id BIGINT,username TEXT,first_name TEXT,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(chat_id,user_id))","CREATE TABLE IF NOT EXISTS group_notify_log(id SERIAL PRIMARY KEY,file_id INTEGER NOT NULL,chat_id BIGINT NOT NULL,sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,UNIQUE(file_id,chat_id))","CREATE TABLE IF NOT EXISTS logs(id SERIAL PRIMARY KEY,user_id BIGINT,action TEXT,details TEXT,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS message_templates(id SERIAL PRIMARY KEY,name TEXT NOT NULL UNIQUE,type TEXT DEFAULT 'text',content TEXT DEFAULT '',file_id TEXT DEFAULT '',created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS scheduled_messages(id SERIAL PRIMARY KEY,template_id INTEGER,target TEXT DEFAULT 'all',specialty_id INTEGER DEFAULT 0,send_at TEXT,sent INTEGER DEFAULT 0,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS group_bot_msgs(id SERIAL PRIMARY KEY,chat_id BIGINT NOT NULL,message_id BIGINT NOT NULL,sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS group_welcome(chat_id BIGINT PRIMARY KEY,image_file_id TEXT,message TEXT,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)","CREATE TABLE IF NOT EXISTS cache_store(key TEXT PRIMARY KEY,value TEXT,expires_at BIGINT)"];
-  for(const sql of T){try{if(pg)await pg.query(sql);else{const w=await getSQLite();if(w)sRun(w,sql.replace(/SERIAL/g,'INTEGER').replace(/BIGINT/g,'INTEGER'),[]);}}catch(_){}}
-  if(pg){const IDX=["CREATE INDEX IF NOT EXISTS idx_files_category ON files(category_id)","CREATE INDEX IF NOT EXISTS idx_files_deleted ON files(is_deleted)","CREATE INDEX IF NOT EXISTS idx_files_downloads ON files(downloads DESC)","CREATE INDEX IF NOT EXISTS idx_history_user ON history(user_id)","CREATE INDEX IF NOT EXISTS idx_favorites_user ON favorites(user_id)","CREATE INDEX IF NOT EXISTS idx_ratings_file ON ratings(file_id)","CREATE INDEX IF NOT EXISTS idx_comments_file ON comments(file_id)","CREATE INDEX IF NOT EXISTS idx_user_points_total ON user_points(total_points DESC)","CREATE INDEX IF NOT EXISTS idx_users_active ON users(last_active)"];for(const i of IDX){try{await pg.query(i);}catch(_){}}}
+const USE_PG = !!process.env.DATABASE_URL;
+let pgPool   = null;
+
+// ── PostgreSQL Pool ──
+function getPg() {
+  if (pgPool) return pgPool;
+  if (!USE_PG) return null;
+  try {
+    const { Pool } = require('pg');
+    pgPool = new Pool({
+      connectionString:            process.env.DATABASE_URL,
+      ssl:                         { rejectUnauthorized: false },
+      max:                         20,   // كان 8 — رفعناه لـ 20
+      min:                         2,    // دائماً connection جاهزة
+      idleTimeoutMillis:           30000,
+      connectionTimeoutMillis:     10000,
+      statement_timeout:           20000,
+      keepAlive:                   true,
+      keepAliveInitialDelayMillis: 10000,
+    });
+
+    pgPool.on('error', err => {
+      logger.error('[DB] pool error: ' + err.message);
+      if (err.message.includes('ECONNRESET') || err.message.includes('terminated')) {
+        pgPool = null;
+      }
+    });
+
+    // Keepalive ping كل 25 ثانية
+    setInterval(() => {
+      if (!pgPool) return;
+      pgPool.query('SELECT 1').catch(() => { pgPool = null; });
+    }, 25000).unref();
+
+    logger.info('✅ PG Pool جاهز (max:20)');
+    return pgPool;
+  } catch(e) {
+    logger.error('[DB] pool init error: ' + e.message);
+    return null;
+  }
+}
+
+// ── SQLite Fallback ──
+let sqliteDb = null;
+const DB_PATH = path.join(__dirname, '..', 'data', 'study_bot.db');
+
+async function getSQLite() {
+  if (sqliteDb) return sqliteDb;
+  try {
+    const fs  = require('fs');
+    const dir = path.dirname(DB_PATH);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  } catch(_) {}
+
+  // better-sqlite3 (أسرع)
+  try {
+    const Database = require('better-sqlite3');
+    const db = new Database(DB_PATH);
+    db.pragma('journal_mode = WAL');
+    db.pragma('synchronous = NORMAL');
+    db.pragma('cache_size = -64000'); // 64MB cache
+    sqliteDb = { type: 'better', db };
+    return sqliteDb;
+  } catch(_) {}
+
+  // sql.js fallback
+  try {
+    const fs        = require('fs');
+    const initSqlJs = require('sql.js');
+    const SQL       = await initSqlJs();
+    let buf = null;
+    try { buf = fs.readFileSync(DB_PATH); } catch(_) {}
+    const db   = buf ? new SQL.Database(buf) : new SQL.Database();
+    const save = () => { try { fs.writeFileSync(DB_PATH, Buffer.from(db.export())); } catch(_) {} };
+    sqliteDb = { type: 'sqljs', db, save };
+    return sqliteDb;
+  } catch(e) {
+    logger.error('[DB] no SQLite available: ' + e.message);
+    return null;
+  }
+}
+
+// ── SQLite helpers ──
+function toQ(sql) { return sql.replace(/\$\d+/g, '?'); }
+
+function sGet(w, sql, p = []) {
+  const q = toQ(sql);
+  if (w.type === 'better') {
+    try { return w.db.prepare(q).get(...p) || null; } catch(_) { return null; }
+  }
+  try {
+    const s = w.db.prepare(q); s.bind(p);
+    if (s.step()) { const r = s.getAsObject(); s.free(); return r; }
+    s.free(); return null;
+  } catch(_) { return null; }
+}
+
+function sAll(w, sql, p = []) {
+  const q = toQ(sql);
+  if (w.type === 'better') {
+    try { return w.db.prepare(q).all(...p); } catch(_) { return []; }
+  }
+  try {
+    const r = w.db.exec(q, p);
+    if (!r.length) return [];
+    const { columns, values } = r[0];
+    return values.map(row => { const obj = {}; columns.forEach((c, i) => { obj[c] = row[i]; }); return obj; });
+  } catch(_) { return []; }
+}
+
+function sRun(w, sql, p = []) {
+  const q = toQ(sql);
+  if (w.type === 'better') {
+    try { w.db.prepare(q).run(...p); } catch(_) {}
+    return;
+  }
+  try { w.db.run(q, p); w.save(); } catch(_) {}
+}
+
+// ── Public API ──
+async function get(sql, params = []) {
+  if (USE_PG) {
+    const pool = getPg();
+    if (!pool) throw new Error('No PG pool');
+    try { const r = await pool.query(sql, params); return r.rows[0] || null; }
+    catch(e) { logger.error('[DB] get: ' + e.message); throw e; }
+  }
+  const w = await getSQLite();
+  if (!w) throw new Error('No SQLite');
+  return sGet(w, sql, params);
+}
+
+async function all(sql, params = []) {
+  if (USE_PG) {
+    const pool = getPg();
+    if (!pool) throw new Error('No PG pool');
+    try { const r = await pool.query(sql, params); return r.rows; }
+    catch(e) { logger.error('[DB] all: ' + e.message); throw e; }
+  }
+  const w = await getSQLite();
+  if (!w) throw new Error('No SQLite');
+  return sAll(w, sql, params);
+}
+
+async function run(sql, params = []) {
+  if (USE_PG) {
+    const pool = getPg();
+    if (!pool) throw new Error('No PG pool');
+    try { await pool.query(sql, params); }
+    catch(e) { logger.error('[DB] run: ' + e.message); throw e; }
+    return;
+  }
+  const w = await getSQLite();
+  if (!w) throw new Error('No SQLite');
+  sRun(w, sql, params);
+}
+
+async function transaction(queries) {
+  if (USE_PG) {
+    const pool   = getPg();
+    const client = await pool.connect();
+    try {
+      await client.query('BEGIN');
+      for (const { sql, params } of queries) await client.query(sql, params || []);
+      await client.query('COMMIT');
+    } catch(e) {
+      await client.query('ROLLBACK').catch(() => {});
+      throw e;
+    } finally { client.release(); }
+    return;
+  }
+  const w = await getSQLite();
+  if (!w) throw new Error('No SQLite');
+  if (w.type === 'better') {
+    const t = w.db.transaction(() => { for (const { sql, params } of queries) sRun(w, sql, params || []); });
+    t();
+  } else {
+    for (const { sql, params } of queries) sRun(w, sql, params || []);
+  }
+}
+
+// ── Schema ──
+async function initSchema() {
+  const pg = getPg();
+
+  const TABLES = [
+    "CREATE TABLE IF NOT EXISTS required_channels(id SERIAL PRIMARY KEY,channel_id TEXT NOT NULL UNIQUE,channel_name TEXT,channel_url TEXT,added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,is_active INTEGER DEFAULT 1)",
+    "CREATE TABLE IF NOT EXISTS users(id BIGINT PRIMARY KEY,first_name TEXT,last_name TEXT,username TEXT,is_banned INTEGER DEFAULT 0,joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS admins(user_id BIGINT PRIMARY KEY,added_by BIGINT,permissions TEXT DEFAULT 'upload,add_content',specialty_id INTEGER DEFAULT 0,added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS specialties(id SERIAL PRIMARY KEY,name TEXT NOT NULL UNIQUE,is_deleted INTEGER DEFAULT 0)",
+    "CREATE TABLE IF NOT EXISTS years(id SERIAL PRIMARY KEY,specialty_id INTEGER NOT NULL,name TEXT NOT NULL,is_deleted INTEGER DEFAULT 0)",
+    "CREATE TABLE IF NOT EXISTS semesters(id SERIAL PRIMARY KEY,year_id INTEGER NOT NULL,name TEXT NOT NULL,is_deleted INTEGER DEFAULT 0)",
+    "CREATE TABLE IF NOT EXISTS subjects(id SERIAL PRIMARY KEY,semester_id INTEGER NOT NULL,name TEXT NOT NULL,is_deleted INTEGER DEFAULT 0)",
+    "CREATE TABLE IF NOT EXISTS categories(id SERIAL PRIMARY KEY,subject_id INTEGER NOT NULL,name TEXT NOT NULL,is_deleted INTEGER DEFAULT 0)",
+    "CREATE TABLE IF NOT EXISTS files(id SERIAL PRIMARY KEY,category_id INTEGER NOT NULL,title TEXT NOT NULL,description TEXT DEFAULT '',file_id TEXT NOT NULL,file_type TEXT DEFAULT 'document',downloads INTEGER DEFAULT 0,uploaded_by BIGINT DEFAULT 0,is_deleted INTEGER DEFAULT 0,uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS favorites(user_id BIGINT,file_id INTEGER,PRIMARY KEY(user_id,file_id))",
+    "CREATE TABLE IF NOT EXISTS history(id SERIAL PRIMARY KEY,user_id BIGINT,file_id INTEGER,viewed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS ratings(user_id BIGINT,file_id INTEGER,rating INTEGER,PRIMARY KEY(user_id,file_id))",
+    "CREATE TABLE IF NOT EXISTS user_specialties(user_id BIGINT PRIMARY KEY,specialty_id INTEGER,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT)",
+    "CREATE TABLE IF NOT EXISTS bundles(id SERIAL PRIMARY KEY,category_id INTEGER NOT NULL,title TEXT NOT NULL,description TEXT DEFAULT '',downloads INTEGER DEFAULT 0,uploaded_by BIGINT DEFAULT 0,is_deleted INTEGER DEFAULT 0,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS bundle_files(id SERIAL PRIMARY KEY,bundle_id INTEGER NOT NULL,file_id TEXT NOT NULL,file_type TEXT DEFAULT 'document',title TEXT DEFAULT '')",
+    "CREATE TABLE IF NOT EXISTS user_states(user_id BIGINT PRIMARY KEY,state TEXT NOT NULL,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS group_chats(chat_id BIGINT PRIMARY KEY,title TEXT,specialty_id INTEGER DEFAULT 0,notify_new_files INTEGER DEFAULT 1,joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS polls(id SERIAL PRIMARY KEY,chat_id BIGINT NOT NULL,created_by BIGINT,question TEXT,media_file_id TEXT,media_type TEXT,message_id BIGINT,is_closed INTEGER DEFAULT 0,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS poll_options(id SERIAL PRIMARY KEY,poll_id INTEGER NOT NULL,option_text TEXT NOT NULL,emoji TEXT DEFAULT '🔵',votes INTEGER DEFAULT 0,position INTEGER DEFAULT 1)",
+    "CREATE TABLE IF NOT EXISTS poll_votes(poll_id INTEGER NOT NULL,option_id INTEGER NOT NULL,user_id BIGINT NOT NULL,voted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(poll_id,user_id))",
+    "CREATE TABLE IF NOT EXISTS ai_history(id SERIAL PRIMARY KEY,user_id BIGINT NOT NULL,role TEXT NOT NULL,content TEXT NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS comments(id SERIAL PRIMARY KEY,file_id INTEGER NOT NULL,user_id BIGINT NOT NULL,text TEXT NOT NULL,is_deleted INTEGER DEFAULT 0,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS reports(id SERIAL PRIMARY KEY,file_id INTEGER NOT NULL,user_id BIGINT NOT NULL,reason TEXT,status TEXT DEFAULT 'pending',created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS user_points(user_id BIGINT PRIMARY KEY,total_points INTEGER DEFAULT 0,downloads_count INTEGER DEFAULT 0,ratings_count INTEGER DEFAULT 0,comments_count INTEGER DEFAULT 0,streak_days INTEGER DEFAULT 0,last_activity_date DATE,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS group_members(chat_id BIGINT,user_id BIGINT,username TEXT,first_name TEXT,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(chat_id,user_id))",
+    "CREATE TABLE IF NOT EXISTS group_notify_log(id SERIAL PRIMARY KEY,file_id INTEGER NOT NULL,chat_id BIGINT NOT NULL,sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,UNIQUE(file_id,chat_id))",
+    "CREATE TABLE IF NOT EXISTS logs(id SERIAL PRIMARY KEY,user_id BIGINT,action TEXT,details TEXT,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS message_templates(id SERIAL PRIMARY KEY,name TEXT NOT NULL UNIQUE,type TEXT DEFAULT 'text',content TEXT DEFAULT '',file_id TEXT DEFAULT '',created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS scheduled_messages(id SERIAL PRIMARY KEY,template_id INTEGER,target TEXT DEFAULT 'all',specialty_id INTEGER DEFAULT 0,send_at TEXT,sent INTEGER DEFAULT 0,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS group_bot_msgs(id SERIAL PRIMARY KEY,chat_id BIGINT NOT NULL,message_id BIGINT NOT NULL,sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS group_welcome(chat_id BIGINT PRIMARY KEY,image_file_id TEXT,message TEXT,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS cache_store(key TEXT PRIMARY KEY,value TEXT,expires_at BIGINT)",
+  ];
+
+  for (const sql of TABLES) {
+    try {
+      if (pg) await pg.query(sql);
+      else { const w = await getSQLite(); if (w) sRun(w, sql.replace(/SERIAL/g, 'INTEGER').replace(/BIGINT/g, 'INTEGER'), []); }
+    } catch(_) {}
+  }
+
+  // ── Indexes — الأصليين + الجدد المحسّنين ──
+  if (pg) {
+    const IDX = [
+      // الأصليين
+      "CREATE INDEX IF NOT EXISTS idx_files_category   ON files(category_id)",
+      "CREATE INDEX IF NOT EXISTS idx_files_deleted    ON files(is_deleted)",
+      "CREATE INDEX IF NOT EXISTS idx_files_downloads  ON files(downloads DESC)",
+      "CREATE INDEX IF NOT EXISTS idx_history_user     ON history(user_id)",
+      "CREATE INDEX IF NOT EXISTS idx_favorites_user   ON favorites(user_id)",
+      "CREATE INDEX IF NOT EXISTS idx_ratings_file     ON ratings(file_id)",
+      "CREATE INDEX IF NOT EXISTS idx_comments_file    ON comments(file_id)",
+      "CREATE INDEX IF NOT EXISTS idx_user_points      ON user_points(total_points DESC)",
+      "CREATE INDEX IF NOT EXISTS idx_users_active     ON users(last_active)",
+
+      // ✅ جدد — تسرّع أكثر الـ queries استخداماً
+      "CREATE INDEX IF NOT EXISTS idx_files_cat_del    ON files(category_id, is_deleted)",       // browse الأكثر استخداماً
+      "CREATE INDEX IF NOT EXISTS idx_files_uploaded   ON files(uploaded_at DESC)",               // latest files
+      "CREATE INDEX IF NOT EXISTS idx_users_banned     ON users(is_banned)",                      // ban check
+      "CREATE INDEX IF NOT EXISTS idx_history_file     ON history(file_id)",                      // file stats
+      "CREATE INDEX IF NOT EXISTS idx_comments_del     ON comments(file_id, is_deleted)",         // comments query
+      "CREATE INDEX IF NOT EXISTS idx_ai_history_user  ON ai_history(user_id, created_at DESC)",  // AI chat history
+      "CREATE INDEX IF NOT EXISTS idx_user_states_upd  ON user_states(updated_at)",               // cleanup
+      "CREATE INDEX IF NOT EXISTS idx_gnl_chat         ON group_notify_log(chat_id)",             // group notify
+      "CREATE INDEX IF NOT EXISTS idx_sched_sent       ON scheduled_messages(sent, send_at)",     // scheduler
+      "CREATE INDEX IF NOT EXISTS idx_bundle_files_bnd ON bundle_files(bundle_id)",               // bundle files
+    ];
+    for (const idx of IDX) {
+      try { await pg.query(idx); } catch(_) {}
+    }
+    logger.info('✅ Indexes جاهزة (' + IDX.length + ')');
+  }
+
   logger.info('✅ Schema ready');
 }
-async function getSetting(k){const r=await get('SELECT value FROM settings WHERE key=$1',[k]);return r?r.value:null;}
-async function setSetting(k,v){await run('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value',[k,v]);}
-function saveDB(){}
 
-module.exports={get,all,run,transaction,getPg,getSQLite,initSchema,getSetting,setSetting,saveDB};
+async function getSetting(k) {
+  const r = await get('SELECT value FROM settings WHERE key=$1', [k]);
+  return r ? r.value : null;
+}
+
+async function setSetting(k, v) {
+  await run('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=EXCLUDED.value', [k, v]);
+}
+
+function saveDB() {}
+
+module.exports = { get, all, run, transaction, getPg, getSQLite, initSchema, getSetting, setSetting, saveDB };
