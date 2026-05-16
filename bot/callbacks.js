@@ -10,7 +10,7 @@ module.exports.registerCallbacks = function(bot, deps) {
 
   const { run: dbRun, all: dbAll } = require('../database/db');
   const filesDb = require('../database/files');
-  const million = require('./handlers/million');
+  const million = require('../handlers/million');
 
   // ── Helpers ──
   async function hGrpSp(ctx, d) {
