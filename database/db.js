@@ -262,6 +262,10 @@ async function initSchema() {
     logger.info('✅ Indexes جاهزة (' + IDX.length + ')');
   }
 
+  // Migration: used_count
+  try { if(pg) await pg.query('ALTER TABLE million_questions ADD COLUMN IF NOT EXISTS used_count INTEGER DEFAULT 0'); } catch(_) {}
+  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_mq_used ON million_questions(used_count) WHERE is_active=1'); } catch(_) {}
+
   logger.info('✅ Schema ready');
 }
 
@@ -277,3 +281,4 @@ async function setSetting(k, v) {
 function saveDB() {}
 
 module.exports = { get, all, run, transaction, getPg, getSQLite, initSchema, getSetting, setSetting, saveDB };
+// هذا السطر ما يضاف هنا — شغّل الكومند التالي مباشرة على DB
