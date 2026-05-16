@@ -9,8 +9,7 @@ module.exports.registerCallbacks = function(bot, deps) {
   } = deps;
 
   const { run: dbRun, all: dbAll } = require('../database/db');
-  const filesDb    = require('../database/files');
-  const ownerPanel = require('../handlers/owner_panel');
+  const filesDb  = require('../database/files');
   const million  = require('../handlers/million');
 
   // ── Helpers ──
@@ -82,7 +81,7 @@ module.exports.registerCallbacks = function(bot, deps) {
       return ctx.reply('📦 اكتب اسم الحزمة الجديدة:').catch(() => {});
     }],
     ['noop',       () => {}],
-    ['main_menu',   ctx => startHandler(ctx)],
+    ['main_menu',  ctx => startHandler(ctx)],
     ['mg_menu',    ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {}); return manage.mainMenu(ctx); }],
     ['mg_content', ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {}); return manage.handleCallback(ctx, 'mg_content'); }],
     ['browse',          ctx => browse.showSpecs(ctx)],
@@ -103,9 +102,6 @@ module.exports.registerCallbacks = function(bot, deps) {
       return ctx.answerCbQuery('✅ تم مسح سجلك', { show_alert: true }).catch(() => {});
     }],
     ['skip_sp',   async ctx => { await usersDb.setSpecialty(ctx.uid, 0); return startHandler.showMainMenu(ctx); }],
-    ['owner_panel',       ctx => ownerPanel.showOwnerPanel(ctx)],
-    ['owner_server_stats', ctx => ownerPanel.showServerStats(ctx)],
-    ['owner_clear_cache',  ctx => ownerPanel.clearCache(ctx)],
     ['change_sp', async ctx => {
       const sp = await contentDb.getSpecs();
       return eos(ctx, '🎓 *اختر تخصصك:*', { parse_mode: 'Markdown', ...kbBuild(sp.map(s => [kbBtn('🎓 ' + s.name, 'set_sp_' + s.id)])) });

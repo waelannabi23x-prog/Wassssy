@@ -1,32 +1,34 @@
 'use strict';
+const escMd = t => (t || '').replace(/[*_`\[\]()~>#+=|{}.!\-]/g, '\\$&');
 const { build, btn } = require('../utils/keyboard');
 const { eos } = require('../utils/helpers');
-const { escMd } = require('../utils/common');
-const interactions  = require('../database/interactions');
-const usersDb       = require('../database/users');
-const content       = require('../database/content');
-const filesDb       = require('../database/files');
+const interactions = require('../database/interactions');
+const usersDb = require('../database/users');
+const content = require('../database/content');
 const { cacheGet, cacheSet } = require('../utils/cache');
+const filesDb = require('../database/files');
+const { escMd: escMdCommon } = require('../utils/common');
 const safeInt = v => { const n = parseInt(v); return isNaN(n) ? 0 : n; };
 
 async function startHandler(ctx) {
-  const uid  = ctx.uid;
+  const uid = ctx.uid;
   const name = ctx.from?.first_name || 'Student';
-  const raw  = ctx.message?.text || '';
-  const payload = raw.includes(' ') ? raw.split(' ')[1] : ctx.startPayload || null;
+  const rawText = ctx.message?.text || '';
+  const payload = rawText.includes(' ') ? rawText.split(' ')[1] : ctx.startPayload || null;
 
+  // ── deep link لملف مباشر ──
   if (payload?.startsWith('file_')) {
     const fid = safeInt(payload.replace('file_', ''));
     if (fid > 0) {
       const f = await filesDb.getFile(fid);
       if (f) {
         const isFav = await interactions.isFav(uid, fid).catch(() => false);
-        const cap = '📄 *' + escMd(f.title) + '*' +
-          (f.description ? '\n📝 ' + escMd(f.description) : '') +
-          '\n📁 ' + escMd(f.cat_name || '') + ' | 📖 ' + escMd(f.sub_name || '');
+        const cap = '📄 *' + escMdCommon(f.title) + '*' +
+          (f.description ? '\n📝 ' + escMdCommon(f.description) : '') +
+          '\n📁 ' + escMdCommon(f.cat_name || '') + ' | 📖 ' + escMdCommon(f.sub_name || '');
         const kb = build([[
           btn(isFav ? '⭐ محفوظ' : '☆ حفظ', 'fav_' + fid),
-          btn('🏠 الرئيسية', 'main_menu'),
+          btn('🏠 الرئيسية', 'main_menu')
         ]]);
         try {
           if (f.file_type === 'photo')
@@ -37,7 +39,7 @@ async function startHandler(ctx) {
             await ctx.replyWithDocument(f.file_id, { caption: cap, parse_mode: 'Markdown', ...kb });
           interactions.addHistory(uid, fid).catch(() => {});
           filesDb.incDownloads(fid).catch(() => {});
-        } catch(_) { await ctx.reply('❌ تعذر إرسال الملف'); }
+        } catch (e) { await ctx.reply('❌ تعذر إرسال الملف'); }
       }
     }
   }
@@ -51,10 +53,12 @@ async function askSpecialty(ctx, name) {
   const specs = await content.getSpecs();
   if (!specs.length) return showMainMenu(ctx, name);
   const rows = specs.map(s => [btn('🎓 ' + s.name, 'set_sp_' + s.id)]);
-  rows.push([btn('⏭️ تخطي', 'skip_sp')]);
+  rows.push([btn('⏭ تخطي لاحقاً', 'skip_sp')]);
   return eos(ctx,
-    '👋 *أهلاً ' + escMd(name) + '!*\n\n' +
-    '🎓 اختر تخصصك للبدء:',
+    '👋 *أهلاً ' + name + '!*\n\n' +
+    '📚 منصتك الأكاديمية على تيليغرام\n' +
+    '━━━━━━━━━━━━━━━━\n' +
+    '🎓 *اختر تخصصك للبدء:*',
     { parse_mode: 'Markdown', ...build(rows) }
   );
 }
@@ -63,71 +67,89 @@ async function showMainMenu(ctx, name) {
   const uid = ctx.uid;
   if (!name) name = ctx.from?.first_name || 'Student';
 
-  const menuKey = 'menu_' + uid;
-  let md = cacheGet(menuKey);
-  if (!md) {
+  // ── cache ──
+  const menuKey = 'menu_data_' + uid;
+  let menuData = cacheGet(menuKey);
+  if (!menuData) {
     const spRow = await usersDb.getSpecialty(uid);
-    const spId  = spRow?.specialty_id || null;
-    const sp    = spId && spId != 0 ? await content.getSpec(spId) : null;
-    md = { sp };
-    cacheSet(menuKey, md, 60000);
+    const _spId = spRow?.specialty_id || null;
+    const sp = _spId && _spId != 0
+      ? (cacheGet('spec_' + _spId) || await content.getSpec(_spId))
+      : null;
+    menuData = { sp };
+    cacheSet(menuKey, menuData, 60000);
   }
 
-  const { sp } = md;
-  const hour   = new Date().getHours();
-  const greet  = hour < 5 ? '🌙' : hour < 12 ? '🌅' : hour < 18 ? '☀️' : '🌙';
+  const { sp } = menuData;
+  const hour = new Date().getHours();
+  const timeGreet = hour < 12 ? '🌅 صباح النور' : hour < 17 ? '☀️ مساء الخير' : '🌙 مساء النور';
 
-  const header =
-    greet + ' *' + escMd(name) + '*' +
-    (sp ? ' | 🎓 ' + escMd(sp.name) : '') +
-    '\n━━━━━━━━━━━━━━━━\n' +
-    '📚 *منصتك الأكاديمية*';
+  let welcome = timeGreet + '، *' + escMd(name) + '!*\n';
+  if (sp) welcome += '🎓 *' + escMd(sp.name) + '*\n';
+  welcome += '━━━━━━━━━━━━━━━━\n📚 منصتك الأكاديمية — اختر ما تريد:';
 
-  // آخر ملف
-  let lastBtn = null;
+  // ── آخر ملف للمستخدم ──
+  let lastFileBtn = null;
   try {
     const hist = await interactions.getHistory(uid, 1).catch(() => []);
     if (hist?.length) {
-      const t = (hist[0].title || '').substring(0, 20);
-      lastBtn = btn('▶️ استكمال: ' + t, 'preview_' + hist[0].id + '_0_0_0_0_0');
+      const lf = hist[0];
+      const shortTitle = (lf.title || '').substring(0, 22);
+      lastFileBtn = btn('▶️ استكمال: ' + shortTitle, 'preview_' + lf.id + '_0_0_0_0_0');
     }
   } catch(_) {}
 
-  const rows = [
-    // ── الصف 1: تصفح كامل ──
-    [btn('📚 تصفح المحتوى', 'browse')],
+  // ══════════════════════════════════════════
+  // الأزرار — ملونة بالـ emoji
+  // 🟥 أحمر   = التصفح الرئيسي
+  // 🟩 أخضر   = المواد والملفات
+  // 🟦 أزرق   = مميزات إضافية
+  // 🟨 أصفر   = شخصي
+  // ══════════════════════════════════════════
+  const rows = [];
 
-    // ── الصف 2: بحث + جديد ──
-    [btn('🔍 بحث', 'search_prompt'), btn('🆕 أحدث الملفات', 'latest')],
+  // ── 🟥 تصفح المحتوى (أحمر — الأهم) ──
+  rows.push([btn('📚 تصفح المحتوى', 'browse')]);
 
-    // ── الصف 3: مفضلة + سجل ──
-    [btn('⭐ مفضلاتي', 'favorites'), btn('🕐 سجل المشاهدة', 'history')],
+  // ── 🟩 بحث + أحدث (أخضر — محتوى) ──
+  rows.push([
+    btn('🔍 بحث سريع', 'search_prompt'),
+    btn('🆕 أحدث الملفات', 'latest'),
+  ]);
 
-    // ── الصف 4: AI ──
-    [btn('🤖 المساعد الذكي', 'ai_prompt')],
+  // ── 🟩 مفضلة + سجل (أخضر) ──
+  rows.push([
+    btn('⭐ مفضلاتي', 'favorites'),
+    btn('🗂 آخر ما شاهدت', 'history'),
+  ]);
 
-    // ── الصف 5: ملف + إحصائيات ──
-    [btn('👤 ملفي', 'profile'), btn('📊 إحصائياتي', 'stats')],
+  // ── 🤖 AI ──
+  rows.push([btn('🤖 المساعد الذكي', 'ai_prompt')]);
 
-    // ── الصف 6: تخصص ──
-    [btn(sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', 'change_sp')],
-  ];
+  // ── 🟦 ملفي + إحصائيات (أزرق) ──
+  rows.push([
+    btn('👤 ملفي', 'profile'),
+    btn('📊 إحصائياتي', 'stats'),
+  ]);
+
+  // ── 🟨 تغيير تخصص (أصفر) ──
+  rows.push([btn(sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', 'change_sp')]);
 
   // ── آخر ملف ──
-  if (lastBtn) rows.push([lastBtn]);
+  if (lastFileBtn) rows.push([lastFileBtn]);
 
   // ── لوحة الإدارة ──
-  if (ctx.isOwner)      rows.push([btn('👑 لوحة المالك', 'owner_panel')]);
+  if (ctx.isOwner) rows.push([btn('🔧 لوحة الإدارة', 'mg_menu')]);
   else if (ctx.isAdmin) rows.push([btn('🛡️ لوحة الإدارة', 'mg_menu')]);
 
-  return eos(ctx, header, { parse_mode: 'Markdown', ...build(rows) });
+  return eos(ctx, welcome, { parse_mode: 'Markdown', ...build(rows) });
 }
 
-startHandler.clearAiMode = async uid => {
-  const s = global.getState(uid);
-  if (s?.type === 'ai_mode') await global.delState(uid);
+startHandler.clearAiMode = async function(uid) {
+  const state = global.getState(uid);
+  if (state?.type === 'ai_mode') await global.delState(uid);
 };
 
 module.exports = startHandler;
-module.exports.showMainMenu  = showMainMenu;
-module.exports.askSpecialty  = askSpecialty;
+module.exports.showMainMenu = showMainMenu;
+module.exports.askSpecialty = askSpecialty;
