@@ -179,7 +179,7 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'ml_',         fn: (ctx) => million.handleCallback(bot, ctx) },
     { p: 'ct_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showFiles(ctx, p[1], p[2], p[3], p[4], p[5]); }},
     { p: 'sb_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showCategories(ctx, p[1], p[2], p[3], p[4]); }},
-    { p: 'sm_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showSemesters(ctx, p[1], p[2], p[3]); }},
+    { p: 'sm_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showSubjects(ctx, p[1], p[2], p[3]); }},
     { p: 'yr_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showSemesters(ctx, p[1], p[2]); }},
     { p: 'sp_',         fn: (ctx, d) => browse.showYears(ctx, safeInt(d.substring(3))) },
     { p: 'mg_',         fn: async (ctx, d) => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {}); return manage.handleCallback(ctx, d); }},
