@@ -41,7 +41,13 @@ async function setState(uid, val) {
   if (_redis) {
     try {
       await _redis.set('state:' + uid, json, { ex: 86400 });
-    } catch(e) { logger.warn('[Redis] setState:', e.message); }
+    } catch(e) {
+      if (e.message && e.message.includes('NOPERM')) {
+        logger.warn('[Redis] NOPERM — تعطيل Redis والاعتماد على الذاكرة');
+        _redis = null; // disable for this session, no more spam
+      }
+      // silent fail for other errors
+    }
   }
 
   // DB دائماً كـ backup
