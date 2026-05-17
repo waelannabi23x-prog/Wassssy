@@ -143,6 +143,7 @@ async function launch() {
   logger.info('🚀 Study Bot — Starting...');
   try {
     await initSchema();
+    await notesH.initNotes().catch(()=>{});
     await initPersistentStates();
     logger.info('✅ DB ready');
 
