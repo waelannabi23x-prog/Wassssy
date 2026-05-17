@@ -230,3 +230,40 @@ module.exports = function registerCommands(bot, deps) {
     } catch(e) { return ctx.reply('❌ ' + e.message).catch(() => {}); }
   });
 };
+
+  bot.command('addchannel', async ctx => {
+    if (!ctx.isOwner) return ctx.reply('للمالك فقط').catch(() => {});
+    const args = ctx.message.text.split(' ').slice(1);
+    if (args.length < 3) return ctx.reply('الصيغة: /addchannel @username الاسم الرابط').catch(() => {});
+    const channelId = args[0];
+    const url = args[args.length - 1];
+    const name = args.slice(1, args.length - 1).join(' ');
+    try {
+      const { addChannel } = require('../utils/channelGuard');
+      await addChannel(channelId, name, url);
+      return ctx.reply('تمت الاضافة: ' + name).catch(() => {});
+    } catch(e) { return ctx.reply('خطا: ' + e.message).catch(() => {}); }
+  });
+
+  bot.command('removechannel', async ctx => {
+    if (!ctx.isOwner) return ctx.reply('للمالك فقط').catch(() => {});
+    const id = parseInt(ctx.message.text.split(' ')[1]);
+    if (!id) return ctx.reply('ارسل رقم القناة').catch(() => {});
+    try {
+      const { removeChannel } = require('../utils/channelGuard');
+      await removeChannel(id);
+      return ctx.reply('تم الحذف رقم ' + id).catch(() => {});
+    } catch(e) { return ctx.reply('خطا: ' + e.message).catch(() => {}); }
+  });
+
+  bot.command('channels', async ctx => {
+    if (!ctx.isOwner) return ctx.reply('للمالك فقط').catch(() => {});
+    try {
+      const { getChannels } = require('../utils/channelGuard');
+      const list = await getChannels();
+      if (!list.length) return ctx.reply('لا توجد قنوات').catch(() => {});
+      const txt = list.map(ch => ch.id + '. ' + ch.channel_name + ' ' + ch.channel_url).join('\n');
+      return ctx.reply('القنوات:\n' + txt).catch(() => {});
+    } catch(e) { return ctx.reply('خطا: ' + e.message).catch(() => {}); }
+  });
+
