@@ -1236,7 +1236,72 @@ router.get('/points/rank', auth, async (req, res) => {
   } catch(e) { res.json({ rank: 999 }); }
 });
 
+// ── /bundles/category/:catId ─────────────────────────────────────
+router.get('/bundles/category/:catId', auth, async (req, res) => {
+  try {
+    const rows = await all(
+      `SELECT b.*, COUNT(bf.id) as files_count
+       FROM bundles b
+       LEFT JOIN bundle_files bf ON bf.bundle_id = b.id
+       WHERE b.category_id = $1 AND b.is_deleted = 0
+       GROUP BY b.id ORDER BY b.created_at DESC`,
+      [req.params.catId]
+    );
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
+// ── /send-bundle/:id ──────────────────────────────────────────────
+router.post('/send-bundle/:id', auth, async (req, res) => {
+  try {
+    const uid = req.tgUser.id;
+    const bot = global.__bot;
+    if (!bot) return res.status(500).json({ error: 'Bot unavailable' });
+    const b = await get('SELECT * FROM bundles WHERE id=$1 AND is_deleted=0', [req.params.id]);
+    if (!b) return res.status(404).json({ error: 'Not found' });
+    const files = await all(
+      `SELECT f.* FROM files f
+       JOIN bundle_files bf ON bf.bundle_id=$1 AND bf.file_id=f.id
+       WHERE f.is_deleted=0 ORDER BY bf.sort_order`,
+      [req.params.id]
+    );
+    res.json({ ok: true });
+    // إرسال في الخلفية
+    setImmediate(async () => {
+      try {
+        await bot.telegram.sendMessage(uid, `📦 *${b.title}*`, { parse_mode: 'Markdown' });
+        for (const f of files) {
+          try {
+            if (f.file_type === 'photo') await bot.telegram.sendPhoto(uid, f.file_id, { caption: f.title });
+            else if (f.file_type === 'link') await bot.telegram.sendMessage(uid, `🔗 ${f.title}\n${f.file_id}`);
+            else await bot.telegram.sendDocument(uid, f.file_id, { caption: f.title });
+          } catch(_) {}
+          await new Promise(r => setTimeout(r, 300));
+        }
+        await bot.telegram.sendMessage(uid, `✅ اكتملت الحزمة: ${files.length} ملف`);
+      } catch(_) {}
+    });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 // ── /bundles ─────────────────────────────────────────────────────
+
+router.get('/bundles/category/:catId', auth, async (req, res) => {
+  try {
+    const rows = await all(
+      `SELECT b.*, COUNT(bf.file_id) as files_count,
+              COALESCE(SUM(bf2.cnt),0) as total_size
+       FROM bundles b
+       LEFT JOIN bundle_files bf ON bf.bundle_id = b.id
+       LEFT JOIN (SELECT bundle_id, COUNT(*) as cnt FROM bundle_files GROUP BY bundle_id) bf2 ON bf2.bundle_id = b.id
+       WHERE b.category_id = $1 AND b.is_deleted = 0
+       GROUP BY b.id ORDER BY b.created_at DESC`,
+      [req.params.catId]
+    );
+    res.json(rows);
+  } catch(e) { res.json([]); }
+});
+
 router.get('/bundles', auth, async (req, res) => {
   try {
     const rows = await all(

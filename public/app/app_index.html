@@ -742,13 +742,63 @@ async categories({sbId,sbName,smId,smName,yrId,yrName,spId,spName}){
 async files({catId,catName,sbName,smName,yrName,spName}){
   loader();
   try{
-    const files=await cached('fl'+catId,()=>API.get('/files/'+catId),300000);
-    const items=files.map(f=>{const{i:ico,c}=ftype(f.file_type);return`<div class="fc" onclick='NAV.go("preview",{fileId:${f.id}},"📄 ${esc(f.title.substring(0,22))}")'>
-      <div class="fci ${c}">${ico}</div>
-      <div class="fcb"><div class="fct">${esc(f.title)}</div>
-      <div class="fcm"><span class="fctg">⬇️ ${f.downloads||0}</span>${f.rating_avg?`<span class="fctg">${starsHtml(f.rating_avg,f.rating_cnt)}</span>`:''}</div></div>
-      <span class="fca">›</span></div>`;}).join('');
-    render(`${bcHtml([spName,yrName,smName,sbName,catName])}${items||empty('📭','لا توجد ملفات')}`);
+    const [files,bundles]=await Promise.all([
+      cached('fl'+catId,()=>API.get('/files/'+catId),300000),
+      cached('bnd'+catId,()=>API.get('/bundles/category/'+catId),300000).catch(()=>[]),
+    ]);
+    const bundlesHtml=bundles&&bundles.length?`
+      <div class="sh">📦 الحزم الدراسية (${bundles.length})</div>
+      ${bundles.map(b=>`<div class="cd gold" style="margin-bottom:9px" onclick='NAV.go("bundleView",${JSON.stringify({bundleId:b.id,catId,catName,sbName,smName,yrName,spName})},"📦 ${esc(b.title.substring(0,20))}")'>
+        <div class="mc">
+          <div class="mci gold">📦</div>
+          <div class="mcb">
+            <div class="mct">${esc(b.title)}</div>
+            <div class="mcs">${b.files_count||0} ملف · ⬇️ ${b.downloads||0} تحميل</div>
+          </div>
+          <div class="mca">›</div>
+        </div>
+      </div>`).join('')}
+    `:'';
+    const filesHtml=files&&files.length?`
+      <div class="sh">📄 الملفات (${files.length})</div>
+      ${files.map(f=>{const{i:ico,c:fc}=ftype(f.file_type);return`<div class="fc" onclick='NAV.go("preview",{fileId:${f.id}},"📄 ${esc(f.title.substring(0,22))}")'>
+        <div class="fci ${fc}">${ico}</div>
+        <div class="fcb"><div class="fct">${esc(f.title)}</div>
+        <div class="fcm"><span class="fctg">⬇️ ${f.downloads||0}</span>${f.rating_avg?`<span class="fctg">${starsHtml(f.rating_avg,f.rating_cnt)}</span>`:''}</div></div>
+        <span class="fca">›</span></div>`;}).join('')}
+    `:empty('📭','لا توجد ملفات');
+    render(`${bcHtml([spName,yrName,smName,sbName,catName])}${bundlesHtml}${filesHtml}`);
+  }catch(e){toast('خطأ: '+e.message,'err');}
+},
+
+/* ── BUNDLE VIEW ── */
+async bundleView({bundleId,catId,catName,sbName,smName,yrName,spName}){
+  loader();
+  try{
+    const b=await API.get('/bundles/'+bundleId);
+    const typeIcons={photo:'🖼️',document:'📄',video:'🎥',audio:'🎵',voice:'🎤',link:'🔗'};
+    const counts={};
+    (b.files||[]).forEach(f=>{counts[f.file_type]=(counts[f.file_type]||0)+1;});
+    const typeStr=Object.entries(counts).map(([t,n])=>`${typeIcons[t]||'📄'} ${n}`).join(' · ');
+    render(`
+      ${bcHtml([spName,yrName,smName,sbName,catName,b.title])}
+      <div class="pvhero">
+        <div style="font-size:38px;margin-bottom:10px">📦</div>
+        <div class="pvtitle">${esc(b.title)}</div>
+        ${b.description?`<div style="font-size:12px;color:var(--t2);margin-bottom:8px">${esc(b.description)}</div>`:''}
+        <div class="pvstats">
+          <span class="pvstat">📄 ${b.files_count||b.files?.length||0} ملف</span>
+          <span class="pvstat">⬇️ ${b.downloads||0} تحميل</span>
+        </div>
+        ${typeStr?`<div style="font-size:11px;color:var(--t2);margin-top:8px">${typeStr}</div>`:''}
+      </div>
+      <button class="btn btn-gold" onclick="sendBundle(${bundleId},this)">⬇️ تحميل الحزمة كاملة</button>
+      <div class="sh" style="margin-top:4px">محتوى الحزمة</div>
+      ${(b.files||[]).map(f=>{const{i:ico,c:fc}=ftype(f.file_type);return`<div class="fc">
+        <div class="fci ${fc}">${ico}</div>
+        <div class="fcb"><div class="fct">${esc(f.title||f.file_id)}</div></div>
+      </div>`;}).join('')||empty('📭','الحزمة فارغة')}
+    `);
   }catch(e){toast('خطأ','err');}
 },
 
@@ -1428,6 +1478,11 @@ async function tabLeaderboard(){
 /* ════════════════════════════════════════
    USER ACTIONS
 ════════════════════════════════════════ */
+async function sendBundle(id,btn){
+  const orig=btn.innerHTML;btn.innerHTML='⏳ جاري...';btn.disabled=true;
+  try{await API.post('/send-bundle/'+id);toast('✅ تم! افتح البوت','ok');tg?.HapticFeedback?.notificationOccurred('success');btn.innerHTML='✅ تم!';setTimeout(()=>{btn.innerHTML=orig;btn.disabled=false;},3000);}
+  catch(e){toast('❌ '+e.message,'err');btn.innerHTML=orig;btn.disabled=false;}
+}
 async function sendFile(id,btn){
   const orig=btn.innerHTML;btn.innerHTML='⏳ جاري...';btn.disabled=true;
   try{await API.post('/send/'+id);toast('✅ تم! افتح المحادثة مع البوت','ok');tg?.HapticFeedback?.notificationOccurred('success');btn.innerHTML='✅ تم!';setTimeout(()=>{btn.innerHTML=orig;btn.disabled=false;},3000);}
