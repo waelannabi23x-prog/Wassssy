@@ -61,8 +61,10 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
   ctx.sendChatAction('upload_document').catch(function(){});
   ctx.deleteMessage().catch(function(){});
 
+  var _fkey = "file_" + fid;
+  var _fcached = cacheGet(_fkey);
   var results = await Promise.all([
-    filesDb.getFile(fid),
+    _fcached ? Promise.resolve(_fcached) : filesDb.getFile(fid).then(function(f){ if(f) cacheSet(_fkey, f, 1800000); return f; }),
     interactions.isFav(uid, fid).catch(function(){ return false; }),
   ]);
   var f   = results[0];
