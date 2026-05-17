@@ -1382,3 +1382,27 @@ async function loadAdminsList(){
 function onSearch(q){document.getElementById('sc')?.classList.toggle('on',q.length>0);clearTimeout(_srchTimer);if(q.length<2){document.getElementById('sr').innerHTML=empty('🔍','اكتب حرفين');return;}document.getElementById('sr').innerHTML=`<div class="ldr"><div class="spin"></div></div>`;_srchTimer=setTimeout(()=>runSearch(q),380);}
 async function runSearch(q){if(!q||q.length<2)return;const si=document.getElementById('si');if(si)si.value=q;_srchHist=_srchHist.filter(h=>h!==q);_srchHist.push(q);
   try{const res=await API.get('/search?q='+en
+
+/* INIT */
+async function init(){
+  await new Promise(r=>setTimeout(r,1600));
+  try{
+    const prof=await API.get('/profile').catch(()=>({isAdmin:false,isOwner:false,user:TG_USER,favCount:0,specialty:null}));
+    PROFILE=prof;IS_ADMIN=prof.isAdmin;IS_OWNER=prof.isOwner;TG_USER=prof.user||TG_USER;
+    if(IS_ADMIN||IS_OWNER){
+      document.getElementById('hAdminBtn').style.display='flex';
+      const nb=document.getElementById('nbar');
+      nb.style.gridTemplateColumns='repeat(6,1fr)';
+      nb.insertAdjacentHTML('beforeend',`<button class="nb" id="nb-admin" onclick="NAV.tab('admin')"><div class="nbbar"></div><span class="nbico">${IS_OWNER?'👑':'🛡️'}</span>${IS_OWNER?'المالك':'إدارة'}</button>`);
+    }
+    API.post('/points/daily').catch(()=>{});
+  }catch(e){}
+  const ls=document.getElementById('ls'),root=document.getElementById('root');
+  ls.style.opacity='0';root.style.opacity='1';
+  setTimeout(()=>ls.style.display='none',600);
+  NAV.tab('home');
+}
+window.addEventListener('load',init);
+</script>
+</body>
+</html>
