@@ -84,6 +84,17 @@ module.exports.registerCallbacks = function(bot, deps) {
     ['main_menu',  ctx => startHandler(ctx)],
     ['notes_show', ctx => notesH.showNotes(ctx)],
     ['note_add',   ctx => notesH.startAddNote(ctx)],
+    
+    ['mg_open_app', async ctx => {
+      const url = process.env.WEBHOOK_URL + '/app/app_index.html';
+      return ctx.reply('📱 افتح الـ Mini App:', {
+        reply_markup: { inline_keyboard: [[{ text: '📱 فتح EduMaster App', web_app: { url } }]] }
+      }).catch(() => {});
+    }],
+    ['mg_toggle_app', async ctx => {
+      await ctx.answerCbQuery(global._appPublic ? '✅ App ظاهر للكل' : '🔒 App مخفي', { show_alert: true }).catch(() => {});
+      return manage.mainMenu(ctx);
+    }],
     ['mg_menu',    ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {}); return manage.mainMenu(ctx); }],
     ['mg_content', ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {}); return manage.handleCallback(ctx, 'mg_content'); }],
     ['browse',          ctx => browse.showSpecs(ctx)],

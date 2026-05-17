@@ -54,6 +54,10 @@ async function mainMenu(ctx){
     rows.push([btn('🚩 البلاغات','mg_reports'),btn('📨 نظام الرسائل','mg_msgs')]);
     rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp')]);
   }
+  if(isOwner(ctx.uid)){
+    const appVisible = global._appPublic || false;
+    rows.push([btn('📱 فتح Mini App','mg_open_app'), btn(appVisible ? '👁 ظاهر للكل' : '🔒 مخفي عن المستخدمين', 'mg_toggle_app')]);
+  }
   rows.push([btn('🏠 القائمة الرئيسية','main_menu')]);
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
