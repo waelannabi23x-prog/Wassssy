@@ -153,4 +153,42 @@ module.exports = function registerCommands(bot, deps) {
     '📚 *أوامر البوت*\n\n/start — الرئيسية\n/search — البحث\n/profile — شخصي\n/stats — إحصائيات\n/cancel — إلغاء\n/ai — مساعد ذكي\n/reset — مسح سياق\n\n👑 *المشرفين:*\n/admin — الإدارة',
     { parse_mode: 'Markdown' }
   ).catch(() => {}));
+
+  bot.command('addchannel', async ctx => {
+    const parts = ctx.message.text.replace('/addchannel', '').trim().split(' ');
+    if (parts.length < 3) return ctx.reply('❌ الصيغة:
+/addchannel @username الاسم https://t.me/username').catch(() => {});
+    const channelId = parts[0];
+    const url       = parts[parts.length - 1];
+    const name      = parts.slice(1, parts.length - 1).join(' ');
+    try {
+      const { addChannel } = require('../utils/channelGuard');
+      await addChannel(channelId, name, url);
+      return ctx.reply('✅ تمت إضافة القناة:
+📣 ' + name + '
+🔗 ' + url).catch(() => {});
+    } catch(e) { return ctx.reply('❌ ' + e.message).catch(() => {}); }
+  });
+
+  bot.command('removechannel', async ctx => {
+    const id = parseInt(ctx.message.text.replace('/removechannel', '').trim());
+    try {
+      const { removeChannel, getChannels } = require('../utils/channelGuard');
+      await removeChannel(id);
+      return ctx.reply('✅ تم إيقاف القناة رقم ' + id).catch(() => {});
+    } catch(e) { return ctx.reply('❌ ' + e.message).catch(() => {}); }
+  });
+
+  bot.command('channels', async ctx => {
+    try {
+      const { getChannels } = require('../utils/channelGuard');
+      const list = await getChannels();
+      const txt = '📋 *القنوات المطلوبة:*
+
+' + list.map(c => c.id + '. ' + c.channel_name + ' — ' + c.channel_url).join('
+');
+      return ctx.reply(txt, { parse_mode: 'Markdown' }).catch(() => {});
+    } catch(e) { return ctx.reply('❌ ' + e.message).catch(() => {}); }
+  });
+
 };
