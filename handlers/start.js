@@ -124,7 +124,7 @@ async function showMainMenu(ctx, name) {
   ]);
 
   // ── 🤖 AI ──
-  rows.push([btn('🤖 المساعد الذكي', 'ai_prompt')]);
+  rows.push([btn('🤖 المساعد الذكي', 'ai_prompt'), btn('📝 ملاحظاتي', 'notes_show')]);
 
   // ── 🟦 ملفي + إحصائيات (أزرق) ──
   rows.push([

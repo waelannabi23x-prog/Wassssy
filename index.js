@@ -121,7 +121,7 @@ require('./bot/commands')(bot, {
 // ── Callbacks ──
 const { registerCallbacks } = require('./bot/callbacks');
 registerCallbacks(bot, {
-  CBDedup, cbRes, startHandler, manage, browse, userH,
+  CBDedup, cbRes, startHandler, manage, browse, userH, notesH,
   bundlesDb, contentDb, usersDb, interactions, commentsDb,
   cacheClear, cacheClearPrefix, kbBtn, kbBuild, eos, logger,
   safeInt, tagAll, muteAll, unmuteAll,
