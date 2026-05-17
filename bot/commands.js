@@ -154,116 +154,35 @@ module.exports = function registerCommands(bot, deps) {
     { parse_mode: 'Markdown' }
   ).catch(() => {}));
 
-  bot.command('addchannel', async ctx => {
-    const parts = ctx.message.text.replace('/addchannel', '').trim().split(' ');
-    if (parts.length < 3) return ctx.reply('❌ الصيغة:
-/addchannel @username الاسم https://t.me/username').catch(() => {});
-    const channelId = parts[0];
-    const url       = parts[parts.length - 1];
-    const name      = parts.slice(1, parts.length - 1).join(' ');
-    try {
-      const { addChannel } = require('../utils/channelGuard');
-      await addChannel(channelId, name, url);
-      return ctx.reply('✅ تمت إضافة القناة:
-📣 ' + name + '
-🔗 ' + url).catch(() => {});
-    } catch(e) { return ctx.reply('❌ ' + e.message).catch(() => {}); }
-  });
-
-  bot.command('removechannel', async ctx => {
-    const id = parseInt(ctx.message.text.replace('/removechannel', '').trim());
-    try {
-      const { removeChannel, getChannels } = require('../utils/channelGuard');
-      await removeChannel(id);
-      return ctx.reply('✅ تم إيقاف القناة رقم ' + id).catch(() => {});
-    } catch(e) { return ctx.reply('❌ ' + e.message).catch(() => {}); }
-  });
-
-  bot.command('channels', async ctx => {
-    try {
-      const { getChannels } = require('../utils/channelGuard');
-      const list = await getChannels();
-      const txt = '📋 *القنوات المطلوبة:*
-
-' + list.map(c => c.id + '. ' + c.channel_name + ' — ' + c.channel_url).join('
-');
-      return ctx.reply(txt, { parse_mode: 'Markdown' }).catch(() => {});
-    } catch(e) { return ctx.reply('❌ ' + e.message).catch(() => {}); }
-  });
-
-
-  bot.command('addchannel', async ctx => {
-    if (!ctx.isOwner) return ctx.reply('🚫 للمالك فقط').catch(() => {});
-    const parts = ctx.message.text.replace('/addchannel', '').trim().split(' ');
-    if (parts.length < 3) return ctx.reply('❌ الصيغة: /addchannel @username الاسم https://t.me/x').catch(() => {});
-    const channelId = parts[0];
-    const url = parts[parts.length - 1];
-    const name = parts.slice(1, parts.length - 1).join(' ');
-    try {
-      const { addChannel } = require('../utils/channelGuard');
-      await addChannel(channelId, name, url);
-      return ctx.reply('✅ تمت الإضافة: ' + name).catch(() => {});
-    } catch(e) { return ctx.reply('❌ ' + e.message).catch(() => {}); }
-  });
-
-  bot.command('removechannel', async ctx => {
-    if (!ctx.isOwner) return ctx.reply('🚫 للمالك فقط').catch(() => {});
-    const id = parseInt(ctx.message.text.replace('/removechannel', '').trim());
-    if (!id) return ctx.reply('❌ أرسل رقم القناة').catch(() => {});
-    try {
-      const { removeChannel } = require('../utils/channelGuard');
-      await removeChannel(id);
-      return ctx.reply('✅ تم إيقاف القناة رقم ' + id).catch(() => {});
-    } catch(e) { return ctx.reply('❌ ' + e.message).catch(() => {}); }
-  });
-
-  bot.command('channels', async ctx => {
-    if (!ctx.isOwner) return ctx.reply('🚫 للمالك فقط').catch(() => {});
-    try {
-      const { getChannels } = require('../utils/channelGuard');
-      const list = await getChannels();
-      if (!list.length) return ctx.reply('📋 لا توجد قنوات').catch(() => {});
-      const txt = list.map(ch => ch.id + '. ' + ch.channel_name + ' — ' + ch.channel_url).join('
-');
-      return ctx.reply('📋 القنوات:
-' + txt).catch(() => {});
-    } catch(e) { return ctx.reply('❌ ' + e.message).catch(() => {}); }
-  });
 };
 
   bot.command('addchannel', async ctx => {
     if (!ctx.isOwner) return ctx.reply('للمالك فقط').catch(() => {});
     const args = ctx.message.text.split(' ').slice(1);
-    if (args.length < 3) return ctx.reply('الصيغة: /addchannel @username الاسم الرابط').catch(() => {});
-    const channelId = args[0];
+    if (args.length < 3) return ctx.reply('الصيغة: /addchannel @ch الاسم الرابط').catch(() => {});
+    const cid = args[0];
     const url = args[args.length - 1];
-    const name = args.slice(1, args.length - 1).join(' ');
-    try {
-      const { addChannel } = require('../utils/channelGuard');
-      await addChannel(channelId, name, url);
-      return ctx.reply('تمت الاضافة: ' + name).catch(() => {});
-    } catch(e) { return ctx.reply('خطا: ' + e.message).catch(() => {}); }
+    const nm = args.slice(1, args.length - 1).join(' ');
+    const { addChannel } = require('../utils/channelGuard');
+    await addChannel(cid, nm, url).catch(e => ctx.reply('خطا: ' + e.message).catch(() => {}));
+    return ctx.reply('تمت الاضافة: ' + nm).catch(() => {});
   });
 
   bot.command('removechannel', async ctx => {
     if (!ctx.isOwner) return ctx.reply('للمالك فقط').catch(() => {});
     const id = parseInt(ctx.message.text.split(' ')[1]);
     if (!id) return ctx.reply('ارسل رقم القناة').catch(() => {});
-    try {
-      const { removeChannel } = require('../utils/channelGuard');
-      await removeChannel(id);
-      return ctx.reply('تم الحذف رقم ' + id).catch(() => {});
-    } catch(e) { return ctx.reply('خطا: ' + e.message).catch(() => {}); }
+    const { removeChannel } = require('../utils/channelGuard');
+    await removeChannel(id).catch(() => {});
+    return ctx.reply('تم الحذف ' + id).catch(() => {});
   });
 
   bot.command('channels', async ctx => {
     if (!ctx.isOwner) return ctx.reply('للمالك فقط').catch(() => {});
-    try {
-      const { getChannels } = require('../utils/channelGuard');
-      const list = await getChannels();
-      if (!list.length) return ctx.reply('لا توجد قنوات').catch(() => {});
-      const txt = list.map(ch => ch.id + '. ' + ch.channel_name + ' ' + ch.channel_url).join('\n');
-      return ctx.reply('القنوات:\n' + txt).catch(() => {});
-    } catch(e) { return ctx.reply('خطا: ' + e.message).catch(() => {}); }
+    const { getChannels } = require('../utils/channelGuard');
+    const list = await getChannels().catch(() => []);
+    if (!list.length) return ctx.reply('لا توجد قنوات').catch(() => {});
+    const txt = list.map(ch => ch.id + '. ' + ch.channel_name + ' ' + ch.channel_url).join('\n');
+    return ctx.reply('القنوات:\n' + txt).catch(() => {});
   });
 
