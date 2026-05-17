@@ -154,8 +154,6 @@ module.exports = function registerCommands(bot, deps) {
     { parse_mode: 'Markdown' }
   ).catch(() => {}));
 
-};
-
   bot.command('addchannel', async ctx => {
     if (!ctx.isOwner) return ctx.reply('للمالك فقط').catch(() => {});
     const args = ctx.message.text.split(' ').slice(1);
@@ -186,3 +184,4 @@ module.exports = function registerCommands(bot, deps) {
     return ctx.reply('القنوات:\n' + txt).catch(() => {});
   });
 
+};
