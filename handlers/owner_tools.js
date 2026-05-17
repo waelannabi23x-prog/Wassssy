@@ -30,9 +30,14 @@ exports.trySmartUpload = async (ctx) => {
   const regex = /تخصص:|سنة:|فصل:|مادة:|قسم:|spec:|year:|sem:|mat:|cat:/i;
   if (!regex.test(caption)) return false;
   ctx.reply('جاري تحليل المسار...').catch(() => {});
-  let cleanCaption = caption.replace(regex, '').trim();
-  let parts = cleanCaption.split(/[|,]/).map(p => p.trim()).filter(p => p);
-  if (parts.length < 5) { ctx.reply('صيغة غير مكتملة. مثال:\nتخصص: LMD | سنة: 2 | فصل: 1 | مادة: Algo | قسم: Serie'); return true; }
+  // نقسم بـ | ثم نمسح الـlabel من كل جزء (تخصص: X → X)
+  let parts = caption.split(/[|,]/)
+    .map(p => p.replace(/^[^:：]+[:：]\s*/, '').trim())
+    .filter(p => p && !/^(تخصص|سنة|فصل|مادة|قسم|spec|year|sem|mat|cat)$/i.test(p));
+  if (parts.length < 5) {
+    ctx.reply('❌ صيغة غير مكتملة\n\nمثال مع ملف:\n`Computer science | 1 | Sem 2 | Analyse 2 | Cours`\n\nأو:\n`تخصص: CS | سنة: 1 | فصل: Sem 2 | مادة: Analyse 2 | قسم: Cours`', {parse_mode:'Markdown'});
+    return true;
+  }
   let fileId, fileType, fileName = '';
   if (msg.document) { fileId = msg.document.file_id; fileType = 'document'; fileName = msg.document.file_name || 'ملف'; }
   else if (msg.photo) { fileId = msg.photo[msg.photo.length - 1].file_id; fileType = 'photo'; fileName = 'صورة'; }
