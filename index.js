@@ -16,6 +16,7 @@ const { startScheduler }  = require('./utils/scheduler');
 const { initPersistentStates } = require('./utils/stateManager');
 const { setState: _setState, delState: _delState, getState: _getState } = require('./utils/redis');
 const { CBDedup, GrpBuf, GrpMsgs } = require('./bot/services');
+const notesH = require('./handlers/notes');
 
 // ── Handlers ──
 const startHandler  = require('./handlers/start');
