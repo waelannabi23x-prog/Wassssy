@@ -489,7 +489,6 @@ select.inp{-webkit-appearance:none}
 <div id="toast"></div>
 
 <script>
-document.body.style.background="red";
 'use strict';
 const tg=window.Telegram?.WebApp;
 let ID_DATA='',TG_USER=null,IS_ADMIN=false,IS_OWNER=false;
@@ -1381,14 +1380,33 @@ async function loadAdminsList(){
 
 /* SEARCH */
 function onSearch(q){document.getElementById('sc')?.classList.toggle('on',q.length>0);clearTimeout(_srchTimer);if(q.length<2){document.getElementById('sr').innerHTML=empty('🔍','اكتب حرفين');return;}document.getElementById('sr').innerHTML=`<div class="ldr"><div class="spin"></div></div>`;_srchTimer=setTimeout(()=>runSearch(q),380);}
-async function runSearch(q){if(!q||q.length<2)return;const si=document.getElementById("si");if(si)si.value=q;_srchHist=_srchHist.filter(h=>h!==q);_srchHist.push(q);try{const res=await API.get("/search?q="+encodeURIComponent(q));const el=document.getElementById("sr");if(!el)return;if(!res.length){el.innerHTML=empty("😕","لا نتائج");return;}el.innerHTML=res.map(f=>{const{i:ico,c}=ftype(f.file_type);return`<div class="fc" onclick="NAV.go("preview",{fileId:${f.id}},"📄 ")"><div class="fci ${c}">${ico}</div><div class="fcb"><div class="fct">${esc(f.title)}</div><div class="fcm"><span class="fctg">⬇️ ${f.downloads||0}</span></div></div><span class="fca">›</span></div>`;}).join("");}catch(e){const el=document.getElementById("sr");if(el)el.innerHTML=empty("❌","خطأ");}}
-function clrSearch(){const si=document.getElementById("si");if(si){si.value="";si.focus();}document.getElementById("sc")?.classList.remove("on");document.getElementById("sr").innerHTML=empty("🔍","ابحث");}
-  try{const res=await API.get('/search?q='+en
+async function runSearch(q){if(!q||q.length<2)return;const si=document.getElementById('si');if(si)si.value=q;_srchHist=_srchHist.filter(h=>h!==q);_srchHist.push(q);
+  try{const res=await API.get('/search?q='+encodeURIComponent(q));const el=document.getElementById('sr');if(!el)return;if(!res.length){el.innerHTML=empty('😕','لا نتائج');return;}el.innerHTML=res.map(f=>{const{i:ico,c}=ftype(f.file_type);return`<div class="fc" onclick='NAV.go("preview",{fileId:${f.id}},"📄 ${esc(f.title.substring(0,22))}")'>
+    <div class="fci ${c}">${ico}</div>
+    <div class="fcb"><div class="fct">${esc(f.title)}</div><div class="fcm"><span class="fctg">📖 ${esc(f.subject_name||'')}</span><span class="fctg"> · ⬇️ ${f.downloads||0}</span></div></div>
+    <span class="fca">›</span></div>`;}).join('');}catch(e){const el=document.getElementById('sr');if(el)el.innerHTML=empty('❌','خطأ');}
+}
+function clrSearch(){const si=document.getElementById('si');if(si){si.value='';si.focus();}document.getElementById('sc')?.classList.remove('on');document.getElementById('sr').innerHTML=empty('🔍','ابحث');}
 
 /* INIT */
 async function init(){
-  document.getElementById('ls').style.display='none';
-  document.getElementById('root').style.opacity='1';
+  await new Promise(r=>setTimeout(r,1800));
+  try{
+    const prof=await API.get('/profile');
+    PROFILE=prof;IS_ADMIN=prof.isAdmin;IS_OWNER=prof.isOwner;TG_USER=prof.user||TG_USER;
+    if(IS_ADMIN||IS_OWNER){
+      document.getElementById('hAdminBtn').style.display='flex';
+      const nb=document.getElementById('nbar');
+      nb.style.gridTemplateColumns='repeat(6,1fr)';
+      nb.insertAdjacentHTML('beforeend',`<button class="nb" id="nb-admin" onclick="NAV.tab('admin')"><div class="nbbar"></div><span class="nbico">${IS_OWNER?'👑':'🛡️'}</span>${IS_OWNER?'المالك':'إدارة'}</button>`);
+    }
+    API.post('/points/daily').catch(()=>{});
+    const pts=await API.get('/points/me').catch(()=>null);
+    if(pts){POINTS=pts;if(pts.streak_days===7)showAch('🔥','7 أيام متتالية!','شارة جديدة 🎯');if(pts.total_points>=100&&pts.total_points<110)showAch('💎','100 XP!','أحسنت 💪');}
+  }catch(e){}
+  const ls=document.getElementById('ls'),root=document.getElementById('root');
+  ls.style.opacity='0';root.style.opacity='1';
+  setTimeout(()=>ls.style.display='none',600);
   NAV.tab('home');
 }
 window.addEventListener('load',init);
