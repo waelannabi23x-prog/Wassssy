@@ -548,25 +548,6 @@ function esc(s){if(!s)return'';return String(s).replace(/[&<>"']/g,c=>({'&':'&am
 function toast(m,t='info'){const w=document.getElementById('toast');const e=document.createElement('div');e.className='ti '+t;e.textContent=m;w.appendChild(e);setTimeout(()=>{e.style.animation='tiOut .3s ease forwards';setTimeout(()=>e.remove(),300);},2800);}
 function render(h,bk=false){const el=document.getElementById('cnt');el.innerHTML=`<div class="pg${bk?' bk':''}">${h}</div>`;el.scrollTop=0;}
 
-const _scrollPos = {};
-const _origRender = render;
-function render(h, bk=false) {
-  // احفظ موضع الـ scroll للصفحة الحالية
-  if(STACK.length > 0) {
-    const cur = STACK[STACK.length-1];
-    _scrollPos[cur.page + JSON.stringify(cur.params)] = document.getElementById('cnt')?.scrollTop || 0;
-  }
-  _origRender(h, bk);
-  // استعد الـ scroll لو كنا راجعين
-  if(bk && STACK.length > 0) {
-    const cur = STACK[STACK.length-1];
-    const key = cur.page + JSON.stringify(cur.params);
-    if(_scrollPos[key]) {
-      setTimeout(() => { const el = document.getElementById('cnt'); if(el) el.scrollTop = _scrollPos[key]; }, 50);
-    }
-  }
-}
-
 function loader(){render(`<div class="ldr"><div class="spin"></div></div>`);}
 function empty(i='📭',t='لا يوجد',s=''){return`<div class="empty"><div class="empty-ico">${i}</div><div class="empty-t">${t}</div>${s?`<div class="empty-s">${s}</div>`:''}</div>`;}
 function skels(n=3){return Array(n).fill(`<div class="skel skel-row"></div>`).join('');}
