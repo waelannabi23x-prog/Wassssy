@@ -45,7 +45,6 @@ const { eos } = require('./utils/helpers');
 global.setState  = _setState;
 global.delState  = _delState;
 global.getState  = _getState;
-global.userStates = {};
 global.maintenanceMode = false;
 
 // ── Config ──
@@ -195,7 +194,7 @@ async function launch() {
 
     if (WEBHOOK_URL) {
       await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, {
-        allowed_updates: ['message', 'callback_query', 'my_chat_member', 'inline_query'],
+        allowed_updates: ['message', 'callback_query', 'my_chat_member'],
         drop_pending_updates: true,
         max_connections: 40,
         ...(WEBHOOK_SECRET && { secret_token: WEBHOOK_SECRET }),

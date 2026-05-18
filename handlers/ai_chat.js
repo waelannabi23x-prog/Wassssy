@@ -6,7 +6,7 @@ const { smartSearch }   = require('./group');
 const { getBotKnowledge } = require('../utils/ai_knowledge');
 
 // ══════════════════════════════════════
-// 🛡️ Rate Limiter — 5 رسائل/دقيقة
+// 🛡️ Rate Limiter — 10 رسائل/دقيقة
 // ══════════════════════════════════════
 const _aiRl    = new Map();
 const AI_MAX   = 10;
@@ -38,7 +38,7 @@ const HIST_MAX   = 10;
 
 setInterval(() => {
   const cut = Date.now() - 7200000;
-  for (const [k, v] of _aiHistory) if (!v._ts || v._ts < cut) _aiHistory.delete(k);
+  for (const [k, v] of _aiHistory) if (!v.ts || v.ts < cut) _aiHistory.delete(k);
 }, 1800000).unref();
 
 // ✅ يحمل التاريخ من DB بعد restart
@@ -171,12 +171,13 @@ async function handleAiChat(ctx, text) {
   }
 
   // ✅ Hybrid: memory أولاً، لو ما فيها نحمل من DB
-  let history = _aiHistory.get(uid);
-  if (!history) {
-    history = await loadHistoryFromDB(uid);
-    if (history.length) { history._ts = Date.now(); _aiHistory.set(uid, history); }
-    else history = [];
+  let hEntry = _aiHistory.get(uid);
+  if (!hEntry) {
+    const _dbMsgs = await loadHistoryFromDB(uid);
+    hEntry = { msgs: _dbMsgs, ts: Date.now() };
+    _aiHistory.set(uid, hEntry);
   }
+  const history = hEntry.msgs;
 
   let botK = '';
   try { botK = await getBotKnowledge(); } catch(_) {}
@@ -184,7 +185,7 @@ async function handleAiChat(ctx, text) {
   const sysContent = SYSTEM_PERSONA + kPrefix + ragContext;
   const messages = [
     { role: 'system', content: sysContent },
-    ...history.filter(m => m.role && m.content),
+    ...hEntry.msgs.filter(m => m.role && m.content),
     { role: 'user', content: text }
   ];
 
@@ -192,11 +193,10 @@ async function handleAiChat(ctx, text) {
     const reply = await aiChat(messages);
 
     // ✅ حفظ في Memory + DB
-    history.push({ role: 'user',      content: text  });
-    history.push({ role: 'assistant', content: reply });
-    if (history.length > HIST_MAX * 2) history.splice(0, 2);
-    history._ts = Date.now();
-    _aiHistory.set(uid, history);
+    hEntry.msgs.push({ role: 'user',      content: text  });
+    hEntry.msgs.push({ role: 'assistant', content: reply });
+    if (hEntry.msgs.length > HIST_MAX * 2) hEntry.msgs.splice(0, 2);
+    hEntry.ts = Date.now();
     saveToDB(uid, text, reply);
 
     // تنظيف تلقائي بعد ساعة خمول

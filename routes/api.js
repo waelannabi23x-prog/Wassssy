@@ -260,7 +260,7 @@ router.post('/admin/broadcast', auth, async (req, res) => {
           ? (await all('SELECT chat_id as id FROM group_chats WHERE specialty_id=$1', [specialtyId])).map(r => r.id)
           : (await all('SELECT chat_id as id FROM group_chats')).map(r => r.id))
       : await usersDb.allIds();
-    const bot = require('../index').bot || global.botInstance;
+    const bot = global.__bot;
     let sent = 0, failed = 0;
     const chunks = [];
     for (let i = 0; i < ids.length; i += 30) chunks.push(ids.slice(i, i + 30));
@@ -381,14 +381,9 @@ router.post('/admin/upload-media', (req, res, next) => {
 
     if (!fileId) return res.status(500).json({ error: 'no file_id returned' });
 
-    // احصل على URL
-    const fileInfo = await bot.telegram.getFile(fileId);
-    const fileUrl = `https://api.telegram.org/file/bot${process.env.BOT_TOKEN}/${fileInfo.file_path}`;
-
     res.json({
       ok: true,
       file_id: fileId,
-      url: fileUrl,
       type: isVideo ? 'video' : 'image'
     });
 
@@ -559,19 +554,16 @@ router.post('/profile/update', auth, async (req, res) => {
 
 // ─── تحديث التخصص ────────────────────────────────────────────────
 // (إذا لم يكن موجوداً مسبقاً)
-if (!global._hasSpecialtyRoute) {
-  global._hasSpecialtyRoute = true;
-  router.post('/profile/specialty', auth, async (req, res) => {
-    try {
-      const uid = parseInt(req.tgUser.id);
-      const { specialtyId } = req.body;
-      await run('UPDATE users SET specialty_id=$1 WHERE id=$2', [specialtyId||null, uid]);
-      const { cacheClear } = require('../utils/cache');
-      cacheClear('prof_' + uid);
-      res.json({ ok: true });
-    } catch(e) { res.status(500).json({ error: e.message }); }
-  });
-}
+router.post('/profile/specialty', auth, async (req, res) => {
+  try {
+    const uid = parseInt(req.tgUser.id);
+    const { specialtyId } = req.body;
+    await run('UPDATE users SET specialty_id=$1 WHERE id=$2', [specialtyId||null, uid]);
+    const { cacheClear } = require('../utils/cache');
+    cacheClear('prof_' + uid);
+    res.json({ ok: true });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
 
 // ─── نقاط المستخدم ───────────────────────────────────────────────
 router.get('/points/me', auth, async (req, res) => {
@@ -627,13 +619,14 @@ router.get('/history', auth, async (req, res) => {
     const uid = parseInt(req.tgUser.id);
     const rows = await all(
       `SELECT f.*, c.name as cat_name, s.name as sub_name
-       FROM files f
+       FROM history h
+       JOIN files f ON f.id = h.file_id
        LEFT JOIN categories c ON c.id = f.category_id
        LEFT JOIN subjects s ON s.id = c.subject_id
-       WHERE f.is_deleted=0
-       ORDER BY f.downloads DESC, f.uploaded_at DESC
-       LIMIT 20`,
-      []
+       WHERE h.user_id=$1 AND f.is_deleted=0
+       ORDER BY h.viewed_at DESC
+       LIMIT 30`,
+      [uid]
     );
     res.json(rows);
   } catch(e) { res.json([]); }
@@ -751,56 +744,20 @@ router.post('/admin/channels', auth, async (req, res) => {
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
-router.post('/admin/channels/:id/delete', auth, async (req, res) => {
-  const uid = parseInt(req.tgUser.id);
-  const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
-  const adm = await get('SELECT 1 FROM admins WHERE user_id=$1',[uid]).catch(()=>null);
-  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
-  try { await run('UPDATE channels SET is_deleted=1 WHERE id=$1',[parseInt(req.params.id)]); res.json({ ok:true }); }
-  catch(e) { res.status(500).json({ error: e.message }); }
-});
-// ══════════════════════════════════════════════════════════════════
-// routes_missing_v2.js — استبدل routes_missing.js الأول بهذا
-// أضفه في api.js قبل module.exports = router;
-// ══════════════════════════════════════════════════════════════════
+// ── Bundle Routes (API) ───────────────────────────────────────────
 
-// ─── ملفات حديثة حسب التخصص ──────────────────────────────────────
-router.get('/latest/specialty/:spId', auth, async (req, res) => {
+router.get('/bundles', auth, async (req, res) => {
   try {
-    const spId = parseInt(req.params.spId);
     const rows = await all(
-      `SELECT f.*, c.name as cat_name, s.name as sub_name
-       FROM files f
-       JOIN categories c ON c.id = f.category_id
-       JOIN subjects s ON s.id = c.subject_id
-       JOIN semesters sem ON sem.id = s.semester_id
-       JOIN years y ON y.id = sem.year_id
-       WHERE y.specialty_id = $1::bigint AND f.is_deleted=0
-       ORDER BY f.uploaded_at DESC LIMIT 8`,
-      [spId]
+      `SELECT b.*, COUNT(bf.id) as files_count
+       FROM bundles b LEFT JOIN bundle_files bf ON bf.bundle_id = b.id
+       WHERE b.is_deleted = 0
+       GROUP BY b.id ORDER BY b.created_at DESC`
     );
     res.json(rows);
   } catch(e) { res.json([]); }
 });
 
-// ─── تحديث بروفايل المستخدم (الاسم) ─────────────────────────────
-router.post('/profile/update', auth, async (req, res) => {
-  try {
-    const uid = parseInt(req.tgUser.id);
-    const { first_name, last_name } = req.body;
-    if (first_name) {
-      await run(
-        'UPDATE users SET first_name=$1, last_name=$2 WHERE id=$3',
-        [first_name.trim(), (last_name || '').trim(), uid]
-      ).catch(() => {});
-    }
-    const { cacheClear } = require('../utils/cache');
-    cacheClear('prof_' + uid);
-    res.json({ ok: true });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-// ── /bundles/category/:catId ─────────────────────────────────────
 router.get('/bundles/category/:catId', auth, async (req, res) => {
   try {
     const rows = await all(
@@ -809,13 +766,27 @@ router.get('/bundles/category/:catId', auth, async (req, res) => {
        LEFT JOIN bundle_files bf ON bf.bundle_id = b.id
        WHERE b.category_id = $1 AND b.is_deleted = 0
        GROUP BY b.id ORDER BY b.created_at DESC`,
-      [req.params.catId]
+      [parseInt(req.params.catId)]
     );
     res.json(rows);
   } catch(e) { res.json([]); }
 });
 
-// ── /send-bundle/:id ──────────────────────────────────────────────
+router.get('/bundles/:id', auth, async (req, res) => {
+  try {
+    const b = await get('SELECT * FROM bundles WHERE id=$1 AND is_deleted=0', [parseInt(req.params.id)]);
+    if (!b) return res.status(404).json({ error: 'not found' });
+    const files = await all(
+      `SELECT f.* FROM files f
+       JOIN bundle_files bf ON bf.file_id::int = f.id
+       WHERE bf.bundle_id=$1 AND f.is_deleted=0
+       ORDER BY bf.sort_order ASC`,
+      [parseInt(req.params.id)]
+    );
+    res.json({ ...b, files });
+  } catch(e) { res.status(500).json({ error: e.message }); }
+});
+
 router.post('/send-bundle/:id', auth, async (req, res) => {
   try {
     const uid = parseInt(req.tgUser.id);
@@ -825,127 +796,25 @@ router.post('/send-bundle/:id', auth, async (req, res) => {
     if (!b) return res.status(404).json({ error: 'Not found' });
     const files = await all(
       `SELECT f.* FROM files f
-       JOIN bundle_files bf ON bf.bundle_id=$1 AND bf.file_id=f.id
-       WHERE f.is_deleted=0 ORDER BY bf.sort_order`,
+       JOIN bundle_files bf ON bf.file_id::int = f.id
+       WHERE bf.bundle_id=$1 AND f.is_deleted=0
+       ORDER BY bf.sort_order ASC`,
       [parseInt(req.params.id)]
     );
     res.json({ ok: true });
-    // إرسال في الخلفية
     setImmediate(async () => {
       try {
         await bot.telegram.sendMessage(uid, `📦 *${b.title}*`, { parse_mode: 'Markdown' });
         for (const f of files) {
           try {
-            if (f.file_type === 'photo') await bot.telegram.sendPhoto(uid, f.file_id, { caption: f.title });
-            else if (f.file_type === 'link') await bot.telegram.sendMessage(uid, `🔗 ${f.title}\n${f.file_id}`);
-            else await bot.telegram.sendDocument(uid, f.file_id, { caption: f.title });
+            if      (f.file_type === 'photo') await bot.telegram.sendPhoto(uid, f.file_id, { caption: f.title });
+            else if (f.file_type === 'link')  await bot.telegram.sendMessage(uid, `🔗 ${f.title}\n${f.file_id}`);
+            else                              await bot.telegram.sendDocument(uid, f.file_id, { caption: f.title });
           } catch(_) {}
           await new Promise(r => setTimeout(r, 300));
         }
         await bot.telegram.sendMessage(uid, `✅ اكتملت الحزمة: ${files.length} ملف`);
       } catch(_) {}
-    });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-// ── /bundles ─────────────────────────────────────────────────────
-router.get('/bundles', auth, async (req, res) => {
-  try {
-    const rows = await all(
-      `SELECT b.*, COUNT(bf.file_id) as files_count
-       FROM bundles b LEFT JOIN bundle_files bf ON bf.bundle_id=b.id
-       GROUP BY b.id ORDER BY b.created_at DESC`
-    );
-    res.json(rows);
-  } catch(e) { res.json([]); }
-});
-
-router.get('/bundles/:id', auth, async (req, res) => {
-  try {
-    const b = await get('SELECT * FROM bundles WHERE id=$1', [parseInt(req.params.id)]);
-    if(!b) return res.status(404).json({ error: 'not found' });
-    const files = await all(
-      `SELECT f.* FROM files f
-       JOIN bundle_files bf ON bf.file_id=f.id
-       WHERE bf.bundle_id=$1 ORDER BY bf.sort_order`,
-      [parseInt(req.params.id)]
-    );
-    res.json({ ...b, files });
-  } catch(e) { res.status(500).json({ error: e.message }); }
-});
-
-// ── /latest?specialty=id ─────────────────────────────────────────
-router.get('/latest', auth, async (req, res) => {
-  try {
-    const { specialty } = req.query;
-    let q = `SELECT f.*, c.name as cat_name, sub.name as sub_name,
-               COALESCE(dl.cnt,0) as downloads
-             FROM files f
-             LEFT JOIN categories c ON c.id=f.category_id
-             LEFT JOIN subjects sub ON sub.id=c.subject_id
-             LEFT JOIN (SELECT file_id, COUNT(*) as cnt FROM downloads GROUP BY file_id) dl ON dl.file_id=f.id`;
-    const params = [];
-    if(specialty) {
-      q += ` WHERE sub.specialty_id=$1`;
-      params.push(parseInt(specialty));
-    }
-    q += ` ORDER BY f.created_at DESC LIMIT 30`;
-    const rows = await all(q, params);
-    res.json(rows);
-  } catch(e) { res.json([]); }
-});
-
-// ── /history ─────────────────────────────────────────────────────
-router.get('/history', auth, async (req, res) => {
-  try {
-    const rows = await all(
-      `SELECT f.*, c.name as cat_name, sub.name as sub_name,
-               COALESCE(dl2.cnt,0) as downloads
-       FROM downloads dl
-       JOIN files f ON f.id=dl.file_id
-       LEFT JOIN categories c ON c.id=f.category_id
-       LEFT JOIN subjects sub ON sub.id=c.subject_id
-       LEFT JOIN (SELECT file_id, COUNT(*) as cnt FROM downloads GROUP BY file_id) dl2 ON dl2.file_id=f.id
-       WHERE dl.user_id=$1
-       ORDER BY dl.created_at DESC LIMIT 50`,
-      [parseInt(req.tgUser.id)]
-    );
-    res.json(rows);
-  } catch(e) { res.json([]); }
-});
-
-// ── /user/:id/profile (public) ───────────────────────────────────
-router.get('/user/:id/profile', auth, async (req, res) => {
-  try {
-    const uid = parseInt(req.params.id);
-    const OWNER_ID = parseInt(process.env.OWNER_ID||'0');
-    const [user, pts, dlC, cmtC, isAdm, sp] = await Promise.all([
-      get('SELECT id,first_name,last_name,username,bio,specialty_id FROM users WHERE id=$1',[uid]),
-      get('SELECT * FROM user_points WHERE user_id=$1',[uid]).catch(()=>null),
-      get('SELECT COUNT(*) as c FROM downloads WHERE user_id=$1',[uid]),
-      get('SELECT COUNT(*) as c FROM comments WHERE user_id=$1',[uid]),
-      get('SELECT permissions FROM admins WHERE user_id=$1',[uid]).catch(()=>null),
-      null,
-    ]);
-    if(!user) return res.status(404).json({ error: 'not found' });
-    let specialtyName = null;
-    if(user.specialty_id) {
-      const sp2 = await get('SELECT name FROM specialties WHERE id=$1',[user.specialty_id]).catch(()=>null);
-      specialtyName = sp2?.name||null;
-    }
-    res.json({
-      id: user.id,
-      first_name: user.first_name,
-      last_name: user.last_name,
-      username: user.username,
-      bio: user.bio||null,
-      specialty_name: specialtyName,
-      total_points: pts?.total_points||0,
-      streak_days: pts?.streak_days||0,
-      downloads_count: parseInt(dlC?.c||0),
-      comments_count: parseInt(cmtC?.c||0),
-      is_admin: !!isAdm,
-      is_owner: uid===OWNER_ID,
     });
   } catch(e) { res.status(500).json({ error: e.message }); }
 });

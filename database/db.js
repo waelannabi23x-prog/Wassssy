@@ -31,10 +31,11 @@ function getPg() {
     });
 
     // Keepalive ping كل 25 ثانية
-    setInterval(() => {
-      if (!pgPool) return;
-      pgPool.query('SELECT 1').catch(() => { pgPool = null; });
-    }, 25000).unref();
+    const _kpTimer = setInterval(() => {
+      if (!pgPool) { clearInterval(_kpTimer); return; }
+      pgPool.query('SELECT 1').catch(() => { pgPool = null; clearInterval(_kpTimer); });
+    }, 25000);
+    _kpTimer.unref();
 
     logger.info('✅ PG Pool جاهز (max:20)');
     return pgPool;
@@ -221,6 +222,10 @@ async function initSchema() {
     "CREATE TABLE IF NOT EXISTS group_bot_msgs(id SERIAL PRIMARY KEY,chat_id BIGINT NOT NULL,message_id BIGINT NOT NULL,sent_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     "CREATE TABLE IF NOT EXISTS group_welcome(chat_id BIGINT PRIMARY KEY,image_file_id TEXT,message TEXT,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     "CREATE TABLE IF NOT EXISTS cache_store(key TEXT PRIMARY KEY,value TEXT,expires_at BIGINT)",
+    "CREATE TABLE IF NOT EXISTS ads(id SERIAL PRIMARY KEY,title TEXT NOT NULL,body TEXT,icon TEXT DEFAULT '📌',link TEXT,specialty_id INTEGER,is_pinned INTEGER DEFAULT 0,is_deleted INTEGER DEFAULT 0,image_url TEXT,video_url TEXT,created_by BIGINT,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS channels(id SERIAL PRIMARY KEY,name TEXT NOT NULL,description TEXT,link TEXT,icon TEXT DEFAULT '📺',members_count INTEGER,sort_order INTEGER DEFAULT 0,is_deleted INTEGER DEFAULT 0,created_by BIGINT,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
+    "CREATE TABLE IF NOT EXISTS comment_likes(user_id BIGINT NOT NULL,comment_id INTEGER NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,PRIMARY KEY(user_id,comment_id))",
+    "CREATE TABLE IF NOT EXISTS downloads(id SERIAL PRIMARY KEY,user_id BIGINT NOT NULL,file_id INTEGER NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
   ];
 
   for (const sql of TABLES) {
@@ -254,7 +259,11 @@ async function initSchema() {
       "CREATE INDEX IF NOT EXISTS idx_user_states_upd  ON user_states(updated_at)",               // cleanup
       "CREATE INDEX IF NOT EXISTS idx_gnl_chat         ON group_notify_log(chat_id)",             // group notify
       "CREATE INDEX IF NOT EXISTS idx_sched_sent       ON scheduled_messages(sent, send_at)",     // scheduler
-      "CREATE INDEX IF NOT EXISTS idx_bundle_files_bnd ON bundle_files(bundle_id)",               // bundle files
+      "CREATE INDEX IF NOT EXISTS idx_bundle_files_bnd ON bundle_files(bundle_id)",
+      "CREATE INDEX IF NOT EXISTS idx_ads_deleted      ON ads(is_deleted,created_at DESC)",
+      "CREATE INDEX IF NOT EXISTS idx_channels_sort    ON channels(sort_order ASC,id DESC)",
+      "CREATE INDEX IF NOT EXISTS idx_downloads_user   ON downloads(user_id,created_at DESC)",
+      "CREATE INDEX IF NOT EXISTS idx_downloads_file   ON downloads(file_id)",               // bundle files
     ];
     for (const idx of IDX) {
       try { await pg.query(idx); } catch(_) {}
@@ -265,6 +274,11 @@ async function initSchema() {
   // Migration: used_count
   try { if(pg) await pg.query('ALTER TABLE million_questions ADD COLUMN IF NOT EXISTS used_count INTEGER DEFAULT 0'); } catch(_) {}
   try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_mq_used ON million_questions(used_count) WHERE is_active=1'); } catch(_) {}
+
+  // ── Migrations: جداول bundle_files.sort_order + bio ──
+  try { if(pg) await pg.query('ALTER TABLE bundle_files ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0'); } catch(_) {}
+  try { if(pg) await pg.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT NULL'); } catch(_) {}
+  try { if(pg) await pg.query('ALTER TABLE comments ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0'); } catch(_) {}
 
   logger.info('✅ Schema ready');
 }
