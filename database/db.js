@@ -205,6 +205,7 @@ async function initSchema() {
     "CREATE TABLE IF NOT EXISTS settings(key TEXT PRIMARY KEY,value TEXT)",
     "CREATE TABLE IF NOT EXISTS bundles(id SERIAL PRIMARY KEY,category_id INTEGER NOT NULL,title TEXT NOT NULL,description TEXT DEFAULT '',downloads INTEGER DEFAULT 0,uploaded_by BIGINT DEFAULT 0,is_deleted INTEGER DEFAULT 0,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     "CREATE TABLE IF NOT EXISTS bundle_files(id SERIAL PRIMARY KEY,bundle_id INTEGER NOT NULL,file_id TEXT NOT NULL,file_type TEXT DEFAULT 'document',title TEXT DEFAULT '')",
+        "CREATE TABLE IF NOT EXISTS million_questions(id SERIAL PRIMARY KEY,question TEXT NOT NULL,option_a TEXT,option_b TEXT,option_c TEXT,option_d TEXT,correct_answer TEXT,difficulty INTEGER DEFAULT 1,category TEXT DEFAULT 'general',used_count INTEGER DEFAULT 0,is_active INTEGER DEFAULT 1,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     "CREATE TABLE IF NOT EXISTS user_states(user_id BIGINT PRIMARY KEY,state TEXT NOT NULL,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     "CREATE TABLE IF NOT EXISTS group_chats(chat_id BIGINT PRIMARY KEY,title TEXT,specialty_id INTEGER DEFAULT 0,notify_new_files INTEGER DEFAULT 1,joined_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",
     "CREATE TABLE IF NOT EXISTS polls(id SERIAL PRIMARY KEY,chat_id BIGINT NOT NULL,created_by BIGINT,question TEXT,media_file_id TEXT,media_type TEXT,message_id BIGINT,is_closed INTEGER DEFAULT 0,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)",

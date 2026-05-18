@@ -140,8 +140,7 @@ async function authMiddleware(ctx, next) {
       }
 
       if (!cbData || !cbData.startsWith('del_channel_')) {
-          // ⚡ skip channel check for callbacks
-          if (cbData && cbData !== 'main_menu') { return next(); }
+          // ✅ لا نتجاوز subscription check للـ callbacks
         const subCached = require('../utils/cache').cacheGet('sub_ok_' + uid);
         if (!subCached) {
           const res2 = await guard.checkAllChannels({ telegram: ctx.telegram }, uid);
@@ -165,7 +164,11 @@ async function authMiddleware(ctx, next) {
   const dlKey = uid + '_' + today;
   if (!global._dlCache.has(dlKey)) {
     global._dlCache.set(dlKey, 1);
-    if (global._dlCache.size > 50000) global._dlCache.clear(); // منع تضخم الذاكرة
+    if (global._dlCache.size > 50000) {
+      // احذف أقدم 10000 مدخل بدل مسح الكل
+      const keys = global._dlCache.keys();
+      for (let i = 0; i < 10000; i++) global._dlCache.delete(keys.next().value);
+    }
     try { const {checkDailyLogin}=require('../database/points'); checkDailyLogin(uid).catch(()=>{}); } catch(_){}
   }
   return next();
