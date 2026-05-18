@@ -850,23 +850,6 @@ router.post('/send-bundle/:id', auth, async (req, res) => {
 });
 
 // ── /bundles ─────────────────────────────────────────────────────
-
-router.get('/bundles/category/:catId', auth, async (req, res) => {
-  try {
-    const rows = await all(
-      `SELECT b.*, COUNT(bf.file_id) as files_count,
-              COALESCE(SUM(bf2.cnt),0) as total_size
-       FROM bundles b
-       LEFT JOIN bundle_files bf ON bf.bundle_id = b.id
-       LEFT JOIN (SELECT bundle_id, COUNT(*) as cnt FROM bundle_files GROUP BY bundle_id) bf2 ON bf2.bundle_id = b.id
-       WHERE b.category_id = $1 AND b.is_deleted = 0
-       GROUP BY b.id ORDER BY b.created_at DESC`,
-      [req.params.catId]
-    );
-    res.json(rows);
-  } catch(e) { res.json([]); }
-});
-
 router.get('/bundles', auth, async (req, res) => {
   try {
     const rows = await all(
