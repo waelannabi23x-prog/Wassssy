@@ -524,14 +524,13 @@ router.get('/latest/specialty/:spId', auth, async (req, res) => {
     const rows = await all(
       `SELECT f.*, c.name as cat_name, s.name as sub_name, s.id as sub_id,
               sem.name as sem_name, y.name as year_name,
-              COALESCE(d.cnt,0) as downloads,
+              f.downloads,
               COALESCE(r.avg,0) as rating_avg
        FROM files f
        JOIN categories c ON c.id = f.category_id
        JOIN subjects s ON s.id = c.subject_id
        JOIN semesters sem ON sem.id = s.semester_id
        JOIN years y ON y.id = sem.year_id
-       -- downloads in files.downloads column
        LEFT JOIN (SELECT file_id, AVG(rating)::numeric(3,1) as avg FROM ratings GROUP BY file_id) r ON r.file_id=f.id
        WHERE y.specialty_id = $1
        ORDER BY f.created_at DESC LIMIT 8`,
