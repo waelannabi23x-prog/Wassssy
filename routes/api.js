@@ -532,8 +532,8 @@ router.get('/latest/specialty/:spId', auth, async (req, res) => {
        JOIN semesters sem ON sem.id = s.semester_id
        JOIN years y ON y.id = sem.year_id
        LEFT JOIN (SELECT file_id, AVG(rating)::numeric(3,1) as avg FROM ratings GROUP BY file_id) r ON r.file_id=f.id
-       WHERE y.specialty_id = $1
-       ORDER BY f.created_at DESC LIMIT 8`,
+       WHERE y.specialty_id = $1::bigint
+       ORDER BY f.uploaded_at DESC LIMIT 8`,
       [spId]
     );
     res.json(rows);
@@ -775,7 +775,7 @@ router.get('/latest/specialty/:spId', auth, async (req, res) => {
        JOIN subjects s ON s.id = c.subject_id
        JOIN semesters sem ON sem.id = s.semester_id
        JOIN years y ON y.id = sem.year_id
-       WHERE y.specialty_id = $1 AND f.is_deleted=0
+       WHERE y.specialty_id = $1::bigint AND f.is_deleted=0
        ORDER BY f.uploaded_at DESC LIMIT 8`,
       [spId]
     );
