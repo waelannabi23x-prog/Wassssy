@@ -61,6 +61,18 @@ router.get('/file/:id', auth, async (req, res) => {
   res.json({ ...f, rating, fav, comments });
 });
 
+// ── Arabic text normalizer for search ──
+function _normAr(s) {
+  return s
+    .replace(/[\u064B-\u065F\u0670]/g, '') // تشكيل
+    .replace(/[أإآ]/g, 'ا')
+    .replace(/ة/g, 'ه')
+    .replace(/ى/g, 'ي')
+    .replace(/^ال/, '')
+    .toLowerCase()
+    .trim();
+}
+
 router.get('/search', auth, async (req, res) => {
   const q = (req.query.q || '').slice(0, 80);
   if (q.length < 2) return res.json([]);
@@ -128,8 +140,20 @@ router.get('/favorites', auth, async (req, res) => {
 
 router.get('/comments/:id', auth, async (req, res) => {
   try {
-    const rows = await all(`SELECT c.*, u.first_name FROM comments c LEFT JOIN users u ON u.id=c.user_id WHERE c.file_id=$1 AND c.is_deleted=0 ORDER BY c.created_at DESC LIMIT 50`, [parseInt(req.params.id)]);
-    res.json(rows);
+    const limit  = Math.min(parseInt(req.query.limit)  || 20, 50);
+    const offset = Math.max(parseInt(req.query.offset) || 0,  0);
+    const rows = await all(
+      `SELECT c.*, u.first_name FROM comments c
+       LEFT JOIN users u ON u.id = c.user_id
+       WHERE c.file_id=$1 AND c.is_deleted=0
+       ORDER BY c.created_at DESC LIMIT $2 OFFSET $3`,
+      [parseInt(req.params.id), limit, offset]
+    );
+    const total = await get(
+      'SELECT COUNT(*) as cnt FROM comments WHERE file_id=$1 AND is_deleted=0',
+      [parseInt(req.params.id)]
+    );
+    res.json({ comments: rows, total: parseInt(total?.cnt || 0), limit, offset });
   } catch(e) { res.json([]); }
 });
 

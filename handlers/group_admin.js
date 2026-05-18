@@ -173,8 +173,14 @@ async function tagAll(ctx, chatId) {
       return ctx.answerCbQuery('📭 لا يوجد أعضاء', { show_alert: true }).catch(() => {});
     }
 
-    const mentions = members.map(m => `[${m.first_name || '👤'}](tg://user?id=${m.user_id})`).join(' ');
-    const m1 = await ctx.reply('👋 ' + mentions, { parse_mode: 'Markdown' }).catch(() => null);
+    // تقسيم المنشنات لـ chunks (كل chunk = 30 عضو = ~1200 حرف آمنة)
+    const CHUNK = 30;
+    for (let i = 0; i < members.length; i += CHUNK) {
+      const chunk = members.slice(i, i + CHUNK);
+      const mentions = chunk.map(m => `[${(m.first_name || '👤').substring(0, 20)}](tg://user?id=${m.user_id})`).join(' ');
+      await ctx.reply((i === 0 ? '👋 ' : '') + mentions, { parse_mode: 'Markdown' }).catch(() => null);
+      if (i + CHUNK < members.length) await new Promise(r => setTimeout(r, 1000)); // Telegram flood wait
+    }
   // المنشن يبقى — عشان الأعضاء يشوفونه
   } catch(e) {
     console.error('[tag]', e.message);
@@ -207,6 +213,7 @@ async function muteAll(ctx, chatId) {
         });
         ok++;
       } catch(_) { fail++; }
+      await new Promise(r => setTimeout(r, 50)); // Telegram: max 20 restrict/sec
     }
     const m2 = await ctx.reply(
       `🔇 *تم الإسكات*\n✅ ${ok} عضو | ❌ ${fail} فشل\n⏱ لمدة ساعة واحدة`,
@@ -248,6 +255,7 @@ async function unmuteAll(ctx, chatId) {
         });
         ok++;
       } catch(_) { fail++; }
+      await new Promise(r => setTimeout(r, 50)); // Telegram rate limit safety
     }
     const m3 = await ctx.reply(
       `🔊 *تم التفعيل*\n✅ ${ok} عضو | ❌ ${fail} فشل`,

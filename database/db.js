@@ -276,7 +276,13 @@ async function initSchema() {
   try { if(pg) await pg.query('ALTER TABLE million_questions ADD COLUMN IF NOT EXISTS used_count INTEGER DEFAULT 0'); } catch(_) {}
   try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_mq_used ON million_questions(used_count) WHERE is_active=1'); } catch(_) {}
 
-  // ── Migrations: جداول bundle_files.sort_order + bio ──
+  // ── Migrations: pg_trgm + search indexes ──
+  try { if(pg) await pg.query('CREATE EXTENSION IF NOT EXISTS pg_trgm'); } catch(_) {}
+  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_files_title_trgm ON files USING GIN(title gin_trgm_ops)'); } catch(_) {}
+  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_files_desc_trgm  ON files USING GIN(description gin_trgm_ops)'); } catch(_) {}
+  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_users_name_trgm  ON users USING GIN(first_name gin_trgm_ops)'); } catch(_) {}
+
+// ── Migrations: جداول bundle_files.sort_order + bio ──
   try { if(pg) await pg.query('ALTER TABLE bundle_files ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0'); } catch(_) {}
   try { if(pg) await pg.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT NULL'); } catch(_) {}
   try { if(pg) await pg.query('ALTER TABLE comments ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0'); } catch(_) {}
@@ -295,5 +301,29 @@ async function setSetting(k, v) {
 
 function saveDB() {}
 
-module.exports = { get, all, run, transaction, getPg, getSQLite, initSchema, getSetting, setSetting, saveDB };
+// ── Batch Download Counter ──────────────────────────────────────
+const _dlBatch = new Map();
+
+function batchDownload(fileId) {
+  const id = parseInt(fileId);
+  if (!id) return;
+  _dlBatch.set(id, (_dlBatch.get(id) || 0) + 1);
+}
+
+async function _flushDlBatch() {
+  if (!_dlBatch.size) return;
+  const pg = await getPg().catch(() => null);
+  if (!pg) return;
+  const entries = [..._dlBatch];
+  _dlBatch.clear();
+  await Promise.all(
+    entries.map(([fid, cnt]) =>
+      pg.query('UPDATE files SET downloads = downloads + $1 WHERE id = $2', [cnt, fid]).catch(() => {})
+    )
+  );
+}
+
+setInterval(_flushDlBatch, 30000).unref(); // flush كل 30 ثانية
+
+module.exports = { batchDownload, get, all, run, transaction, getPg, getSQLite, initSchema, getSetting, setSetting, saveDB };
 // هذا السطر ما يضاف هنا — شغّل الكومند التالي مباشرة على DB
