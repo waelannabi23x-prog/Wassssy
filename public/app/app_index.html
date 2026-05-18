@@ -422,6 +422,15 @@ select.inp{-webkit-appearance:none}
 /* DVIDER */
 .dvd{height:1px;background:var(--ln);margin:14px 0}
 .dvd2{height:1px;background:linear-gradient(90deg,transparent,var(--jade),transparent);margin:14px 0;opacity:.3}
+
+body.lv0 .hbar::after{background:linear-gradient(90deg,transparent,#a0a0c0,transparent)}
+body.lv1 .hbar::after{background:linear-gradient(90deg,transparent,#4d9fff,transparent)}
+body.lv2 .hbar::after{background:linear-gradient(90deg,transparent,#10d9a0,transparent)}
+body.lv3 .hbar::after{background:linear-gradient(90deg,transparent,#9d7dff,transparent)}
+body.lv4 .hbar::after{background:linear-gradient(90deg,transparent,#e8b84b,transparent)}
+body.lv5 .hbar::after{background:linear-gradient(90deg,transparent,#f5c842 40%,#ff6b9d,transparent);animation:shimmer 3s infinite}
+body.lv5 #nav .nbar::before{background:linear-gradient(90deg,transparent,#f5c842 40%,#ff6b9d,transparent)}
+body.lv5 .spin{border-top-color:#f5c842}
 </style>
 </head>
 <body>
@@ -545,6 +554,12 @@ function skels(n=3){return Array(n).fill(`<div class="skel skel-row"></div>`).jo
 function timeAgo(d){if(!d)return'';const m=Math.floor((Date.now()-new Date(d))/60000);if(m<1)return'الآن';if(m<60)return m+'د';const h=Math.floor(m/60);if(h<24)return h+'س';const dy=Math.floor(h/24);if(dy<30)return dy+'ي';return new Date(d).toLocaleDateString('ar');}
 function ftype(t){if(t==='link')return{i:'🔗',c:'lnk'};if(t==='photo')return{i:'🖼️',c:'img'};if(t==='video')return{i:'🎬',c:'vid'};return{i:'📄',c:'doc'};}
 function lvl(pts){for(let i=LEVELS.length-1;i>=0;i--)if(pts>=LEVELS[i].min)return{idx:i,...LEVELS[i]};return{idx:0,...LEVELS[0]};}
+
+function applyTheme(pts){
+  const l=lvl(pts);
+  document.body.className=document.body.className.replace(/lv\d/g,'').trim();
+  document.body.classList.add(l.c.replace('lv','lv'));
+}
 function xpPct(pts){const l=lvl(pts);if(l.idx===LEVELS.length-1)return 100;return Math.round(((pts-l.min)/(l.max-l.min+1))*100);}
 function starsHtml(avg,cnt){if(!avg)return'';const f=Math.round(avg);return`<span style="display:inline-flex;align-items:center;gap:1px">${[1,2,3,4,5].map(i=>`<span style="color:${i<=f?'#f5c842':'#303060'};font-size:11px">★</span>`).join('')}<span style="color:var(--t2);font-size:10px">${parseFloat(avg).toFixed(1)}${cnt?` (${cnt})`:''}</span></span>`;}
 function avColor(id){const cs=['linear-gradient(135deg,#00f0a0,#00c880)','linear-gradient(135deg,#f5c842,#d4a820)','linear-gradient(135deg,#a855f7,#7c3aed)','linear-gradient(135deg,#3b82f6,#1d4ed8)','linear-gradient(135deg,#f43f5e,#be123c)','linear-gradient(135deg,#06b6d4,#0891b2)'];return cs[(parseInt(id)||0)%cs.length];}
@@ -1398,6 +1413,7 @@ async function init(){
       nb.insertAdjacentHTML('beforeend',`<button class="nb" id="nb-admin" onclick="NAV.tab('admin')"><div class="nbbar"></div><span class="nbico">${IS_OWNER?'👑':'🛡️'}</span>${IS_OWNER?'المالك':'إدارة'}</button>`);
     }
     API.post('/points/daily').catch(()=>{});
+    if(pts&&pts.total_points)applyTheme(pts.total_points);
     const pts=await API.get('/points/me').catch(()=>null);
     if(pts){POINTS=pts;if(pts.streak_days===7)showAch('🔥','7 أيام متتالية!','شارة جديدة 🎯');if(pts.total_points>=100&&pts.total_points<110)showAch('💎','100 XP!','أحسنت 💪');}
   }catch(e){}
