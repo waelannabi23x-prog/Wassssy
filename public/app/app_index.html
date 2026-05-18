@@ -539,6 +539,26 @@ function bust(pre){for(const k in C)if(k.startsWith(pre))delete C[k];}
 function esc(s){if(!s)return'';return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function toast(m,t='info'){const w=document.getElementById('toast');const e=document.createElement('div');e.className='ti '+t;e.textContent=m;w.appendChild(e);setTimeout(()=>{e.style.animation='tiOut .3s ease forwards';setTimeout(()=>e.remove(),300);},2800);}
 function render(h,bk=false){const el=document.getElementById('cnt');el.innerHTML=`<div class="pg${bk?' bk':''}">${h}</div>`;el.scrollTop=0;}
+
+const _scrollPos = {};
+const _origRender = render;
+function render(h, bk=false) {
+  // احفظ موضع الـ scroll للصفحة الحالية
+  if(STACK.length > 0) {
+    const cur = STACK[STACK.length-1];
+    _scrollPos[cur.page + JSON.stringify(cur.params)] = document.getElementById('cnt')?.scrollTop || 0;
+  }
+  _origRender(h, bk);
+  // استعد الـ scroll لو كنا راجعين
+  if(bk && STACK.length > 0) {
+    const cur = STACK[STACK.length-1];
+    const key = cur.page + JSON.stringify(cur.params);
+    if(_scrollPos[key]) {
+      setTimeout(() => { const el = document.getElementById('cnt'); if(el) el.scrollTop = _scrollPos[key]; }, 50);
+    }
+  }
+}
+
 function loader(){render(`<div class="ldr"><div class="spin"></div></div>`);}
 function empty(i='📭',t='لا يوجد',s=''){return`<div class="empty"><div class="empty-ico">${i}</div><div class="empty-t">${t}</div>${s?`<div class="empty-s">${s}</div>`:''}</div>`;}
 function skels(n=3){return Array(n).fill(`<div class="skel skel-row"></div>`).join('');}
@@ -553,6 +573,18 @@ function showAch(i,t,s){const p=document.getElementById('achPop');document.getEl
 function bcHtml(items){return`<div class="bc">${items.map((b,i)=>`<span class="bc-i${i===items.length-1?' on':''}">${esc(b)}</span>${i<items.length-1?'<span class="bc-s">›</span>':''}`).join('')}</div>`;}
 
 // Owner stars animation
+
+function applyLevelTheme(pts) {
+  const lv = lvl(pts);
+  document.body.className = document.body.className.replace(/theme-lvd/g, '');
+  document.body.classList.add('theme-lv' + lv.idx);
+  // Aurora color
+  const colors = ['#a0a0c0','#4d9fff','#10d9a0','#9d7dff','#e8b84b','#f5c842'];
+  const col = colors[lv.idx] || '#10d9a0';
+  document.querySelector('.aurora-a')?.style.setProperty('background', 
+    'radial-gradient(circle,' + col + '22 0%,transparent 60%)');
+}
+
 function createOwnerStars(container){
   for(let i=0;i<20;i++){
     const star=document.createElement('div');
@@ -866,6 +898,7 @@ search(){
   render(`
     <div class="srchw"><span style="font-size:16px;color:var(--t2)">🔍</span><input class="srchinp" id="si" type="search" placeholder="ابحث عن ملف أو مادة..." autocomplete="off" oninput="onSearch(this.value)" onkeydown="if(event.key==='Enter')runSearch(this.value)"><button class="srchclr" id="sc" onclick="clrSearch()">✕</button></div>
     <div class="sh" style="margin-bottom:8px">اقتراحات</div>
+    <div style="font-size:11px;color:var(--t2);margin-bottom:8px">🔍 ابحث بالاسم أو رقم الملف</div>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:14px">${['cours','td','exam','tp','ds','corrections','série'].map(t=>`<div class="srchtag" onclick="runSearch('${t}')">${t}</div>`).join('')}</div>
     <div id="sr">${empty('🔍','ابحث عن أي ملف')}</div>
   `);
@@ -1383,6 +1416,25 @@ async function runSearch(q){if(!q||q.length<2)return;const si=document.getElemen
     <div class="fcb"><div class="fct">${esc(f.title)}</div><div class="fcm"><span class="fctg">📖 ${esc(f.subject_name||'')}</span><span class="fctg"> · ⬇️ ${f.downloads||0}</span></div></div>
     <span class="fca">›</span></div>`;}).join('');}catch(e){const el=document.getElementById('sr');if(el)el.innerHTML=empty('❌','خطأ');}
 }
+
+async function searchById(q) {
+  const el = document.getElementById('sr');
+  if (el) el.innerHTML = '<div class="ldr"><div class="spin"></div></div>';
+  try {
+    // جرب بحث بـ ID أولاً لو رقم
+    const isId = /^d+$/.test(q.trim());
+    const res = await API.get('/search?q=' + encodeURIComponent(q));
+    el.innerHTML = res.map(f => {
+      const {i: ico, c: fc} = ftype(f.file_type);
+      return '<div class="fc" onclick='NAV.go("preview",{fileId:' + f.id + '},"📄 ' + esc(f.title.substring(0,22)) + '")'>'+
+        '<div class="fci ' + fc + '">' + ico + '</div>'+
+        '<div class="fcb"><div class="fct">' + esc(f.title) + '</div>'+
+        '<div class="fcm"><span class="fctg">📖 ' + esc(f.subject_name||'') + '</span><span class="fctg"> · ⬇️ ' + (f.downloads||0) + '</span></div></div>'+
+        '<span class="fca">›</span></div>';
+    }).join('');
+  } catch(e) { if(el) el.innerHTML = empty('❌','خطأ'); }
+}
+
 function clrSearch(){const si=document.getElementById('si');if(si){si.value='';si.focus();}document.getElementById('sc')?.classList.remove('on');document.getElementById('sr').innerHTML=empty('🔍','ابحث');}
 
 /* INIT */
@@ -1398,6 +1450,7 @@ async function init(){
       nb.insertAdjacentHTML('beforeend',`<button class="nb" id="nb-admin" onclick="NAV.tab('admin')"><div class="nbbar"></div><span class="nbico">${IS_OWNER?'👑':'🛡️'}</span>${IS_OWNER?'المالك':'إدارة'}</button>`);
     }
     API.post('/points/daily').catch(()=>{});
+    if(pts&&pts.total_points) applyLevelTheme(pts.total_points);
     const pts=await API.get('/points/me').catch(()=>null);
     if(pts){POINTS=pts;if(pts.streak_days===7)showAch('🔥','7 أيام متتالية!','شارة جديدة 🎯');if(pts.total_points>=100&&pts.total_points<110)showAch('💎','100 XP!','أحسنت 💪');}
   }catch(e){}
