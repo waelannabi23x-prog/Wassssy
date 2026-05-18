@@ -55,8 +55,8 @@ router.get('/file/:id', auth, async (req, res) => {
   if (!f) return res.status(404).json({ error: 'Not found' });
   const [rating, fav, comments] = await Promise.all([
     interactions.getAvgRating(req.params.id),
-    interactions.isFav(req.tgUser.id, req.params.id),
-    get('SELECT COUNT(*) as c FROM comments WHERE file_id=$1 AND is_deleted=0', [req.params.id]).then(r => r?.c || 0),
+    interactions.isFav(parseInt(req.tgUser.id), req.params.id),
+    get('SELECT COUNT(*) as c FROM comments WHERE file_id=$1 AND is_deleted=0', [parseInt(req.params.id)]).then(r => r?.c || 0),
   ]);
   res.json({ ...f, rating, fav, comments });
 });
@@ -71,7 +71,7 @@ router.get('/search', auth, async (req, res) => {
 });
 
 router.get('/profile', auth, async (req, res) => {
-  const uid = req.tgUser.id;
+  const uid = parseInt(req.tgUser.id);
   const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
   const isOwner = parseInt(uid) === OWNER_ID;
   const adm = await get('SELECT permissions FROM admins WHERE user_id=$1', [uid]);
@@ -91,7 +91,7 @@ router.get('/latest', auth, async (req, res) => {
 });
 
 router.post('/fav/:id', auth, async (req, res) => {
-  const uid = req.tgUser.id, fid = req.params.id;
+  const uid = parseInt(req.tgUser.id), fid = req.params.id;
   const isFav = await interactions.isFav(uid, fid);
   if (isFav) await interactions.removeFav(uid, fid);
   else await interactions.addFav(uid, fid);
@@ -100,7 +100,7 @@ router.post('/fav/:id', auth, async (req, res) => {
 
 // إرسال الملف للمستخدم عبر البوت
 router.post('/send/:id', auth, async (req, res) => {
-  const uid = req.tgUser.id;
+  const uid = parseInt(req.tgUser.id);
   const f = await filesDb.getFile(req.params.id);
   if (!f) return res.status(404).json({ error: 'Not found' });
   try {
@@ -121,14 +121,14 @@ router.post('/send/:id', auth, async (req, res) => {
 
 router.get('/favorites', auth, async (req, res) => {
   try {
-    const rows = await all(`SELECT f.*, s.name as sub_name FROM favorites fv JOIN files f ON f.id=fv.file_id LEFT JOIN subjects s ON s.id=(SELECT semester_id FROM categories c JOIN subjects sb ON sb.id=c.subject_id WHERE c.id=f.category_id LIMIT 1) WHERE fv.user_id=$1 AND f.is_deleted=0 ORDER BY f.uploaded_at DESC`, [req.tgUser.id]);
+    const rows = await all(`SELECT f.*, s.name as sub_name FROM favorites fv JOIN files f ON f.id=fv.file_id LEFT JOIN subjects s ON s.id=(SELECT semester_id FROM categories c JOIN subjects sb ON sb.id=c.subject_id WHERE c.id=f.category_id LIMIT 1) WHERE fv.user_id=$1 AND f.is_deleted=0 ORDER BY f.uploaded_at DESC`, [parseInt(req.tgUser.id)]);
     res.json(rows);
   } catch(e) { res.json([]); }
 });
 
 router.get('/comments/:id', auth, async (req, res) => {
   try {
-    const rows = await all(`SELECT c.*, u.first_name FROM comments c LEFT JOIN users u ON u.id=c.user_id WHERE c.file_id=$1 AND c.is_deleted=0 ORDER BY c.created_at DESC LIMIT 50`, [req.params.id]);
+    const rows = await all(`SELECT c.*, u.first_name FROM comments c LEFT JOIN users u ON u.id=c.user_id WHERE c.file_id=$1 AND c.is_deleted=0 ORDER BY c.created_at DESC LIMIT 50`, [parseInt(req.params.id)]);
     res.json(rows);
   } catch(e) { res.json([]); }
 });
@@ -137,7 +137,7 @@ router.post('/comment/:id', auth, async (req, res) => {
   try {
     const { text } = req.body;
     if (!text || text.trim().length < 1) return res.status(400).json({ error: 'empty' });
-    await run(`INSERT INTO comments(file_id,user_id,text) VALUES($1,$2,$3)`, [req.params.id, req.tgUser.id, text.trim()]);
+    await run(`INSERT INTO comments(file_id,user_id,text) VALUES($1,$2,$3)`, [req.params.id, parseInt(req.tgUser.id), text.trim()]);
     try { require('../handlers/xp').onComment(global.__bot, parseInt(req.tgUser.id)).catch(()=>{}); } catch(_) {}
     res.json({ ok: true });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -147,8 +147,8 @@ router.post('/rate/:id', auth, async (req, res) => {
   try {
     const { rating } = req.body;
     if (!rating || rating < 1 || rating > 5) return res.status(400).json({ error: 'invalid' });
-    await run(`INSERT INTO ratings(user_id,file_id,rating) VALUES($1,$2,$3) ON CONFLICT(user_id,file_id) DO UPDATE SET rating=$3`, [req.tgUser.id, req.params.id, rating]);
-    const avg = await get(`SELECT AVG(rating) as avg, COUNT(*) as cnt FROM ratings WHERE file_id=$1`, [req.params.id]);
+    await run(`INSERT INTO ratings(user_id,file_id,rating) VALUES($1,$2,$3) ON CONFLICT(user_id,file_id) DO UPDATE SET rating=$3`, [parseInt(req.tgUser.id), req.params.id, rating]);
+    const avg = await get(`SELECT AVG(rating) as avg, COUNT(*) as cnt FROM ratings WHERE file_id=$1`, [parseInt(req.params.id)]);
     try { require('../handlers/xp').onRating(global.__bot, parseInt(req.tgUser.id)).catch(()=>{}); } catch(_) {}
     res.json({ ok: true, avg: avg.avg, cnt: avg.cnt });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -230,7 +230,7 @@ router.post('/admin/delfile/:id', auth, async (req, res) => {
   const isOwner = uid === OWNER_ID;
   const adm = await get('SELECT * FROM admins WHERE user_id=$1', [uid]);
   if (!isOwner && !adm) return res.status(403).json({ error: 'forbidden' });
-  await run('UPDATE files SET is_deleted=1 WHERE id=$1', [req.params.id]);
+  await run('UPDATE files SET is_deleted=1 WHERE id=$1', [parseInt(req.params.id)]);
   res.json({ ok: true });
 });
 
@@ -317,7 +317,7 @@ router.post('/admin/removeadmin/:id', auth, async (req, res) => {
   const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
   const uid = parseInt(req.tgUser.id);
   if (uid !== OWNER_ID) return res.status(403).json({ error: 'owner only' });
-  await run('DELETE FROM admins WHERE user_id=$1', [req.params.id]);
+  await run('DELETE FROM admins WHERE user_id=$1', [parseInt(req.params.id)]);
   res.json({ ok: true });
 });
 // ══════════════════════════════════════════════════════════════════
@@ -730,7 +730,7 @@ router.post('/admin/ads/:id/delete', auth, async (req, res) => {
   const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
   const adm = await get('SELECT 1 FROM admins WHERE user_id=$1',[uid]).catch(()=>null);
   if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
-  try { await run('UPDATE ads SET is_deleted=1 WHERE id=$1',[req.params.id]); res.json({ ok:true }); }
+  try { await run('UPDATE ads SET is_deleted=1 WHERE id=$1',[parseInt(req.params.id)]); res.json({ ok:true }); }
   catch(e) { res.status(500).json({ error: e.message }); }
 });
 
@@ -756,7 +756,7 @@ router.post('/admin/channels/:id/delete', auth, async (req, res) => {
   const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
   const adm = await get('SELECT 1 FROM admins WHERE user_id=$1',[uid]).catch(()=>null);
   if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
-  try { await run('UPDATE channels SET is_deleted=1 WHERE id=$1',[req.params.id]); res.json({ ok:true }); }
+  try { await run('UPDATE channels SET is_deleted=1 WHERE id=$1',[parseInt(req.params.id)]); res.json({ ok:true }); }
   catch(e) { res.status(500).json({ error: e.message }); }
 });
 // ══════════════════════════════════════════════════════════════════
@@ -818,16 +818,16 @@ router.get('/bundles/category/:catId', auth, async (req, res) => {
 // ── /send-bundle/:id ──────────────────────────────────────────────
 router.post('/send-bundle/:id', auth, async (req, res) => {
   try {
-    const uid = req.tgUser.id;
+    const uid = parseInt(req.tgUser.id);
     const bot = global.__bot;
     if (!bot) return res.status(500).json({ error: 'Bot unavailable' });
-    const b = await get('SELECT * FROM bundles WHERE id=$1 AND is_deleted=0', [req.params.id]);
+    const b = await get('SELECT * FROM bundles WHERE id=$1 AND is_deleted=0', [parseInt(req.params.id)]);
     if (!b) return res.status(404).json({ error: 'Not found' });
     const files = await all(
       `SELECT f.* FROM files f
        JOIN bundle_files bf ON bf.bundle_id=$1 AND bf.file_id=f.id
        WHERE f.is_deleted=0 ORDER BY bf.sort_order`,
-      [req.params.id]
+      [parseInt(req.params.id)]
     );
     res.json({ ok: true });
     // إرسال في الخلفية
@@ -862,13 +862,13 @@ router.get('/bundles', auth, async (req, res) => {
 
 router.get('/bundles/:id', auth, async (req, res) => {
   try {
-    const b = await get('SELECT * FROM bundles WHERE id=$1', [req.params.id]);
+    const b = await get('SELECT * FROM bundles WHERE id=$1', [parseInt(req.params.id)]);
     if(!b) return res.status(404).json({ error: 'not found' });
     const files = await all(
       `SELECT f.* FROM files f
        JOIN bundle_files bf ON bf.file_id=f.id
        WHERE bf.bundle_id=$1 ORDER BY bf.sort_order`,
-      [req.params.id]
+      [parseInt(req.params.id)]
     );
     res.json({ ...b, files });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -908,7 +908,7 @@ router.get('/history', auth, async (req, res) => {
        LEFT JOIN (SELECT file_id, COUNT(*) as cnt FROM downloads GROUP BY file_id) dl2 ON dl2.file_id=f.id
        WHERE dl.user_id=$1
        ORDER BY dl.created_at DESC LIMIT 50`,
-      [req.tgUser.id]
+      [parseInt(req.tgUser.id)]
     );
     res.json(rows);
   } catch(e) { res.json([]); }
