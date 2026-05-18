@@ -233,17 +233,17 @@ async function handleCallback(ctx, data) {
     return editNote(ctx, parseInt(data.replace('note_nav_','')));
 
   if (data.startsWith('note_pin_')) {
-    if (!ctx.isOwner && !ctx.isAdmin) return ctx.answerCbQuery('🚫 غير مصرح').catch(()=>{});
+    if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط').catch(()=>{});
     return togglePin(ctx, data.replace('note_pin_',''));
   }
 
   if (data.startsWith('note_del_')) {
-    if (!ctx.isOwner && !ctx.isAdmin) return ctx.answerCbQuery('🚫 غير مصرح').catch(()=>{});
+    if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط').catch(()=>{});
     return deleteNote(ctx, data.replace('note_del_',''));
   }
 
   if (data === 'note_add') {
-    if (!ctx.isOwner && !ctx.isAdmin) return ctx.answerCbQuery('🚫 غير مصرح').catch(()=>{});
+    if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط').catch(()=>{});
     await ctx.answerCbQuery('').catch(()=>{});
     return startAddNote(ctx);
   }
