@@ -1,4 +1,10 @@
 'use strict';
+const { connection: _conn } = require('../utils/queues');
+if (!_conn) { console.warn('[BroadcastWorker] disabled — no Redis'); module.exports = null; }
+else {
+const { connection } = require('../utils/queues');
+if (!connection) { console.warn('[BroadcastWorker] No Redis — worker disabled'); module.exports = null; return; }
+
 const { Worker } = require('bullmq');
 const { connection } = require('../utils/queues');
 
@@ -43,3 +49,5 @@ broadcastWorker.on('failed', (job, err) => {
 });
 
 module.exports = broadcastWorker;
+
+}
