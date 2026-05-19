@@ -57,6 +57,7 @@ const safeInt = v => { const n = parseInt(v); return isNaN(n) ? 0 : n; };
 
 // ── Express ──
 const app = express();
+app.use(helmet({ contentSecurityPolicy: false }));
 app.use(compression({ level: 6, threshold: 512 }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(require('path').join(__dirname, 'public'), { etag: false, maxAge: 0, setHeaders: (res) => { res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate'); } }));

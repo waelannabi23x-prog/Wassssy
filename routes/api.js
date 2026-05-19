@@ -1,4 +1,27 @@
 'use strict';
+
+// ── Batch Download Counter ──
+const _dlBuf = new Map();
+setInterval(async () => {
+  const entries = [..._dlBuf.entries()];
+  _dlBuf.clear();
+  for (const [id, count] of entries) {
+    run('UPDATE files SET downloads = downloads + $1 WHERE id=$2', [count, id]).catch(() => {});
+  }
+}, 5000).unref();
+function incDownloads(id) { _dlBuf.set(id, (_dlBuf.get(id) || 0) + 1); }
+
+
+function normalizeArabic(q) {
+  return q
+    .replace(/[ً-ٟ]/g, '') // حذف التشكيل
+    .replace(/^ال/, '')                // حذف ال التعريف
+    .replace(/[أإآا]/g, 'ا')          // توحيد الألف
+    .replace(/ة/g, 'ه')               // ة → ه
+    .replace(/ى/g, 'ي')               // ى → ي
+    .trim().toLowerCase();
+}
+
 const express = require('express');
 const router = express.Router();
 const { verifyWebApp } = require('../utils/webapp_auth');

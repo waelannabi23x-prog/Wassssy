@@ -269,7 +269,12 @@ async function initSchema() {
     for (const idx of IDX) {
       try { await pg.query(idx); } catch(_) {}
     }
-    logger.info('✅ Indexes جاهزة (' + IDX.length + ')');
+    
+      // ── Full-Text Search Index ──
+      "CREATE INDEX IF NOT EXISTS idx_files_fts ON files USING GIN(to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(description,'')))",
+      "CREATE INDEX IF NOT EXISTS idx_files_title_trgm ON files(title)",
+
+      logger.info('✅ Indexes جاهزة (' + IDX.length + ')');
   }
 
   // Migration: used_count
