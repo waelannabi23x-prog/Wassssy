@@ -136,15 +136,16 @@ router.post('/fav/:id', auth, async (req, res) => {
 // إرسال الملف للمستخدم عبر البوت
 router.post('/send/:id', auth, async (req, res) => {
   const uid = parseInt(req.tgUser.id);
-  const f = await filesDb.getFile(req.params.id);
+  const f = await filesDb.getFile(parseInt(req.params.id));
   if (!f) return res.status(404).json({ error: 'Not found' });
   try {
     const bot = global.__bot;
-    const cap = `📄 *${f.title}*\n📁 ${f.cat_name} | 📖 ${f.sub_name}`;
+    if (!bot) return res.status(500).json({ error: 'Bot unavailable' });
+    const cap = `📄 *${f.title}*${f.cat_name ? '\n📁 ' + f.cat_name : ''}${f.sub_name ? ' | 📖 ' + f.sub_name : ''}`;
     if (f.file_type === 'link') await bot.telegram.sendMessage(uid, cap + '\n\n🔗 ' + f.file_id, { parse_mode: 'Markdown' });
     else if (f.file_type === 'photo') await bot.telegram.sendPhoto(uid, f.file_id, { caption: cap, parse_mode: 'Markdown' });
     else await bot.telegram.sendDocument(uid, f.file_id, { caption: cap, parse_mode: 'Markdown' });
-    filesDb.incDownloads(req.params.id);
+    filesDb.incDownloads(parseInt(req.params.id));
     interactions.addHistory(uid, req.params.id).catch(() => {});
     // ── XP: downloader gets XP ──
     try { require('../handlers/xp').onDownload(global.__bot, parseInt(uid)).catch(()=>{}); } catch(_) {}

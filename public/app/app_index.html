@@ -1359,6 +1359,34 @@ async function loadAllLatest(){
     <span class="fca">›</span></div>`;}).join('')||empty('📭','لا ملفات'));}
   catch(e){render(empty('❌','خطأ'));}
 }
+
+async function viewPublicProfile(userId){
+  STACK.push({page:'pubProf',params:{userId},title:'',tab:_tab});
+  setHdr('👤 بروفايل',true);tg?.BackButton?.show();loader();
+  try{
+    const u=await API.get('/user/'+userId+'/profile');
+    const name=((u.first_name||'')+' '+(u.last_name||'')).trim()||'مستخدم';
+    const ini=name[0]?.toUpperCase()||'؟';
+    const lv2=lvl(u.total_points||0);
+    render(`
+      <div class="prof-hero">
+        <div class="av av-lg" style="background:${avColor(u.id)}">${ini}</div>
+        <div class="prof-name">${esc(name)}</div>
+        ${u.username?`<div class="prof-un">@${esc(u.username)}</div>`:''}
+        <div class="prof-sp">🎓 ${u.specialty_name||'بدون تخصص'}</div>
+        ${u.is_owner?'<div class="tag tag-gold" style="margin:8px auto 0;width:fit-content">👑 مالك المنصة</div>':u.is_admin?'<div class="tag tag-jade" style="margin:8px auto 0;width:fit-content">🛡️ مشرف</div>':''}
+        <div class="lvbg ${lv2.c}" style="margin:10px auto 0">${lv2.i} ${lv2.n} · ${u.total_points||0} XP</div>
+      </div>
+      <div class="srow">
+        <div class="sp jade"><div class="sp-v">${u.downloads_count||0}</div><div class="sp-l">تحميل</div></div>
+        <div class="sp purple"><div class="sp-v">${u.comments_count||0}</div><div class="sp-l">تعليق</div></div>
+        <div class="sp gold"><div class="sp-v">${u.streak_days||0}🔥</div><div class="sp-l">يوم</div></div>
+      </div>
+      ${u.username?`<button class="btn btn-jade" onclick="tg?.openLink?.('https://t.me/${esc(u.username)}')">💬 مراسلة ${esc(u.first_name||'')}</button>`:''}
+    `);
+  }catch(e){render(empty('❌','خطأ في تحميل البروفايل'));}
+}
+
 async function loadLeaderboard(){
   STACK.push({page:'lb',params:{},title:'',tab:_tab});
   setHdr('🏆 المتصدرون',true);tg?.BackButton?.show();loader();
@@ -1366,7 +1394,7 @@ async function loadLeaderboard(){
     const lb=await API.get('/points/leaderboard').catch(()=>[]);
     const myRank=lb.findIndex(u=>u.user_id==TG_USER?.id)+1||999;
     render(`<div style="font-size:12px;color:var(--t2);margin-bottom:12px;text-align:center">ترتيبك: #${myRank}</div>
-      ${lb.map((u,i)=>`<div class="lbr">
+      ${lb.map((u,i)=>`<div class="lbr" onclick="viewPublicProfile(${u.user_id})" style="cursor:pointer">
         <div class="lbrank ${i<3?['r1','r2','r3c'][i]:'rn'}">${i<3?['🥇','🥈','🥉'][i]:i+1}</div>
         <div class="av av-sm" style="background:${avColor(u.user_id)};${u.user_id==TG_USER?.id?'box-shadow:0 0 0 2px var(--jade)':''}">${(u.first_name||'?')[0].toUpperCase()}</div>
         <div style="flex:1;min-width:0"><div style="font-size:12px;font-weight:700;overflow:hidden;white-space:nowrap;text-overflow:ellipsis">${esc(u.first_name||'')} ${u.user_id==TG_USER?.id?'<span class="tag tag-jade" style="font-size:9px">أنت</span>':''}</div></div>
