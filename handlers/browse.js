@@ -33,6 +33,7 @@ async function getPathData(spId, yrId, smId, sbId, catId) {
 }
 
 async function showSpecs(ctx) {
+  ctx.answerCbQuery('').catch(function() {});
   var specs = cacheGet('specs_all');
   if (!specs) { specs = await content.getSpecs(); cacheSet('specs_all', specs, 21600000); }
   var rows = specs.map(function(s){ return [btn('🎓 '+s.name, 'sp_'+s.id)]; });
@@ -41,6 +42,7 @@ async function showSpecs(ctx) {
 }
 
 async function showYears(ctx, spId, page) {
+  ctx.answerCbQuery('').catch(function() {});
   spId = safeInt(spId); page = safeInt(page);
   var ckey = 'yrs_'+spId;
   var yd = cacheGet(ckey);
@@ -65,6 +67,7 @@ async function showYears(ctx, spId, page) {
 }
 
 async function showSemesters(ctx, spId, yrId) {
+  ctx.answerCbQuery('').catch(function() {});
   spId = safeInt(spId); yrId = safeInt(yrId);
   var ckey = 'sems_'+spId+'_'+yrId;
   var sd = cacheGet(ckey);
@@ -81,6 +84,7 @@ async function showSemesters(ctx, spId, yrId) {
 }
 
 async function showSubjects(ctx, spId, yrId, smId, page) {
+  ctx.answerCbQuery('').catch(function() {});
   spId=safeInt(spId); yrId=safeInt(yrId); smId=safeInt(smId); page=safeInt(page);
   var ckey = 'subs_'+spId+'_'+yrId+'_'+smId;
   var subd = cacheGet(ckey);
@@ -110,6 +114,7 @@ async function showSubjects(ctx, spId, yrId, smId, page) {
 }
 
 async function showCategories(ctx, spId, yrId, smId, sbId) {
+  ctx.answerCbQuery('').catch(function() {});
   spId=safeInt(spId); yrId=safeInt(yrId); smId=safeInt(smId); sbId=safeInt(sbId);
   var ckey = 'cats_'+spId+'_'+yrId+'_'+smId+'_'+sbId;
   var catd = cacheGet(ckey);
