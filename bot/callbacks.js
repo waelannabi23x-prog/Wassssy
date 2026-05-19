@@ -248,14 +248,30 @@ module.exports.registerCallbacks = function(bot, deps) {
         return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(() => {});
 
       // Pre-warm بالتوازي
-      if (data === 'browse' || data === 'main_menu')
+      // Pre-warm aggressive
+      if (data === 'browse' || data === 'main_menu') {
         contentDb.getSpecs().catch(() => {});
-      else if (data.startsWith('sp_'))
-        contentDb.getYears(parseInt(data.split('_').pop())).catch(() => {});
-      else if (data.startsWith('yr_') && !data.startsWith('yr_page_'))
-        contentDb.getSemesters(parseInt(data.split('_').pop())).catch(() => {});
-      else if (data.startsWith('sm_'))
-        contentDb.getSubjects(parseInt(data.split('_').pop())).catch(() => {});
+      } else if (data.startsWith('sp_')) {
+        const sid = parseInt(data.split('_').pop());
+        contentDb.getYears(sid).catch(() => {});
+      } else if (data.startsWith('yr_') && !data.startsWith('yr_page_')) {
+        const yid = parseInt(data.split('_').pop());
+        contentDb.getSemesters(yid).catch(() => {});
+      } else if (data.startsWith('sm_')) {
+        const smid = parseInt(data.split('_').pop());
+        Promise.all([
+          contentDb.getSubjects(smid),
+        ]).catch(() => {});
+      } else if (data.startsWith('sb_')) {
+        const parts = data.split('_');
+        const sbid = parseInt(parts.pop());
+        contentDb.getCategories(sbid).catch(() => {});
+      } else if (data.startsWith('ct_') && !data.startsWith('ct_page_')) {
+        const parts = data.split('_');
+        // pre-warm files for this category
+        const filesDb = require('../database/files');
+        filesDb.getFiles(parseInt(parts[parts.length-1])).catch(() => {});
+      }
 
       if (exactR.has(data)) return exactR.get(data)(ctx, data);
       const _h = _getPrefixHandler(data);
