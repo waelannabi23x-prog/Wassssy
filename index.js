@@ -6,6 +6,7 @@ require('./utils/validateEnv').validateEnv();
 const { Telegraf }    = require('telegraf');
 const express         = require('express');
 const compression     = require('compression');
+const helmet = require('helmet');
 const logger          = require('./utils/logger');
 const { res: cbRes }  = require('./utils/cbRegistry');
 const { initSchema, getSetting, run: dbRun, all: dbAll, getPg } = require('./database/db');
