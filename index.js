@@ -48,6 +48,20 @@ global.delState  = _delState;
 global.getState  = _getState;
 global.maintenanceMode = false;
 
+// ── Cluster-safe maintenance: يقرأ من cache كل 30s ──
+setInterval(async () => {
+  try {
+    const { cacheGet, cacheSet } = require('./utils/cache');
+    const { getSetting } = require('./database/db');
+    let val = cacheGet('_maint_mode');
+    if (val === null) {
+      val = (await getSetting('maintenance')) === 'true';
+      cacheSet('_maint_mode', val, 30000);
+    }
+    global.maintenanceMode = !!val;
+  } catch(_) {}
+}, 30000).unref();
+
 // ── Config ──
 const TOKEN        = process.env.BOT_TOKEN;
 if (!TOKEN) { logger.error('FATAL: BOT_TOKEN missing'); process.exit(1); }

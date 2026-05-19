@@ -34,7 +34,7 @@ const filesDb = require('../database/files');
 const interactions = require('../database/interactions');
 const usersDb = require('../database/users');
 const { smartSearch } = require('../handlers/group');
-const { cacheGet, cacheSet } = require('../utils/cache');
+const { cacheGet, cacheSet, cacheMGet } = require('../utils/cache');
 const { all, get, run } = require('../database/db');
 
 // ─── Auth middleware ────────────────────────────────

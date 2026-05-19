@@ -1,7 +1,7 @@
 'use strict';
 
 const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
-const { get, run } = require('../database/db');
+const { get, run, getP } = require('../database/db');
 
 // ✅ OWNER_ID إجباري من .env — لا fallback hardcoded
 const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
@@ -85,7 +85,7 @@ async function authMiddleware(ctx, next) {
   const banCached = cacheGet('ban_' + uid);
   const [info, banRow] = await Promise.all([
     getAdminInfo(uid),
-    banCached === undefined ? get('SELECT is_banned FROM users WHERE id=$1', [uid]) : Promise.resolve(null),
+    banCached === undefined ? getP('getBan', [uid]) : Promise.resolve(null),
   ]);
   ctx.isAdmin    = info.isAdmin;
   ctx.adminPerms = info.perms;

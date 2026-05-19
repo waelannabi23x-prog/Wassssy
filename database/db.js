@@ -148,6 +148,15 @@ async function all(sql, params = []) {
 }
 
 async function run(sql, params = []) {
+  // ⚡ Intercept download counter → batch بدل write مباشر
+  if (
+    sql.includes('downloads') &&
+    (sql.includes('+ 1') || sql.includes('+1') || sql.includes('downloads+1') || sql.includes('downloads + 1')) &&
+    sql.toLowerCase().includes('files')
+  ) {
+    const fid = params?.[0] ?? params?.[1];
+    if (fid) { batchDownload(parseInt(fid)); return { changes: 1, lastID: 0 }; }
+  }
   if (USE_PG) {
     const pool = getPg();
     if (!pool) throw new Error('No PG pool');

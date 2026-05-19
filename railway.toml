@@ -8,7 +8,7 @@ nixPkgs = ["nodejs_20"]
 cmds = ["npm ci --omit=dev"]
 
 [deploy]
-startCommand = "node --max-old-space-size=460 --optimize-for-size --expose-gc index.js"
+startCommand = "node_modules/.bin/pm2-runtime ecosystem.config.js"
 restartPolicyType = "on_failure"
 restartPolicyMaxRetries = 10
 region = "europe-west4"
