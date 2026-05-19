@@ -212,16 +212,25 @@ async function initSchema() {
   // ── Indexes — الأصليين + الجدد المحسّنين ──
   if (pg) {
     const IDX = [
-      // الأصليين
       "CREATE INDEX IF NOT EXISTS idx_files_category   ON files(category_id)",
+      "CREATE INDEX IF NOT EXISTS idx_files_cat_del    ON files(category_id,is_deleted)",
       "CREATE INDEX IF NOT EXISTS idx_files_deleted    ON files(is_deleted)",
       "CREATE INDEX IF NOT EXISTS idx_files_downloads  ON files(downloads DESC)",
+      "CREATE INDEX IF NOT EXISTS idx_files_uploader   ON files(uploaded_by)",
       "CREATE INDEX IF NOT EXISTS idx_history_user     ON history(user_id)",
+      "CREATE INDEX IF NOT EXISTS idx_history_time     ON history(user_id,viewed_at DESC)",
       "CREATE INDEX IF NOT EXISTS idx_favorites_user   ON favorites(user_id)",
+      "CREATE INDEX IF NOT EXISTS idx_favorites_file   ON favorites(file_id)",
       "CREATE INDEX IF NOT EXISTS idx_ratings_file     ON ratings(file_id)",
+      "CREATE INDEX IF NOT EXISTS idx_ratings_avg      ON ratings(file_id,rating)",
       "CREATE INDEX IF NOT EXISTS idx_comments_file    ON comments(file_id)",
       "CREATE INDEX IF NOT EXISTS idx_user_points      ON user_points(total_points DESC)",
       "CREATE INDEX IF NOT EXISTS idx_users_active     ON users(last_active)",
+      "CREATE INDEX IF NOT EXISTS idx_cats_subject     ON categories(subject_id,is_deleted)",
+      "CREATE INDEX IF NOT EXISTS idx_subs_sem         ON subjects(semester_id,is_deleted)",
+      "CREATE INDEX IF NOT EXISTS idx_sems_year        ON semesters(year_id,is_deleted)",
+      "CREATE INDEX IF NOT EXISTS idx_years_spec       ON years(specialty_id,is_deleted)",
+      "CREATE INDEX IF NOT EXISTS idx_bundle_files     ON bundle_files(bundle_id)",
 
       // ✅ جدد — تسرّع أكثر الـ queries استخداماً
       "CREATE INDEX IF NOT EXISTS idx_files_cat_del    ON files(category_id, is_deleted)",       // browse الأكثر استخداماً
