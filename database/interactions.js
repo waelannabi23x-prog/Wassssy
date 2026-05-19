@@ -130,7 +130,9 @@ async function getSimilar(fileId, limit = 4) {
     LIMIT  $2
   `, [fileId, limit]).catch(() => []);
 
-  cacheSet(k, results, 1800000); return results;
+  // لا تخزن نتائج فارغة — يرجع للـ DB كل مرة
+  if (results.length) cacheSet(k, results, 1800000);
+  return results;
 }
 
 // ─── Logs ─────────────────────────────────────────────────────────────────────
