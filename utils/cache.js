@@ -114,7 +114,7 @@ async function cacheWarmup() {
   }
   // Fallback: warmup من DB
   try {
-    const CONC = 5;
+    const CONC = 15;
     const content = require('../database/content');
     const specs = await content.getSpecs();
     if (!specs?.length) return;
@@ -127,8 +127,14 @@ async function cacheWarmup() {
           tasks.push(async () => { try { await content.getSemesters(yr.id); } catch(_) {} });
           try {
             const sems = await content.getSemesters(yr.id);
-            for (const sm of (sems || []))
+            for (const sm of (sems || [])) {
               tasks.push(async () => { try { await content.getSubjects(sm.id); } catch(_) {} });
+              try {
+                const subs = await content.getSubjects(sm.id);
+                for (const sb of (subs || []))
+                  tasks.push(async () => { try { await content.getCategories(sb.id); } catch(_) {} });
+              } catch(_) {}
+            }
           } catch(_) {}
         }
       } catch(_) {}
@@ -136,6 +142,7 @@ async function cacheWarmup() {
     let i = 0;
     const worker = async () => { while (i < tasks.length) { const t = tasks[i++]; await t(); } };
     await Promise.all(Array.from({ length: Math.min(CONC, tasks.length) }, worker));
+    require('./logger').info('⚡ Warmed: ' + tasks.length + ' keys');
     _evictLRU();
   } catch(_) {}
 }

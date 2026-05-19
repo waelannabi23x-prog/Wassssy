@@ -9,6 +9,8 @@ module.exports = {
     env: { NODE_ENV: 'production' },
     autorestart: true,
     watch: false,
+    kill_timeout: 5000,
+    listen_timeout: 8000,
     exp_backoff_restart_delay: 3000,
     out_file: './logs/pm2-out.log',
     error_file: './logs/pm2-err.log',
