@@ -245,7 +245,13 @@ router.get('/admin/users', auth, async (req, res) => {
   const limit = 20;
   let rows;
   if (q) {
-    rows = await all(`SELECT * FROM users WHERE first_name ILIKE $1 OR username ILIKE $1 OR id::text=$2 ORDER BY joined_at DESC LIMIT $3 OFFSET $4`, [`%${q}%`, q, limit, page * limit]);
+    rows = await all(
+      `SELECT *, similarity(first_name, $3) as sim
+       FROM users
+       WHERE first_name ILIKE $1 OR username ILIKE $1 OR id::text=$2 OR first_name % $3
+       ORDER BY sim DESC, joined_at DESC LIMIT $4 OFFSET $5`,
+      [`%${q}%`, q, _normAr(q), limit, page * limit]
+    );
   } else {
     rows = await all(`SELECT * FROM users ORDER BY joined_at DESC LIMIT $1 OFFSET $2`, [limit, page * limit]);
   }

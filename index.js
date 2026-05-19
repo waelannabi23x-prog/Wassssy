@@ -72,6 +72,7 @@ const safeInt = v => { const n = parseInt(v); return isNaN(n) ? 0 : n; };
 
 // ── Express ──
 const app = express();
+app.disable('x-powered-by');
 app.use(helmet({ contentSecurityPolicy: false }));
 app.use(compression({ level: 6, threshold: 512 }));
 app.use(express.json({ limit: '1mb' }));
@@ -233,7 +234,41 @@ async function launch() {
       logger.info('✅ Webhook: ' + WEBHOOK_URL);
     } else {
       logger.warn('⚠️ No WEBHOOK_URL — polling mode');
-      bot.launch({ drop_pending_updates: true });
+      
+// ── Share + Summarize ────────────────────────────────────────────
+const { handleShare, handleSummarize } = require('./handlers/share_summary');
+
+// callback: share_{fileId}
+bot.action(/^share_(\d+)$/, handleShare);
+
+// commands: /لخص أو /summarize
+bot.command(['لخص', 'summarize', 'sum'], handleSummarize);
+
+// deep link: /start file_{fileId}
+bot.start(async (ctx, next) => {
+  const payload = ctx.startPayload;
+  if (payload?.startsWith('file_')) {
+    const fid = parseInt(payload.replace('file_', ''));
+    if (fid) {
+      try {
+        const file = await require('./database/db').get(
+          'SELECT * FROM files WHERE id=$1 AND is_deleted=0', [fid]
+        );
+        if (file) {
+          const type = file.file_type === 'photo' ? 'sendPhoto' : 'sendDocument';
+          await ctx.telegram[type](ctx.chat.id, file.file_id, {
+            caption: `📄 *${file.title}*\n\n🔽 اضغط للتحميل المباشر`,
+            parse_mode: 'Markdown'
+          });
+          return;
+        }
+      } catch(_) {}
+    }
+  }
+  return next();
+});
+
+bot.launch({ drop_pending_updates: true });
     }
 
     millionaire.register(bot);

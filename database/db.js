@@ -50,11 +50,9 @@ let sqliteDb = null;
 const DB_PATH = path.join(__dirname, '..', 'data', 'study_bot.db');
 
 async function getSQLite() {
-  if (sqliteDb) return sqliteDb;
-  try {
-    const fs  = require('fs');
-    const dir = path.dirname(DB_PATH);
-    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+  // SQLite disabled on Railway — PostgreSQL only
+  return null;
+});
   } catch(_) {}
 
   // better-sqlite3 (أسرع)

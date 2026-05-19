@@ -126,6 +126,19 @@ function classifyIntent(text) {
   return 'GENERAL_CHAT';
 }
 
+
+// ── RAG Context Cache — 5 دقائق per user ──────────────────────
+const _ragCache = new Map();
+function _getRagCache(uid) {
+  const e = _ragCache.get(uid);
+  if (e && Date.now() - e.ts < 300000) return e.val;
+  return null;
+}
+function _setRagCache(uid, val) {
+  if (_ragCache.size > 2000) _ragCache.delete(_ragCache.keys().next().value);
+  _ragCache.set(uid, { val, ts: Date.now() });
+}
+
 async function handleAiChat(ctx, text) {
   const uid = ctx.uid;
 
@@ -154,7 +167,10 @@ async function handleAiChat(ctx, text) {
     }
   }
 
-  let ragContext = '';
+  // ⚡ RAG Cache
+  let ragContext = _getRagCache(uid) || '';
+  const _needRag = !ragContext;
+  if (_needRag) ragContext = '';
   if (['CONCEPT_EXPLAIN', 'PROBLEM_SOLVING', 'STUDY_QUESTION'].includes(intent)) {
     const relevantFiles = await smartSearchForAI(text, 3);
     if (relevantFiles.length > 0) {
