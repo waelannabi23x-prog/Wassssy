@@ -52,39 +52,7 @@ const DB_PATH = path.join(__dirname, '..', 'data', 'study_bot.db');
 async function getSQLite() {
   // SQLite disabled on Railway — PostgreSQL only
   return null;
-});
-  } catch(_) {}
-
-  // better-sqlite3 (أسرع)
-  try {
-    const Database = require('better-sqlite3');
-    const db = new Database(DB_PATH);
-    db.pragma('journal_mode = WAL');
-    db.pragma('synchronous = NORMAL');
-    db.pragma('cache_size = -64000'); // 64MB cache
-    sqliteDb = { type: 'better', db };
-    return sqliteDb;
-  } catch(_) {}
-
-  // sql.js fallback
-  try {
-    const fs        = require('fs');
-    const initSqlJs = require('sql.js');
-    const SQL       = await initSqlJs();
-    let buf = null;
-    try { buf = fs.readFileSync(DB_PATH); } catch(_) {}
-    const db   = buf ? new SQL.Database(buf) : new SQL.Database();
-    const save = () => { try { fs.writeFileSync(DB_PATH, Buffer.from(db.export())); } catch(_) {} };
-    sqliteDb = { type: 'sqljs', db, save };
-    return sqliteDb;
-  } catch(e) {
-    logger.error('[DB] no SQLite available: ' + e.message);
-    return null;
-  }
 }
-
-// ── SQLite helpers ──
-function toQ(sql) { return sql.replace(/\$\d+/g, '?'); }
 
 function sGet(w, sql, p = []) {
   const q = toQ(sql);
