@@ -3,11 +3,8 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "pm2-runtime ecosystem.config.js",
-    "dev": "nodemon --watch . --ext js index.js",
-    "cluster": "pm2 start ecosystem.config.js",
-    "stop": "pm2 stop study-bot",
-    "logs": "pm2 logs study-bot"
+    "start": "node --max-old-space-size=460 --optimize-for-size --expose-gc index.js",
+    "dev": "nodemon --watch . --ext js index.js"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.0",

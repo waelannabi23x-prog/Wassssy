@@ -1,10 +1,5 @@
 'use strict';
 
-
-// ── BullMQ Workers ────────────────────────────────────────────────
-require('./workers/broadcast.worker');
-require('./workers/notify.worker');
-
 require('dotenv').config();
 require('./utils/validateEnv').validateEnv();
 
@@ -212,6 +207,12 @@ async function launch() {
 
     millionaire.register(bot);
     global.__bot = bot;
+
+// ── BullMQ Workers — بعد ما يكون bot جاهز ──
+setImmediate(() => {
+  try { require('./workers/broadcast.worker'); } catch(e) { logger.warn('[Worker] broadcast:', e.message); }
+  try { require('./workers/notify.worker');    } catch(e) { logger.warn('[Worker] notify:',    e.message); }
+});
     logger.info('🚀 Ready!');
   } catch(e) {
     logger.error('[Launch]', e.message);
