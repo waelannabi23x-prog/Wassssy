@@ -46,8 +46,6 @@ function getPg() {
 }
 
 // ── SQLite Fallback ──
-let sqliteDb = null;
-const DB_PATH = path.join(__dirname, '..', 'data', 'study_bot.db');
 
 async function getSQLite() {
   // SQLite disabled on Railway — PostgreSQL only
