@@ -1,6 +1,6 @@
 'use strict';
 
-const { aiChat }        = require('../utils/groq_client');
+const { aiChat, aiChatStream }        = require('../utils/groq_client');
 const { all, run }      = require('../database/db');
 const { smartSearch }   = require('./group');
 const { getBotKnowledge } = require('../utils/ai_knowledge');
@@ -190,9 +190,27 @@ async function handleAiChat(ctx, text) {
   ];
 
   try {
-    const reply = await aiChat(messages);
+    // ── Streaming Response ────────────────────────────────────────
+    const placeholder = await ctx.reply('💬 ...', {}).catch(() => null);
+    const chatId = ctx.chat.id;
+    const msgId  = placeholder?.message_id;
 
-    // ✅ حفظ في Memory + DB
+    let lastEdit = 0;
+    const reply  = await aiChatStream(messages, async (accumulated, isFinal) => {
+      if (!msgId) return;
+      const now = Date.now();
+      // edit كل 900ms فقط لتفادي flood control — أو عند الانتهاء
+      if (isFinal || now - lastEdit > 900) {
+        lastEdit = now;
+        await ctx.telegram.editMessageText(
+          chatId, msgId, null,
+          isFinal ? accumulated : accumulated + ' ▌',
+          { parse_mode: 'Markdown' }
+        ).catch(() => {});
+      }
+    });
+
+    // حفظ في Memory + DB
     hEntry.msgs.push({ role: 'user',      content: text  });
     hEntry.msgs.push({ role: 'assistant', content: reply });
     if (hEntry.msgs.length > HIST_MAX * 2) hEntry.msgs.splice(0, 2);

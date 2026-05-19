@@ -107,4 +107,42 @@ async function aiChat(messages, maxTokens = 700, temperature = 0.65) {
 }
 
 // ✅ نصدّر aiChat — groqChat كـ alias للتوافق مع الكود القديم
-module.exports = { aiChat, groqChat: aiChat };
+
+// ── Streaming: يبعث tokens بشكل تدريجي ─────────────────────────
+async function aiChatStream(messages, onChunk, maxTokens = 700) {
+  const g = getGroq();
+  // إذا ما فيه Groq، استخدم Gemini العادي (لا يدعم streaming)
+  if (!g) {
+    const result = await aiChat(messages, maxTokens);
+    await onChunk(result, true);
+    return result;
+  }
+  try {
+    const stream = await g.chat.completions.create({
+      model: 'llama-3.3-70b-versatile',
+      messages,
+      max_tokens: maxTokens,
+      stream: true,
+      temperature: 0.65
+    });
+    let full = '';
+    for await (const chunk of stream) {
+      const token = chunk.choices[0]?.delta?.content || '';
+      if (token) {
+        full += token;
+        await onChunk(full, false);
+      }
+    }
+    if (!full.trim()) throw new Error('Empty stream');
+    await onChunk(full, true);
+    return full;
+  } catch(e) {
+    // fallback لـ Gemini إذا فشل Groq stream
+    logger.warn('[AI Stream] fallback to Gemini:', e.message?.substring(0, 80));
+    const result = await aiChat(messages, maxTokens);
+    await onChunk(result, true);
+    return result;
+  }
+}
+
+module.exports = { aiChat, aiChatStream, groqChat: aiChat };

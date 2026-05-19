@@ -140,7 +140,34 @@ async function cacheWarmup() {
   } catch(_) {}
 }
 
-module.exports = {
+
+// ── Batch Cache Read — pipeline لتقليل roundtrips ───────────────
+async function cacheMGet(keys) {
+  // أولاً: كل اللي موجود في الـ memory
+  const results = keys.map(k => cacheGet(k));
+  const missing = keys.reduce((acc, k, i) => { if (results[i] === null) acc.push(i); return acc; }, []);
+
+  if (!missing.length) return results;
+
+  // الناقص: اجلبه من Upstash بـ pipeline
+  try {
+    const r = _getUpstash ? _getUpstash() : null;
+    if (!r) return results;
+    const pipe = r.pipeline();
+    missing.forEach(i => pipe.get(keys[i]));
+    const raw = await pipe.exec();
+    missing.forEach((idx, j) => {
+      if (raw[j] !== null) {
+        try { results[idx] = JSON.parse(raw[j]); }
+        catch { results[idx] = raw[j]; }
+      }
+    });
+  } catch(_) {}
+
+  return results;
+}
+
+module.exports = { cacheMGet,
   cacheGet, cacheSet, cacheClear, cacheClearPrefix,
   cacheGetAsync, cacheSetAsync,
   cacheWarmup, cacheStats, getCacheSize, getCacheKeys,

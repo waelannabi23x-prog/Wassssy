@@ -3,11 +3,15 @@
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start": "node --max-old-space-size=512 --expose-gc index.js",
-    "dev": "nodemon --watch . --ext js index.js"
+    "start": "pm2-runtime ecosystem.config.js",
+    "dev": "nodemon --watch . --ext js index.js",
+    "cluster": "pm2 start ecosystem.config.js",
+    "stop": "pm2 stop study-bot",
+    "logs": "pm2 logs study-bot"
   },
   "dependencies": {
     "@upstash/redis": "^1.38.0",
+    "bullmq": "^5.76.10",
     "compression": "^1.8.1",
     "dotenv": "^16.6.1",
     "express": "^5.2.1",
@@ -17,6 +21,7 @@
     "node-telegram-bot-api": "^0.67.0",
     "pdf-parse": "^2.4.5",
     "pg": "^8.20.0",
+    "pm2": "^7.0.1",
     "telegraf": "^4.16.3"
   },
   "engines": {

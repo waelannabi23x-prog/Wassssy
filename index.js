@@ -1,5 +1,10 @@
 'use strict';
 
+
+// ── BullMQ Workers ────────────────────────────────────────────────
+require('./workers/broadcast.worker');
+require('./workers/notify.worker');
+
 require('dotenv').config();
 require('./utils/validateEnv').validateEnv();
 
