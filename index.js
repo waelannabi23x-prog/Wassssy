@@ -78,18 +78,33 @@ setInterval(() => {
   for (const [k, v] of _floodMap) if (v.t < cut) _floodMap.delete(k);
 }, 60000).unref();
 
+// ── In-Flight dedup (يمنع تكرار نفس الطلب) ──
+const _inFlight = new Map();
+function dedupExec(uid, key, fn) {
+  const k = `${uid}_${key}`;
+  if (_inFlight.has(k)) return _inFlight.get(k);
+  const p = fn().finally(() => _inFlight.delete(k));
+  _inFlight.set(k, p);
+  return p;
+}
+global.dedupRequest = dedupExec;
+
 const rateLimit = (ctx, next) => {
   const uid = ctx.from?.id;
   if (!uid) return next();
+  // الأدمن والأونر بدون حد
+  if (ctx.isOwner || ctx.isAdmin) return next();
   const now = Date.now();
   let u = _floodMap.get(uid);
-  if (!u || now - u.t > 1000) { u = { c: 1, t: now }; _floodMap.set(uid, u); }
-  else {
-    u.c++;
-    if (u.c > 6) {
-      if (u.c === 7) return ctx.reply('⚠️ إبطاء قليلاً...').catch(() => {});
-      return;
-    }
+  if (!u || now - u.t > 2000) {
+    _floodMap.set(uid, { c: 1, t: now });
+    return next();
+  }
+  u.c++;
+  // حد 4 ضغطات كل 2 ثانية
+  if (u.c > 4) {
+    if (u.c === 5) ctx.answerCbQuery('⚠️ إبطاء قليلاً...', { show_alert: false }).catch(() => {});
+    return; // تجاهل بدون رد
   }
   return next();
 };
