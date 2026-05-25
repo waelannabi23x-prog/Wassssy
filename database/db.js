@@ -52,6 +52,13 @@ async function getSQLite() {
   return null;
 }
 
+
+// SQLite placeholder: ? → $1,$2
+function toQ(sql) {
+  let i = 0;
+  return sql.replace(/\?/g, () => '$' + (++i));
+}
+
 function sGet(w, sql, p = []) {
   const q = toQ(sql);
   if (w.type === 'better') {
@@ -295,13 +302,13 @@ function batchDownload(fileId) {
 
 async function _flushDlBatch() {
   if (!_dlBatch.size) return;
-  const pg = await getPg().catch(() => null);
+  const pg = getPg();
   if (!pg) return;
   const entries = [..._dlBatch];
   _dlBatch.clear();
   await Promise.all(
     entries.map(([fid, cnt]) =>
-      pg.query('UPDATE files SET downloads = downloads + $1 WHERE id = $2', [cnt, fid]).catch(() => {})
+      pg.query('UPDATE files SET downloads = downloads + $1 WHERE id = $2', [cnt, fid]).catch(e => logger.error('[DL]', e.message))
     )
   );
 }

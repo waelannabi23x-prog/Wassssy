@@ -1,3 +1,4 @@
+const { escMd } = require('../utils/common');
 const Groq = require('groq-sdk');
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 const https = require('https');
@@ -56,7 +57,7 @@ ${text}` }],
     });
 
     const summary = res.choices[0].message.content.trim();
-    await ctx.reply(`📄 *ملخص: ${title}*\n\n${summary}`, { parse_mode: 'Markdown' });
+    await ctx.reply(`📄 *ملخص: ${escMd(title)}*\n\n${summary}`, { parse_mode: 'Markdown' });
   } catch(e) {
     if(thinking) ctx.deleteMessage(thinking.message_id).catch(()=>{});
     ctx.reply('❌ فشل التلخيص: ' + e.message).catch(()=>{});

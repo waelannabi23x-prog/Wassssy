@@ -9,7 +9,7 @@ const compression     = require('compression');
 const helmet = require('helmet');
 const logger          = require('./utils/logger');
 const { res: cbRes }  = require('./utils/cbRegistry');
-const { initSchema, getSetting, run: dbRun, all: dbAll, getPg } = require('./database/db');
+const { initSchema, getSetting, run: dbRun, all: dbAll, get: dbGet, getPg } = require('./database/db');
 const { authMiddleware, OWNER_ID } = require('./middlewares/auth');
 const { loadAllStates }   = require('./utils/redis');
 const { cacheWarmup, cacheClear, cacheClearPrefix } = require('./utils/cache');
@@ -241,9 +241,7 @@ bot.start(async (ctx, next) => {
     const fid = parseInt(payload.replace('file_', ''));
     if (fid) {
       try {
-        const file = await require('./database/db').get(
-          'SELECT * FROM files WHERE id=$1 AND is_deleted=0', [fid]
-        );
+        const file = await dbGet('SELECT * FROM files WHERE id=$1 AND is_deleted=0', [fid]);
         if (file) {
           const type = file.file_type === 'photo' ? 'sendPhoto' : 'sendDocument';
           await ctx.telegram[type](ctx.chat.id, file.file_id, {

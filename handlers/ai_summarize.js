@@ -1,3 +1,4 @@
+const { escMd } = require('../utils/common');
 const https = require('https');
 const http = require('http');
 
@@ -58,7 +59,7 @@ async function handleSummarize(ctx, fileId, fileType, title) {
       { role: 'user', content: 'المستند: ' + title + '\n\n' + text }
     ], 800, 0.3);
 
-    await ctx.reply('📄 *ملخص: ' + title + '*\n\n' + summary, { parse_mode: 'Markdown' });
+    await ctx.reply('📄 *ملخص: ' + escMd(title) + '*\n\n' + summary, { parse_mode: 'Markdown' });
   } catch (e) {
     if (thinking) ctx.deleteMessage(thinking.message_id).catch(() => {});
     ctx.reply('❌ فشل التلخيص: ' + e.message).catch(() => {});
