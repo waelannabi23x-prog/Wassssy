@@ -233,7 +233,6 @@ async function initSchema() {
       "CREATE INDEX IF NOT EXISTS idx_bundle_files     ON bundle_files(bundle_id)",
 
       // ✅ جدد — تسرّع أكثر الـ queries استخداماً
-      "CREATE INDEX IF NOT EXISTS idx_files_cat_del    ON files(category_id, is_deleted)",       // browse الأكثر استخداماً
       "CREATE INDEX IF NOT EXISTS idx_files_uploaded   ON files(uploaded_at DESC)",               // latest files
       "CREATE INDEX IF NOT EXISTS idx_users_banned     ON users(is_banned)",                      // ban check
       "CREATE INDEX IF NOT EXISTS idx_history_file     ON history(file_id)",                      // file stats
@@ -242,7 +241,6 @@ async function initSchema() {
       "CREATE INDEX IF NOT EXISTS idx_user_states_upd  ON user_states(updated_at)",               // cleanup
       "CREATE INDEX IF NOT EXISTS idx_gnl_chat         ON group_notify_log(chat_id)",             // group notify
       "CREATE INDEX IF NOT EXISTS idx_sched_sent       ON scheduled_messages(sent, send_at)",     // scheduler
-      "CREATE INDEX IF NOT EXISTS idx_bundle_files_bnd ON bundle_files(bundle_id)",
       "CREATE INDEX IF NOT EXISTS idx_ads_deleted      ON ads(is_deleted,created_at DESC)",
       "CREATE INDEX IF NOT EXISTS idx_channels_sort    ON channels(sort_order ASC,id DESC)",
       "CREATE INDEX IF NOT EXISTS idx_downloads_user   ON downloads(user_id,created_at DESC)",
@@ -252,9 +250,6 @@ async function initSchema() {
       try { await pg.query(idx); } catch(_) {}
     }
     
-      // ── Full-Text Search Index ──
-      "CREATE INDEX IF NOT EXISTS idx_files_fts ON files USING GIN(to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(description,'')))",
-      "CREATE INDEX IF NOT EXISTS idx_files_title_trgm ON files(title)",
 
       logger.info('✅ Indexes جاهزة (' + IDX.length + ')');
   }
@@ -265,6 +260,7 @@ async function initSchema() {
 
   // ── Migrations: pg_trgm + search indexes ──
   try { if(pg) await pg.query('CREATE EXTENSION IF NOT EXISTS pg_trgm'); } catch(_) {}
+  try { if(pg) await pg.query("CREATE INDEX IF NOT EXISTS idx_files_fts ON files USING GIN(to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(description,'')))"); } catch(_) {}
   try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_files_title_trgm ON files USING GIN(title gin_trgm_ops)'); } catch(_) {}
   try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_files_desc_trgm  ON files USING GIN(description gin_trgm_ops)'); } catch(_) {}
   try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_users_name_trgm  ON users USING GIN(first_name gin_trgm_ops)'); } catch(_) {}

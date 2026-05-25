@@ -224,16 +224,6 @@ async function launch() {
 
     app.listen(PORT, () => logger.info('✅ Express :' + PORT));
 
-    if (WEBHOOK_URL) {
-      await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, {
-        allowed_updates: ['message', 'callback_query', 'my_chat_member'],
-        drop_pending_updates: true,
-        max_connections: 40,
-        ...(WEBHOOK_SECRET && { secret_token: WEBHOOK_SECRET }),
-      });
-      logger.info('✅ Webhook: ' + WEBHOOK_URL);
-    } else {
-      logger.warn('⚠️ No WEBHOOK_URL — polling mode');
       
 // ── Share + Summarize ────────────────────────────────────────────
 const { handleShare, handleSummarize } = require('./handlers/share_summary');
@@ -268,6 +258,17 @@ bot.start(async (ctx, next) => {
   return next();
 });
 
+
+    if (WEBHOOK_URL) {
+      await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, {
+        allowed_updates: ['message', 'callback_query', 'my_chat_member'],
+        drop_pending_updates: true,
+        max_connections: 40,
+        ...(WEBHOOK_SECRET && { secret_token: WEBHOOK_SECRET }),
+      });
+      logger.info('✅ Webhook: ' + WEBHOOK_URL);
+    } else {
+      logger.warn('⚠️ No WEBHOOK_URL — polling mode');
 bot.launch({ drop_pending_updates: true });
     }
 
