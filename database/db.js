@@ -13,7 +13,7 @@ function getPg() {
     const { Pool } = require('pg');
     pgPool = new Pool({
       connectionString:            process.env.DATABASE_URL,
-      ssl:                         { rejectUnauthorized: false },
+      ssl: process.env.DATABASE_URL?.includes('localhost') ? false : { rejectUnauthorized: true, ca: process.env.PG_SSL_CERT || undefined },
       max:                         20,   // كان 8 — رفعناه لـ 20
       min:                         2,    // دائماً connection جاهزة
       idleTimeoutMillis:           30000,

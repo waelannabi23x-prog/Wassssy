@@ -183,7 +183,7 @@ router.get('/comments/:id', auth, async (req, res) => {
 
 router.post('/comment/:id', auth, async (req, res) => {
   try {
-    const { text } = req.body;
+    const { text } = sanitizeBody(req.body, { text: 500 });
     if (!text || text.trim().length < 1) return res.status(400).json({ error: 'empty' });
     await run(`INSERT INTO comments(file_id,user_id,text) VALUES($1,$2,$3)`, [req.params.id, parseInt(req.tgUser.id), text.trim()]);
     try { require('../handlers/xp').onComment(global.__bot, parseInt(req.tgUser.id)).catch(()=>{}); } catch(_) {}
@@ -305,7 +305,7 @@ router.post('/admin/broadcast', auth, async (req, res) => {
   const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
   const uid = parseInt(req.tgUser.id);
   if (uid !== OWNER_ID) return res.status(403).json({ error: 'owner only' });
-  const { text, target, specialtyId } = req.body;
+  const _sb308 = sanitizeBody(req.body, { text: 2000 }); const { text, target, specialtyId } = _sb308;
   if (!text) return res.status(400).json({ error: 'no text' });
   try {
     const usersDb = require('../database/users');
@@ -593,7 +593,7 @@ router.get('/latest/specialty/:spId', auth, async (req, res) => {
 router.post('/profile/update', auth, async (req, res) => {
   try {
     const uid = parseInt(req.tgUser.id);
-    const { first_name, last_name } = req.body;
+    const { first_name, last_name } = sanitizeBody(req.body, { first_name: 64, last_name: 64 });
     if (first_name) {
       await run(
         'UPDATE users SET first_name=$1, last_name=$2 WHERE id=$3',
@@ -750,7 +750,7 @@ router.post('/admin/ads', auth, async (req, res) => {
   const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
   const adm = await get('SELECT 1 FROM admins WHERE user_id=$1',[uid]).catch(()=>null);
   if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
-  const { title, body, icon, link, specialty_id, is_pinned, image_url, video_url } = req.body;
+  const _sb753 = sanitizeBody(req.body, { title: 200, body: 2000, icon: 200, link: 500, image_url: 500, video_url: 500 }); const { title, body, icon, link, specialty_id, is_pinned, image_url, video_url } = _sb753;
   if (!title) return res.status(400).json({ error: 'title required' });
   try {
     await run(
@@ -881,3 +881,17 @@ router.use((err, req, res, next) => {
 });
 
 module.exports = router;
+
+// ── Input length sanitizer (injected fix) ──
+function sanitizeBody(obj, limits = {}) {
+  const out = {};
+  for (const [k, v] of Object.entries(obj || {})) {
+    if (typeof v === 'string') {
+      const max = limits[k] || 1000;
+      out[k] = v.slice(0, max).trim();
+    } else {
+      out[k] = v;
+    }
+  }
+  return out;
+}

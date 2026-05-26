@@ -76,7 +76,7 @@ const safeInt = v => { const n = parseInt(v); return isNaN(n) ? 0 : n; };
 // ── Express ──
 const app = express();
 app.disable('x-powered-by');
-app.use(helmet({ contentSecurityPolicy: false }));
+app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'", "'unsafe-inline'", 'telegram.org', '*.telegram.org'], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", 'data:', 'https:'], connectSrc: ["'self'", 'https://api.telegram.org'] } } }));
 app.use(compression({ level: 6, threshold: 512 }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(require('path').join(__dirname, 'public'), { etag: false, maxAge: 0, setHeaders: (res) => { res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate'); } }));
@@ -262,7 +262,7 @@ bot.start(async (ctx, next) => {
 
 
     if (WEBHOOK_URL) {
-      await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, {
+      await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/updates', {
         allowed_updates: ['message', 'callback_query', 'my_chat_member', 'chat_member', 'inline_query'],
         drop_pending_updates: true,
         max_connections: 40,
