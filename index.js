@@ -223,7 +223,8 @@ async function launch() {
       });
     });
 
-    const apiRoutes = require('./routes/api');
+    setupGroupCommands(bot);
+const apiRoutes = require('./routes/api');
     app.use('/api', apiRoutes);
 
     app.listen(PORT, () => logger.info('✅ Express :' + PORT));
