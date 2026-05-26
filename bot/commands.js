@@ -47,7 +47,7 @@ module.exports = function registerCommands(bot, deps) {
       }
       const un = global._cachedBotUsername;
       const buttons = res.map(f => ([{
-        text: '📥 ' + f.title.substring(0, 55),
+        text: '📥 ' + f.title.substring(0, 38) + (f.sub_name ? '  •  ' + f.sub_name.substring(0, 18) : ''),
         url: 'https://t.me/' + un + '?start=file_' + f.id
       }]));
       return ctx.reply('🔍 *نتائج: "' + q + '"*', {
