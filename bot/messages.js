@@ -190,6 +190,19 @@ module.exports.registerMessages = function(bot, deps) {
     } catch(e) { logger.error('[TextHandler]', e.message, { uid: ctx.from?.id }); }
   });
 
+  // ── New member joined (welcome message) ──
+  bot.on('new_chat_members', async ctx => {
+    const members = ctx.message?.new_chat_members || [];
+    for (const member of members) {
+      if (!member.is_bot) {
+        try {
+          const { handleNewMember } = require('../handlers/group_admin');
+          await handleNewMember(bot, ctx.chat.id, member.id, member.first_name);
+        } catch(_) {}
+      }
+    }
+  });
+
   // ── Chat member changes ──
   bot.on('my_chat_member', async ctx => {
     const chat = ctx.myChatMember?.chat, member = ctx.myChatMember?.new_chat_member, oldMember = ctx.myChatMember?.old_chat_member;

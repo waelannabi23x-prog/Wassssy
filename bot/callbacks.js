@@ -228,6 +228,16 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'sp_',         fn: (ctx, d) => browse.showYears(ctx, safeInt(d.substring(3))) },                                    // ✅ specialty → years
 
     // Admin (آخر شيء — prefix قصير)
+    { p: 'leave_grp_', fn: async (ctx, d) => {
+      if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(() => {});
+      const chatId = parseInt(d.substring(10));
+      try {
+        await ctx.telegram.leaveChat(chatId);
+        await dbRun('DELETE FROM group_chats WHERE chat_id=$1', [chatId]);
+        await ctx.answerCbQuery('✅ تم الخروج').catch(() => {});
+        return ctx.editMessageText('✅ خرجت من القروب ' + chatId).catch(() => ctx.reply('✅ تم الخروج.').catch(() => {}));
+      } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
+    }},
     { p: 'mg_',         fn: async (ctx, d) => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {}); return manage.handleCallback(ctx, d); }},
   ];
 
