@@ -42,9 +42,18 @@ module.exports = function registerCommands(bot, deps) {
       const { smartSearch } = require('../handlers/group');
       const res = await smartSearch(q, 5);
       if (!res?.length) return ctx.reply('❌ لا نتائج لـ: ' + q).catch(() => {});
-      const un = await (async () => { try { const m = await bot.telegram.getMe(); return m.username; } catch(_){ return null; } })();
-      const lines = res.map((f, i) => `${i+1}. ${f.title}` + (un ? ` — [تحميل](https://t.me/${un}?start=file_${f.id})` : '')).join('\n');
-      return ctx.reply('🔍 *نتائج:*\n\n' + lines, { parse_mode: 'Markdown' }).catch(() => {});
+      if (!global._cachedBotUsername) {
+        try { global._cachedBotUsername = (await bot.telegram.getMe()).username; } catch(_) {}
+      }
+      const un = global._cachedBotUsername;
+      const buttons = res.map(f => ([{
+        text: '📥 ' + f.title.substring(0, 55),
+        url: 'https://t.me/' + un + '?start=file_' + f.id
+      }]));
+      return ctx.reply('🔍 *نتائج: "' + q + '"*', {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: buttons }
+      }).catch(() => {});
     }
     await global.setState(ctx.uid, { type: 'search', query: raw || '' });
     return ctx.reply('🔍 اكتب كلمة البحث:').catch(() => {});
