@@ -84,8 +84,7 @@ async function showMainMenu(ctx, name) {
   const hour = new Date().getHours();
   const timeGreet = hour < 5 ? '🌙' : hour < 12 ? '🌅 صباح النور' : hour < 18 ? '☀️ مساء الخير' : '🌙 مساء النور';
 
-  let welcome = timeGreet + ' ' + escMd(ctx.from?.first_name || '') + '
-';
+  let welcome = timeGreet + ' ' + escMd(ctx.from?.first_name || '') + '\n';
   if (sp) welcome += '🎓 ' + sp.name + '\n';
   welcome += '📚 منصتك الأكاديمية — اختر ما تريد:';
 
