@@ -1,4 +1,5 @@
 'use strict';
+const { addChannel, removeChannel, getChannels } = require('../utils/channelGuard');
 
 module.exports = function registerCommands(bot, deps) {
   const {
