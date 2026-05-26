@@ -113,6 +113,7 @@ module.exports = function registerCommands(bot, deps) {
   });
 
   bot.command('new', async ctx => {
+    if (ctx.chat?.type !== 'private') return ctx.deleteMessage().catch(() => {});
     if (!ctx.isAdmin) return ctx.reply('🚫 ليس لديك صلاحية.').catch(() => {});
     return manage.mainMenu(ctx);
   });
