@@ -33,6 +33,15 @@ module.exports.registerMessages = function(bot, deps) {
       if (ctx.from && !ctx.from.is_bot)
         GrpBuf.add(ctx.chat.id, ctx.from.id, ctx.from.username, ctx.from.first_name);
 
+      // ── Welcome message ──
+      if (ctx.message?.new_chat_members?.length) {
+        const { handleNewMember } = require('../handlers/group_admin');
+        for (const m of ctx.message.new_chat_members) {
+          if (!m.is_bot) handleNewMember(bot, ctx.chat.id, m.id, m.first_name).catch(() => {});
+        }
+        return;
+      }
+
       const s = global.getState(ctx.uid);
       if (s?.type === 'mg_bundle_files' && ctx.message.media_group_id) {
         const mgId = ctx.message.media_group_id;
@@ -188,19 +197,6 @@ module.exports.registerMessages = function(bot, deps) {
       }
       if ((s?.type || '').startsWith('mg_') && ctx.isAdmin) return manage.handleText(ctx, s);
     } catch(e) { logger.error('[TextHandler]', e.message, { uid: ctx.from?.id }); }
-  });
-
-  // ── New member joined (welcome message) ──
-  bot.on('new_chat_members', async ctx => {
-    const members = ctx.message?.new_chat_members || [];
-    for (const member of members) {
-      if (!member.is_bot) {
-        try {
-          const { handleNewMember } = require('../handlers/group_admin');
-          await handleNewMember(bot, ctx.chat.id, member.id, member.first_name);
-        } catch(_) {}
-      }
-    }
   });
 
   // ── Chat member changes ──
