@@ -38,7 +38,10 @@ const filesDb       = require('./database/files');
 const { handleAiChat, resetChat } = require('./handlers/ai_chat');
 const { handleOwnerAI }           = require('./handlers/ai_owner');
 const { smartSearch }             = require('./handlers/group');
-const { handleNewMember, showAllMembers, tagMembers, tagAll, muteAll, unmuteAll } = require('./handlers/group_admin');
+const { handleNewMember, handleMemberLeft, showAllMembers, tagAll, muteAll, unmuteAll, showGroupStats, warnMember, banMember, unbanMember, muteMember, unmuteMember, checkAntiSpam } = require("./handlers/group_admin");
+const setupGroupCommands = require("./handlers/group_commands");
+const { migrateGroupTables } = require("./database/group_db");
+const groupBroadcast = require("./utils/groupBroadcast");
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { eos } = require('./utils/helpers');
 
