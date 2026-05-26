@@ -114,8 +114,7 @@ module.exports = function registerCommands(bot, deps) {
 
   bot.command('new', async ctx => {
     if (!ctx.isAdmin) return ctx.reply('🚫 ليس لديك صلاحية.').catch(() => {});
-    await global.setState(ctx.uid, { type: 'add_content' });
-    return ctx.reply('📝 ابدأ بإرسال اسم الملف أو الفئة.').catch(() => {});
+    return manage.mainMenu(ctx);
   });
 
   bot.command('top', async ctx => {
@@ -161,7 +160,6 @@ module.exports = function registerCommands(bot, deps) {
     const cid = args[0];
     const url = args[args.length - 1];
     const nm = args.slice(1, args.length - 1).join(' ');
-    const { addChannel } = require('../utils/channelGuard');
     await addChannel(cid, nm, url).catch(e => ctx.reply('خطا: ' + e.message).catch(() => {}));
     return ctx.reply('تمت الاضافة: ' + nm).catch(() => {});
   });
@@ -170,14 +168,12 @@ module.exports = function registerCommands(bot, deps) {
     if (!ctx.isOwner) return ctx.reply('للمالك فقط').catch(() => {});
     const id = parseInt(ctx.message.text.split(' ')[1]);
     if (!id) return ctx.reply('ارسل رقم القناة').catch(() => {});
-    const { removeChannel } = require('../utils/channelGuard');
     await removeChannel(id).catch(() => {});
     return ctx.reply('تم الحذف ' + id).catch(() => {});
   });
 
   bot.command('channels', async ctx => {
     if (!ctx.isOwner) return ctx.reply('للمالك فقط').catch(() => {});
-    const { getChannels } = require('../utils/channelGuard');
     const list = await getChannels().catch(() => []);
     if (!list.length) return ctx.reply('لا توجد قنوات').catch(() => {});
     const txt = list.map(ch => ch.id + '. ' + ch.channel_name + ' ' + ch.channel_url).join('\n');

@@ -92,6 +92,7 @@ module.exports.registerCallbacks = function(bot, deps) {
       }).catch(() => {});
     }],
     ['mg_toggle_app', async ctx => {
+      global._appPublic = !global._appPublic;
       await ctx.answerCbQuery(global._appPublic ? '✅ App ظاهر للكل' : '🔒 App مخفي', { show_alert: true }).catch(() => {});
       return manage.mainMenu(ctx);
     }],

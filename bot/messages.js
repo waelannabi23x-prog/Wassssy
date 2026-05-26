@@ -226,12 +226,31 @@ module.exports.registerMessages = function(bot, deps) {
       const { smartSearch } = require('../handlers/group');
       const res = await smartSearch(q, 10);
       if (!res?.length) { ctx.answerInlineQuery([], { cache_time: 5 }); return; }
-      const results = res.map(f => ({
-        type: 'article', id: String(f.id),
-        title: f.title, description: f.sub_name || '',
-        input_message_content: { message_text: '📄 ' + f.title + (f.sub_name ? '\n📚 ' + f.sub_name : '') }
-      }));
-      ctx.answerInlineQuery(results, { cache_time: 10 });
+      // جلب username البوت مرة واحدة + تخزينه
+      if (!global._cachedBotUsername) {
+        try { global._cachedBotUsername = (await ctx.telegram.getMe()).username; } catch(_) {}
+      }
+      const un = global._cachedBotUsername;
+      const results = res.map(f => {
+        const dlLink = un ? `https://t.me/${un}?start=file_${f.id}` : null;
+        const txt = '📄 *' + f.title + '*' +
+          (f.sub_name ? '\n📚 ' + f.sub_name : '') +
+          (dlLink ? '\n\n🔽 [تحميل مباشر](' + dlLink + ')' : '');
+        return {
+          type: 'article', id: String(f.id),
+          title: f.title,
+          description: (f.sub_name || '') + (f.cat_name ? ' · ' + f.cat_name : ''),
+          thumb_url: 'https://telegram.org/img/t_logo.png',
+          input_message_content: {
+            message_text: txt,
+            parse_mode: 'Markdown'
+          },
+          reply_markup: dlLink ? {
+            inline_keyboard: [[{ text: '📥 تحميل', url: dlLink }]]
+          } : undefined
+        };
+      });
+      ctx.answerInlineQuery(results, { cache_time: 30 });
     } catch(_) { ctx.answerInlineQuery([], { cache_time: 5 }); }
   });
 };
