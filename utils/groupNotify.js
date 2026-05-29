@@ -1,5 +1,5 @@
 'use strict';
-const { all, run } = require('../database/db');
+const { all, run, get } = require('../database/db');
 
 // ══════════════════════════════════════════════════════════
 // 🔧 Helpers
