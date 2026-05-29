@@ -1,6 +1,7 @@
 'use strict';
 
 const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
+const { getSetting, get: dbGet } = require('../database/db');
 const { get, run, getP } = require('../database/db');
 
 // ✅ OWNER_ID إجباري من .env — لا fallback hardcoded
@@ -119,8 +120,7 @@ async function authMiddleware(ctx, next) {
     const chatType = ctx.chat?.type;
     if (!ctx.isOwner && !ctx.isAdmin && chatType === 'private') {
       const cbData = ctx.callbackQuery?.data;
-      const guard = require('../utils/channelGuard');
-
+      
       if (cbData === 'check_subscription') {
         // ⚡ أجب فوراً + امسح الكاش + افحص من جديد
         ctx.answerCbQuery('🔄 جاري التحقق...').catch(()=>{});
@@ -128,8 +128,7 @@ async function authMiddleware(ctx, next) {
         const res = await guard.checkAllChannels({ telegram: ctx.telegram }, uid);
         if (res.ok) {
           await ctx.deleteMessage().catch(()=>{});
-          const startHandler = require('../handlers/start');
-          const name = ctx.from?.first_name || 'Student';
+                    const name = ctx.from?.first_name || 'Student';
           return startHandler.showMainMenu(ctx, name);
         }
         // ✅ لم يشترك — أعد عرض القنوات المتبقية فقط

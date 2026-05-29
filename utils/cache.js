@@ -118,30 +118,15 @@ async function cacheWarmup() {
     const content = require('../database/content');
     const specs = await content.getSpecs();
     if (!specs?.length) return;
-    const tasks = [];
-    for (const sp of specs) {
-      tasks.push(async () => { try { await content.getYears(sp.id); } catch(_) {} });
-      try {
-        const years = await content.getYears(sp.id);
-        for (const yr of (years || [])) {
-          tasks.push(async () => { try { await content.getSemesters(yr.id); } catch(_) {} });
-          try {
-            const sems = await content.getSemesters(yr.id);
-            for (const sm of (sems || [])) {
-              tasks.push(async () => { try { await content.getSubjects(sm.id); } catch(_) {} });
-              try {
-                const subs = await content.getSubjects(sm.id);
-                for (const sb of (subs || []))
-                  tasks.push(async () => { try { await content.getCategories(sb.id); } catch(_) {} });
-              } catch(_) {}
-            }
-          } catch(_) {}
-        }
-      } catch(_) {}
-    }
-    let i = 0;
-    const worker = async () => { while (i < tasks.length) { const t = tasks[i++]; await t(); } };
-    await Promise.all(Array.from({ length: Math.min(CONC, tasks.length) }, worker));
+    // ✅ متوازي حقيقي بدل sequential
+    const years  = await Promise.all(specs.map(sp => content.getYears(sp.id).catch(() => [])));
+    const allYears = years.flat();
+    const sems   = await Promise.all(allYears.map(yr => content.getSemesters(yr.id).catch(() => [])));
+    const allSems = sems.flat();
+    const subs   = await Promise.all(allSems.map(sm => content.getSubjects(sm.id).catch(() => [])));
+    const allSubs = subs.flat();
+    await Promise.all(allSubs.map(sb => content.getCategories(sb.id).catch(() => {})));
+    const tasks = { length: specs.length + allYears.length + allSems.length + allSubs.length };
     require('./logger').info('⚡ Warmed: ' + tasks.length + ' keys');
     _evictLRU();
   } catch(_) {}

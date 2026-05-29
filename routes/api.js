@@ -12,6 +12,9 @@ function normalizeArabic(q) {
 }
 
 const express = require('express');
+// ── Async error wrapper — يمنع unhandled rejections ──
+const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
 const router = express.Router();
 const { verifyWebApp } = require('../utils/webapp_auth');
 const { rateLimit } = require('../utils/apiRateLimit');
