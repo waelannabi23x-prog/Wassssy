@@ -71,7 +71,7 @@ module.exports.registerCallbacks = function(bot, deps) {
       try {
         const rows = await bundlesDb.getAllBundles().catch(() => []);
         if (!rows.length) return ctx.reply('📦 لا توجد حزم.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-        const kb = rows.map(b => [kbBtn('📦 ' + b.name + (b.specialty_name ? ' · ' + b.specialty_name : ''), 'bundle_view_' + b.id)]);
+        const kb = rows.map(b => [kbBtn('📦 ' + b.title + (b.specialty_name ? ' · ' + b.specialty_name : ''), 'bundle_view_' + b.id)]);
         kb.push([kbBtn('➕ حزمة جديدة', 'bundle_new')]);
         return eos(ctx, '📦 *الحزم الدراسية* (' + rows.length + ')', { parse_mode: 'Markdown', ...kbBuild(kb) });
       } catch(e) { return ctx.reply('❌ ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
@@ -134,7 +134,7 @@ module.exports.registerCallbacks = function(bot, deps) {
         const [files, b] = await Promise.all([bundlesDb.getBundleFiles(bid), bundlesDb.getBundle(bid)]);
         const kb = files.map(f => [kbBtn('🗑️ ' + f.title.substring(0,35), 'bundle_del_file_' + bid + '_' + f.id)]);
         kb.push([kbBtn('➕ إضافة ملفات', 'bundle_add_files_' + bid), kbBtn('🗑️ حذف الحزمة', 'bundle_delete_' + bid)]);
-        kb.push([kbBtn('◀️ رجوع', 'bundle_list')]);
+        kb.push([kbBtn('◀️ رجوع', 'mg_content')]);
         return eos(ctx, '📦 *' + b.name + '*\n\n' + files.length + ' ملف', { parse_mode: 'Markdown', ...kbBuild(kb) });
       } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
     }},
@@ -157,7 +157,7 @@ module.exports.registerCallbacks = function(bot, deps) {
         if (!b) return ctx.answerCbQuery('❌ غير موجود').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
         const kb = files.map(f => [kbBtn('🗑️ ' + f.title.substring(0,35), 'bundle_del_file_' + bid + '_' + f.id)]);
         kb.push([kbBtn('➕ إضافة ملفات', 'bundle_add_files_' + bid), kbBtn('🗑️ حذف الحزمة', 'bundle_delete_' + bid)]);
-        kb.push([kbBtn('◀️ رجوع', 'bundle_list')]);
+        kb.push([kbBtn('◀️ رجوع', 'mg_content')]);
         return eos(ctx, '📦 *' + b.name + '*\n\n' + files.length + ' ملف\n\n_اضغط على ملف لحذفه_', { parse_mode: 'Markdown', ...kbBuild(kb) });
       } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
     }},
