@@ -24,10 +24,9 @@ function getPg() {
     });
 
     pgPool.on('error', err => {
-      logger.error('[DB] pool error: ' + err.message);
-      if (err.message.includes('ECONNRESET') || err.message.includes('terminated')) {
-        pgPool = null;
-      }
+      // ✅ نسجّل الخطأ فقط — لا نحذف الـ pool لأن ذلك يسبب connection leak
+      // الـ pool يعيد الاتصال تلقائياً
+      logger.error('[DB] pool error (auto-recovering): ' + err.message);
     });
 
     // Keepalive ping كل 25 ثانية
