@@ -2,7 +2,7 @@
 const { run, all } = require('../database/db');
 const logger = require('./logger');
 
-const _mem = {};
+const _mem = new Map();
 let _redis = null;
 
 if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
@@ -25,7 +25,7 @@ async function loadAllStates() {
     const rows = await all("SELECT user_id, state FROM user_states WHERE updated_at > NOW() - INTERVAL '24 hours'");
     let n = 0;
     for (const r of rows) {
-      try { _mem[r.user_id] = JSON.parse(r.state); n++; } catch(_) {}
+      try { _mem.set(r.user_id, JSON.parse(r.state)); n++; } catch(_) {}
     }
     run("DELETE FROM user_states WHERE updated_at <= NOW() - INTERVAL '24 hours'").catch(() => {});
     logger.info('Loaded ' + n + ' states من DB');
@@ -35,7 +35,7 @@ async function loadAllStates() {
 // ── setState: Redis أولاً + DB backup ──
 async function setState(uid, val) {
   val._ts = Date.now();
-  _mem[uid] = val;
+  _mem.set(uid, val);
   const json = JSON.stringify(val);
 
   if (_redis) {
@@ -59,7 +59,7 @@ async function setState(uid, val) {
 
 // ── delState ──
 async function delState(uid) {
-  delete _mem[uid];
+  _mem.delete(uid);
 
   if (_redis) {
     try { await _redis.del('state:' + uid); } catch(_) {}
@@ -70,13 +70,13 @@ async function delState(uid) {
 
 // ── getState: من الذاكرة دائماً (فوري) ──
 async function getStateAsync(uid) {
-  if (_mem[uid]) return _mem[uid];
+  if (_mem.has(uid)) return _mem.get(uid);
   if (_redis) {
     try {
       const val = await _redis.get('state:' + uid);
       if (val) {
         const parsed = typeof val === 'string' ? JSON.parse(val) : val;
-        _mem[uid] = parsed;
+        _mem.set(uid, parsed);
         return parsed;
       }
     } catch(_) {}
@@ -84,6 +84,6 @@ async function getStateAsync(uid) {
   return null;
 }
 
-function getState(uid) { return _mem[uid] || null; }
+function getState(uid) { return _mem.get(uid) || null; }
 
 module.exports = { loadAllStates, setState, delState, getState, getStateAsync, _mem };
