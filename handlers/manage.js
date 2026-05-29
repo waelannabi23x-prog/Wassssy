@@ -261,7 +261,7 @@ async function handleFileUpload(ctx){
   const isLink=msg.entities?.some(e=>e.type==='url'||e.type==='text_link')||msgText.startsWith('http');
   if(msg.document){fid=msg.document.file_id;ftype='document';}
   else if(msg.photo){fid=msg.photo[msg.photo.length-1].file_id;ftype='photo';}
-  else if(msg.video){fid=msg.video.file_id;ftype='document';}
+  else if(msg.video){fid=msg.video.file_id;ftype='video';}
   else if(msg.audio){fid=msg.audio.file_id;ftype='document';}
   else if(msg.voice){fid=msg.voice.file_id;ftype='document';}
   else if(isLink){fid=msgText;ftype='link';}

@@ -49,7 +49,17 @@ async function sendToGroup(bot, chatId, text, extra, retries = 3) {
 // 📢 إشعار القروبات بملف جديد
 // ══════════════════════════════════════════════════════════
 async function notifyGroupsNewFile(bot, fileInfo) {
-  if (!bot || !fileInfo?.specialty_id) return;
+  if (!bot || !fileInfo) return;
+
+    // استخرج specialty_id من DB إذا ما كان موجود
+    if (!fileInfo.specialty_id && fileInfo.category_id) {
+      const spec = await get(
+        `SELECT y.specialty_id FROM categories c JOIN subjects s ON c.subject_id=s.id JOIN semesters sm ON s.semester_id=sm.id JOIN years y ON sm.year_id=y.id WHERE c.id=$1 LIMIT 1`,
+        [fileInfo.category_id]
+      ).catch(() => null);
+      if (spec?.specialty_id) fileInfo.specialty_id = spec.specialty_id;
+    }
+    if (!fileInfo.specialty_id) return;
 
   try {
     const groups = await all(
