@@ -53,7 +53,7 @@ module.exports.registerMessages = function(bot, deps) {
             let fid, ft, tl = '';
             if (m.document)    { fid = m.document.file_id; ft = 'document'; tl = m.document.file_name || ''; }
             else if (m.photo)  { fid = m.photo[m.photo.length - 1].file_id; ft = 'photo'; }
-            else if (m.video)  { fid = m.video.file_id; ft = 'document'; }
+            else if (m.video)  { fid = m.video.file_id; ft = 'video'; }
             else continue;
             await bundlesDb.addBundleFile(s.bundleId, fid, ft, tl).catch(() => {}); c++;
           }
@@ -135,6 +135,7 @@ module.exports.registerMessages = function(bot, deps) {
     if (s?.type === 'mg_bundle_files') return manage.handleBundleFileUpload(ctx);
     if (s?.type === 'mg_file')         return manage.handleFileUpload(ctx);
     if (s?.type === 'mg_tpl_content')  return manage.handleText(ctx, s);
+    if (s?.type === 'mg_notify_groups_msg') return manage.handleText(ctx, s);
   });
 
   // ── Text ──
