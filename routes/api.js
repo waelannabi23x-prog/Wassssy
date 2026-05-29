@@ -1,16 +1,5 @@
 'use strict';
 
-// ── Batch Download Counter ──
-const _dlBuf = new Map();
-setInterval(async () => {
-  const entries = [..._dlBuf.entries()];
-  _dlBuf.clear();
-  for (const [id, count] of entries) {
-    run('UPDATE files SET downloads = downloads + $1 WHERE id=$2', [count, id]).catch(() => {});
-  }
-}, 5000).unref();
-function incDownloads(id) { _dlBuf.set(id, (_dlBuf.get(id) || 0) + 1); }
-
 
 function normalizeArabic(q) {
   return q
@@ -83,18 +72,6 @@ router.get('/file/:id', auth, async (req, res) => {
   ]);
   res.json({ ...f, rating, fav, comments });
 });
-
-// ── Arabic text normalizer for search ──
-function _normAr(s) {
-  return s
-    .replace(/[\u064B-\u065F\u0670]/g, '') // تشكيل
-    .replace(/[أإآ]/g, 'ا')
-    .replace(/ة/g, 'ه')
-    .replace(/ى/g, 'ي')
-    .replace(/^ال/, '')
-    .toLowerCase()
-    .trim();
-}
 
 router.get('/search', auth, async (req, res) => {
   const q = (req.query.q || '').slice(0, 80);

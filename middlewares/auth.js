@@ -166,8 +166,8 @@ async function authMiddleware(ctx, next) {
     global._dlCache.set(dlKey, 1);
     if (global._dlCache.size > 50000) {
       // احذف أقدم 10000 مدخل بدل مسح الكل
-      const keys = global._dlCache.keys();
-      for (let i = 0; i < 10000; i++) global._dlCache.delete(keys.next().value);
+      const arr = [...global._dlCache.keys()].slice(0, 10000);
+      arr.forEach(k => global._dlCache.delete(k));
     }
     try { const {checkDailyLogin}=require('../database/points'); checkDailyLogin(uid).catch(()=>{}); } catch(_){}
   }

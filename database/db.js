@@ -53,46 +53,6 @@ async function getSQLite() {
 }
 
 
-// SQLite placeholder: ? → $1,$2
-function toQ(sql) {
-  let i = 0;
-  return sql.replace(/\?/g, () => '$' + (++i));
-}
-
-function sGet(w, sql, p = []) {
-  const q = toQ(sql);
-  if (w.type === 'better') {
-    try { return w.db.prepare(q).get(...p) || null; } catch(_) { return null; }
-  }
-  try {
-    const s = w.db.prepare(q); s.bind(p);
-    if (s.step()) { const r = s.getAsObject(); s.free(); return r; }
-    s.free(); return null;
-  } catch(_) { return null; }
-}
-
-function sAll(w, sql, p = []) {
-  const q = toQ(sql);
-  if (w.type === 'better') {
-    try { return w.db.prepare(q).all(...p); } catch(_) { return []; }
-  }
-  try {
-    const r = w.db.exec(q, p);
-    if (!r.length) return [];
-    const { columns, values } = r[0];
-    return values.map(row => { const obj = {}; columns.forEach((c, i) => { obj[c] = row[i]; }); return obj; });
-  } catch(_) { return []; }
-}
-
-function sRun(w, sql, p = []) {
-  const q = toQ(sql);
-  if (w.type === 'better') {
-    try { w.db.prepare(q).run(...p); } catch(_) {}
-    return;
-  }
-  try { w.db.run(q, p); w.save(); } catch(_) {}
-}
-
 // ── Public API ──
 async function get(sql, params = []) {
   if (USE_PG) {

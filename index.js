@@ -227,6 +227,12 @@ async function launch() {
 const apiRoutes = require('./routes/api');
     app.use('/api', apiRoutes);
 
+// ── Global Express Error Handler ──
+app.use((err, req, res, _next) => {
+  logger.error('[API Error] ' + err.message, { path: req.path, uid: req.tgUser?.id });
+  res.status(err.status || 500).json({ error: 'حدث خطأ، حاول مجددًا.' });
+});
+
     app.listen(PORT, () => logger.info('✅ Express :' + PORT));
 
       
@@ -263,7 +269,7 @@ bot.start(async (ctx, next) => {
 
 
     if (WEBHOOK_URL) {
-      await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN', {
+      await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, {
         allowed_updates: ['message', 'callback_query', 'my_chat_member', 'chat_member', 'inline_query'],
         drop_pending_updates: true,
         max_connections: 40,
