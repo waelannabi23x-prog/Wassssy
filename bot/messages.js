@@ -194,7 +194,7 @@ module.exports.registerMessages = function(bot, deps) {
         try {
           const _cf = await filesDb.getFile(s.fid);
           if (_cf) ctx.telegram.sendMessage(OWNER_ID, '💬 *تعليق جديد*\n📄 ' + _cf.title + '\n👤 ' + (ctx.from.first_name || '') + '\n\n' + txt.substring(0, 300), { parse_mode: 'Markdown' }).catch(() => {});
-        } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+        } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
         return browse.showComments(ctx, s.fid, s.spId, s.yrId, s.smId, s.sbId, s.catId);
       }
       if ((s?.type || '').startsWith('mg_') && ctx.isAdmin) return manage.handleText(ctx, s);
@@ -239,7 +239,7 @@ module.exports.registerMessages = function(bot, deps) {
       if (!res?.length) { ctx.answerInlineQuery([], { cache_time: 5 }); return; }
       // جلب username البوت مرة واحدة + تخزينه
       if (!global._cachedBotUsername) {
-        try { global._cachedBotUsername = (await ctx.telegram.getMe()).username; } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+        try { global._cachedBotUsername = (await ctx.telegram.getMe()).username; } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
       }
       const un = global._cachedBotUsername;
       const results = res.map(f => {

@@ -44,7 +44,7 @@ module.exports = function registerCommands(bot, deps) {
       const res = await smartSearch(q, 5);
       if (!res?.length) return ctx.reply('❌ لا نتائج لـ: ' + q).catch(() => {});
       if (!global._cachedBotUsername) {
-        try { global._cachedBotUsername = (await bot.telegram.getMe()).username; } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+        try { global._cachedBotUsername = (await bot.telegram.getMe()).username; } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
       }
       const un = global._cachedBotUsername;
       const buttons = res.map(f => ([{

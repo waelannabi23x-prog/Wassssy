@@ -67,7 +67,7 @@ async function cacheGetAsync(key) {
       cacheSet(key, val, TTL.CONTENT); // ضعه في الذاكرة
       return val;
     }
-  } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+  } catch(err) { require('./logger').debug('[catch]', err.message); }
   return null;
 }
 
@@ -79,7 +79,7 @@ async function cacheSetAsync(key, val, ttl) {
   if (!r) return;
   try {
     await r.set(key, val, { ex: Math.floor(ttl / 1000) });
-  } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+  } catch(err) { require('./logger').debug('[catch]', err.message); }
 }
 
 // ── Warmup: يجلب من Upstash أولاً ──
@@ -93,12 +93,12 @@ async function cacheWarmup() {
           try {
             const val = await r.get(k);
             if (val) cacheSet(k, val, TTL.CONTENT);
-          } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+          } catch(err) { require('./logger').debug('[catch]', err.message); }
         }));
         require('./logger').info('⚡ Warmup من Upstash: ' + keys.length + ' مفتاح');
         return;
       }
-    } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+    } catch(err) { require('./logger').debug('[catch]', err.message); }
   }
   // Fallback: warmup من DB
   try {
@@ -117,7 +117,7 @@ async function cacheWarmup() {
     const tasks = { length: specs.length + allYears.length + allSems.length + allSubs.length };
     require('./logger').info('⚡ Warmed: ' + tasks.length + ' keys');
     _evictLRU();
-  } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+  } catch(err) { require('./logger').debug('[catch]', err.message); }
 }
 
 
@@ -142,7 +142,7 @@ async function cacheMGet(keys) {
         catch { results[idx] = raw[j]; }
       }
     });
-  } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+  } catch(err) { require('./logger').debug('[catch]', err.message); }
 
   return results;
 }

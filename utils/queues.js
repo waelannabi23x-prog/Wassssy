@@ -53,7 +53,7 @@ if (_conn) {
 // Fallback: إذا BullMQ فشل → نفذ مباشرة بدون queue
 async function safeAdd(queue, name, data) {
   if (queue) {
-    try { return await queue.add(name, data); } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+    try { return await queue.add(name, data); } catch(err) { require('./logger').debug('[catch]', err.message); }
   }
   // Fallback: in-process async
   setImmediate(async () => {
@@ -61,7 +61,7 @@ async function safeAdd(queue, name, data) {
     if (!bot || !data.userIds?.length) return;
     let sent = 0;
     for (const id of data.userIds) {
-      try { await bot.telegram.sendMessage(id, data.message, { parse_mode: data.parseMode || 'Markdown' }); sent++; } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+      try { await bot.telegram.sendMessage(id, data.message, { parse_mode: data.parseMode || 'Markdown' }); sent++; } catch(err) { require('./logger').debug('[catch]', err.message); }
       if (sent % 25 === 0) await new Promise(r => setTimeout(r, 1000));
     }
     if (data.fromUid) {
