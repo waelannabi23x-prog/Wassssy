@@ -199,7 +199,7 @@ async function showLeaderboard(ctx) {
 
 const { awardPoints } = require('../database/points');
 async function awardXP(uid, type) {
-  return awardPoints(uid, type).catch(() => {});
+  return awardPoints(uid, type).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 }
 
 module.exports = { showProfile, showLeaderboard, awardXP };

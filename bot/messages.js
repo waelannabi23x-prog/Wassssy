@@ -37,7 +37,7 @@ module.exports.registerMessages = function(bot, deps) {
       if (ctx.message?.new_chat_members?.length) {
         const { handleNewMember } = require('../handlers/group_admin');
         for (const m of ctx.message.new_chat_members) {
-          if (!m.is_bot) handleNewMember(bot, ctx.chat.id, m.id, m.first_name).catch(() => {});
+          if (!m.is_bot) handleNewMember(bot, ctx.chat.id, m.id, m.first_name).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
         }
         return;
       }
@@ -55,10 +55,10 @@ module.exports.registerMessages = function(bot, deps) {
             else if (m.photo)  { fid = m.photo[m.photo.length - 1].file_id; ft = 'photo'; }
             else if (m.video)  { fid = m.video.file_id; ft = 'video'; }
             else continue;
-            await bundlesDb.addBundleFile(s.bundleId, fid, ft, tl).catch(() => {}); c++;
+            await bundlesDb.addBundleFile(s.bundleId, fid, ft, tl).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); c++;
           }
           s.fileCount = (s.fileCount || 0) + c;
-          ctx.reply('📎 ' + c + ' ملف. المجموع: ' + s.fileCount + '\nأبعث المزيد أو /done').catch(() => {});
+          ctx.reply('📎 ' + c + ' ملف. المجموع: ' + s.fileCount + '\nأبعث المزيد أو /done').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
         }, 1500);
         return;
       }
@@ -77,7 +77,7 @@ module.exports.registerMessages = function(bot, deps) {
       const hasCap = !!(ctx.message.caption && /تخصص:|سنة:|spec:|year:|sem:|mat:|cat:/i.test(ctx.message.caption));
       if (isFwd && !hasCap && !s) {
         await require('../utils/stateManager').setState(ctx.uid, { type: 'pending_forward', doc: ctx.message.document, photo: null });
-        await ctx.reply('📎 ملف محفوظ! أرسل المسار:\n`تخصص: X | سنة: X | فصل: X | مادة: X | قسم: X`', { parse_mode: 'Markdown' }).catch(() => {});
+        await ctx.reply('📎 ملف محفوظ! أرسل المسار:\n`تخصص: X | سنة: X | فصل: X | مادة: X | قسم: X`', { parse_mode: 'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
         return;
       }
     }
@@ -88,13 +88,13 @@ module.exports.registerMessages = function(bot, deps) {
     if (s?.type === 'mg_bulk_files')   return manage.handleBulkUpload(ctx);
     if (s?.type === 'mg_tpl_file') {
       await require('../utils/stateManager').setState(ctx.uid, { ...s, type: 'mg_tpl_content', fileId: ctx.message.document.file_id });
-      return ctx.reply('✏️ اكتب نص الرسالة (أو skip):').catch(() => {});
+      return ctx.reply('✏️ اكتب نص الرسالة (أو skip):').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
 
     // Restore backup
     if (s?.type === 'mg_awaiting_restore' && ctx.isOwner) {
       await require('../utils/stateManager').delState(ctx.uid);
-      const msg = await ctx.reply('⏳ جاري الاستعادة...').catch(() => {});
+      const msg = await ctx.reply('⏳ جاري الاستعادة...').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       try {
         const link = await ctx.telegram.getFileLink(ctx.message.document.file_id);
         const raw  = await new Promise((resolve, reject) => {
@@ -114,11 +114,11 @@ module.exports.registerMessages = function(bot, deps) {
           try { await dbRun('INSERT INTO ' + table + '(' + cols.join(',') + ') VALUES ' + ph + ' ON CONFLICT DO NOTHING', vals); restored += rows.length; }
           catch(e) { errors++; logger.error('[Restore]', table, e.message); }
         }
-        if (msg) ctx.deleteMessage(msg.message_id).catch(() => {});
-        ctx.reply('✅ تمت الاستعادة\n\n' + restored + ' سجل | ' + errors + ' خطأ').catch(() => {});
+        if (msg) ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+        ctx.reply('✅ تمت الاستعادة\n\n' + restored + ' سجل | ' + errors + ' خطأ').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       } catch(e) {
-        if (msg) ctx.deleteMessage(msg.message_id).catch(() => {});
-        ctx.reply('❌ فشلت الاستعادة: ' + e.message).catch(() => {});
+        if (msg) ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+        ctx.reply('❌ فشلت الاستعادة: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }
       return;
     }
@@ -148,7 +148,7 @@ module.exports.registerMessages = function(bot, deps) {
       const txt = ctx.message.text.trim();
 
       if (s.type === 'ai_mode' && ctx.chat?.type === 'private') {
-        if (txt.length > 1000) return ctx.reply('⚠️ الحد 1000 حرف.').catch(() => {});
+        if (txt.length > 1000) return ctx.reply('⚠️ الحد 1000 حرف.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
         if (ctx.isOwner && await handleOwnerAI(ctx, txt, null, null)) return;
         if (await handleAiChat(ctx, txt)) return;
       }
@@ -158,7 +158,7 @@ module.exports.registerMessages = function(bot, deps) {
       if (s.type === 'mg_bulk_files' && txt !== '/done') return manage.handleText(ctx, s);
       if (s.type === 'mg_tpl_link') {
         await require('../utils/stateManager').setState(ctx.uid, { ...s, type: 'mg_tpl_content', fileId: txt });
-        return ctx.reply('✏️ اكتب نص الرسالة (أو skip):').catch(() => {});
+        return ctx.reply('✏️ اكتب نص الرسالة (أو skip):').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }
       if (s.type === 'pending_forward' && ctx.isOwner) {
         const pTrig = /تخصص:|سنة:|فصل:|مادة:|قسم:|spec:|year:|sem:|mat:|cat:/i;
@@ -171,29 +171,29 @@ module.exports.registerMessages = function(bot, deps) {
       if (s.type === 'bundle_search') {
         const rows = await bundlesDb.searchBundles(txt).catch(() => []);
         await require('../utils/stateManager').delState(ctx.uid);
-        if (!rows.length) return ctx.reply('❌ لا نتائج لـ "' + txt + '"').catch(() => {});
+        if (!rows.length) return ctx.reply('❌ لا نتائج لـ "' + txt + '"').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
         const kb = rows.map(b => [kbBtn('📦 ' + b.name, 'bundle_view_' + b.id)]);
         return eos(ctx, '🔍 نتائج: ' + rows.length, { ...kbBuild(kb) });
       }
       if (s.type === 'mg_bundle_create') {
         if (!ctx.isAdmin) { await require('../utils/stateManager').delState(ctx.uid); return; }
         const name = txt.trim();
-        if (!name) return ctx.reply('❌ الاسم فارغ').catch(() => {});
+        if (!name) return ctx.reply('❌ الاسم فارغ').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
         const b = await bundlesDb.createBundle(name, null, null);
         await require('../utils/stateManager').setState(ctx.uid, { type: 'mg_bundle_files', bundleId: b.id, fileCount: 0 });
-        return ctx.reply('✅ تم إنشاء الحزمة: *' + name + '*\n\nأرسل الملفات الآن.\n/done للإنهاء', { parse_mode: 'Markdown' }).catch(() => {});
+        return ctx.reply('✅ تم إنشاء الحزمة: *' + name + '*\n\nأرسل الملفات الآن.\n/done للإنهاء', { parse_mode: 'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }
       if (s.type === 'search')      return userH.handleSearch(ctx, txt);
       if (s.type === 'add_comment') {
-        if (!txt || txt === '/cancel') { await require('../utils/stateManager').delState(ctx.uid); return ctx.reply('❌ تم الإلغاء.').catch(() => {}); }
-        if (txt.length > 500) return ctx.reply('⚠️ الحد 500 حرف.').catch(() => {});
+        if (!txt || txt === '/cancel') { await require('../utils/stateManager').delState(ctx.uid); return ctx.reply('❌ تم الإلغاء.').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
+        if (txt.length > 500) return ctx.reply('⚠️ الحد 500 حرف.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
         await commentsDb.addComment(s.fid, ctx.uid, txt);
         await require('../utils/stateManager').delState(ctx.uid);
         cacheClear('cmts_' + s.fid + '_0'); cacheClear('cmts_' + s.fid + '_1');
-        await ctx.reply('✅ تم إضافة تعليقك!').catch(() => {});
+        await ctx.reply('✅ تم إضافة تعليقك!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
         try {
           const _cf = await filesDb.getFile(s.fid);
-          if (_cf) ctx.telegram.sendMessage(OWNER_ID, '💬 *تعليق جديد*\n📄 ' + _cf.title + '\n👤 ' + (ctx.from.first_name || '') + '\n\n' + txt.substring(0, 300), { parse_mode: 'Markdown' }).catch(() => {});
+          if (_cf) ctx.telegram.sendMessage(OWNER_ID, '💬 *تعليق جديد*\n📄 ' + _cf.title + '\n👤 ' + (ctx.from.first_name || '') + '\n\n' + txt.substring(0, 300), { parse_mode: 'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
         } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
         return browse.showComments(ctx, s.fid, s.spId, s.yrId, s.smId, s.sbId, s.catId);
       }
@@ -223,8 +223,8 @@ module.exports.registerMessages = function(bot, deps) {
       } catch(e) { if (!e.message?.includes('TOPIC_CLOSED')) logger.error('[GrpJoin]', e.message); }
     } else if (['left', 'kicked'].includes(member?.status)) {
       await Promise.all([
-        dbRun('DELETE FROM group_chats WHERE chat_id=$1',  [chat.id]).catch(() => {}),
-        dbRun('DELETE FROM group_members WHERE chat_id=$1', [chat.id]).catch(() => {}),
+        dbRun('DELETE FROM group_chats WHERE chat_id=$1',  [chat.id]).catch(err => { require('../utils/logger').debug("[silent]", err.message); }),
+        dbRun('DELETE FROM group_members WHERE chat_id=$1', [chat.id]).catch(err => { require('../utils/logger').debug("[silent]", err.message); }),
       ]);
     }
   });

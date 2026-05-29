@@ -11,7 +11,7 @@ function bar(val, max, w) {
 }
 
 async function showAnalytics(ctx) {
-  if (!ctx.isAdmin) return ctx.answerCbQuery('\ud83d\udeab', { show_alert: true }).catch(() => {});
+  if (!ctx.isAdmin) return ctx.answerCbQuery('\ud83d\udeab', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   const cKey = 'analytics_main_v2';
   const cached = cacheGet(cKey);
   if (cached) return eos(ctx, cached.text, { parse_mode: 'Markdown', ...build(cached.kb) });
@@ -57,7 +57,7 @@ async function showAnalytics(ctx) {
 }
 
 async function showDetailedAnalytics(ctx) {
-  if (!ctx.isAdmin) return ctx.answerCbQuery('\ud83d\udeab', { show_alert: true }).catch(() => {});
+  if (!ctx.isAdmin) return ctx.answerCbQuery('\ud83d\udeab', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   const [topSubs,newUsers7d,reportStats,avgRating,bundleStats] = await Promise.all([
     all('SELECT s.name, COUNT(f.id) as cnt, COALESCE(SUM(f.downloads),0) as dl FROM subjects s JOIN categories c ON c.subject_id=s.id JOIN files f ON f.category_id=c.id AND f.is_deleted=0 WHERE s.is_deleted=0 GROUP BY s.id,s.name ORDER BY dl DESC LIMIT 8'),
     all("SELECT TO_CHAR(joined_at,'DD/MM') as day, COUNT(*) as cnt FROM users WHERE joined_at >= NOW() - INTERVAL '7 days' GROUP BY TO_CHAR(joined_at,'DD/MM'),DATE(joined_at) ORDER BY DATE(joined_at) ASC"),
@@ -84,7 +84,7 @@ async function showDetailedAnalytics(ctx) {
 }
 
 async function showDailyAnalytics(ctx) {
-  if (!ctx.isAdmin) return ctx.answerCbQuery('\ud83d\udeab', { show_alert: true }).catch(() => {});
+  if (!ctx.isAdmin) return ctx.answerCbQuery('\ud83d\udeab', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   const [todayFiles,todayDl,todayUsers,todayComments,hourlyActivity] = await Promise.all([
     get('SELECT COUNT(*) as c FROM files WHERE DATE(uploaded_at)=CURRENT_DATE AND is_deleted=0'),
     get('SELECT COALESCE(SUM(downloads),0) as c FROM files WHERE DATE(uploaded_at)=CURRENT_DATE AND is_deleted=0'),
@@ -109,7 +109,7 @@ async function showDailyAnalytics(ctx) {
 }
 
 async function showTopUsers(ctx) {
-  if (!ctx.isAdmin) return ctx.answerCbQuery('\ud83d\udeab', { show_alert: true }).catch(() => {});
+  if (!ctx.isAdmin) return ctx.answerCbQuery('\ud83d\udeab', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   const [topDl,topFav,mostActive] = await Promise.all([
     all('SELECT u.first_name,u.username,COUNT(h.file_id) as cnt FROM history h JOIN users u ON u.id=h.user_id WHERE u.is_banned=0 GROUP BY u.id,u.first_name,u.username ORDER BY cnt DESC LIMIT 8'),
     all('SELECT u.first_name,u.username,COUNT(f.file_id) as cnt FROM favorites f JOIN users u ON u.id=f.user_id GROUP BY u.id,u.first_name,u.username ORDER BY cnt DESC LIMIT 5'),

@@ -17,7 +17,7 @@ async function initNotes() {
     is_deleted   INTEGER DEFAULT 0,
     created_by   BIGINT,
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`).catch(() => {});
+  )`).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   _ready = true;
 }
 
@@ -81,7 +81,7 @@ async function showNotes(ctx, idx = 0) {
           [btn('🏠 رئيسية','main_menu')],
         ]),
       }
-    ).catch(() => {});
+    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
 
   idx = Math.max(0, Math.min(idx, notes.length - 1));
@@ -117,7 +117,7 @@ async function editNote(ctx, idx) {
   const newType = n.media_file_id ? (n.media_type||'text') : 'text';
 
   if (prevType !== newType) {
-    await ctx.deleteMessage().catch(() => {});
+    await ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     return showNotes(ctx, idx);
   }
 
@@ -128,7 +128,7 @@ async function editNote(ctx, idx) {
       await ctx.editMessageText(txt, { parse_mode: 'Markdown', ...kb });
     }
   } catch(_) {
-    await ctx.deleteMessage().catch(() => {});
+    await ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     return showNotes(ctx, idx);
   }
 }
@@ -136,9 +136,9 @@ async function editNote(ctx, idx) {
 /* ── Pin / Unpin ───────────────────────────────────────────── */
 async function togglePin(ctx, noteId) {
   const n = await get('SELECT is_pinned FROM notes WHERE id=$1', [noteId]).catch(() => null);
-  if (!n) return ctx.answerCbQuery('❌ ملاحظة غير موجودة').catch(() => {});
+  if (!n) return ctx.answerCbQuery('❌ ملاحظة غير موجودة').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   await run('UPDATE notes SET is_pinned=$1 WHERE id=$2', [n.is_pinned ? 0 : 1, noteId]);
-  await ctx.answerCbQuery(n.is_pinned ? '✅ إلغاء التثبيت' : '📌 تم التثبيت').catch(() => {});
+  await ctx.answerCbQuery(n.is_pinned ? '✅ إلغاء التثبيت' : '📌 تم التثبيت').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   const notes = await getNotes();
   const idx   = notes.findIndex(x => x.id == noteId);
   return editNote(ctx, Math.max(0, idx));
@@ -147,8 +147,8 @@ async function togglePin(ctx, noteId) {
 /* ── Delete ────────────────────────────────────────────────── */
 async function deleteNote(ctx, noteId) {
   await run('UPDATE notes SET is_deleted=1 WHERE id=$1', [noteId]);
-  await ctx.answerCbQuery('🗑 تم الحذف').catch(() => {});
-  await ctx.deleteMessage().catch(() => {});
+  await ctx.answerCbQuery('🗑 تم الحذف').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  await ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   return showNotes(ctx, 0);
 }
 
@@ -165,7 +165,7 @@ async function startAddNote(ctx) {
     '• رابط 🔗\n\n' +
     '_أو اكتب /cancel للإلغاء_',
     { parse_mode: 'Markdown' }
-  ).catch(() => {});
+  ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 }
 
 /* ── Handle note content input ─────────────────────────────── */
@@ -207,7 +207,7 @@ async function handleNoteInput(ctx, state) {
     return ctx.reply(
       '✏️ أرسل *عنوان* الملاحظة\n_(أو أرسل - للتخطي)_',
       { parse_mode: 'Markdown' }
-    ).catch(() => {});
+    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
 
   if (state.step === 'title') {
@@ -217,7 +217,7 @@ async function handleNoteInput(ctx, state) {
       [title, state.content||'', state.mediaFileId||null, state.mediaType||'text', state.url||null, uid]
     );
     await require('../utils/stateManager').delState(uid);
-    await ctx.reply('✅ *تمت إضافة الملاحظة!*', { parse_mode: 'Markdown' }).catch(() => {});
+    await ctx.reply('✅ *تمت إضافة الملاحظة!*', { parse_mode: 'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     return showNotes(ctx, 0);
   }
 }
@@ -233,18 +233,18 @@ async function handleCallback(ctx, data) {
     return editNote(ctx, parseInt(data.replace('note_nav_','')));
 
   if (data.startsWith('note_pin_')) {
-    if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط').catch(()=>{});
+    if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     return togglePin(ctx, data.replace('note_pin_',''));
   }
 
   if (data.startsWith('note_del_')) {
-    if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط').catch(()=>{});
+    if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     return deleteNote(ctx, data.replace('note_del_',''));
   }
 
   if (data === 'note_add') {
-    if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط').catch(()=>{});
-    await ctx.answerCbQuery('').catch(()=>{});
+    if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    await ctx.answerCbQuery('').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     return startAddNote(ctx);
   }
 }

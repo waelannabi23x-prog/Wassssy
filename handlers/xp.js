@@ -43,7 +43,7 @@ async function award(bot, uid, reason, amount) {
     if (result.leveled_up && bot && uid) {
       const msg = levelUpMsg(result);
       bot.telegram.sendMessage(uid, msg, { parse_mode: 'Markdown' })
-        .catch(() => {}); // non-blocking — don't crash if user blocked bot
+        .catch(err => { require('../utils/logger').debug("[silent]", err.message); }); // non-blocking — don't crash if user blocked bot
     }
 
     return result;

@@ -143,7 +143,7 @@ async function broadcastToGroups(bot, opts = {}) {
         if (msg.includes('kicked') || msg.includes('Forbidden') || msg.includes('not found')) {
           fatal++;
           // تنظيف القروب المحظور
-          run('UPDATE group_chats SET notify_new_files=0 WHERE chat_id=$1', [g.chat_id]).catch(() => {});
+          run('UPDATE group_chats SET notify_new_files=0 WHERE chat_id=$1', [g.chat_id]).catch(err => { require('./logger').debug("[silent]", err.message); });
         }
         // Flood wait
         const floodMatch = msg.match(/retry after (\d+)/i);

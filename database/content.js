@@ -51,14 +51,14 @@ const deleteSpec = async id => {
       [id]
     ).catch(()=>[]);
     // 2. حذف cascade بالترتيب الصحيح
-    await _run('DELETE FROM files WHERE id IN (SELECT f.id FROM files f JOIN categories c ON f.category_id=c.id JOIN subjects s ON c.subject_id=s.id JOIN semesters sm ON s.semester_id=sm.id JOIN years y ON sm.year_id=y.id WHERE y.specialty_id=$1)',[id]).catch(()=>{});
-    await _run('DELETE FROM categories WHERE subject_id IN (SELECT s.id FROM subjects s JOIN semesters sm ON s.semester_id=sm.id JOIN years y ON sm.year_id=y.id WHERE y.specialty_id=$1)',[id]).catch(()=>{});
-    await _run('DELETE FROM subjects WHERE semester_id IN (SELECT sm.id FROM semesters sm JOIN years y ON sm.year_id=y.id WHERE y.specialty_id=$1)',[id]).catch(()=>{});
-    await _run('DELETE FROM semesters WHERE year_id IN (SELECT id FROM years WHERE specialty_id=$1)',[id]).catch(()=>{});
-    await _run('DELETE FROM years WHERE specialty_id=$1',[id]).catch(()=>{});
-    await _run('DELETE FROM user_specialties WHERE specialty_id=$1',[id]).catch(()=>{});
-    await _run('DELETE FROM group_chats WHERE specialty_id=$1',[id]).catch(()=>{});
-    await _run('DELETE FROM specialties WHERE id=$1',[id]).catch(()=>{});
+    await _run('DELETE FROM files WHERE id IN (SELECT f.id FROM files f JOIN categories c ON f.category_id=c.id JOIN subjects s ON c.subject_id=s.id JOIN semesters sm ON s.semester_id=sm.id JOIN years y ON sm.year_id=y.id WHERE y.specialty_id=$1)',[id]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    await _run('DELETE FROM categories WHERE subject_id IN (SELECT s.id FROM subjects s JOIN semesters sm ON s.semester_id=sm.id JOIN years y ON sm.year_id=y.id WHERE y.specialty_id=$1)',[id]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    await _run('DELETE FROM subjects WHERE semester_id IN (SELECT sm.id FROM semesters sm JOIN years y ON sm.year_id=y.id WHERE y.specialty_id=$1)',[id]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    await _run('DELETE FROM semesters WHERE year_id IN (SELECT id FROM years WHERE specialty_id=$1)',[id]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    await _run('DELETE FROM years WHERE specialty_id=$1',[id]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    await _run('DELETE FROM user_specialties WHERE specialty_id=$1',[id]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    await _run('DELETE FROM group_chats WHERE specialty_id=$1',[id]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    await _run('DELETE FROM specialties WHERE id=$1',[id]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     // 3. تنظيف الكاش
     files.forEach(f => { cacheClear('file_'+f.id); cacheClear('prev_static_'+f.id); cacheClearPrefix('showfiles_'+f.category_id); });
     cacheClearPrefix('search_'); cacheClearPrefix('gsrc_');

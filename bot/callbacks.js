@@ -14,40 +14,40 @@ module.exports.registerCallbacks = function(bot, deps) {
 
   // ── Helpers ──
   async function hGrpSp(ctx, d) {
-    if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(() => {});
+    if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     const r = d.substring(7), i = r.lastIndexOf('_');
     const cid = parseInt(r.substring(0, i)), sid = parseInt(r.substring(i + 1));
     try {
       await dbRun('INSERT INTO group_chats(chat_id,specialty_id) VALUES($1,$2) ON CONFLICT(chat_id) DO UPDATE SET specialty_id=$2', [cid, sid]);
       const sp = await dbAll('SELECT name FROM specialties WHERE id=$1', [sid]);
       const nm = sp[0]?.name || sid;
-      await ctx.answerCbQuery('✅ ' + nm).catch(() => {});
-      await ctx.telegram.editMessageText(cid, ctx.callbackQuery.message.message_id, null, '✅ تخصص القروب: 🎓 ' + nm).catch(() => {});
-    } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
+      await ctx.answerCbQuery('✅ ' + nm).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+      await ctx.telegram.editMessageText(cid, ctx.callbackQuery.message.message_id, null, '✅ تخصص القروب: 🎓 ' + nm).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
   }
 
   async function hGrpDl(ctx, d) {
-    if (!ctx.isOwner) return ctx.answerCbQuery('🚫').catch(() => {});
+    if (!ctx.isOwner) return ctx.answerCbQuery('🚫').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     try {
       const f = await filesDb.getFile(d.substring(7));
-      if (!f) return ctx.answerCbQuery('❌ غير موجود').catch(() => {});
+      if (!f) return ctx.answerCbQuery('❌ غير موجود').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       const cap = '📄 ' + f.title + (f.sub_name ? '\n📚 ' + f.sub_name : '');
       let sm;
       if (f.file_type === 'photo')     sm = await ctx.telegram.sendPhoto(ctx.chat.id, f.file_id, { caption: cap });
       else if (f.file_type === 'link') sm = await ctx.telegram.sendMessage(ctx.chat.id, cap + '\n🔗 ' + f.file_id);
       else                              sm = await ctx.telegram.sendDocument(ctx.chat.id, f.file_id, { caption: cap });
-      if (sm?.message_id) await dbRun('INSERT INTO group_bot_msgs(chat_id,message_id) VALUES($1,$2)', [ctx.chat.id, sm.message_id]).catch(() => {});
-      ctx.answerCbQuery('✅ تم الإرسال').catch(() => {});
-    } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
+      if (sm?.message_id) await dbRun('INSERT INTO group_bot_msgs(chat_id,message_id) VALUES($1,$2)', [ctx.chat.id, sm.message_id]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+      ctx.answerCbQuery('✅ تم الإرسال').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
   }
 
   async function hSearchDel(ctx, d) {
-    if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {});
+    if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     const p = d.substring(11).split('|'), fid = p[0], q = decodeURIComponent(p[1] || '');
     await filesDb.softDelete(fid);
     cacheClearPrefix('search_');
     if (global._clearSearchCache) global._clearSearchCache();
-    await ctx.answerCbQuery('✅ تم الحذف').catch(() => {});
+    await ctx.answerCbQuery('✅ تم الحذف').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     return userH.handleSearch(ctx, q);
   }
 
@@ -55,30 +55,30 @@ module.exports.registerCallbacks = function(bot, deps) {
     const i = d.indexOf('_', 9), tt = d.substring(9, i), nm = decodeURIComponent(d.substring(i + 1));
     if (tt === 'text' || tt === 'link') {
       await require('../utils/stateManager').setState(ctx.uid, { type: 'mg_tpl_content', name: nm, tplType: tt, fileId: '' });
-      return ctx.reply(tt === 'link' ? '🔗 اكتب الرابط:' : '✏️ اكتب المحتوى:').catch(() => {});
+      return ctx.reply(tt === 'link' ? '🔗 اكتب الرابط:' : '✏️ اكتب المحتوى:').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
     await require('../utils/stateManager').setState(ctx.uid, { type: 'mg_tpl_file', name: nm, tplType: tt, fileId: '' });
-    return ctx.reply('📎 أبعث الملف أو الصورة:').catch(() => {});
+    return ctx.reply('📎 أبعث الملف أو الصورة:').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
 
   // ── Exact matches ──
   const exactR = new Map([
     ['bundle_search_prompt', async ctx => {
       await require('../utils/stateManager').setState(ctx.uid, { type: 'bundle_search' });
-      return ctx.reply('🔍 اكتب اسم الحزمة للبحث:').catch(() => {});
+      return ctx.reply('🔍 اكتب اسم الحزمة للبحث:').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }],
     ['bundle_list', async ctx => {
       try {
         const rows = await bundlesDb.getAllBundles().catch(() => []);
-        if (!rows.length) return ctx.reply('📦 لا توجد حزم.').catch(() => {});
+        if (!rows.length) return ctx.reply('📦 لا توجد حزم.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
         const kb = rows.map(b => [kbBtn('📦 ' + b.name + (b.specialty_name ? ' · ' + b.specialty_name : ''), 'bundle_view_' + b.id)]);
         kb.push([kbBtn('➕ حزمة جديدة', 'bundle_new')]);
         return eos(ctx, '📦 *الحزم الدراسية* (' + rows.length + ')', { parse_mode: 'Markdown', ...kbBuild(kb) });
-      } catch(e) { return ctx.reply('❌ ' + e.message).catch(() => {}); }
+      } catch(e) { return ctx.reply('❌ ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
     }],
     ['bundle_new', async ctx => {
       await require('../utils/stateManager').setState(ctx.uid, { type: 'mg_bundle_create' });
-      return ctx.reply('📦 اكتب اسم الحزمة الجديدة:').catch(() => {});
+      return ctx.reply('📦 اكتب اسم الحزمة الجديدة:').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }],
     ['noop',       () => {}],
     ['main_menu',  ctx => startHandler(ctx)],
@@ -89,15 +89,15 @@ module.exports.registerCallbacks = function(bot, deps) {
       const url = process.env.WEBHOOK_URL + '/app/app_index.html';
       return ctx.reply('📱 افتح الـ Mini App:', {
         reply_markup: { inline_keyboard: [[{ text: '📱 فتح EduMaster App', web_app: { url } }]] }
-      }).catch(() => {});
+      }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }],
     ['mg_toggle_app', async ctx => {
       global._appPublic = !global._appPublic;
-      await ctx.answerCbQuery(global._appPublic ? '✅ App ظاهر للكل' : '🔒 App مخفي', { show_alert: true }).catch(() => {});
+      await ctx.answerCbQuery(global._appPublic ? '✅ App ظاهر للكل' : '🔒 App مخفي', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       return manage.mainMenu(ctx);
     }],
-    ['mg_menu',    ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {}); return manage.mainMenu(ctx); }],
-    ['mg_content', ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {}); return manage.handleCallback(ctx, 'mg_content'); }],
+    ['mg_menu',    ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); return manage.mainMenu(ctx); }],
+    ['mg_content', ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); return manage.handleCallback(ctx, 'mg_content'); }],
     ['browse',          ctx => browse.showSpecs(ctx)],
     ['latest',          ctx => userH.showLatest(ctx)],
     ['new_in_sp',       ctx => userH.showNewInSpecialty(ctx)],
@@ -107,13 +107,13 @@ module.exports.registerCallbacks = function(bot, deps) {
     ['profile',         ctx => userH.showProfile(ctx)],
     ['stats',           ctx => userH.showStats(ctx)],
     ['progress',        ctx => userH.showProgress(ctx)],
-    ['search_prompt',   ctx => { require('../utils/stateManager').setState(ctx.uid, { type: 'search' }); return ctx.reply('🔍 اكتب كلمة البحث:').catch(() => {}); }],
-    ['ai_prompt',       ctx => { require('../utils/stateManager').setState(ctx.uid, { type: 'ai_mode' }); return ctx.reply('🤖 المساعد الذكي مفعل!\n\nاكتب سؤالك:').catch(() => {}); }],
-    ['ai_reset',        ctx => { const { resetChat } = require('../handlers/ai_chat'); resetChat(ctx.uid); return ctx.reply('🔄 تم مسح سياق المحادثة.').catch(() => {}); }],
+    ['search_prompt',   ctx => { require('../utils/stateManager').setState(ctx.uid, { type: 'search' }); return ctx.reply('🔍 اكتب كلمة البحث:').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }],
+    ['ai_prompt',       ctx => { require('../utils/stateManager').setState(ctx.uid, { type: 'ai_mode' }); return ctx.reply('🤖 المساعد الذكي مفعل!\n\nاكتب سؤالك:').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }],
+    ['ai_reset',        ctx => { const { resetChat } = require('../handlers/ai_chat'); resetChat(ctx.uid); return ctx.reply('🔄 تم مسح سياق المحادثة.').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }],
     ['clear_my_history', async ctx => {
-      await dbRun('DELETE FROM history WHERE user_id=$1', [ctx.uid]).catch(() => {});
+      await dbRun('DELETE FROM history WHERE user_id=$1', [ctx.uid]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       cacheClear('lastfile_' + ctx.uid); cacheClear('rec_' + ctx.uid);
-      return ctx.answerCbQuery('✅ تم مسح سجلك', { show_alert: true }).catch(() => {});
+      return ctx.answerCbQuery('✅ تم مسح سجلك', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }],
     ['skip_sp',   async ctx => { await usersDb.setSpecialty(ctx.uid, 0); return startHandler.showMainMenu(ctx); }],
     ['change_sp', async ctx => {
@@ -126,40 +126,40 @@ module.exports.registerCallbacks = function(bot, deps) {
   const prefR = [
     // Bundle
     { p: 'bundle_del_file_',  fn: async (ctx, d) => {
-      if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {});
+      if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       const p = d.substring(16).split('_'), bid = parseInt(p[0]), fid = parseInt(p[1]);
       try {
         await bundlesDb.removeBundleFile(bid, fid);
-        await ctx.answerCbQuery('✅ تم حذف الملف').catch(() => {});
+        await ctx.answerCbQuery('✅ تم حذف الملف').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
         const [files, b] = await Promise.all([bundlesDb.getBundleFiles(bid), bundlesDb.getBundle(bid)]);
         const kb = files.map(f => [kbBtn('🗑️ ' + f.title.substring(0,35), 'bundle_del_file_' + bid + '_' + f.id)]);
         kb.push([kbBtn('➕ إضافة ملفات', 'bundle_add_files_' + bid), kbBtn('🗑️ حذف الحزمة', 'bundle_delete_' + bid)]);
         kb.push([kbBtn('◀️ رجوع', 'bundle_list')]);
         return eos(ctx, '📦 *' + b.name + '*\n\n' + files.length + ' ملف', { parse_mode: 'Markdown', ...kbBuild(kb) });
-      } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
+      } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
     }},
     { p: 'bundle_add_files_', fn: async (ctx, d) => {
-      if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {});
+      if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       const bid = parseInt(d.substring(17));
       await require('../utils/stateManager').setState(ctx.uid, { type: 'mg_bundle_files', bundleId: bid, fileCount: 0 });
-      return ctx.reply('📦 أرسل الملفات الآن.\n/done للإنهاء').catch(() => {});
+      return ctx.reply('📦 أرسل الملفات الآن.\n/done للإنهاء').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }},
     { p: 'bundle_delete_',    fn: async (ctx, d) => {
-      if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(() => {});
+      if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       const bid = parseInt(d.substring(14));
-      try { await bundlesDb.deleteBundle(bid); await ctx.answerCbQuery('✅ تم حذف الحزمة').catch(() => {}); return ctx.reply('✅ تم حذف الحزمة.').catch(() => {}); }
-      catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
+      try { await bundlesDb.deleteBundle(bid); await ctx.answerCbQuery('✅ تم حذف الحزمة').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); return ctx.reply('✅ تم حذف الحزمة.').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
+      catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
     }},
     { p: 'bundle_view_',      fn: async (ctx, d) => {
       const bid = parseInt(d.substring(12));
       try {
         const [b, files] = await Promise.all([bundlesDb.getBundle(bid), bundlesDb.getBundleFiles(bid)]);
-        if (!b) return ctx.answerCbQuery('❌ غير موجود').catch(() => {});
+        if (!b) return ctx.answerCbQuery('❌ غير موجود').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
         const kb = files.map(f => [kbBtn('🗑️ ' + f.title.substring(0,35), 'bundle_del_file_' + bid + '_' + f.id)]);
         kb.push([kbBtn('➕ إضافة ملفات', 'bundle_add_files_' + bid), kbBtn('🗑️ حذف الحزمة', 'bundle_delete_' + bid)]);
         kb.push([kbBtn('◀️ رجوع', 'bundle_list')]);
         return eos(ctx, '📦 *' + b.name + '*\n\n' + files.length + ' ملف\n\n_اضغط على ملف لحذفه_', { parse_mode: 'Markdown', ...kbBuild(kb) });
-      } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
+      } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
     }},
 
     // Search & Manage
@@ -176,13 +176,13 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'add_cmt_',    fn: async (ctx, d) => {
       const p = d.substring(8).split('_');
       await require('../utils/stateManager').setState(ctx.uid, { type: 'add_comment', fid: p[0], spId: p[1], yrId: p[2], smId: p[3], sbId: p[4], catId: p[5] });
-      return ctx.reply('✍️ اكتب تعليقك:\n_(أو /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
+      return ctx.reply('✍️ اكتب تعليقك:\n_(أو /cancel)_', { parse_mode: 'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }},
     { p: 'cmt_pg_',     fn: (ctx, d) => { const p = d.substring(7).split('_'); return browse.showComments(ctx, p[0], p[1], p[2], p[3], p[4], p[5], p[6], parseInt(p[7])); }},
     { p: 'dcmt_',       fn: async (ctx, d) => {
       const p = d.substring(5).split('_');
       await commentsDb.deleteCommentAdmin(p[0]);
-      await ctx.answerCbQuery('✅ تم الحذف').catch(() => {});
+      await ctx.answerCbQuery('✅ تم الحذف').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       return browse.showComments(ctx, p[1], p[2], p[3], p[4], p[5], p[6], p[7]);
     }},
     { p: 'report_',     fn: (ctx, d) => { const p = d.substring(7).split('_'); return browse.showReportMenu(ctx, p[0], p[1], p[2], p[3], p[4], p[5]); }},
@@ -195,12 +195,12 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'preview_',    fn: (ctx, d) => { const p = d.split('_'); return browse.showPreview(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }},
 
     // Specialty, Favorites, Rating
-    { p: 'set_sp_',     fn: async (ctx, d) => { await usersDb.setSpecialty(ctx.uid, safeInt(d.substring(7))); await ctx.answerCbQuery('✅ تم حفظ تخصصك').catch(() => {}); return startHandler.showMainMenu(ctx); }},
+    { p: 'set_sp_',     fn: async (ctx, d) => { await usersDb.setSpecialty(ctx.uid, safeInt(d.substring(7))); await ctx.answerCbQuery('✅ تم حفظ تخصصك').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); return startHandler.showMainMenu(ctx); }},
     { p: 'unfav_',      fn: (ctx, d) => userH.toggleFav(ctx, safeInt(d.substring(6)), true)  },
     { p: 'rate_',       fn: async (ctx, d) => {
       const p = d.substring(5).split('_');
       await interactions.addRating(ctx.uid, p[0], parseInt(p[1]));
-      await ctx.answerCbQuery('⭐ تم التقييم!').catch(() => {});
+      await ctx.answerCbQuery('⭐ تم التقييم!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       cacheClear('personal_' + ctx.uid + '_' + p[0]);
       return browse.showPreview(ctx, p[0], p[2], p[3], p[4], p[5], p[6]);
     }},
@@ -229,16 +229,16 @@ module.exports.registerCallbacks = function(bot, deps) {
 
     // Admin (آخر شيء — prefix قصير)
     { p: 'leave_grp_', fn: async (ctx, d) => {
-      if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(() => {});
+      if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       const chatId = parseInt(d.substring(10));
       try {
         await ctx.telegram.leaveChat(chatId);
         await dbRun('DELETE FROM group_chats WHERE chat_id=$1', [chatId]);
-        await ctx.answerCbQuery('✅ تم الخروج').catch(() => {});
-        return ctx.editMessageText('✅ خرجت من القروب ' + chatId).catch(() => ctx.reply('✅ تم الخروج.').catch(() => {}));
-      } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
+        await ctx.answerCbQuery('✅ تم الخروج').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+        return ctx.editMessageText('✅ خرجت من القروب ' + chatId).catch(() => ctx.reply('✅ تم الخروج.').catch(err => { require('../utils/logger').debug("[silent]", err.message); }));
+      } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
     }},
-    { p: 'mg_',         fn: async (ctx, d) => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {}); return manage.handleCallback(ctx, d); }},
+    { p: 'mg_',         fn: async (ctx, d) => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); return manage.handleCallback(ctx, d); }},
   ];
 
   function _getPrefixHandler(data) {
@@ -252,36 +252,36 @@ module.exports.registerCallbacks = function(bot, deps) {
     if (!_raw || CBDedup.isDupe(cbId)) return;
 
     const data = cbRes(_raw);
-    ctx.answerCbQuery('').catch(() => {}); // أجب فوراً — يشيل الـ spinner
+    ctx.answerCbQuery('').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); // أجب فوراً — يشيل الـ spinner
 
     try {
       if (ctx.chat?.type !== 'private' && !data.startsWith('grp_'))
-        return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(() => {});
+        return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
       // Pre-warm بالتوازي
       // Pre-warm aggressive
       if (data === 'browse' || data === 'main_menu') {
-        contentDb.getSpecs().catch(() => {});
+        contentDb.getSpecs().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       } else if (data.startsWith('sp_')) {
         const sid = parseInt(data.split('_').pop());
-        contentDb.getYears(sid).catch(() => {});
+        contentDb.getYears(sid).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       } else if (data.startsWith('yr_') && !data.startsWith('yr_page_')) {
         const yid = parseInt(data.split('_').pop());
-        contentDb.getSemesters(yid).catch(() => {});
+        contentDb.getSemesters(yid).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       } else if (data.startsWith('sm_')) {
         const smid = parseInt(data.split('_').pop());
         Promise.all([
           contentDb.getSubjects(smid),
-        ]).catch(() => {});
+        ]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       } else if (data.startsWith('sb_')) {
         const parts = data.split('_');
         const sbid = parseInt(parts.pop());
-        contentDb.getCategories(sbid).catch(() => {});
+        contentDb.getCategories(sbid).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       } else if (data.startsWith('ct_') && !data.startsWith('ct_page_')) {
         const parts = data.split('_');
         // pre-warm files for this category
         const filesDb = require('../database/files');
-        filesDb.getFiles(parseInt(parts[parts.length-1])).catch(() => {});
+        filesDb.getFiles(parseInt(parts[parts.length-1])).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }
 
       if (exactR.has(data)) return exactR.get(data)(ctx, data);

@@ -113,7 +113,7 @@ async function cacheWarmup() {
     const allSems = sems.flat();
     const subs   = await Promise.all(allSems.map(sm => content.getSubjects(sm.id).catch(() => [])));
     const allSubs = subs.flat();
-    await Promise.all(allSubs.map(sb => content.getCategories(sb.id).catch(() => {})));
+    await Promise.all(allSubs.map(sb => content.getCategories(sb.id).catch(err => { require('./logger').debug("[silent]", err.message); })));
     const tasks = { length: specs.length + allYears.length + allSems.length + allSubs.length };
     require('./logger').info('⚡ Warmed: ' + tasks.length + ' keys');
     _evictLRU();

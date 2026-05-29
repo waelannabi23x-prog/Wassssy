@@ -87,7 +87,7 @@ async function handleOwnerAI(ctx, text, mediaFileId, mediaType) {
   if(!ctx.isOwner) return false;
   const triggers = /^(ارسل|ابعث|بعث|جدول الساعة|send to|broadcast|ابعث للجميع|ارسل للجميع|ابعث للقروب|ابعث لتخصص)/i;
   if(!triggers.test(text) && !mediaFileId) return false;
-  ctx.telegram.sendChatAction(ctx.chat.id, 'typing').catch(()=>{});
+  ctx.telegram.sendChatAction(ctx.chat.id, 'typing').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   const cmd = await parseOwnerCommand(text, !!mediaFileId, mediaType);
   await executeOwnerCommand(ctx, cmd, mediaFileId, mediaType);
   return true;

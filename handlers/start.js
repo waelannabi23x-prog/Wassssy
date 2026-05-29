@@ -37,8 +37,8 @@ async function startHandler(ctx) {
             await ctx.reply(cap + '\n\n🔗 ' + f.file_id, { parse_mode: 'Markdown', ...kb });
           else
             await ctx.replyWithDocument(f.file_id, { caption: cap, parse_mode: 'Markdown', ...kb });
-          interactions.addHistory(uid, fid).catch(() => {});
-          filesDb.incDownloads(fid).catch(() => {});
+          interactions.addHistory(uid, fid).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+          filesDb.incDownloads(fid).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
         } catch (e) { await ctx.reply('❌ تعذر إرسال الملف'); }
       }
     }

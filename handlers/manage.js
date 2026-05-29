@@ -36,7 +36,7 @@ const clearState=uid=>{ if(require('../utils/stateManager').delState) require('.
 async function concurrentBroadcast(bot,chatId,msgId,ids,txt,opt={}){if(!bot)return {sent:0,failed:0};
   if(!bot||!bot.sendMessage){console.error('[BC] bot is undefined');return {sent:0,failed:ids.length};}
   let s=0,f=0;const t=ids.length,B=30;
-  const ui=async()=>{const p=Math.round((s+f)/t*100),b='█'.repeat(Math.round(p/10))+'░'.repeat(10-Math.round(p/10));bot.editMessageText(chatId,msgId,null,'📢 *جاري الإرسال...*\x60['+b+'] '+p+'%\x60\n✅ '+s+' | ❌ '+f+' | ⏳ '+(t-s-f),{parse_mode:'Markdown'}).catch(()=>{});};
+  const ui=async()=>{const p=Math.round((s+f)/t*100),b='█'.repeat(Math.round(p/10))+'░'.repeat(10-Math.round(p/10));bot.editMessageText(chatId,msgId,null,'📢 *جاري الإرسال...*\x60['+b+'] '+p+'%\x60\n✅ '+s+' | ❌ '+f+' | ⏳ '+(t-s-f),{parse_mode:'Markdown'}).catch(err => { require('../utils/logger').debug("[silent]", err.message); });};
   for(let i=0;i<t;i+=B){const r=await Promise.allSettled(ids.slice(i,i+B).map(id=>bot.sendMessage(id,txt,opt).then(()=>true).catch(()=>false)));r.forEach(x=>{if(x.status==='fulfilled'&&x.value)s++;else f++;});await ui();if(i+B<t)await new Promise(r=>setTimeout(r,1100));}
   return {sent:s,failed:f};
 }
@@ -176,12 +176,12 @@ async function showUsers(ctx, page=0) {
   rows.push(back('mg_menu'));
 
   // إرسال رسالة جديدة دائماً بدل التعديل (يحل مشكلة الصمت)
-  if (ctx.callbackQuery) ctx.deleteMessage().catch(()=>{});
+  if (ctx.callbackQuery) ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   return ctx.reply(text, { parse_mode: 'Markdown', ...build(rows) }).catch(e => {
     console.error('[showUsers reply]', e.message);
     // إذا فشل Markdown، ابعث بدون تنسيق
     const plain = text.replace(/[*_`]/g, '');
-    return ctx.reply(plain, build(rows)).catch(()=>{});
+    return ctx.reply(plain, build(rows)).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   });
 }
 
@@ -193,7 +193,7 @@ const PERM_LABELS={upload:'📤 رفع',delete:'🗑 حذف',add_content:'➕ إ
 async function showEditPerms(ctx, adminId) {
   const list = await adminsDb.getAll();
   const admin = list.find(a => a.user_id == adminId);
-  if (!admin) return ctx.reply('❌ المشرف غير موجود').catch(()=>{});
+  if (!admin) return ctx.reply('❌ المشرف غير موجود').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   const currentPerms = (admin.permissions || '').split(',').map(p => p.trim());
   const name = admin.first_name || 'ID:' + adminId;
   let text = '\u2699\ufe0f *\u0635\u0644\u0627\u062d\u064a\u0627\u062a ' + escMd(name) + '*\n';
@@ -247,7 +247,7 @@ async function handleBulkUpload(ctx){
   else if(msg.audio){fid=msg.audio.file_id;ftype='document';title=msg.audio.title||msg.audio.file_name||msg.caption||('صوت_'+Date.now());}
   else return false;
   const finalTitle=state.prefix?state.prefix+' — '+title:title;
-  try{await filesDb.addFile(state.catId,finalTitle,'',fid,ftype,uid);state.uploaded=state.uploaded||[];state.uploaded.push(finalTitle);ctx.reply('✅ '+finalTitle).catch(()=>{});}
+  try{await filesDb.addFile(state.catId,finalTitle,'',fid,ftype,uid);state.uploaded=state.uploaded||[];state.uploaded.push(finalTitle);ctx.reply('✅ '+finalTitle).catch(err => { require('../utils/logger').debug("[silent]", err.message); });}
   catch(e){state.failed=state.failed||[];state.failed.push(finalTitle+(e.message==='exists'?' (موجود)':''));}
   return true;
 }
@@ -269,11 +269,11 @@ async function handleFileUpload(ctx){
     const newFile=await filesDb.addFile(state.catId,state.title,state.desc||'',fid,ftype,uid);
     await interactions.addLog(uid,'upload',state.title);clearState(uid);
     if(newFile&&global.__bot) {
-      notifyGroupsNewFile(global.__bot,newFile).catch(()=>{});
+      notifyGroupsNewFile(global.__bot,newFile).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       // نشر في القناة الرسمية
       if(process.env.CHANNEL_ID) {
         const { postToChannel } = require('../utils/groupNotify');
-        postToChannel(global.__bot, newFile).catch(()=>{});
+        postToChannel(global.__bot, newFile).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }
     }
     ctx.reply('✅ *'+escMd(state.title)+'* رُفع بنجاح!',{parse_mode:'Markdown',...build([[btn('➕ رفع آخر','mg_upl_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId+'_'+state.catId)],[btn('📁 عرض الملفات','mg_fls_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId+'_'+state.catId)]])});
@@ -315,7 +315,7 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
       case 'mg_rn_fl':await filesDb.rename(state.id,text);done('✅ تمت التسمية!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_'));break;
       case 'mg_desc_fl':await filesDb.updateDesc(state.id,text);done('✅ تم التحديث!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_'));break;
       case 'mg_admin_search':{clearState(uid);const [fr,ur]=await Promise.all([filesDb.search(text),usersDb.searchUsers(text)]);let resp='🔍 *بحث: "'+escMd(text)+'"*\n\n';if(fr.length){resp+='📄 *ملفات ('+fr.length+'):*\n';fr.slice(0,5).forEach(f=>{resp+='• '+escMd(f.title)+' ('+escMd(f.sub_name)+')\n';});}if(ur.length){resp+='\n👥 *مستخدمون ('+ur.length+'):*\n';ur.slice(0,5).forEach(u=>{resp+='• '+escMd(u.first_name||'ID:'+u.id)+(u.username?' @'+escMd(u.username):'')+'\n';});}if(!fr.length&&!ur.length) resp+='_لا نتائج._';ctx.reply(resp,{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
-      case 'mg_broadcast':{clearState(uid);const ids=await usersDb.allIds();const total_bc=ids.length;const sm=await ctx.reply('📢 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total_bc,{parse_mode:'Markdown'});const bcRes=await concurrentBroadcast(ctx.telegram,ctx.chat.id,sm.message_id,ids,'📢 *إعلان*\n\n'+text,{parse_mode:'Markdown'});ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ *اكتمل!*\n`[██████████] 100%`\n✅ '+bcRes.sent+' | ❌ '+bcRes.failed,{...build([back('mg_menu')]),parse_mode:'Markdown'}).catch(()=>{});break;}
+      case 'mg_broadcast':{clearState(uid);const ids=await usersDb.allIds();const total_bc=ids.length;const sm=await ctx.reply('📢 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total_bc,{parse_mode:'Markdown'});const bcRes=await concurrentBroadcast(ctx.telegram,ctx.chat.id,sm.message_id,ids,'📢 *إعلان*\n\n'+text,{parse_mode:'Markdown'});ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ *اكتمل!*\n`[██████████] 100%`\n✅ '+bcRes.sent+' | ❌ '+bcRes.failed,{...build([back('mg_menu')]),parse_mode:'Markdown'}).catch(err => { require('../utils/logger').debug("[silent]", err.message); });break;}
       case 'mg_notify_sp_msg':{clearState(uid);const spUsers=await usersDb.getUsersBySpecialty(state.spId);await safeAdd(broadcastQueue,'broadcast-sp',{userIds:spUsers,message:'🔔 '+text,parseMode:'Markdown',fromUid:uid});ctx.reply('📤 جاري الإرسال لـ *'+spUsers.length+'* مستخدم — ستصلك النتيجة',{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
       case 'mg_notify_groups_msg':{
         clearState(uid);
@@ -356,7 +356,7 @@ async function handleCallback(ctx,data){
   if(data==='mg_content') return showContent(ctx);
   if(data==='mg_analytics') return showAnalytics(ctx);
   if(data==='mg_logs') return showLogs(ctx);
-  if(data==='mg_users'){try{const p=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);if(!p.includes('full')&&!p.includes('view_users')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});return await showUsers(ctx);}catch(e){console.error('[mg_users]',e.message);return ctx.reply('❌ خطأ: '+e.message).catch(()=>{});}}
+  if(data==='mg_users'){try{const p=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);if(!p.includes('full')&&!p.includes('view_users')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});return await showUsers(ctx);}catch(e){console.error('[mg_users]',e.message);return ctx.reply('❌ خطأ: '+e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });}}
   if(data==='mg_admins') return showAdmins(ctx);
   if(data==='mg_trash') return showTrash(ctx);
   if(data==='mg_search_prompt'){setState(uid,{type:'mg_admin_search'});return ctx.reply('🔍 بحث:\nأدخل اسم ملف أو مستخدم:');}
@@ -366,7 +366,7 @@ async function handleCallback(ctx,data){
   if(data.startsWith('mg_notify_sp_')&&!data.startsWith('mg_notify_sp_msg')){const spId=data.replace('mg_notify_sp_','');setState(uid,{type:'mg_notify_sp_msg',spId});return ctx.reply('📝 رسالة الإشعار:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
   if(data==='mg_post_channel'){
     setState(uid,{type:'mg_channel_post'});
-    return ctx.reply('📢 أرسل المحتوى للنشر في القناة (نص أو صورة أو فيديو أو مستند مع caption):').catch(()=>{});
+    return ctx.reply('📢 أرسل المحتوى للنشر في القناة (نص أو صورة أو فيديو أو مستند مع caption):').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
   if(data==='mg_msgs') return showMsgsMenu(ctx);
   if(data==='mg_templates') return showTemplates(ctx);
@@ -377,16 +377,16 @@ async function handleCallback(ctx,data){
   if(data.startsWith('mg_sched_all_')){setState(uid,{type:'mg_sched_time',tplId:data.replace('mg_sched_all_',''),target:'all'});return ctx.reply('📅 وقت الإرسال\nمثال: 2026-04-10 20:00');}
   if(data.startsWith('mg_sched_sp_')&&!data.startsWith('mg_sched_spid_')){const tplId=data.replace('mg_sched_sp_','');const specs=await content.getSpecs();const rows=specs.map(s=>[btn('🎓 '+s.name,'mg_sched_spid_'+tplId+'_'+s.id)]);return eos(ctx,'اختر التخصص:',{...build(rows)});}
   if(data.startsWith('mg_sched_spid_')){const p=data.replace('mg_sched_spid_','').split('_');setState(uid,{type:'mg_sched_time',tplId:p[0],target:'specialty',spId:p[1]});return ctx.reply('📅 وقت الإرسال\nمثال: 2026-04-10 20:00');}
-  if(data.startsWith('mg_send_now_')){const tplId=data.replace('mg_send_now_','');const tpl=await messagesDb.getTemplate(tplId);if(!tpl) return ctx.reply('❌ غير موجود');const ids=await usersDb.allIds();let sent=0,failed=0;const total=ids.length;const sm=await ctx.reply('📤 *جاري...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total,{parse_mode:'Markdown'});async function st(id){const o={parse_mode:'Markdown'};if(tpl.type==='text')return ctx.telegram.sendMessage(id,tpl.content,o).then(()=>1).catch(()=>0);if(tpl.type==='photo')return ctx.telegram.sendPhoto(id,tpl.file_id,{caption:tpl.content,...o}).then(()=>1).catch(()=>0);if(tpl.type==='document')return ctx.telegram.sendDocument(id,tpl.file_id,{caption:tpl.content,...o}).then(()=>1).catch(()=>0);if(tpl.type==='video')return ctx.telegram.sendVideo(id,tpl.file_id,{caption:tpl.content,...o}).then(()=>1).catch(()=>0);if(tpl.type==='link')return ctx.telegram.sendMessage(id,tpl.content).then(()=>1).catch(()=>0);return 0;}for(let i=0;i<ids.length;i+=30){const r=await Promise.allSettled(ids.slice(i,i+30).map(st));r.forEach(x=>{if(x.status==='fulfilled'&&x.value)sent++;else failed++;});const p=Math.round((sent+failed)/total*100);const b='█'.repeat(Math.round(p/10))+'░'.repeat(10-Math.round(p/10));ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'📤 *جاري...*\x60['+b+'] '+p+'%\x60\n✅ '+sent+' | ❌ '+failed+' | ⏳ '+(total-sent-failed),{parse_mode:'Markdown'}).catch(()=>{});if(i+30<total)await new Promise(r=>setTimeout(r,1100));}return ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ *اكتمل!*\n`[██████████] 100%`\n✅ '+sent+' | ❌ '+failed,{parse_mode:'Markdown',...build([back('mg_templates')])}).catch(()=>{});}
+  if(data.startsWith('mg_send_now_')){const tplId=data.replace('mg_send_now_','');const tpl=await messagesDb.getTemplate(tplId);if(!tpl) return ctx.reply('❌ غير موجود');const ids=await usersDb.allIds();let sent=0,failed=0;const total=ids.length;const sm=await ctx.reply('📤 *جاري...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total,{parse_mode:'Markdown'});async function st(id){const o={parse_mode:'Markdown'};if(tpl.type==='text')return ctx.telegram.sendMessage(id,tpl.content,o).then(()=>1).catch(()=>0);if(tpl.type==='photo')return ctx.telegram.sendPhoto(id,tpl.file_id,{caption:tpl.content,...o}).then(()=>1).catch(()=>0);if(tpl.type==='document')return ctx.telegram.sendDocument(id,tpl.file_id,{caption:tpl.content,...o}).then(()=>1).catch(()=>0);if(tpl.type==='video')return ctx.telegram.sendVideo(id,tpl.file_id,{caption:tpl.content,...o}).then(()=>1).catch(()=>0);if(tpl.type==='link')return ctx.telegram.sendMessage(id,tpl.content).then(()=>1).catch(()=>0);return 0;}for(let i=0;i<ids.length;i+=30){const r=await Promise.allSettled(ids.slice(i,i+30).map(st));r.forEach(x=>{if(x.status==='fulfilled'&&x.value)sent++;else failed++;});const p=Math.round((sent+failed)/total*100);const b='█'.repeat(Math.round(p/10))+'░'.repeat(10-Math.round(p/10));ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'📤 *جاري...*\x60['+b+'] '+p+'%\x60\n✅ '+sent+' | ❌ '+failed+' | ⏳ '+(total-sent-failed),{parse_mode:'Markdown'}).catch(err => { require('../utils/logger').debug("[silent]", err.message); });if(i+30<total)await new Promise(r=>setTimeout(r,1100));}return ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ *اكتمل!*\n`[██████████] 100%`\n✅ '+sent+' | ❌ '+failed,{parse_mode:'Markdown',...build([back('mg_templates')])}).catch(err => { require('../utils/logger').debug("[silent]", err.message); });}
   if(data==='mg_scheduled') return showScheduled(ctx);
   if(data.startsWith('mg_del_sched_')){await messagesDb.deleteScheduled(data.replace('mg_del_sched_',''));return showScheduled(ctx);}
   if(data==='mg_reports'){const rpts=await all(`SELECT r.*,f.title as ft,u.first_name as fn FROM reports r LEFT JOIN files f ON r.file_id=f.id LEFT JOIN users u ON r.user_id=u.id WHERE r.status='pending' ORDER BY r.created_at DESC LIMIT 20`);let txt='🚩 *البلاغات ('+rpts.length+')*\n\n';if(!rpts.length) txt+='لا توجد بلاغات.';else rpts.forEach((r,i)=>{txt+=(i+1)+'. '+escMd(r.ft||'?')+' | '+escMd(r.reason||'?')+' | '+(r.fn||r.user_id)+'\n';});const rrows=rpts.map(r=>[btn('✅ حل','mg_resolve_report_'+r.id),btn('🗑 حذف','mg_cdl_fl_0_0_0_0_'+r.file_id),btn('❌ تجاهل','mg_dismiss_report_'+r.id)]);rrows.push(back('mg_menu'));return eos(ctx,txt,{parse_mode:'Markdown',...build(rrows)});}
-  if(data.startsWith('mg_dismiss_report_')){const rid=data.replace('mg_dismiss_report_','');dbRun("UPDATE reports SET status='dismissed' WHERE id=$1",[rid]).catch(()=>{});return handleCallback(ctx,'mg_reports');}
-if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_report_','');dbRun("UPDATE reports SET status='resolved' WHERE id=$1",[rid]).catch(()=>{});ctx.answerCbQuery('✅ تم حل البلاغ').catch(()=>{});return handleCallback(ctx,'mg_reports');}
+  if(data.startsWith('mg_dismiss_report_')){const rid=data.replace('mg_dismiss_report_','');dbRun("UPDATE reports SET status='dismissed' WHERE id=$1",[rid]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });return handleCallback(ctx,'mg_reports');}
+if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_report_','');dbRun("UPDATE reports SET status='resolved' WHERE id=$1",[rid]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });ctx.answerCbQuery('✅ تم حل البلاغ').catch(err => { require('../utils/logger').debug("[silent]", err.message); });return handleCallback(ctx,'mg_reports');}
   if(data==='mg_maint'){global.maintenanceMode=!global.maintenanceMode;await setSetting('maintenance',global.maintenanceMode?'true':'false');await interactions.addLog(uid,'maintenance',global.maintenanceMode?'ON':'OFF');return eos(ctx,'🔧 *الصيانة: '+(global.maintenanceMode?'🔴 مفعّلة':'🟢 متوقفة')+'*',{parse_mode:'Markdown',...build([[btn(global.maintenanceMode?'🟢 إيقاف':'🔴 تفعيل','mg_maint')],[btn('📝 تعديل الرسالة','mg_set_maint_msg'),btn('◀️ رجوع','mg_menu')]])});}
   if(data==='mg_set_maint_msg'){setState(uid,{type:'mg_maint_msg'});return ctx.reply('📝 رسالة الصيانة:');}
   if(data==='mg_backup'){
-    const msg = await ctx.reply('⏳ جاري تصدير البيانات...').catch(()=>{});
+    const msg = await ctx.reply('⏳ جاري تصدير البيانات...').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     try {
       const tables = ['specialties','years','semesters','subjects','categories','files','bundles','bundle_files','admins','settings','message_templates','scheduled_messages'];
       const backup = { exported_at: new Date().toISOString(), tables: {} };
@@ -397,10 +397,10 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
       const buf  = Buffer.from(json, 'utf8');
       const fname = 'backup_' + new Date().toISOString().substring(0,10) + '.json';
       await ctx.replyWithDocument({ source: buf, filename: fname }, { caption: '💾 Backup ' + new Date().toISOString().substring(0,10) });
-      if (msg) ctx.deleteMessage(msg.message_id).catch(()=>{});
+      if (msg) ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     } catch(e) {
-      if (msg) ctx.deleteMessage(msg.message_id).catch(()=>{});
-      ctx.reply('❌ فشل التصدير: ' + e.message).catch(()=>{});
+      if (msg) ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+      ctx.reply('❌ فشل التصدير: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
     return;
   }
@@ -445,7 +445,7 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
   if(data.startsWith('mg_dl_cat_')){const p=data.replace('mg_dl_cat_','').split('_');const cat=await content.getCategory(p[4]);return eos(ctx,'🗑 حذف *'+escMd(cat?.name||'')+'*؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_cat_'+p[0]+'_'+p[1]+'_'+p[2]+'_'+p[3]+'_'+p[4]),btn('❌ لا','mg_cats_'+p[0]+'_'+p[1]+'_'+p[2]+'_'+p[3])]])});}
   if(data.startsWith('mg_cdl_cat_')){const p=data.replace('mg_cdl_cat_','').split('_');await content.deleteCategory(p[4]);return showCategories(ctx,p[0],p[1],p[2],p[3]);}
   if(data.startsWith('mg_add_bundle_files_')){const p=data.replace('mg_add_bundle_files_','').split('_');require('../utils/stateManager').setState(ctx.uid,{type:'mg_bundle_files',bundleId:p[0],catId:p[1],spId:p[2],yrId:p[3],smId:p[4],sbId:p[5],fileCount:0});return ctx.reply('➕ أبعث ملفات للحزمة. /done للانتهاء');}
-  if(data.startsWith('mg_dl_bundle_')){const p=data.replace('mg_dl_bundle_','').split('_');const _bId=parseInt(p[0]),_bCat=parseInt(p[1]);await bundlesDb.deleteBundle(_bId);const {cacheClearPrefix:ccp,cacheClear:cc}=require('../utils/cache');ccp('showfiles_'+_bCat);cc('bdls_'+_bCat);cc('bundle_full_'+_bId);await ctx.answerCbQuery('✅ تم حذف الحزمة').catch(()=>{});return browse.showFiles(ctx,p[2],p[3],p[4],p[5],p[1],0);}
+  if(data.startsWith('mg_dl_bundle_')){const p=data.replace('mg_dl_bundle_','').split('_');const _bId=parseInt(p[0]),_bCat=parseInt(p[1]);await bundlesDb.deleteBundle(_bId);const {cacheClearPrefix:ccp,cacheClear:cc}=require('../utils/cache');ccp('showfiles_'+_bCat);cc('bdls_'+_bCat);cc('bundle_full_'+_bId);await ctx.answerCbQuery('✅ تم حذف الحزمة').catch(err => { require('../utils/logger').debug("[silent]", err.message); });return browse.showFiles(ctx,p[2],p[3],p[4],p[5],p[1],0);}
   if(data.startsWith('mg_rn_bundle_')){const p=data.replace('mg_rn_bundle_','').split('_');setState(uid,{type:'mg_rename_bundle',bundleId:p[0],catId:p[1],spId:p[2],yrId:p[3],smId:p[4],sbId:p[5]});return ctx.reply('✏️ الاسم الجديد:');}
   if(data.startsWith('mg_add_bundle_')){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط.',{show_alert:true});const p=data.replace('mg_add_bundle_','').split('_');setState(uid,{type:'mg_bundle_title',spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});return ctx.reply('📦 اسم الحزمة:');}
   if(data.startsWith('mg_upl_bulk_')){const p=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);if(!p.includes('full')&&!p.includes('upload')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});const pr=data.replace('mg_upl_bulk_','').split('_');setState(uid,{type:'mg_bulk_prefix',spId:pr[0],yrId:pr[1],smId:pr[2],sbId:pr[3],catId:pr[4]});return ctx.reply('رفع متعدد — بادئة للأسماء؟ أو skip:');}
@@ -454,7 +454,7 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
   if(data.startsWith('mg_desc_fl_')){const p=data.replace('mg_desc_fl_','').split('_');setState(uid,{type:'mg_desc_fl',id:p[5],spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});return ctx.reply('📝 الوصف الجديد:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
   if(data.startsWith('mg_dl_fl_')){const p=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);if(!p.includes('full')&&!p.includes('delete')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});const pr=data.replace('mg_dl_fl_','').split('_');const f=await filesDb.getFile(pr[5]);return eos(ctx,'🗑 نقل *'+escMd(f?.title||'الملف')+'* للسلة؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_fl_'+pr.join('_')),btn('❌ لا','mg_fls_'+pr.slice(0,5).join('_'))]])});}
   if(data.startsWith('mg_cdl_fl_')){const p=data.replace('mg_cdl_fl_','').split('_');await filesDb.softDelete(p[5]);return showMgFiles(ctx,p[0],p[1],p[2],p[3],p[4]);}
-  }catch(e){console.error('[CB]',e.message);ctx.reply('❌ '+e.message).catch(()=>{});}
+  }catch(e){console.error('[CB]',e.message);ctx.reply('❌ '+e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });}
 }
 
 module.exports={mainMenu,handleCallback,handleText,handleFileUpload,handleBulkUpload,showUserProfile,showUsers,handleBundleFileUpload};

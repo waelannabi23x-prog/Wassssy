@@ -7,7 +7,7 @@ const POINTS = { download: 5, rating: 3, comment: 2, favorite: 1, daily_login: 1
 async function ensureUser(uid) {
   await run(
     'INSERT INTO user_points(user_id) VALUES($1) ON CONFLICT(user_id) DO NOTHING', [uid]
-  ).catch(() => {});
+  ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 }
 
 async function awardPoints(uid, type) {
@@ -20,7 +20,7 @@ async function awardPoints(uid, type) {
   await run(
     `UPDATE user_points SET total_points = total_points + $1${extra}, updated_at = CURRENT_TIMESTAMP WHERE user_id = $2`,
     [pts, uid]
-  ).catch(() => {});
+  ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   cacheClear('pts_' + uid);
   cacheClear('leaderboard_v1');
 }
@@ -72,7 +72,7 @@ async function checkDailyLogin(uid) {
        total_points = total_points + 1, streak_days = streak_days + 1,
        updated_at = CURRENT_TIMESTAMP WHERE user_id = $1`,
       [uid]
-    ).catch(() => {});
+    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     cacheClear('pts_' + uid);
     return true;
   }

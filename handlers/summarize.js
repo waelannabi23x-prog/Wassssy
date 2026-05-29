@@ -24,7 +24,7 @@ async function handleSummarize(ctx, fileId, fileType, title) {
     const buffer = await fetchBuffer(link.href);
     
     // 🛡️ حماية الذاكرة: رفض الملفات الأكبر من 5 ميجا
-    if (buffer.length > 5 * 1024 * 1024) { if(thinking) ctx.deleteMessage(thinking.message_id).catch(()=>{}); return ctx.reply('⚠️ الملف كبير جداً (أكثر من 5MB) للتلخيص.'); }
+    if (buffer.length > 5 * 1024 * 1024) { if(thinking) ctx.deleteMessage(thinking.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); return ctx.reply('⚠️ الملف كبير جداً (أكثر من 5MB) للتلخيص.'); }
     let text = null;
     try {
       const pdfParse = require('pdf-parse');
@@ -32,7 +32,7 @@ async function handleSummarize(ctx, fileId, fileType, title) {
       text = data.text?.trim().substring(0, 6000);
     } catch(e) {}
 
-    if(thinking) ctx.deleteMessage(thinking.message_id).catch(()=>{});
+    if(thinking) ctx.deleteMessage(thinking.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
     if(!text || text.length < 50) {
       return ctx.reply('⚠️ ما قدرت أقرأ هذا الملف — قد يكون ملف صور (scanned). جرب ملف PDF نصي.');
@@ -59,8 +59,8 @@ ${text}` }],
     const summary = res.choices[0].message.content.trim();
     await ctx.reply(`📄 *ملخص: ${escMd(title)}*\n\n${summary}`, { parse_mode: 'Markdown' });
   } catch(e) {
-    if(thinking) ctx.deleteMessage(thinking.message_id).catch(()=>{});
-    ctx.reply('❌ فشل التلخيص: ' + e.message).catch(()=>{});
+    if(thinking) ctx.deleteMessage(thinking.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    ctx.reply('❌ فشل التلخيص: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
 }
 

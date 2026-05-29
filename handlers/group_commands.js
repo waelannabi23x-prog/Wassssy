@@ -64,7 +64,7 @@ function setupGroupCommands(bot) {
     const ok = await isAdminOrOwner(ctx, ctx.chat.id);
     if (!ok) {
       const m = await ctx.reply('🚫 هذا الأمر للمشرفين فقط').catch(() => null);
-      if (m) setTimeout(() => ctx.deleteMessage(m.message_id).catch(() => {}), 4000);
+      if (m) setTimeout(() => ctx.deleteMessage(m.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 4000);
       return;
     }
     return next();
@@ -75,7 +75,7 @@ function setupGroupCommands(bot) {
   // ════════════════════════════════════
   bot.command('rules', grpOnly, async ctx => {
     try { await showGroupRules(ctx, ctx.chat.id); }
-    catch (e) { ctx.reply('❌ ' + e.message).catch(() => {}); }
+    catch (e) { ctx.reply('❌ ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
   });
 
   // ════════════════════════════════════
@@ -87,7 +87,7 @@ function setupGroupCommands(bot) {
       return ctx.reply(
         '📝 *طريقة الاستخدام:*\n`/setrules قواعدك هنا`\n\nأو أرسل الأمر بدون نص لمسح القواعد الحالية.',
         { parse_mode: 'Markdown' }
-      ).catch(() => {});
+      ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
     await setGroupRules(ctx, ctx.chat.id, text);
   });
@@ -97,7 +97,7 @@ function setupGroupCommands(bot) {
   // ════════════════════════════════════
   bot.command('all', grpOnly, adminOnly, async ctx => {
     try { await showAllMembers(ctx, ctx.chat.id); }
-    catch (e) { ctx.reply('❌').catch(() => {}); }
+    catch (e) { ctx.reply('❌').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
   });
 
   // ════════════════════════════════════
@@ -106,7 +106,7 @@ function setupGroupCommands(bot) {
   bot.command('tag', grpOnly, adminOnly, async ctx => {
     const msg = ctx.message.text.replace(/^\/tag\s*/i, '').trim();
     try { await tagAll(ctx, ctx.chat.id, msg || null); }
-    catch (e) { ctx.reply('❌').catch(() => {}); }
+    catch (e) { ctx.reply('❌').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
   });
 
   // ════════════════════════════════════
@@ -114,7 +114,7 @@ function setupGroupCommands(bot) {
   // ════════════════════════════════════
   bot.command('stats', grpOnly, adminOnly, async ctx => {
     try { await showGroupStats(ctx, ctx.chat.id); }
-    catch (e) { ctx.reply('❌').catch(() => {}); }
+    catch (e) { ctx.reply('❌').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
   });
 
   // ════════════════════════════════════
@@ -127,7 +127,7 @@ function setupGroupCommands(bot) {
       return ctx.reply(
         '📌 *طريقة الاستخدام:*\n`/mute @user 30` — إسكات لمدة 30 دقيقة\nأو رُدَّ على رسالة العضو وأرسل `/mute`',
         { parse_mode: 'Markdown' }
-      ).catch(() => {});
+      ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
 
     // استخرج المدة (الرقم بعد المستخدم)
@@ -135,7 +135,7 @@ function setupGroupCommands(bot) {
     const duration = parseInt(parts[2]) || 60; // افتراضي 60 دقيقة
 
     await muteMember(ctx, ctx.chat.id, target.userId, duration);
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   });
 
   // ════════════════════════════════════
@@ -147,28 +147,28 @@ function setupGroupCommands(bot) {
       return ctx.reply(
         '📌 *طريقة الاستخدام:*\n`/unmute @user` أو رُدَّ على رسالة العضو وأرسل `/unmute`',
         { parse_mode: 'Markdown' }
-      ).catch(() => {});
+      ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
     await unmuteMember(ctx, ctx.chat.id, target.userId);
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   });
 
   // ════════════════════════════════════
   // 🔇 /muteall — إسكات الكل (مشرف)
   // ════════════════════════════════════
   bot.command('muteall', grpOnly, adminOnly, async ctx => {
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     try { await muteAll(ctx, ctx.chat.id); }
-    catch (e) { ctx.reply('❌').catch(() => {}); }
+    catch (e) { ctx.reply('❌').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
   });
 
   // ════════════════════════════════════
   // 🔊 /unmuteall — تفعيل الكل (مشرف)
   // ════════════════════════════════════
   bot.command('unmuteall', grpOnly, adminOnly, async ctx => {
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     try { await unmuteAll(ctx, ctx.chat.id); }
-    catch (e) { ctx.reply('❌').catch(() => {}); }
+    catch (e) { ctx.reply('❌').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
   });
 
   // ════════════════════════════════════
@@ -180,12 +180,12 @@ function setupGroupCommands(bot) {
       return ctx.reply(
         '📌 *طريقة الاستخدام:*\n`/warn @user السبب`\nأو رُدَّ على رسالة العضو وأرسل `/warn السبب`',
         { parse_mode: 'Markdown' }
-      ).catch(() => {});
+      ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
 
     const reason = getReason(ctx, ctx.message?.reply_to_message ? 1 : 2);
     await warnMember(ctx, ctx.chat.id, target.userId, reason);
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   });
 
   // ════════════════════════════════════
@@ -197,10 +197,10 @@ function setupGroupCommands(bot) {
       return ctx.reply(
         '📌 *طريقة الاستخدام:*\n`/warns @user` أو رُدَّ على رسالة العضو وأرسل `/warns`',
         { parse_mode: 'Markdown' }
-      ).catch(() => {});
+      ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
     await showWarns(ctx, ctx.chat.id, target.userId);
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   });
 
   // ════════════════════════════════════
@@ -212,10 +212,10 @@ function setupGroupCommands(bot) {
       return ctx.reply(
         '📌 *طريقة الاستخدام:*\n`/clearwarns @user`',
         { parse_mode: 'Markdown' }
-      ).catch(() => {});
+      ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
     await clearWarns(ctx, ctx.chat.id, target.userId);
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   });
 
   // ════════════════════════════════════
@@ -227,11 +227,11 @@ function setupGroupCommands(bot) {
       return ctx.reply(
         '📌 *طريقة الاستخدام:*\n`/ban @user السبب`\nأو رُدَّ على رسالة العضو وأرسل `/ban السبب`',
         { parse_mode: 'Markdown' }
-      ).catch(() => {});
+      ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
     const reason = getReason(ctx, ctx.message?.reply_to_message ? 1 : 2);
     await banMember(ctx, ctx.chat.id, target.userId, reason, false);
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   });
 
   // ════════════════════════════════════
@@ -243,10 +243,10 @@ function setupGroupCommands(bot) {
       return ctx.reply(
         '📌 *طريقة الاستخدام:*\n`/unban @user` أو `/unban userId`',
         { parse_mode: 'Markdown' }
-      ).catch(() => {});
+      ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
     await unbanMember(ctx, ctx.chat.id, target.userId);
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   });
 
   // ════════════════════════════════════
@@ -258,7 +258,7 @@ function setupGroupCommands(bot) {
       return ctx.reply(
         '📌 *طريقة الاستخدام:*\n`/kick @user` أو رُدَّ على رسالة العضو',
         { parse_mode: 'Markdown' }
-      ).catch(() => {});
+      ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
     try {
       await ctx.telegram.banChatMember(ctx.chat.id, target.userId);
@@ -267,11 +267,11 @@ function setupGroupCommands(bot) {
         `👢 *تم طرد العضو*\n👤 [${target.firstName}](tg://user?id=${target.userId})`,
         { parse_mode: 'Markdown' }
       ).catch(() => null);
-      if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 8000);
+      if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 8000);
     } catch (e) {
-      ctx.reply('❌ فشل الطرد: ' + e.message).catch(() => {});
+      ctx.reply('❌ فشل الطرد: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   });
 
   // ════════════════════════════════════
@@ -279,18 +279,18 @@ function setupGroupCommands(bot) {
   // ════════════════════════════════════
   bot.command('pin', grpOnly, adminOnly, async ctx => {
     if (!ctx.message?.reply_to_message) {
-      return ctx.reply('📌 رُدَّ على الرسالة التي تريد تثبيتها وأرسل `/pin`', { parse_mode: 'Markdown' }).catch(() => {});
+      return ctx.reply('📌 رُدَّ على الرسالة التي تريد تثبيتها وأرسل `/pin`', { parse_mode: 'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
     try {
       await ctx.telegram.pinChatMessage(ctx.chat.id, ctx.message.reply_to_message.message_id, {
         disable_notification: false,
       });
       const msg = await ctx.reply('📌 *تم تثبيت الرسالة*', { parse_mode: 'Markdown' }).catch(() => null);
-      if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 5000);
+      if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 5000);
     } catch (e) {
-      ctx.reply('❌ فشل التثبيت: ' + e.message).catch(() => {});
+      ctx.reply('❌ فشل التثبيت: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   });
 
   // ════════════════════════════════════
@@ -300,11 +300,11 @@ function setupGroupCommands(bot) {
     try {
       await ctx.telegram.unpinChatMessage(ctx.chat.id);
       const msg = await ctx.reply('✅ *تم إلغاء التثبيت*', { parse_mode: 'Markdown' }).catch(() => null);
-      if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 5000);
+      if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 5000);
     } catch (e) {
-      ctx.reply('❌ ' + e.message).catch(() => {});
+      ctx.reply('❌ ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   });
 
   // ════════════════════════════════════
@@ -316,10 +316,10 @@ function setupGroupCommands(bot) {
       return ctx.reply(
         '📝 *طريقة الاستخدام:*\n`/setwelcome رسالتك هنا`\n\n📌 المتغيرات:\n`{name}` الاسم\n`{spec}` التخصص\n`{id}` المعرّف\n`{date}` التاريخ\n`{time}` الوقت',
         { parse_mode: 'Markdown' }
-      ).catch(() => {});
+      ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
     await setWelcomeMessage(ctx, ctx.chat.id, text);
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   });
 
   // ════════════════════════════════════
@@ -331,12 +331,12 @@ function setupGroupCommands(bot) {
       return ctx.reply(
         '🖼 رُدَّ على صورة وأرسل `/setwelcomeimg` لتعيينها صورة ترحيب',
         { parse_mode: 'Markdown' }
-      ).catch(() => {});
+      ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
     const photos = ctx.message.reply_to_message.photo;
     const fileId = photos[photos.length - 1].file_id;
     await setWelcomeImage(ctx, ctx.chat.id, fileId);
-    ctx.deleteMessage().catch(() => {});
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   });
 
   // ════════════════════════════════════
@@ -344,8 +344,8 @@ function setupGroupCommands(bot) {
   // ════════════════════════════════════
   bot.command('clearwelcome', grpOnly, adminOnly, async ctx => {
     await clearWelcome(ctx.chat.id);
-    ctx.reply('✅ تم مسح إعدادات الترحيب — سيُستخدم النص الافتراضي').catch(() => {});
-    ctx.deleteMessage().catch(() => {});
+    ctx.reply('✅ تم مسح إعدادات الترحيب — سيُستخدم النص الافتراضي').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   });
 
   // ════════════════════════════════════
@@ -396,8 +396,8 @@ function setupGroupCommands(bot) {
     }
 
     const msg = await ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => null);
-    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 30000);
-    ctx.deleteMessage().catch(() => {});
+    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 30000);
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   });
 }
 

@@ -122,7 +122,7 @@ async function processGroupNotifications() {
           await run(
             'INSERT INTO group_notify_log(file_id, chat_id, sent_at) VALUES($1, $2, CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING',
             [r.id, r.chat_id]
-          ).catch(() => {});
+          ).catch(err => { require('./logger').debug("[silent]", err.message); });
         } catch (_) {}
       }));
       if (bi + NOTIFY_BATCH < recent.length) await sleep(1000);
@@ -138,7 +138,7 @@ async function cleanup() {
   try { await run("DELETE FROM logs WHERE created_at < NOW() - INTERVAL '30 days'"); } catch (_) {}
 }
 
-function notifyOwners(text) { for (const oid of _owners) _bot.telegram.sendMessage(oid, text).catch(() => {}); }
+function notifyOwners(text) { for (const oid of _owners) _bot.telegram.sendMessage(oid, text).catch(err => { require('./logger').debug("[silent]", err.message); }); }
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 
 module.exports = { startScheduler };

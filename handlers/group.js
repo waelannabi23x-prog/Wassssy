@@ -42,7 +42,7 @@ async function smartSearch(rawQ,limit){
 function invalidateSearchCache(){
   cacheClearPrefix('search_');cacheClearPrefix('gsrc_');
   cacheClear('latest_15');cacheClear('popular_15');
-  if(USE_GO_SEARCH)fetch(`${SEARCH_SVC}/reindex`,{method:'POST'}).catch(()=>{});
+  if(USE_GO_SEARCH)fetch(`${SEARCH_SVC}/reindex`,{method:'POST'}).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 }
 global._clearSearchCache=invalidateSearchCache;
 module.exports={smartSearch,invalidateSearchCache};

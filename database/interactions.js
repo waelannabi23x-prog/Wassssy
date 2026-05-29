@@ -51,7 +51,7 @@ const addHistory = (uid, fid) => {
     for (const [kk, ts] of _histDedup) if (ts < cut) _histDedup.delete(kk);
   }
   const _p = run('INSERT INTO history(user_id,file_id) VALUES($1,$2)', [uid, fid]);
-  try { const {awardPoints}=require('./points'); awardPoints(uid,'download').catch(()=>{}); } catch(_){}
+  try { const {awardPoints}=require('./points'); awardPoints(uid,'download').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); } catch(_){}
   return _p;
 };
 
@@ -137,7 +137,7 @@ async function getSimilar(fileId, limit = 4) {
 
 // ─── Logs ─────────────────────────────────────────────────────────────────────
 const addLog = (uid, action, details) =>
-  run('INSERT INTO logs(user_id,action,details) VALUES($1,$2,$3)', [uid, action, details || '']).catch(() => {});
+  run('INSERT INTO logs(user_id,action,details) VALUES($1,$2,$3)', [uid, action, details || '']).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 const getLogs = (n = 20) =>
   all('SELECT l.*,u.first_name FROM logs l LEFT JOIN users u ON l.user_id=u.id ORDER BY l.created_at DESC LIMIT $1', [n]);
 

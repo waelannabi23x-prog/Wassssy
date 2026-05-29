@@ -57,7 +57,7 @@ function saveToDB(uid, userText, assistantText) {
   run(
     'INSERT INTO ai_history(user_id,role,content) VALUES($1,$2,$3),($4,$5,$6)',
     [uid, 'user', userText.substring(0, 2000), uid, 'assistant', assistantText.substring(0, 2000)]
-  ).catch(() => {});
+  ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 }
 
 // ✅ resetChat: يمسح الذاكرة + DB
@@ -149,7 +149,7 @@ async function handleAiChat(ctx, text) {
   }
 
   if (text.trim().length < 2) return false;
-  ctx.sendChatAction('typing').catch(() => {});
+  ctx.sendChatAction('typing').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   const intent = classifyIntent(text);
 
   if (intent === 'FILE_SEARCH') {
@@ -222,7 +222,7 @@ async function handleAiChat(ctx, text) {
           chatId, msgId, null,
           isFinal ? accumulated : accumulated + ' ▌',
           { parse_mode: 'Markdown' }
-        ).catch(() => {});
+        ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }
     });
 

@@ -16,7 +16,7 @@ async function loadAllStates() {
     for (const r of rows) {
       try { _mem.set(r.user_id, JSON.parse(r.state)); n++; } catch(err) { require('./logger').debug('[catch]', err.message); }
     }
-    run("DELETE FROM user_states WHERE updated_at <= NOW() - INTERVAL '24 hours'").catch(() => {});
+    run("DELETE FROM user_states WHERE updated_at <= NOW() - INTERVAL '24 hours'").catch(err => { require('./logger').debug("[silent]", err.message); });
     logger.info('Loaded ' + n + ' states من DB');
   } catch(e) { logger.warn('[State] DB unavailable:', e.message); }
 }
@@ -43,7 +43,7 @@ async function setState(uid, val) {
   run(
     'INSERT INTO user_states(user_id,state,updated_at) VALUES($1,$2,CURRENT_TIMESTAMP) ON CONFLICT(user_id) DO UPDATE SET state=$2,updated_at=CURRENT_TIMESTAMP',
     [uid, json]
-  ).catch(() => {});
+  ).catch(err => { require('./logger').debug("[silent]", err.message); });
 }
 
 // ── delState ──
@@ -54,7 +54,7 @@ async function delState(uid) {
     try { await _redis.del('state:' + uid); } catch(err) { require('./logger').debug('[catch]', err.message); }
   }
 
-  run('DELETE FROM user_states WHERE user_id=$1', [uid]).catch(() => {});
+  run('DELETE FROM user_states WHERE user_id=$1', [uid]).catch(err => { require('./logger').debug("[silent]", err.message); });
 }
 
 // ── getState: من الذاكرة دائماً (فوري) ──

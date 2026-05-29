@@ -38,7 +38,7 @@ async function ensureUser(uid) {
   await run(
     'INSERT INTO user_xp(user_id,xp,level) VALUES($1,0,1) ON CONFLICT(user_id) DO NOTHING',
     [uid]
-  ).catch(() => {});
+  ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 }
 
 async function initTable() {
@@ -47,7 +47,7 @@ async function initTable() {
     xp        INTEGER DEFAULT 0,
     level     INTEGER DEFAULT 1,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  )`).catch(() => {});
+  )`).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 }
 
 let _ready = false;

@@ -14,7 +14,7 @@ async function notifyUsersNewFile(bot, file, specialtyId) {
     for (let i = 0; i < users.length; i += BATCH) {
       await Promise.allSettled(
         users.slice(i, i + BATCH).map(u =>
-          bot.telegram.sendMessage(u.id, text, { parse_mode: 'Markdown' }).catch(() => {})
+          bot.telegram.sendMessage(u.id, text, { parse_mode: 'Markdown' }).catch(err => { require('./logger').debug("[silent]", err.message); })
         )
       );
       if (i + BATCH < users.length) await new Promise(r => setTimeout(r, 1000));

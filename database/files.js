@@ -44,9 +44,9 @@ async function _flushDownloads(){
     await pg.query(
       'UPDATE files SET downloads=CASE id '+cases+' ELSE downloads END WHERE id IN ('+ph+')',
       vals
-    ).catch(()=>{});
+    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   } else {
-    for(const[id,cnt]of entries) await run('UPDATE files SET downloads=downloads+$1 WHERE id=$2',[cnt,id]).catch(()=>{});
+    for(const[id,cnt]of entries) await run('UPDATE files SET downloads=downloads+$1 WHERE id=$2',[cnt,id]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
   for(const[id]of entries)cacheClear('file_'+id);
 }

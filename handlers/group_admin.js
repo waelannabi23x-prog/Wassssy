@@ -27,7 +27,7 @@ async function handleNewMember(bot, chatId, userId, firstName) {
        ON CONFLICT(chat_id,user_id) DO UPDATE
          SET first_name=EXCLUDED.first_name, updated_at=CURRENT_TIMESTAMP`,
       [chatId, userId, '', firstName || 'عضو']
-    ).catch(() => {});
+    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
     // مسح الكاش عند إضافة عضو جديد
     cacheClear('grp_members_' + chatId);
@@ -115,7 +115,7 @@ async function handleMemberLeft(bot, chatId, userId, firstName) {
     await run(
       'DELETE FROM group_members WHERE chat_id=$1 AND user_id=$2',
       [chatId, userId]
-    ).catch(() => {});
+    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
     // إرسال رسالة وداع (اختياري — يُعطَّل إذا كان القروب كبير)
     const grp = await get(
@@ -127,7 +127,7 @@ async function handleMemberLeft(bot, chatId, userId, firstName) {
       const name = escV2(firstName || 'عضو');
       const msg = `👋 *${name}* غادر القروب\\.\n\nنتمنى لك التوفيق في مسيرتك\\! 🌟`;
       await bot.telegram.sendMessage(chatId, msg, { parse_mode: 'MarkdownV2' })
-        .catch(() => {});
+        .catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
   } catch (e) {
     console.error('[Left]', e.message);
@@ -145,7 +145,7 @@ async function setWelcomeImage(ctx, chatId, fileId) {
        SET image_file_id=$2, updated_at=CURRENT_TIMESTAMP`,
     [chatId, fileId]
   );
-  return ctx.reply('✅ تم حفظ صورة الترحيب').catch(() => {});
+  return ctx.reply('✅ تم حفظ صورة الترحيب').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 }
 
 async function setWelcomeMessage(ctx, chatId, message) {
@@ -159,7 +159,7 @@ async function setWelcomeMessage(ctx, chatId, message) {
   return ctx.reply(
     '✅ تم حفظ رسالة الترحيب\n\n📝 المتغيرات المتاحة:\n`{name}` - اسم العضو\n`{spec}` - التخصص\n`{id}` - المعرّف\n`{date}` - التاريخ\n`{time}` - الساعة',
     { parse_mode: 'Markdown' }
-  ).catch(() => {});
+  ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 }
 
 async function clearWelcome(chatId) {
@@ -195,7 +195,7 @@ async function showAllMembers(ctx, chatId) {
                VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)
                ON CONFLICT(chat_id,user_id) DO UPDATE SET first_name=EXCLUDED.first_name`,
               [chatId, a.user.id, a.user.username || '', a.user.first_name || 'Admin']
-            ).catch(() => {});
+            ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
           }
         }
       } catch (_) {}
@@ -211,7 +211,7 @@ async function showAllMembers(ctx, chatId) {
         `💡 الأعضاء يُسجَّلون تلقائياً عند إرسال أي رسالة\n` +
         `👥 إجمالي القروب حسب Telegram: *${tgTotal}*`,
         { parse_mode: 'Markdown' }
-      ).catch(() => {});
+      ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
 
     let text = `👥 *قائمة الأعضاء*\n`;
@@ -251,12 +251,12 @@ async function showAllMembers(ctx, chatId) {
 
     // حذف القائمة بعد 30 ثانية تلقائياً
     if (sentMsg) {
-      setTimeout(() => ctx.deleteMessage(sentMsg.message_id).catch(() => {}), 30000);
+      setTimeout(() => ctx.deleteMessage(sentMsg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 30000);
     }
     return sentMsg;
   } catch (e) {
     console.error('[/all]', e.message);
-    return ctx.reply('❌ خطأ: ' + e.message).catch(() => {});
+    return ctx.reply('❌ خطأ: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
 }
 
@@ -265,8 +265,8 @@ async function showAllMembers(ctx, chatId) {
 // ══════════════════════════════════════════════════════════
 async function tagAll(ctx, chatId, customMessage) {
   try {
-    ctx.answerCbQuery('⏳ جاري المنشن…').catch(() => {});
-    ctx.deleteMessage().catch(() => {});
+    ctx.answerCbQuery('⏳ جاري المنشن…').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
     const members = await all(
       'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 LIMIT 100',
@@ -274,7 +274,7 @@ async function tagAll(ctx, chatId, customMessage) {
     ).catch(() => []);
 
     if (!members.length) {
-      return ctx.answerCbQuery('📭 لا يوجد أعضاء مسجلون', { show_alert: true }).catch(() => {});
+      return ctx.answerCbQuery('📭 لا يوجد أعضاء مسجلون', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
 
     const header = customMessage
@@ -308,8 +308,8 @@ async function tagAll(ctx, chatId, customMessage) {
 // ══════════════════════════════════════════════════════════
 async function muteAll(ctx, chatId) {
   try {
-    ctx.answerCbQuery('⏳ جاري الإسكات…').catch(() => {});
-    ctx.deleteMessage().catch(() => {}); // مرة واحدة فقط ← BUG FIX
+    ctx.answerCbQuery('⏳ جاري الإسكات…').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); }); // مرة واحدة فقط ← BUG FIX
 
     const members = await all(
       'SELECT user_id FROM group_members WHERE chat_id=$1 LIMIT 100',
@@ -317,7 +317,7 @@ async function muteAll(ctx, chatId) {
     ).catch(() => []);
 
     if (!members.length) {
-      return ctx.answerCbQuery('📭 لا يوجد أعضاء', { show_alert: true }).catch(() => {});
+      return ctx.answerCbQuery('📭 لا يوجد أعضاء', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
 
     let ok = 0, fail = 0;
@@ -348,7 +348,7 @@ async function muteAll(ctx, chatId) {
       { parse_mode: 'Markdown' }
     ).catch(() => null);
 
-    if (sent) setTimeout(() => ctx.deleteMessage(sent.message_id).catch(() => {}), 8000);
+    if (sent) setTimeout(() => ctx.deleteMessage(sent.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 8000);
   } catch (e) {
     console.error('[muteAll]', e.message);
   }
@@ -359,8 +359,8 @@ async function muteAll(ctx, chatId) {
 // ══════════════════════════════════════════════════════════
 async function unmuteAll(ctx, chatId) {
   try {
-    ctx.answerCbQuery('⏳ جاري التفعيل…').catch(() => {});
-    ctx.deleteMessage().catch(() => {}); // مرة واحدة فقط ← BUG FIX
+    ctx.answerCbQuery('⏳ جاري التفعيل…').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); }); // مرة واحدة فقط ← BUG FIX
 
     const members = await all(
       'SELECT user_id FROM group_members WHERE chat_id=$1 LIMIT 100',
@@ -368,7 +368,7 @@ async function unmuteAll(ctx, chatId) {
     ).catch(() => []);
 
     if (!members.length) {
-      return ctx.answerCbQuery('📭 لا يوجد أعضاء', { show_alert: true }).catch(() => {});
+      return ctx.answerCbQuery('📭 لا يوجد أعضاء', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
 
     let ok = 0, fail = 0;
@@ -399,7 +399,7 @@ async function unmuteAll(ctx, chatId) {
       { parse_mode: 'Markdown' }
     ).catch(() => null);
 
-    if (sent) setTimeout(() => ctx.deleteMessage(sent.message_id).catch(() => {}), 8000);
+    if (sent) setTimeout(() => ctx.deleteMessage(sent.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 8000);
   } catch (e) {
     console.error('[unmuteAll]', e.message);
   }
@@ -410,7 +410,7 @@ async function unmuteAll(ctx, chatId) {
 // ══════════════════════════════════════════════════════════
 async function showGroupStats(ctx, chatId) {
   try {
-    ctx.answerCbQuery('📊 جاري التحميل…').catch(() => {});
+    ctx.answerCbQuery('📊 جاري التحميل…').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
     const [tgCount, dbMembers, grp] = await Promise.all([
       ctx.telegram.getChatMembersCount(chatId).catch(() => 0),
@@ -445,7 +445,7 @@ async function showGroupStats(ctx, chatId) {
       },
     }).catch(() => null);
 
-    if (sent) setTimeout(() => ctx.deleteMessage(sent.message_id).catch(() => {}), 20000);
+    if (sent) setTimeout(() => ctx.deleteMessage(sent.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 20000);
   } catch (e) {
     console.error('[GroupStats]', e.message);
   }
@@ -475,7 +475,7 @@ async function showGroupRules(ctx, chatId) {
       reply_markup: {
         inline_keyboard: [[{ text: '✅ قرأت وفهمت', callback_data: 'rules_ok' }]],
       },
-    }).catch(() => {});
+    }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   } catch (e) {
     console.error('[Rules]', e.message);
   }
@@ -486,7 +486,7 @@ async function setGroupRules(ctx, chatId, rules) {
     `UPDATE group_chats SET rules=$1 WHERE chat_id=$2`,
     [rules, chatId]
   );
-  return ctx.reply('✅ تم حفظ قواعد القروب').catch(() => {});
+  return ctx.reply('✅ تم حفظ قواعد القروب').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -499,7 +499,7 @@ async function warnMember(ctx, chatId, targetUserId, reason) {
       `INSERT INTO group_warns(chat_id, user_id, warned_by, reason, created_at)
        VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)`,
       [chatId, targetUserId, ctx.from.id, reason || 'مخالفة القواعد']
-    ).catch(() => {});
+    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
     // احسب مجموع التحذيرات
     const warnCount = await get(
@@ -517,7 +517,7 @@ async function warnMember(ctx, chatId, targetUserId, reason) {
         await ctx.telegram.banChatMember(chatId, targetUserId);
         actionText = `\n🚫 *تم الحظر تلقائياً* بعد ${MAX_WARNS} تحذيرات\\!`;
         // إعادة ضبط التحذيرات
-        await run('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, targetUserId]).catch(() => {});
+        await run('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, targetUserId]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       } catch (_) {
         actionText = `\n⚠️ *تعذّر الحظر* — يرجى المراجعة يدوياً`;
       }
@@ -535,7 +535,7 @@ async function warnMember(ctx, chatId, targetUserId, reason) {
       { parse_mode: 'MarkdownV2' }
     ).catch(() => null);
 
-    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 15000);
+    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 15000);
   } catch (e) {
     console.error('[Warn]', e.message);
   }
@@ -549,7 +549,7 @@ async function showWarns(ctx, chatId, targetUserId) {
     ).catch(() => []);
 
     if (!warns.length) {
-      return ctx.reply('✅ هذا العضو لا يملك أي تحذيرات').catch(() => {});
+      return ctx.reply('✅ هذا العضو لا يملك أي تحذيرات').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
 
     let text = `📋 *تحذيرات العضو*\n━━━━━━━━━━━━━━━━━━\n\n`;
@@ -558,15 +558,15 @@ async function showWarns(ctx, chatId, targetUserId) {
       text += `${i + 1}. ${w.reason || 'لا سبب'} — _${d}_\n`;
     });
 
-    return ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => {});
+    return ctx.reply(text, { parse_mode: 'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   } catch (e) {
     console.error('[ShowWarns]', e.message);
   }
 }
 
 async function clearWarns(ctx, chatId, targetUserId) {
-  await run('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, targetUserId]).catch(() => {});
-  return ctx.reply('✅ تم مسح تحذيرات العضو').catch(() => {});
+  await run('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, targetUserId]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  return ctx.reply('✅ تم مسح تحذيرات العضو').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -584,7 +584,7 @@ async function banMember(ctx, chatId, targetUserId, reason, deleteMessages) {
        VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)
        ON CONFLICT(chat_id, user_id) DO UPDATE SET reason=$4, updated_at=CURRENT_TIMESTAMP`,
       [chatId, targetUserId, ctx.from.id, reason || 'لا سبب']
-    ).catch(() => {});
+    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
     const msg = await ctx.reply(
       `🚫 *تم الحظر*\n` +
@@ -594,22 +594,22 @@ async function banMember(ctx, chatId, targetUserId, reason, deleteMessages) {
       { parse_mode: 'Markdown' }
     ).catch(() => null);
 
-    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 10000);
+    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 10000);
   } catch (e) {
-    ctx.reply('❌ فشل الحظر: ' + e.message).catch(() => {});
+    ctx.reply('❌ فشل الحظر: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
 }
 
 async function unbanMember(ctx, chatId, targetUserId) {
   try {
     await ctx.telegram.unbanChatMember(chatId, targetUserId);
-    await run('DELETE FROM group_bans WHERE chat_id=$1 AND user_id=$2', [chatId, targetUserId]).catch(() => {});
+    await run('DELETE FROM group_bans WHERE chat_id=$1 AND user_id=$2', [chatId, targetUserId]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     const msg = await ctx.reply(`✅ تم رفع الحظر عن [العضو](tg://user?id=${targetUserId})`, {
       parse_mode: 'Markdown',
     }).catch(() => null);
-    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 8000);
+    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 8000);
   } catch (e) {
-    ctx.reply('❌ فشل رفع الحظر: ' + e.message).catch(() => {});
+    ctx.reply('❌ فشل رفع الحظر: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
 }
 
@@ -639,9 +639,9 @@ async function muteMember(ctx, chatId, targetUserId, durationMinutes) {
       `⏱ المدة: ${durText}`,
       { parse_mode: 'Markdown' }
     ).catch(() => null);
-    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 8000);
+    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 8000);
   } catch (e) {
-    ctx.reply('❌ فشل الإسكات: ' + e.message).catch(() => {});
+    ctx.reply('❌ فشل الإسكات: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
 }
 
@@ -664,9 +664,9 @@ async function unmuteMember(ctx, chatId, targetUserId) {
       `🔊 *تم تفعيل العضو*\n👤 [العضو](tg://user?id=${targetUserId})`,
       { parse_mode: 'Markdown' }
     ).catch(() => null);
-    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 8000);
+    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 8000);
   } catch (e) {
-    ctx.reply('❌ فشل التفعيل: ' + e.message).catch(() => {});
+    ctx.reply('❌ فشل التفعيل: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
 }
 

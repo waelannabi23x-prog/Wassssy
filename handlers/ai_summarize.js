@@ -21,7 +21,7 @@ async function handleSummarize(ctx, fileId, fileType, title) {
     const buffer = await fetchBuffer(link.href);
 
     if (buffer.length > 10 * 1024 * 1024) {
-      if (thinking) ctx.deleteMessage(thinking.message_id).catch(() => {});
+      if (thinking) ctx.deleteMessage(thinking.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       return ctx.reply('⚠️ الملف كبير جداً (أكثر من 10MB).');
     }
 
@@ -47,7 +47,7 @@ async function handleSummarize(ctx, fileId, fileType, title) {
       } catch (e) {}
     }
 
-    if (thinking) ctx.deleteMessage(thinking.message_id).catch(() => {});
+    if (thinking) ctx.deleteMessage(thinking.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
     if (!text || text.length < 50) {
       return ctx.reply('⚠️ ما قدرت أقرأ هذا الملف — قد يكون scanned أو غير PDF نصي.');
@@ -61,8 +61,8 @@ async function handleSummarize(ctx, fileId, fileType, title) {
 
     await ctx.reply('📄 *ملخص: ' + escMd(title) + '*\n\n' + summary, { parse_mode: 'Markdown' });
   } catch (e) {
-    if (thinking) ctx.deleteMessage(thinking.message_id).catch(() => {});
-    ctx.reply('❌ فشل التلخيص: ' + e.message).catch(() => {});
+    if (thinking) ctx.deleteMessage(thinking.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    ctx.reply('❌ فشل التلخيص: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
 }
 

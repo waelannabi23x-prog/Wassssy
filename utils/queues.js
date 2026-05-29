@@ -65,7 +65,7 @@ async function safeAdd(queue, name, data) {
       if (sent % 25 === 0) await new Promise(r => setTimeout(r, 1000));
     }
     if (data.fromUid) {
-      bot.telegram.sendMessage(data.fromUid, `✅ اكتمل: *${sent}* مستخدم`, { parse_mode: 'Markdown' }).catch(() => {});
+      bot.telegram.sendMessage(data.fromUid, `✅ اكتمل: *${sent}* مستخدم`, { parse_mode: 'Markdown' }).catch(err => { require('./logger').debug("[silent]", err.message); });
     }
   });
 }

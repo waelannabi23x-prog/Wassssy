@@ -6,7 +6,7 @@ const logger       = require('../utils/logger');
 // ── File Share — deep link ─────────────────────────────────────
 async function handleShare(ctx) {
   try {
-    await ctx.answerCbQuery().catch(() => {});
+    await ctx.answerCbQuery().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     const fileId = parseInt(ctx.match?.[1]);
     if (!fileId) return;
 
@@ -78,7 +78,7 @@ async function handleSummarize(ctx) {
     );
   } catch(e) {
     logger.error('[Summarize]', e.message);
-    ctx.reply('❌ حدث خطأ أثناء المعالجة').catch(() => {});
+    ctx.reply('❌ حدث خطأ أثناء المعالجة').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
 }
 

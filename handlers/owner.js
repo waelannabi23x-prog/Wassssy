@@ -23,7 +23,7 @@ async function stress(ctx, text) {
   var sT = Date.now();
   var p = [];
   for (var i = 0; i < cnt; i++) {
-    p.push(ctx.telegram.sendMessage(ctx.chat.id, '⚡').catch(() => {}));
+    p.push(ctx.telegram.sendMessage(ctx.chat.id, '⚡').catch(err => { require('../utils/logger').debug("[silent]", err.message); }));
   }
   await Promise.all(p);
   var eT = Date.now();

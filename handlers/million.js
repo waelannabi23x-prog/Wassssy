@@ -185,7 +185,7 @@ async function nextTurn(bot, s) {
     { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[[
       { text:'✅ مستعد!', callback_data:'ml_ready' },
       { text:'❌ تنازل', callback_data:'ml_forfeit' },
-    ]]}}).catch(()=>{});
+    ]]}}).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 }
 
 async function askQ(bot, s) {
@@ -224,9 +224,9 @@ async function timeOut(bot, s) {
 
 async function onAnswer(bot, ctx, s, idx) {
   if (ctx.from.id !== s.current)
-    return ctx.answerCbQuery('⚠️ ليس دورك!', { show_alert:true }).catch(()=>{});
+    return ctx.answerCbQuery('⚠️ ليس دورك!', { show_alert:true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   if (s.timer) { clearTimeout(s.timer); s.timer = null; }
-  ctx.answerCbQuery('').catch(()=>{});
+  ctx.answerCbQuery('').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   const q   = s.question;
   const pl  = s.players.get(s.current);
   const ok  = idx === q.a;
@@ -262,19 +262,19 @@ async function onAnswer(bot, ctx, s, idx) {
 
 async function useLL(bot, ctx, s, type) {
   if (ctx.from.id !== s.current)
-    return ctx.answerCbQuery('⚠️ ليس دورك!', { show_alert:true }).catch(()=>{});
+    return ctx.answerCbQuery('⚠️ ليس دورك!', { show_alert:true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   const ll = s.lifelines[s.current];
   if (!ll || !ll[type])
-    return ctx.answerCbQuery('هذه المساعدة مستخدمة!', { show_alert:true }).catch(()=>{});
+    return ctx.answerCbQuery('هذه المساعدة مستخدمة!', { show_alert:true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   ll[type] = false;
-  ctx.answerCbQuery('').catch(()=>{});
+  ctx.answerCbQuery('').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   const q = s.question;
 
   if (type === 'fifty') {
     const wrong  = [0,1,2,3].filter(i => i !== q.a).sort(()=>Math.random()-.5).slice(0,2);
     const hidden = q.opts.map((o,i) => wrong.includes(i) ? null : o);
     s.question = { ...q, hidden };
-    await bot.telegram.sendMessage(s.chatId, `5️⃣0️⃣ *50/50* — تم حذف إجابتين!`, { parse_mode:'Markdown' }).catch(()=>{});
+    await bot.telegram.sendMessage(s.chatId, `5️⃣0️⃣ *50/50* — تم حذف إجابتين!`, { parse_mode:'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     try {
       await bot.telegram.editMessageText(s.chatId, s.msgId, null, qTxt(s,q,hidden), { parse_mode:'Markdown', reply_markup:qKb(s,hidden) });
     } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
@@ -285,7 +285,7 @@ async function useLL(bot, ctx, s, type) {
     const hint   = right ? q.opts[q.a] : q.opts[(q.a+1+Math.floor(Math.random()*3))%4];
     await bot.telegram.sendMessage(s.chatId,
       `📞 *اتصال بالصديق*\n🗣️ *${friend}* يقول:\n"اعتقد الاجابة هي *${hint}*... لكن مش متاكد 100% 🤔"`,
-      { parse_mode:'Markdown' }).catch(()=>{});
+      { parse_mode:'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   } else if (type === 'audience') {
     const dist = genDist(q.a);
     const let_ = ['أ','ب','ج','د'];
@@ -293,10 +293,10 @@ async function useLL(bot, ctx, s, type) {
       const b = '█'.repeat(Math.round(dist[i]/5)) + '░'.repeat(20-Math.round(dist[i]/5));
       return `${let_[i]}) ${b} ${dist[i]}%`;
     }).join('\n');
-    await bot.telegram.sendMessage(s.chatId, `👥 *رأي الجمهور*\n\n${bars}`, { parse_mode:'Markdown' }).catch(()=>{});
+    await bot.telegram.sendMessage(s.chatId, `👥 *رأي الجمهور*\n\n${bars}`, { parse_mode:'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   } else if (type === 'skip') {
     if (s.timer) { clearTimeout(s.timer); s.timer = null; }
-    await bot.telegram.sendMessage(s.chatId, `⏭️ *تم التخطي!* سؤال جديد...`, { parse_mode:'Markdown' }).catch(()=>{});
+    await bot.telegram.sendMessage(s.chatId, `⏭️ *تم التخطي!* سؤال جديد...`, { parse_mode:'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     await sleep(1500); s.msgId = null; askQ(bot, s);
   }
 }
@@ -328,12 +328,12 @@ async function endGame(bot, s) {
 
 async function saveStat(s, uid, prize, won) {
   try {
-    await run(`CREATE TABLE IF NOT EXISTS million_stats(id BIGSERIAL PRIMARY KEY,user_id BIGINT,chat_id BIGINT,prize INTEGER DEFAULT 0,won SMALLINT DEFAULT 0,questions_answered INTEGER DEFAULT 0,played_at TIMESTAMPTZ DEFAULT NOW())`).catch(()=>{});
+    await run(`CREATE TABLE IF NOT EXISTS million_stats(id BIGSERIAL PRIMARY KEY,user_id BIGINT,chat_id BIGINT,prize INTEGER DEFAULT 0,won SMALLINT DEFAULT 0,questions_answered INTEGER DEFAULT 0,played_at TIMESTAMPTZ DEFAULT NOW())`).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     await run(`INSERT INTO million_stats(user_id,chat_id,prize,won,questions_answered,played_at) VALUES($1,$2,$3,$4,$5,NOW())`,
-      [uid, s.chatId, prize, won?1:0, s.qIdx]).catch(()=>{});
+      [uid, s.chatId, prize, won?1:0, s.qIdx]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     const xp = Math.round(prize/100) + (won?500:50);
     await run(`INSERT INTO user_points(user_id,total_points) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET total_points=user_points.total_points+$2`,
-      [uid, xp]).catch(()=>{});
+      [uid, xp]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 }
 
@@ -341,7 +341,7 @@ const sleep = ms => new Promise(r => setTimeout(r, ms));
 
 async function cmdMillion(ctx) {
   if (ctx.chat?.type === 'private')
-    return ctx.reply('هذه اللعبة للمجموعات فقط!\nاضف البوت لمجموعتك واكتب /million').catch(()=>{});
+    return ctx.reply('هذه اللعبة للمجموعات فقط!\nاضف البوت لمجموعتك واكتب /million').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   const chatId = ctx.chat.id;
   const userId = ctx.from.id;
   const name   = ctx.from.first_name || 'لاعب';
@@ -352,7 +352,7 @@ async function cmdMillion(ctx) {
       { reply_markup:{ inline_keyboard:[[
         { text:'➕ انضم', callback_data:'ml_join' },
         { text:'🔴 انهاء', callback_data:'ml_cancel' },
-      ]]}}).catch(()=>{});
+      ]]}}).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
   const s = new Game(chatId, userId, name);
   s.addPlayer(userId, name);
@@ -368,20 +368,20 @@ async function cmdHelp(ctx) {
     `💰 *14 مرحلة من 100 الى 1,000,000 دج*\n\n` +
     `🛡️ *مناطق آمنة:* المرحلة 4، 7، 10\n\n` +
     `🆘 *المساعدات:*\n5️⃣0️⃣ 50/50 — حذف إجابتين\n📞 اتصل بصديق\n👥 رأي الجمهور\n⏭️ تخطي السؤال`,
-    { parse_mode:'Markdown' }).catch(()=>{});
+    { parse_mode:'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 }
 
 async function cmdTop(ctx) {
   try {
-    await run(`CREATE TABLE IF NOT EXISTS million_stats(id BIGSERIAL PRIMARY KEY,user_id BIGINT,chat_id BIGINT,prize INTEGER DEFAULT 0,won SMALLINT DEFAULT 0,questions_answered INTEGER DEFAULT 0,played_at TIMESTAMPTZ DEFAULT NOW())`).catch(()=>{});
+    await run(`CREATE TABLE IF NOT EXISTS million_stats(id BIGSERIAL PRIMARY KEY,user_id BIGINT,chat_id BIGINT,prize INTEGER DEFAULT 0,won SMALLINT DEFAULT 0,questions_answered INTEGER DEFAULT 0,played_at TIMESTAMPTZ DEFAULT NOW())`).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     const rows = await all(
       `SELECT u.first_name,SUM(ms.prize) total,COUNT(*) games,SUM(ms.won) wins FROM million_stats ms LEFT JOIN users u ON u.id=ms.user_id WHERE ms.chat_id=$1 GROUP BY ms.user_id,u.first_name ORDER BY total DESC LIMIT 10`,
       [ctx.chat?.id]).catch(()=>[]);
-    if (!rows.length) return ctx.reply('لا توجد إحصائيات بعد!').catch(()=>{});
+    if (!rows.length) return ctx.reply('لا توجد إحصائيات بعد!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     const md = ['🥇','🥈','🥉'];
     const txt = rows.map((r,i)=>`${md[i]||`${i+1}.`} *${r.first_name||'لاعب'}* — ${parseInt(r.total||0).toLocaleString()} دج | ${r.games} جولة | ${r.wins} فوز`).join('\n');
-    ctx.reply(`🏆 *الترتيب*\n━━━━━━━━━━━━━━━━━\n${txt}`, { parse_mode:'Markdown' }).catch(()=>{});
-  } catch(_) { ctx.reply('خطأ!').catch(()=>{}); }
+    ctx.reply(`🏆 *الترتيب*\n━━━━━━━━━━━━━━━━━\n${txt}`, { parse_mode:'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  } catch(_) { ctx.reply('خطأ!').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
 }
 
 async function handleCallback(bot, ctx) {
@@ -390,30 +390,30 @@ async function handleCallback(bot, ctx) {
   const userId = ctx.from?.id;
   const name   = ctx.from?.first_name || 'لاعب';
   if (!data.startsWith('ml_')) return;
-  ctx.answerCbQuery('').catch(()=>{});
+  ctx.answerCbQuery('').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   const s      = sessions.get(chatId);
   const action = data.slice(3);
 
   if (action === 'join') {
     if (!s || s.state !== 'waiting')
-      return ctx.answerCbQuery('لا توجد لعبة في الانتظار!', { show_alert:true }).catch(()=>{});
+      return ctx.answerCbQuery('لا توجد لعبة في الانتظار!', { show_alert:true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     if (s.players.has(userId))
-      return ctx.answerCbQuery('انت منضم بالفعل!', { show_alert:true }).catch(()=>{});
+      return ctx.answerCbQuery('انت منضم بالفعل!', { show_alert:true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     s.addPlayer(userId, name);
-    await bot.telegram.editMessageText(chatId, s.msgId, null, lobbyTxt(s), { parse_mode:'Markdown', reply_markup:lobbyKb() }).catch(()=>{});
-    return ctx.answerCbQuery(`✅ انضممت للعبة!`, { show_alert:true }).catch(()=>{});
+    await bot.telegram.editMessageText(chatId, s.msgId, null, lobbyTxt(s), { parse_mode:'Markdown', reply_markup:lobbyKb() }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    return ctx.answerCbQuery(`✅ انضممت للعبة!`, { show_alert:true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
 
   if (action === 'start') {
-    if (!s) return ctx.answerCbQuery('لا توجد لعبة!', { show_alert:true }).catch(()=>{});
-    if (s.hostId !== userId) return ctx.answerCbQuery('فقط المضيف يستطيع البدء!', { show_alert:true }).catch(()=>{});
-    if (!s.players.size) return ctx.answerCbQuery('لا يوجد لاعبون!', { show_alert:true }).catch(()=>{});
+    if (!s) return ctx.answerCbQuery('لا توجد لعبة!', { show_alert:true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    if (s.hostId !== userId) return ctx.answerCbQuery('فقط المضيف يستطيع البدء!', { show_alert:true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    if (!s.players.size) return ctx.answerCbQuery('لا يوجد لاعبون!', { show_alert:true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     s.state = 'playing';
     s.queue = [...s.players.keys()].sort(()=>Math.random()-.5);
     s.msgId = null;
     await bot.telegram.sendMessage(chatId,
       `🚀 *انطلقت اللعبة!*\n👥 ${s.players.size} لاعبون\n🎯 الترتيب: ${[...s.queue].map(id=>s.players.get(id)?.name).join(' ← ')}`,
-      { parse_mode:'Markdown' }).catch(()=>{});
+      { parse_mode:'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     await sleep(2000);
     return nextTurn(bot, s);
   }
@@ -431,7 +431,7 @@ async function handleCallback(bot, ctx) {
     if (pl) { pl.score += saf; s.prizePool += saf; }
     await bot.telegram.sendMessage(chatId,
       `🏃 *${pl?.name}* تنازل!\n💰 خرج بـ *${saf.toLocaleString()} دج*`,
-      { parse_mode:'Markdown' }).catch(()=>{});
+      { parse_mode:'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     s.msgId = null;
     await sleep(2000);
     return nextTurn(bot, s);
@@ -439,14 +439,14 @@ async function handleCallback(bot, ctx) {
 
   if (action === 'walk') {
     if (!s || s.current !== userId)
-      return ctx.answerCbQuery('ليس دورك!', { show_alert:true }).catch(()=>{});
+      return ctx.answerCbQuery('ليس دورك!', { show_alert:true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     if (s.timer) { clearTimeout(s.timer); s.timer = null; }
     const prz = s.prize();
     const pl  = s.players.get(userId);
     if (pl) { pl.score += prz; s.prizePool += prz; }
     await bot.telegram.editMessageText(s.chatId, s.msgId, null,
       `🚶 *${pl?.name}* انسحب بذكاء!\n💰 اخذ *${prz.toLocaleString()} دج* 🎉`,
-      { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[] }}).catch(()=>{});
+      { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[] }}).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     await saveStat(s, userId, prz, false);
     s.msgId = null;
     await sleep(3000);
@@ -464,12 +464,12 @@ async function handleCallback(bot, ctx) {
   }
 
   if (action === 'cancel') {
-    if (!s) return ctx.answerCbQuery('لا توجد لعبة!', { show_alert:true }).catch(()=>{});
+    if (!s) return ctx.answerCbQuery('لا توجد لعبة!', { show_alert:true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     if (s.hostId !== userId && !ctx.isAdmin)
-      return ctx.answerCbQuery('فقط المضيف!', { show_alert:true }).catch(()=>{});
+      return ctx.answerCbQuery('فقط المضيف!', { show_alert:true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     if (s.timer) clearTimeout(s.timer);
     sessions.delete(chatId);
-    return bot.telegram.sendMessage(chatId, '🔴 تم الغاء اللعبة.').catch(()=>{});
+    return bot.telegram.sendMessage(chatId, '🔴 تم الغاء اللعبة.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
 
   if (action === 'top') return cmdTop(ctx);

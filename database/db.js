@@ -108,7 +108,7 @@ async function transaction(queries) {
       for (const { sql, params } of queries) await client.query(sql, params || []);
       await client.query('COMMIT');
     } catch(e) {
-      await client.query('ROLLBACK').catch(() => {});
+      await client.query('ROLLBACK').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       throw e;
     } finally { client.release(); }
     return;

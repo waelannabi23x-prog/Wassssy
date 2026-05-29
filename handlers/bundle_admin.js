@@ -85,8 +85,8 @@ async function viewBundleAdmin(ctx, bundleId) {
 
 /* ─── حذف ملف من حزمة ──────────────────────────────── */
 async function removeBundleFile(ctx, bundleFileId, bundleId) {
-  await bundlesDb.removeBundleFile(parseInt(bundleFileId)).catch(() => {});
-  await ctx.answerCbQuery('✅ تم حذف الملف').catch(() => {});
+  await bundlesDb.removeBundleFile(parseInt(bundleFileId)).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  await ctx.answerCbQuery('✅ تم حذف الملف').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   return viewBundleAdmin(ctx, bundleId);
 }
 
@@ -114,8 +114,8 @@ async function startRenameBundle(ctx, bundleId) {
 
 /* ─── حذف حزمة كاملة ───────────────────────────────── */
 async function deleteBundle(ctx, bundleId) {
-  await bundlesDb.deleteBundle(parseInt(bundleId)).catch(() => {});
-  await ctx.answerCbQuery('✅ تم حذف الحزمة').catch(() => {});
+  await bundlesDb.deleteBundle(parseInt(bundleId)).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  await ctx.answerCbQuery('✅ تم حذف الحزمة').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   return ctx.reply(
     '✅ تم حذف الحزمة.',
     { ...build([[btn('🔍 بحث حزمة', 'bundle_search')]]) }
@@ -139,7 +139,7 @@ async function handleBundleText(ctx) {
   // تعديل اسم حزمة
   if (state.type === 'mg_brename') {
     await require('../utils/stateManager').delState(uid);
-    await bundlesDb.renameBundle(state.bundleId, text).catch(() => {});
+    await bundlesDb.renameBundle(state.bundleId, text).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     await ctx.reply('✅ تم تعديل اسم الحزمة');
     await viewBundleAdmin(ctx, state.bundleId);
     return true;

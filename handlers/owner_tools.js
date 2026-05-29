@@ -29,7 +29,7 @@ exports.trySmartUpload = async (ctx) => {
   const caption = (msg.text || msg.caption || '').trim();
   const regex = /تخصص:|سنة:|فصل:|مادة:|قسم:|spec:|year:|sem:|mat:|cat:/i;
   if (!regex.test(caption)) return false;
-  ctx.reply('جاري تحليل المسار...').catch(() => {});
+  ctx.reply('جاري تحليل المسار...').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   // نقسم بـ | ثم نمسح الـlabel من كل جزء (تخصص: X → X)
   let parts = caption.split(/[|,]/)
     .map(p => p.replace(/^[^:：]+[:：]\s*/, '').trim())
@@ -60,7 +60,7 @@ exports.trySmartUpload = async (ctx) => {
 };
 
 exports.fixSmartPath = async (ctx, data) => {
-  ctx.deleteMessage().catch(() => {});
+  ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   ctx.reply('تم التصحيح! أعد إرسال الملف بنفس المسار.');
 };
 

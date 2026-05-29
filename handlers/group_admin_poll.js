@@ -88,14 +88,14 @@ async function castVote(ctx, pollId, optionId) {
   try {
     const uid = ctx.from.id;
     const pollCheck = await get('SELECT is_closed FROM polls WHERE id=$1', [pollId]);
-    if (pollCheck?.is_closed) return ctx.answerCbQuery('🔒 التصويت مغلق!', { show_alert: true }).catch(()=>{});
+    if (pollCheck?.is_closed) return ctx.answerCbQuery('🔒 التصويت مغلق!', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     const existing = await get('SELECT option_id FROM poll_votes WHERE poll_id=$1 AND user_id=$2', [pollId, uid]);
-    if (existing) return ctx.answerCbQuery('🚫 صوّت مسبقاً ولا يمكن التغيير!', { show_alert: true }).catch(()=>{});
+    if (existing) return ctx.answerCbQuery('🚫 صوّت مسبقاً ولا يمكن التغيير!', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     await run('INSERT INTO poll_votes(poll_id,option_id,user_id) VALUES($1,$2,$3)', [pollId, optionId, uid]);
     await run('UPDATE poll_options SET votes=votes+1 WHERE id=$1', [optionId]);
-    ctx.answerCbQuery('✅ تم تسجيل صوتك!').catch(()=>{});
+    ctx.answerCbQuery('✅ تم تسجيل صوتك!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     await refreshPollMessage(ctx, pollId);
-  } catch(e) { console.error('[Vote]', e.message); ctx.answerCbQuery('❌ خطأ').catch(()=>{}); }
+  } catch(e) { console.error('[Vote]', e.message); ctx.answerCbQuery('❌ خطأ').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
 }
 
 // ── تحديث رسالة التصويت ──────────────────────────
@@ -118,11 +118,11 @@ async function refreshPollMessage(ctx, pollId) {
     if (poll.media_file_id) {
       await ctx.telegram.editMessageCaption(poll.chat_id, poll.message_id, null, text, {
         parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows }
-      }).catch(()=>{});
+      }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     } else {
       await ctx.telegram.editMessageText(poll.chat_id, poll.message_id, null, text, {
         parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows }
-      }).catch(()=>{});
+      }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
   } catch(e) { console.error('[Refresh Poll]', e.message); }
 }
@@ -130,7 +130,7 @@ async function refreshPollMessage(ctx, pollId) {
 // ── النتائج التفصيلية — تحديث نفس الرسالة ────────
 async function showPollResults(ctx, pollId) {
   try {
-    ctx.answerCbQuery('📊 تم التحديث').catch(()=>{});
+    ctx.answerCbQuery('📊 تم التحديث').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     await refreshPollMessage(ctx, pollId);
   } catch(e) { console.error('[Results]', e.message); }
 }
@@ -138,11 +138,11 @@ async function showPollResults(ctx, pollId) {
 // ── إغلاق التصويت ────────────────────────────────
 async function closePoll(ctx, pollId) {
   try {
-    ctx.answerCbQuery('').catch(()=>{});
+    ctx.answerCbQuery('').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id).catch(()=>null);
     const isAdmin = ctx.from.id === parseInt(process.env.OWNER_ID) ||
                    ['administrator','creator'].includes(member?.status);
-    if (!isAdmin) return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(()=>{});
+    if (!isAdmin) return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     await run('UPDATE polls SET is_closed=1 WHERE id=$1', [pollId]);
     await refreshPollMessage(ctx, pollId);
   } catch(e) { console.error('[Close Poll]', e.message); }
@@ -151,7 +151,7 @@ async function closePoll(ctx, pollId) {
 // ── تصفير الأصوات ────────────────────────────────
 async function resetPoll(ctx, pollId) {
   try {
-    ctx.answerCbQuery('✅ تم التصفير').catch(()=>{});
+    ctx.answerCbQuery('✅ تم التصفير').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     await run('UPDATE poll_options SET votes=0 WHERE poll_id=$1', [pollId]);
     await run('DELETE FROM poll_votes WHERE poll_id=$1', [pollId]);
     await run('UPDATE polls SET is_closed=0 WHERE id=$1', [pollId]);
@@ -162,9 +162,9 @@ async function resetPoll(ctx, pollId) {
 // ── حذف تصويت ────────────────────────────────────
 async function deletePoll(ctx, pollId) {
   try {
-    ctx.answerCbQuery('🗑 تم الحذف').catch(()=>{});
+    ctx.answerCbQuery('🗑 تم الحذف').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     const poll = await get('SELECT * FROM polls WHERE id=$1', [pollId]);
-    if (poll?.message_id) await ctx.telegram.deleteMessage(poll.chat_id, poll.message_id).catch(()=>{});
+    if (poll?.message_id) await ctx.telegram.deleteMessage(poll.chat_id, poll.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     await run('DELETE FROM poll_votes WHERE poll_id=$1', [pollId]);
     await run('DELETE FROM poll_options WHERE poll_id=$1', [pollId]);
     await run('DELETE FROM polls WHERE id=$1', [pollId]);
