@@ -288,9 +288,9 @@ async function handleText(ctx,state){
   // احفظ الوسائط في الـ state
   if(state.type==='mg_notify_groups_msg'){
     const msg=ctx.message;
-    if(msg.photo){state.mediaFileId=msg.photo[msg.photo.length-1].file_id;state.mediaType='photo';}
-    else if(msg.video){state.mediaFileId=msg.video.file_id;state.mediaType='video';}
-    else if(msg.document){state.mediaFileId=msg.document.file_id;state.mediaType='document';}
+    if(msg.photo){state.mediaFileId=msg.photo[msg.photo.length-1].file_id;state.mediaType="photo";if(msg.caption)state.mediaCaption=msg.caption;}
+    else if(msg.video){state.mediaFileId=msg.video.file_id;state.mediaType="video";if(msg.caption)state.mediaCaption=msg.caption;}
+    else if(msg.document){state.mediaFileId=msg.document.file_id;state.mediaType="document";if(msg.caption)state.mediaCaption=msg.caption;}
     await global.setState(uid,state);
   }
 
@@ -322,7 +322,8 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
         clearState(uid);
         const groups=state.spId==='0'?await all('SELECT chat_id FROM group_chats'):await all('SELECT chat_id FROM group_chats WHERE specialty_id=$1',[state.spId]);
         let gSent=0,gFail=0;
-        const msgText='📣 *إشعار*\n\n'+text;
+        const msgText='📣 *إشعار*\n\n'+(state.mediaCaption||text);
+
         const mFileId=state.mediaFileId||null;
         const mType=state.mediaType||null;
         // إرسال بـ chunks لتسريع الـ broadcast
