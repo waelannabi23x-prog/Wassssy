@@ -135,7 +135,7 @@ module.exports.registerCallbacks = function(bot, deps) {
         const kb = files.map(f => [kbBtn('🗑️ ' + f.title.substring(0,35), 'bundle_del_file_' + bid + '_' + f.id)]);
         kb.push([kbBtn('➕ إضافة ملفات', 'bundle_add_files_' + bid), kbBtn('🗑️ حذف الحزمة', 'bundle_delete_' + bid)]);
         kb.push([kbBtn('◀️ رجوع', 'mg_content')]);
-        return eos(ctx, '📦 *' + b.name + '*\n\n' + files.length + ' ملف', { parse_mode: 'Markdown', ...kbBuild(kb) });
+        return eos(ctx, '📦 *' + (b.title || b.name || "حزمة") + '*\n\n' + files.length + ' ملف', { parse_mode: 'Markdown', ...kbBuild(kb) });
       } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
     }},
     { p: 'bundle_add_files_', fn: async (ctx, d) => {
@@ -158,7 +158,7 @@ module.exports.registerCallbacks = function(bot, deps) {
         const kb = files.map(f => [kbBtn('🗑️ ' + f.title.substring(0,35), 'bundle_del_file_' + bid + '_' + f.id)]);
         kb.push([kbBtn('➕ إضافة ملفات', 'bundle_add_files_' + bid), kbBtn('🗑️ حذف الحزمة', 'bundle_delete_' + bid)]);
         kb.push([kbBtn('◀️ رجوع', 'mg_content')]);
-        return eos(ctx, '📦 *' + b.name + '*\n\n' + files.length + ' ملف\n\n_اضغط على ملف لحذفه_', { parse_mode: 'Markdown', ...kbBuild(kb) });
+        return eos(ctx, '📦 *' + (b.title || b.name || "حزمة") + '*\n\n' + files.length + ' ملف\n\n_اضغط على ملف لحذفه_', { parse_mode: 'Markdown', ...kbBuild(kb) });
       } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
     }},
 
