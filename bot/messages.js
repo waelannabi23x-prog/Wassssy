@@ -128,6 +128,7 @@ module.exports.registerMessages = function(bot, deps) {
 
   // ── Photos / Videos / Audio / Voice ──
   bot.on(['photo', 'video', 'audio', 'voice'], async ctx => {
+    if (ctx.chat?.type !== 'private') return;
     if (!ctx.isAdmin && !ctx.isOwner) return;
     const s = global.getState(ctx.uid);
     if (s?.type === 'note_add') return notesH.handleNoteInput(ctx, s);
