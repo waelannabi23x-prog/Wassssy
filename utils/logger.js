@@ -7,7 +7,7 @@ const ERR_LOG  = path.join(LOG_DIR, 'app.log');
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_KEEP = 3;
 
-try { if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true }); } catch(_) {}
+try { if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true }); } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
 
 let buf = '', flushTimer = null;
 
@@ -19,9 +19,9 @@ function _rotate() {
     for (let i = MAX_KEEP; i >= 1; i--) {
       const src  = i === 1 ? ERR_LOG : `${ERR_LOG}.${i - 1}`;
       const dest = `${ERR_LOG}.${i}`;
-      try { fs.renameSync(src, dest); } catch(_) {}
+      try { fs.renameSync(src, dest); } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
     }
-  } catch(_) {}
+  } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
 }
 
 function _flush() {

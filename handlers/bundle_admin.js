@@ -8,7 +8,7 @@ const filesDb = require('../database/files');
 /* ─── بحث عن حزمة ──────────────────────────────────── */
 async function searchBundles(ctx, query) {
   if (!query || query.trim().length < 2) {
-    await global.setState(ctx.uid, { type: 'bundle_search' });
+    await require('../utils/stateManager').setState(ctx.uid, { type: 'bundle_search' });
     return ctx.reply('🔍 اكتب اسم الحزمة للبحث:');
   }
 
@@ -94,7 +94,7 @@ async function removeBundleFile(ctx, bundleFileId, bundleId) {
 async function startAddFileToBunde(ctx, bundleId) {
   const b = await bundlesDb.getBundle(bundleId);
   if (!b) return ctx.reply('❌ الحزمة غير موجودة');
-  await global.setState(ctx.uid, {
+  await require('../utils/stateManager').setState(ctx.uid, {
     type: 'mg_bundle_files',
     bundleId: parseInt(bundleId),
     fileCount: 0,
@@ -108,7 +108,7 @@ async function startAddFileToBunde(ctx, bundleId) {
 
 /* ─── تعديل اسم حزمة ───────────────────────────────── */
 async function startRenameBundle(ctx, bundleId) {
-  await global.setState(ctx.uid, { type: 'mg_brename', bundleId: parseInt(bundleId) });
+  await require('../utils/stateManager').setState(ctx.uid, { type: 'mg_brename', bundleId: parseInt(bundleId) });
   return ctx.reply('✏️ أدخل الاسم الجديد للحزمة:');
 }
 
@@ -125,20 +125,20 @@ async function deleteBundle(ctx, bundleId) {
 /* ─── handleText للـstates ──────────────────────────── */
 async function handleBundleText(ctx) {
   const uid = ctx.uid;
-  const state = global.getState ? global.getState(uid) : null;
+  const state = require('../utils/stateManager').getState ? require('../utils/stateManager').getState(uid) : null;
   const text = ctx.message?.text?.trim();
   if (!state || !text) return false;
 
   // بحث عن حزمة
   if (state.type === 'bundle_search') {
-    await global.delState(uid);
+    await require('../utils/stateManager').delState(uid);
     await searchBundles(ctx, text);
     return true;
   }
 
   // تعديل اسم حزمة
   if (state.type === 'mg_brename') {
-    await global.delState(uid);
+    await require('../utils/stateManager').delState(uid);
     await bundlesDb.renameBundle(state.bundleId, text).catch(() => {});
     await ctx.reply('✅ تم تعديل اسم الحزمة');
     await viewBundleAdmin(ctx, state.bundleId);

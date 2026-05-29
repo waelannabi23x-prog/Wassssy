@@ -42,7 +42,7 @@ module.exports.registerMessages = function(bot, deps) {
         return;
       }
 
-      const s = global.getState(ctx.uid);
+      const s = require('../utils/stateManager').getState(ctx.uid);
       if (s?.type === 'mg_bundle_files' && ctx.message.media_group_id) {
         const mgId = ctx.message.media_group_id;
         MGColl.add(mgId, ctx.message);
@@ -70,13 +70,13 @@ module.exports.registerMessages = function(bot, deps) {
   // ── Documents ──
   bot.on('document', async ctx => {
     if (!ctx.isAdmin && !ctx.isOwner) return;
-    const s = global.getState(ctx.uid);
+    const s = require('../utils/stateManager').getState(ctx.uid);
 
     if (ctx.isOwner) {
       const isFwd = !!(ctx.message.forward_from || ctx.message.forward_from_chat || ctx.message.forward_sender_name);
       const hasCap = !!(ctx.message.caption && /تخصص:|سنة:|spec:|year:|sem:|mat:|cat:/i.test(ctx.message.caption));
       if (isFwd && !hasCap && !s) {
-        await global.setState(ctx.uid, { type: 'pending_forward', doc: ctx.message.document, photo: null });
+        await require('../utils/stateManager').setState(ctx.uid, { type: 'pending_forward', doc: ctx.message.document, photo: null });
         await ctx.reply('📎 ملف محفوظ! أرسل المسار:\n`تخصص: X | سنة: X | فصل: X | مادة: X | قسم: X`', { parse_mode: 'Markdown' }).catch(() => {});
         return;
       }
@@ -87,13 +87,13 @@ module.exports.registerMessages = function(bot, deps) {
     if (s?.type === 'mg_bundle_files') return manage.handleBundleFileUpload(ctx);
     if (s?.type === 'mg_bulk_files')   return manage.handleBulkUpload(ctx);
     if (s?.type === 'mg_tpl_file') {
-      await global.setState(ctx.uid, { ...s, type: 'mg_tpl_content', fileId: ctx.message.document.file_id });
+      await require('../utils/stateManager').setState(ctx.uid, { ...s, type: 'mg_tpl_content', fileId: ctx.message.document.file_id });
       return ctx.reply('✏️ اكتب نص الرسالة (أو skip):').catch(() => {});
     }
 
     // Restore backup
     if (s?.type === 'mg_awaiting_restore' && ctx.isOwner) {
-      await global.delState(ctx.uid);
+      await require('../utils/stateManager').delState(ctx.uid);
       const msg = await ctx.reply('⏳ جاري الاستعادة...').catch(() => {});
       try {
         const link = await ctx.telegram.getFileLink(ctx.message.document.file_id);
@@ -130,7 +130,7 @@ module.exports.registerMessages = function(bot, deps) {
   bot.on(['photo', 'video', 'audio', 'voice'], async ctx => {
     if (ctx.chat?.type !== 'private') return;
     if (!ctx.isAdmin && !ctx.isOwner) return;
-    const s = global.getState(ctx.uid);
+    const s = require('../utils/stateManager').getState(ctx.uid);
     if (s?.type === 'note_add') return notesH.handleNoteInput(ctx, s);
     if (s?.type === 'mg_bulk_files')   return manage.handleBulkUpload(ctx);
     if (s?.type === 'mg_bundle_files') return manage.handleBundleFileUpload(ctx);
@@ -143,7 +143,7 @@ module.exports.registerMessages = function(bot, deps) {
   bot.on('text', async ctx => {
     try {
       if (ctx.message.text.startsWith('/')) return;
-      const uid = ctx.uid, s = global.getState(uid);
+      const uid = ctx.uid, s = require('../utils/stateManager').getState(uid);
       if (!s) return;
       const txt = ctx.message.text.trim();
 
@@ -157,44 +157,44 @@ module.exports.registerMessages = function(bot, deps) {
       if (s.type === 'mg_bulk_prefix') return manage.handleText(ctx, s);
       if (s.type === 'mg_bulk_files' && txt !== '/done') return manage.handleText(ctx, s);
       if (s.type === 'mg_tpl_link') {
-        await global.setState(ctx.uid, { ...s, type: 'mg_tpl_content', fileId: txt });
+        await require('../utils/stateManager').setState(ctx.uid, { ...s, type: 'mg_tpl_content', fileId: txt });
         return ctx.reply('✏️ اكتب نص الرسالة (أو skip):').catch(() => {});
       }
       if (s.type === 'pending_forward' && ctx.isOwner) {
         const pTrig = /تخصص:|سنة:|فصل:|مادة:|قسم:|spec:|year:|sem:|mat:|cat:/i;
         if (pTrig.test(txt)) {
-          const sv = s; await global.delState(ctx.uid);
+          const sv = s; await require('../utils/stateManager').delState(ctx.uid);
           const fCtx = Object.assign({}, ctx, { message: Object.assign({}, ctx.message, { document: sv.doc, photo: sv.photo, caption: txt }) });
           if (await tools.trySmartUpload(fCtx)) return;
         }
       }
       if (s.type === 'bundle_search') {
         const rows = await bundlesDb.searchBundles(txt).catch(() => []);
-        await global.delState(ctx.uid);
+        await require('../utils/stateManager').delState(ctx.uid);
         if (!rows.length) return ctx.reply('❌ لا نتائج لـ "' + txt + '"').catch(() => {});
         const kb = rows.map(b => [kbBtn('📦 ' + b.name, 'bundle_view_' + b.id)]);
         return eos(ctx, '🔍 نتائج: ' + rows.length, { ...kbBuild(kb) });
       }
       if (s.type === 'mg_bundle_create') {
-        if (!ctx.isAdmin) { await global.delState(ctx.uid); return; }
+        if (!ctx.isAdmin) { await require('../utils/stateManager').delState(ctx.uid); return; }
         const name = txt.trim();
         if (!name) return ctx.reply('❌ الاسم فارغ').catch(() => {});
         const b = await bundlesDb.createBundle(name, null, null);
-        await global.setState(ctx.uid, { type: 'mg_bundle_files', bundleId: b.id, fileCount: 0 });
+        await require('../utils/stateManager').setState(ctx.uid, { type: 'mg_bundle_files', bundleId: b.id, fileCount: 0 });
         return ctx.reply('✅ تم إنشاء الحزمة: *' + name + '*\n\nأرسل الملفات الآن.\n/done للإنهاء', { parse_mode: 'Markdown' }).catch(() => {});
       }
       if (s.type === 'search')      return userH.handleSearch(ctx, txt);
       if (s.type === 'add_comment') {
-        if (!txt || txt === '/cancel') { await global.delState(ctx.uid); return ctx.reply('❌ تم الإلغاء.').catch(() => {}); }
+        if (!txt || txt === '/cancel') { await require('../utils/stateManager').delState(ctx.uid); return ctx.reply('❌ تم الإلغاء.').catch(() => {}); }
         if (txt.length > 500) return ctx.reply('⚠️ الحد 500 حرف.').catch(() => {});
         await commentsDb.addComment(s.fid, ctx.uid, txt);
-        await global.delState(ctx.uid);
+        await require('../utils/stateManager').delState(ctx.uid);
         cacheClear('cmts_' + s.fid + '_0'); cacheClear('cmts_' + s.fid + '_1');
         await ctx.reply('✅ تم إضافة تعليقك!').catch(() => {});
         try {
           const _cf = await filesDb.getFile(s.fid);
           if (_cf) ctx.telegram.sendMessage(OWNER_ID, '💬 *تعليق جديد*\n📄 ' + _cf.title + '\n👤 ' + (ctx.from.first_name || '') + '\n\n' + txt.substring(0, 300), { parse_mode: 'Markdown' }).catch(() => {});
-        } catch(_) {}
+        } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
         return browse.showComments(ctx, s.fid, s.spId, s.yrId, s.smId, s.sbId, s.catId);
       }
       if ((s?.type || '').startsWith('mg_') && ctx.isAdmin) return manage.handleText(ctx, s);
@@ -239,7 +239,7 @@ module.exports.registerMessages = function(bot, deps) {
       if (!res?.length) { ctx.answerInlineQuery([], { cache_time: 5 }); return; }
       // جلب username البوت مرة واحدة + تخزينه
       if (!global._cachedBotUsername) {
-        try { global._cachedBotUsername = (await ctx.telegram.getMe()).username; } catch(_) {}
+        try { global._cachedBotUsername = (await ctx.telegram.getMe()).username; } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
       }
       const un = global._cachedBotUsername;
       const results = res.map(f => {

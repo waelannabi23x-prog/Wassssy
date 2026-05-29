@@ -5,19 +5,8 @@ const logger = require('./logger');
 const _mem = new Map();
 let _redis = null;
 
-if (process.env.UPSTASH_REDIS_REST_URL && process.env.UPSTASH_REDIS_REST_TOKEN) {
-  try {
-    const { Redis } = require('@upstash/redis');
-    _redis = new Redis({
-      url:   process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    });
-    logger.info('✅ Upstash Redis متصل');
-  } catch(e) {
-    logger.warn('[Redis] فشل الاتصال:', e.message);
-    _redis = null;
-  }
-}
+const { getRedisClient } = require('./redisClient');
+_redis = getRedisClient();
 
 // ── Startup: من DB دائماً (KEYS محظور في Upstash Free) ──
 async function loadAllStates() {
@@ -25,7 +14,7 @@ async function loadAllStates() {
     const rows = await all("SELECT user_id, state FROM user_states WHERE updated_at > NOW() - INTERVAL '24 hours'");
     let n = 0;
     for (const r of rows) {
-      try { _mem.set(r.user_id, JSON.parse(r.state)); n++; } catch(_) {}
+      try { _mem.set(r.user_id, JSON.parse(r.state)); n++; } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
     }
     run("DELETE FROM user_states WHERE updated_at <= NOW() - INTERVAL '24 hours'").catch(() => {});
     logger.info('Loaded ' + n + ' states من DB');
@@ -62,7 +51,7 @@ async function delState(uid) {
   _mem.delete(uid);
 
   if (_redis) {
-    try { await _redis.del('state:' + uid); } catch(_) {}
+    try { await _redis.del('state:' + uid); } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
   }
 
   run('DELETE FROM user_states WHERE user_id=$1', [uid]).catch(() => {});
@@ -79,7 +68,7 @@ async function getStateAsync(uid) {
         _mem.set(uid, parsed);
         return parsed;
       }
-    } catch(_) {}
+    } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
   }
   return null;
 }

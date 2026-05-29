@@ -201,7 +201,7 @@ async function askQ(bot, s) {
       const m = await bot.telegram.sendMessage(s.chatId, txt, { parse_mode:'Markdown', reply_markup:kb });
       s.msgId = m.message_id;
     }
-  } catch(_) {}
+  } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   s.timer = setTimeout(() => timeOut(bot, s), ANSWER_TIME * 1000);
 }
 
@@ -215,7 +215,7 @@ async function timeOut(bot, s) {
     await bot.telegram.editMessageText(s.chatId, s.msgId, null,
       `⏰ *انتهى الوقت!*\nالاجابة الصحيحة: *${['أ','ب','ج','د'][q.a]}) ${q.opts[q.a]}*\n💰 *${pl?.name}* خرج بـ *${saf.toLocaleString()} دج*`,
       { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[] }});
-  } catch(_) {}
+  } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   await saveStat(s, s.current, saf, false);
   await sleep(3000);
   s.msgId = null;
@@ -241,7 +241,7 @@ async function onAnswer(bot, ctx, s, idx) {
           ? `🎆🎉👑 *مليونير جديد!*\n👤 *${pl?.name}* ربح *المليون دج!* 🏆🎊`
           : `✅ *إجابة صحيحة!* 🎉\n👤 *${pl?.name}*\n💰 ربح: *${prz.toLocaleString()} دج*\n${s.isSafe()?'🛡️ منطقة آمنة!\n':''}🎯 التالية: *${s.nextPrize().toLocaleString()} دج*`,
         { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[] }});
-    } catch(_) {}
+    } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
     if (isMil) {
       await saveStat(s, s.current, PRIZES[PRIZES.length-1], true);
       await sleep(4000); s.msgId = null; return nextTurn(bot, s);
@@ -254,7 +254,7 @@ async function onAnswer(bot, ctx, s, idx) {
       await bot.telegram.editMessageText(s.chatId, s.msgId, null,
         `❌ *إجابة خاطئة!*\nالصحيحة: *${['أ','ب','ج','د'][q.a]}) ${q.opts[q.a]}*\n💔 *${pl?.name}* خرج بـ *${saf.toLocaleString()} دج*`,
         { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[] }});
-    } catch(_) {}
+    } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
     await saveStat(s, s.current, saf, false);
     await sleep(3000); s.msgId = null; nextTurn(bot, s);
   }
@@ -277,7 +277,7 @@ async function useLL(bot, ctx, s, type) {
     await bot.telegram.sendMessage(s.chatId, `5️⃣0️⃣ *50/50* — تم حذف إجابتين!`, { parse_mode:'Markdown' }).catch(()=>{});
     try {
       await bot.telegram.editMessageText(s.chatId, s.msgId, null, qTxt(s,q,hidden), { parse_mode:'Markdown', reply_markup:qKb(s,hidden) });
-    } catch(_) {}
+    } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   } else if (type === 'phone') {
     const others = [...s.players.entries()].filter(([uid])=>uid!==s.current);
     const friend = others.length ? others[Math.floor(Math.random()*others.length)][1].name : 'الصديق';
@@ -322,7 +322,7 @@ async function endGame(bot, s) {
     await bot.telegram.sendMessage(s.chatId,
       `🎮 *انتهت اللعبة!*\n\n${scoreTxt(s)}\n\n🏆 الفائز: *${top?top[1].name:'لا احد'}*\n\nشكرا للجميع! لجولة جديدة: /million`,
       { parse_mode:'Markdown' });
-  } catch(_) {}
+  } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   sessions.delete(s.chatId);
 }
 
@@ -334,7 +334,7 @@ async function saveStat(s, uid, prize, won) {
     const xp = Math.round(prize/100) + (won?500:50);
     await run(`INSERT INTO user_points(user_id,total_points) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET total_points=user_points.total_points+$2`,
       [uid, xp]).catch(()=>{});
-  } catch(_) {}
+  } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 }
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));

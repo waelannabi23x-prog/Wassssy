@@ -54,17 +54,17 @@ module.exports.registerCallbacks = function(bot, deps) {
   async function hMgTtype(ctx, d) {
     const i = d.indexOf('_', 9), tt = d.substring(9, i), nm = decodeURIComponent(d.substring(i + 1));
     if (tt === 'text' || tt === 'link') {
-      await global.setState(ctx.uid, { type: 'mg_tpl_content', name: nm, tplType: tt, fileId: '' });
+      await require('../utils/stateManager').setState(ctx.uid, { type: 'mg_tpl_content', name: nm, tplType: tt, fileId: '' });
       return ctx.reply(tt === 'link' ? '🔗 اكتب الرابط:' : '✏️ اكتب المحتوى:').catch(() => {});
     }
-    await global.setState(ctx.uid, { type: 'mg_tpl_file', name: nm, tplType: tt, fileId: '' });
+    await require('../utils/stateManager').setState(ctx.uid, { type: 'mg_tpl_file', name: nm, tplType: tt, fileId: '' });
     return ctx.reply('📎 أبعث الملف أو الصورة:').catch(() => {});
   }
 
   // ── Exact matches ──
   const exactR = new Map([
     ['bundle_search_prompt', async ctx => {
-      await global.setState(ctx.uid, { type: 'bundle_search' });
+      await require('../utils/stateManager').setState(ctx.uid, { type: 'bundle_search' });
       return ctx.reply('🔍 اكتب اسم الحزمة للبحث:').catch(() => {});
     }],
     ['bundle_list', async ctx => {
@@ -77,7 +77,7 @@ module.exports.registerCallbacks = function(bot, deps) {
       } catch(e) { return ctx.reply('❌ ' + e.message).catch(() => {}); }
     }],
     ['bundle_new', async ctx => {
-      await global.setState(ctx.uid, { type: 'mg_bundle_create' });
+      await require('../utils/stateManager').setState(ctx.uid, { type: 'mg_bundle_create' });
       return ctx.reply('📦 اكتب اسم الحزمة الجديدة:').catch(() => {});
     }],
     ['noop',       () => {}],
@@ -107,8 +107,8 @@ module.exports.registerCallbacks = function(bot, deps) {
     ['profile',         ctx => userH.showProfile(ctx)],
     ['stats',           ctx => userH.showStats(ctx)],
     ['progress',        ctx => userH.showProgress(ctx)],
-    ['search_prompt',   ctx => { global.setState(ctx.uid, { type: 'search' }); return ctx.reply('🔍 اكتب كلمة البحث:').catch(() => {}); }],
-    ['ai_prompt',       ctx => { global.setState(ctx.uid, { type: 'ai_mode' }); return ctx.reply('🤖 المساعد الذكي مفعل!\n\nاكتب سؤالك:').catch(() => {}); }],
+    ['search_prompt',   ctx => { require('../utils/stateManager').setState(ctx.uid, { type: 'search' }); return ctx.reply('🔍 اكتب كلمة البحث:').catch(() => {}); }],
+    ['ai_prompt',       ctx => { require('../utils/stateManager').setState(ctx.uid, { type: 'ai_mode' }); return ctx.reply('🤖 المساعد الذكي مفعل!\n\nاكتب سؤالك:').catch(() => {}); }],
     ['ai_reset',        ctx => { const { resetChat } = require('../handlers/ai_chat'); resetChat(ctx.uid); return ctx.reply('🔄 تم مسح سياق المحادثة.').catch(() => {}); }],
     ['clear_my_history', async ctx => {
       await dbRun('DELETE FROM history WHERE user_id=$1', [ctx.uid]).catch(() => {});
@@ -141,7 +141,7 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'bundle_add_files_', fn: async (ctx, d) => {
       if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(() => {});
       const bid = parseInt(d.substring(17));
-      await global.setState(ctx.uid, { type: 'mg_bundle_files', bundleId: bid, fileCount: 0 });
+      await require('../utils/stateManager').setState(ctx.uid, { type: 'mg_bundle_files', bundleId: bid, fileCount: 0 });
       return ctx.reply('📦 أرسل الملفات الآن.\n/done للإنهاء').catch(() => {});
     }},
     { p: 'bundle_delete_',    fn: async (ctx, d) => {
@@ -175,7 +175,7 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'do_report_',  fn: (ctx, d) => { const p = d.substring(10).split('_'); return browse.doReport(ctx, p[0], p[1], p[2], p[3], p[4], p[5], p[6]); }},
     { p: 'add_cmt_',    fn: async (ctx, d) => {
       const p = d.substring(8).split('_');
-      await global.setState(ctx.uid, { type: 'add_comment', fid: p[0], spId: p[1], yrId: p[2], smId: p[3], sbId: p[4], catId: p[5] });
+      await require('../utils/stateManager').setState(ctx.uid, { type: 'add_comment', fid: p[0], spId: p[1], yrId: p[2], smId: p[3], sbId: p[4], catId: p[5] });
       return ctx.reply('✍️ اكتب تعليقك:\n_(أو /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
     }},
     { p: 'cmt_pg_',     fn: (ctx, d) => { const p = d.substring(7).split('_'); return browse.showComments(ctx, p[0], p[1], p[2], p[3], p[4], p[5], p[6], parseInt(p[7])); }},

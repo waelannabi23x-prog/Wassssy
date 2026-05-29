@@ -1,6 +1,6 @@
 'use strict';
 
-const { aiChat, aiChatStream }        = require('../utils/groq_client');
+const { aiChatWithFallback: aiChat, aiChatStream }        = require('../utils/groq_client');
 const { all, run }      = require('../database/db');
 const { smartSearch }   = require('./group');
 const { getBotKnowledge } = require('../utils/ai_knowledge');
@@ -64,7 +64,7 @@ function saveToDB(uid, userText, assistantText) {
 async function resetChat(uid) {
   _aiHistory.delete(uid);
   if (_aiTimers.get(uid)) { clearTimeout(_aiTimers.get(uid)); _aiTimers.delete(uid); }
-  try { await run('DELETE FROM ai_history WHERE user_id=$1', [uid]); } catch(_) {}
+  try { await run('DELETE FROM ai_history WHERE user_id=$1', [uid]); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 }
 
 // ══════════════════════════════════════
@@ -196,7 +196,7 @@ async function handleAiChat(ctx, text) {
   const history = hEntry.msgs;
 
   let botK = '';
-  try { botK = await getBotKnowledge(); } catch(_) {}
+  try { botK = await getBotKnowledge(); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   const kPrefix = botK ? ('\n\n[معرفة البوت]:\n' + botK.substring(0, 1500)) : '';
   const sysContent = SYSTEM_PERSONA + kPrefix + ragContext;
   const messages = [

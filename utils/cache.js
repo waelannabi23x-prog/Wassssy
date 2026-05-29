@@ -45,20 +45,8 @@ function cachePurgeExpired() {
 }
 
 // ── Upstash Redis Layer (للكاش المهم فقط) ──
-let _upstash = null;
-
-function _getUpstash() {
-  if (_upstash) return _upstash;
-  if (!process.env.UPSTASH_REDIS_REST_URL || !process.env.UPSTASH_REDIS_REST_TOKEN) return null;
-  try {
-    const { Redis } = require('@upstash/redis');
-    _upstash = new Redis({
-      url:   process.env.UPSTASH_REDIS_REST_URL,
-      token: process.env.UPSTASH_REDIS_REST_TOKEN,
-    });
-    return _upstash;
-  } catch(_) { return null; }
-}
+const { getRedisClient } = require('./redisClient');
+const _getUpstash = getRedisClient;
 
 // مفاتيح مهمة تُخزَّن في Upstash (تبقى بعد restart)
 const PERSIST_PREFIXES = ['precomp_', 'ban_', 'sub_ok_'];
@@ -79,7 +67,7 @@ async function cacheGetAsync(key) {
       cacheSet(key, val, TTL.CONTENT); // ضعه في الذاكرة
       return val;
     }
-  } catch(_) {}
+  } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
   return null;
 }
 
@@ -91,7 +79,7 @@ async function cacheSetAsync(key, val, ttl) {
   if (!r) return;
   try {
     await r.set(key, val, { ex: Math.floor(ttl / 1000) });
-  } catch(_) {}
+  } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
 }
 
 // ── Warmup: يجلب من Upstash أولاً ──
@@ -105,12 +93,12 @@ async function cacheWarmup() {
           try {
             const val = await r.get(k);
             if (val) cacheSet(k, val, TTL.CONTENT);
-          } catch(_) {}
+          } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
         }));
         require('./logger').info('⚡ Warmup من Upstash: ' + keys.length + ' مفتاح');
         return;
       }
-    } catch(_) {}
+    } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
   }
   // Fallback: warmup من DB
   try {
@@ -129,7 +117,7 @@ async function cacheWarmup() {
     const tasks = { length: specs.length + allYears.length + allSems.length + allSubs.length };
     require('./logger').info('⚡ Warmed: ' + tasks.length + ' keys');
     _evictLRU();
-  } catch(_) {}
+  } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
 }
 
 
@@ -154,7 +142,7 @@ async function cacheMGet(keys) {
         catch { results[idx] = raw[j]; }
       }
     });
-  } catch(_) {}
+  } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
 
   return results;
 }

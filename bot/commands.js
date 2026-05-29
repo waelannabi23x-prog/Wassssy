@@ -44,7 +44,7 @@ module.exports = function registerCommands(bot, deps) {
       const res = await smartSearch(q, 5);
       if (!res?.length) return ctx.reply('❌ لا نتائج لـ: ' + q).catch(() => {});
       if (!global._cachedBotUsername) {
-        try { global._cachedBotUsername = (await bot.telegram.getMe()).username; } catch(_) {}
+        try { global._cachedBotUsername = (await bot.telegram.getMe()).username; } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
       }
       const un = global._cachedBotUsername;
       const buttons = res.map(f => ([{
@@ -56,7 +56,7 @@ module.exports = function registerCommands(bot, deps) {
         reply_markup: { inline_keyboard: buttons }
       }).catch(() => {});
     }
-    await global.setState(ctx.uid, { type: 'search', query: raw || '' });
+    await require('../utils/stateManager').setState(ctx.uid, { type: 'search', query: raw || '' });
     return ctx.reply('🔍 اكتب كلمة البحث:').catch(() => {});
   });
 
@@ -64,13 +64,13 @@ module.exports = function registerCommands(bot, deps) {
   bot.command('stats',   ctx => userH.showStats(ctx));
 
   bot.command('done', async ctx => {
-    const s = global.getState(ctx.uid);
+    const s = require('../utils/stateManager').getState(ctx.uid);
     if (!s) return;
     if (s.type === 'mg_bundle_files') {
-      await global.delState(ctx.uid);
+      await require('../utils/stateManager').delState(ctx.uid);
       return ctx.reply('✅ تم حفظ الحزمة.').catch(() => {});
     }
-    await global.delState(ctx.uid);
+    await require('../utils/stateManager').delState(ctx.uid);
   });
 
   bot.command('mygroups',  ctx => tools.listGroups(ctx));
@@ -88,9 +88,9 @@ module.exports = function registerCommands(bot, deps) {
 
   bot.command('dlt', async ctx => {
     if (ctx.chat?.type !== 'private') {
-      const s = global.getState(ctx.uid);
+      const s = require('../utils/stateManager').getState(ctx.uid);
       if (s?.type === 'mg_bundle_files') {
-        await global.delState(ctx.uid);
+        await require('../utils/stateManager').delState(ctx.uid);
         return ctx.reply('❌ تم إلغاء إضافة الملفات.').catch(() => {});
       }
     }
@@ -99,7 +99,7 @@ module.exports = function registerCommands(bot, deps) {
   });
 
   bot.command('ai', async ctx => {
-    await global.setState(ctx.uid, { type: 'ai_mode' });
+    await require('../utils/stateManager').setState(ctx.uid, { type: 'ai_mode' });
     return ctx.reply('🤖 وضع المساعد الذكي مفعل!\n\nاكتب أي سؤال.\n/start للرجوع.').catch(() => {});
   });
 
@@ -107,8 +107,8 @@ module.exports = function registerCommands(bot, deps) {
   bot.command('promote',ctx => tools.batchPromote(ctx));
 
   bot.command('cancel', async ctx => {
-    if (global.getState(ctx.uid)) {
-      await global.delState(ctx.uid);
+    if (require('../utils/stateManager').getState(ctx.uid)) {
+      await require('../utils/stateManager').delState(ctx.uid);
       return ctx.reply('❌ تم الإلغاء.').catch(() => {});
     }
   });

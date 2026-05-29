@@ -13,7 +13,7 @@ function getPg() {
     const { Pool } = require('pg');
     pgPool = new Pool({
       connectionString:            process.env.DATABASE_URL,
-      ssl: { rejectUnauthorized: false },
+      ssl: process.env.DATABASE_URL?.includes('localhost') ? false : { rejectUnauthorized: false },
       max:                         20,   // كان 8 — رفعناه لـ 20
       min:                         2,    // دائماً connection جاهزة
       idleTimeoutMillis:           30000,
@@ -172,7 +172,7 @@ async function initSchema() {
     try {
       if (pg) await pg.query(sql);
       else { const w = await getSQLite(); if (w) sRun(w, sql.replace(/SERIAL/g, 'INTEGER').replace(/BIGINT/g, 'INTEGER'), []); }
-    } catch(_) {}
+    } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
   }
 
   // ── Indexes — الأصليين + الجدد المحسّنين ──
@@ -213,7 +213,7 @@ async function initSchema() {
       "CREATE INDEX IF NOT EXISTS idx_downloads_file   ON downloads(file_id)",               // bundle files
     ];
     for (const idx of IDX) {
-      try { await pg.query(idx); } catch(_) {}
+      try { await pg.query(idx); } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
     }
     
 
@@ -221,20 +221,20 @@ async function initSchema() {
   }
 
   // Migration: used_count
-  try { if(pg) await pg.query('ALTER TABLE million_questions ADD COLUMN IF NOT EXISTS used_count INTEGER DEFAULT 0'); } catch(_) {}
-  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_mq_used ON million_questions(used_count) WHERE is_active=1'); } catch(_) {}
+  try { if(pg) await pg.query('ALTER TABLE million_questions ADD COLUMN IF NOT EXISTS used_count INTEGER DEFAULT 0'); } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_mq_used ON million_questions(used_count) WHERE is_active=1'); } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
 
   // ── Migrations: pg_trgm + search indexes ──
-  try { if(pg) await pg.query('CREATE EXTENSION IF NOT EXISTS pg_trgm'); } catch(_) {}
-  try { if(pg) await pg.query("CREATE INDEX IF NOT EXISTS idx_files_fts ON files USING GIN(to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(description,'')))"); } catch(_) {}
-  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_files_title_trgm ON files USING GIN(title gin_trgm_ops)'); } catch(_) {}
-  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_files_desc_trgm  ON files USING GIN(description gin_trgm_ops)'); } catch(_) {}
-  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_users_name_trgm  ON users USING GIN(first_name gin_trgm_ops)'); } catch(_) {}
+  try { if(pg) await pg.query('CREATE EXTENSION IF NOT EXISTS pg_trgm'); } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query("CREATE INDEX IF NOT EXISTS idx_files_fts ON files USING GIN(to_tsvector('simple', coalesce(title,'') || ' ' || coalesce(description,'')))"); } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_files_title_trgm ON files USING GIN(title gin_trgm_ops)'); } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_files_desc_trgm  ON files USING GIN(description gin_trgm_ops)'); } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_users_name_trgm  ON users USING GIN(first_name gin_trgm_ops)'); } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
 
 // ── Migrations: جداول bundle_files.sort_order + bio ──
-  try { if(pg) await pg.query('ALTER TABLE bundle_files ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0'); } catch(_) {}
-  try { if(pg) await pg.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT NULL'); } catch(_) {}
-  try { if(pg) await pg.query('ALTER TABLE comments ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0'); } catch(_) {}
+  try { if(pg) await pg.query('ALTER TABLE bundle_files ADD COLUMN IF NOT EXISTS sort_order INTEGER DEFAULT 0'); } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS bio TEXT DEFAULT NULL'); } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE comments ADD COLUMN IF NOT EXISTS likes INTEGER DEFAULT 0'); } catch(err) { require('./utils/logger').debug('[catch]', err.message); }
 
   logger.info('✅ Schema ready');
 }

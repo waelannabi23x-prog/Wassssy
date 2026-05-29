@@ -136,7 +136,7 @@ async function showStats(ctx) {
 
 // ✅ FIXED: uses smartSearch (aliases + scoring) instead of raw filesDb.search
 async function handleSearch(ctx, query) {
-  if (global.delState) await global.delState(ctx.uid);
+  if (require('../utils/stateManager').delState) await require('../utils/stateManager').delState(ctx.uid);
   if (!query || query.trim().length < 2) return ctx.reply('⚠️ قصير جداً. ادخل كلمة على الأقل.').catch(function(){});
   if (query.trim().length > 100) return ctx.reply('⚠️ البحث طويل جداً.').catch(function(){});
   query = query.trim().replace(/[%;\\"<>']/g, '');

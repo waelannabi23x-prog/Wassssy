@@ -19,3 +19,13 @@ const getSpecialty = async uid => { const c = cacheGet('usp_'+uid); if(c) return
 const getUsersBySpecialty = async spId => (await all('SELECT user_id as id FROM user_specialties WHERE specialty_id=$1',[spId])).map(r=>r.id);
 
 module.exports = { upsert,updateLastActive,getAll,countActive,cleanOldUsers,count,activeToday,allIds,ban,unban,isBanned,getById,searchUsers,setSpecialty,getSpecialty,getUsersBySpecialty };
+
+async function getUsersBySpecialty(specialtyId) {
+  return all(
+    `SELECT u.id FROM users u
+     JOIN user_specialties us ON us.user_id = u.id
+     WHERE us.specialty_id = $1 AND u.is_banned = 0`,
+    [specialtyId]
+  );
+}
+module.exports.getUsersBySpecialty = getUsersBySpecialty;

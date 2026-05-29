@@ -97,7 +97,7 @@ async function showMainMenu(ctx, name) {
       const shortTitle = (lf.title || '').substring(0, 22);
       lastFileBtn = btn('▶️ استكمال: ' + shortTitle, 'preview_' + lf.id + '_0_0_0_0_0');
     }
-  } catch(_) {}
+  } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
   // ══════════════════════════════════════════
   // الأزرار — ملونة بالـ emoji
@@ -146,8 +146,8 @@ async function showMainMenu(ctx, name) {
 }
 
 startHandler.clearAiMode = async function(uid) {
-  const state = global.getState(uid);
-  if (state?.type === 'ai_mode') await global.delState(uid);
+  const state = require('../utils/stateManager').getState(uid);
+  if (state?.type === 'ai_mode') await require('../utils/stateManager').delState(uid);
 };
 
 module.exports = startHandler;

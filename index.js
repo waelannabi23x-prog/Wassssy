@@ -15,7 +15,6 @@ const { loadAllStates }   = require('./utils/redis');
 const { cacheWarmup, cacheClear, cacheClearPrefix } = require('./utils/cache');
 const { startScheduler }  = require('./utils/scheduler');
 const { initPersistentStates } = require('./utils/stateManager');
-const { setState: _setState, delState: _delState, getState: _getState } = require('./utils/redis');
 const { CBDedup, GrpBuf, GrpMsgs } = require('./bot/services');
 const notesH = require('./handlers/notes');
 
@@ -46,9 +45,6 @@ const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { eos } = require('./utils/helpers');
 
 // ── Globals ──
-global.setState  = _setState;
-global.delState  = _delState;
-global.getState  = _getState;
 global.maintenanceMode = false;
 
 // ── Cluster-safe maintenance: يقرأ من cache كل 30s ──

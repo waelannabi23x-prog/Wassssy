@@ -25,12 +25,12 @@ async function handleAdd(ctx) {
   if (!ctx.isOwner) return ctx.deleteMessage().catch(function(){});
   if (ctx.chat?.type === 'private') return ctx.reply('هذا الأمر للقروبات فقط');
   ctx.deleteMessage().catch(function(){});
-  await global.setState(ctx.uid, { type: 'add_mode', chatId: ctx.chat.id });
+  await require('../utils/stateManager').setState(ctx.uid, { type: 'add_mode', chatId: ctx.chat.id });
   ctx.reply('📥 وضع الإضافة — فوّرد الملفات\n/done للإنهاء').catch(function(){});
 }
 
 async function handleAddFile(ctx) {
-  var state = global.getState(uid) || {}
+  var state = require('../utils/stateManager').getState(uid) || {}
 // ctx.uid];
   if (!state || state.type !== 'add_mode') return false;
   var msg = ctx.message;
@@ -45,7 +45,7 @@ async function handleAddFile(ctx) {
   var ai = await classifyFile(filename, subjects, categories);
   var suggestedSub = ai ? subjects.find(function(s) { return s.name.toLowerCase() === (ai.subject || '').toLowerCase(); }) : null;
   var suggestedCat = ai ? categories.find(function(c) { return c.name.toLowerCase() === (ai.category || '').toLowerCase(); }) : null;
-  await global.setState(ctx.uid, {
+  await require('../utils/stateManager').setState(ctx.uid, {
     type: 'add_confirm', fid: fid, ftype: ftype, title: title,
     suggestedSubId: suggestedSub ? suggestedSub.id : null,
     suggestedCatId: suggestedCat ? suggestedCat.id : null,
@@ -59,14 +59,14 @@ async function handleAddFile(ctx) {
 }
 
 async function handleAddCallback(ctx, data) {
-  var state = global.getState(uid) || {}
+  var state = require('../utils/stateManager').getState(uid) || {}
 // ctx.uid];
-  if (data === 'add_cancel') { await global.delState(ctx.uid); return ctx.editMessageText('❌ تم الإلغاء').catch(function(){}); }
+  if (data === 'add_cancel') { await require('../utils/stateManager').delState(ctx.uid); return ctx.editMessageText('❌ تم الإلغاء').catch(function(){}); }
   if (data.startsWith('add_sub_')) {
     var subId = safeInt(data.replace('add_sub_', ''));
     var sub = await all('SELECT id, name FROM subjects WHERE id=$1', [subId]);
     var cats = await all('SELECT c.id, c.name FROM categories c WHERE c.subject_id=$1', [subId]);
-    await global.setState(ctx.uid, { type: 'add_confirm', fid: state.fid, ftype: state.ftype, title: state.title, suggestedCatId: state.suggestedCatId, chosenSubId: subId, chosenSubName: sub[0] ? sub[0].name : '' });
+    await require('../utils/stateManager').setState(ctx.uid, { type: 'add_confirm', fid: state.fid, ftype: state.ftype, title: state.title, suggestedCatId: state.suggestedCatId, chosenSubId: subId, chosenSubName: sub[0] ? sub[0].name : '' });
     var rows = cats.map(function(c) { return [btn((c.id === state.suggestedCatId ? '✅ ' : '') + c.name, 'add_cat_' + c.id)]; });
     rows.push([btn('❌ إلغاء', 'add_cancel')]);
     return ctx.editMessageText('📚 *' + escMd(sub[0] ? sub[0].name : '') + '*\n\nاختر الفئة:', { parse_mode: 'Markdown', ...build(rows) }).catch(function(){});
@@ -76,11 +76,11 @@ async function handleAddCallback(ctx, data) {
     var cat = await all('SELECT id, name FROM categories WHERE id=$1', [catId]);
     try {
       await filesDb.addFile(catId, state.title, '', state.fid, state.ftype, ctx.uid);
-      await global.delState(ctx.uid);
+      await require('../utils/stateManager').delState(ctx.uid);
       ctx.editMessageText('✅ *' + escMd(state.title) + '*\n📚 ' + escMd(state.chosenSubName) + ' → 📁 ' + escMd(cat[0] ? cat[0].name : ''), { parse_mode: 'Markdown' }).catch(function(){});
-      await global.setState(ctx.uid, { type: 'add_mode', chatId: state.chatId });
+      await require('../utils/stateManager').setState(ctx.uid, { type: 'add_mode', chatId: state.chatId });
       // ── XP for upload ──
-      try { require('./xp').onUpload(global.__bot, ctx.uid).catch(function(){}); } catch(_) {}
+      try { require('./xp').onUpload(global.__bot, ctx.uid).catch(function(){}); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
     } catch(e) { ctx.editMessageText('❌ ' + (e.message === 'exists' ? 'موجود مسبقاً' : e.message)).catch(function(){}); }
   }
 }

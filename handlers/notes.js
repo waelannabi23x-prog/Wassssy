@@ -97,7 +97,7 @@ async function showNotes(ctx, idx = 0) {
     if (n.media_file_id && n.media_type === 'document')
       return await ctx.replyWithDocument(n.media_file_id, { caption: txt, parse_mode: 'Markdown', ...kb });
     return await ctx.reply(txt, { parse_mode: 'Markdown', ...kb });
-  } catch(_) {}
+  } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 }
 
 /* ── Edit note message (for navigation) ───────────────────── */
@@ -154,7 +154,7 @@ async function deleteNote(ctx, noteId) {
 
 /* ── Add note — start flow ─────────────────────────────────── */
 async function startAddNote(ctx) {
-  await global.setState(ctx.uid, { type: 'note_add', step: 'content' });
+  await require('../utils/stateManager').setState(ctx.uid, { type: 'note_add', step: 'content' });
   return ctx.reply(
     '📝 *إضافة ملاحظة جديدة*\n━━━━━━━━━━━━━━━\n\n' +
     'أرسل المحتوى:\n' +
@@ -203,7 +203,7 @@ async function handleNoteInput(ctx, state) {
       }
     }
 
-    await global.setState(uid, { ...state, step: 'title', mediaFileId, mediaType, content, url });
+    await require('../utils/stateManager').setState(uid, { ...state, step: 'title', mediaFileId, mediaType, content, url });
     return ctx.reply(
       '✏️ أرسل *عنوان* الملاحظة\n_(أو أرسل - للتخطي)_',
       { parse_mode: 'Markdown' }
@@ -216,7 +216,7 @@ async function handleNoteInput(ctx, state) {
       'INSERT INTO notes(title,content,media_file_id,media_type,url,created_by) VALUES($1,$2,$3,$4,$5,$6)',
       [title, state.content||'', state.mediaFileId||null, state.mediaType||'text', state.url||null, uid]
     );
-    await global.delState(uid);
+    await require('../utils/stateManager').delState(uid);
     await ctx.reply('✅ *تمت إضافة الملاحظة!*', { parse_mode: 'Markdown' }).catch(() => {});
     return showNotes(ctx, 0);
   }

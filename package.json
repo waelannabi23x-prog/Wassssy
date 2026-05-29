@@ -7,6 +7,7 @@
     "dev": "nodemon --watch . --ext js index.js"
   },
   "dependencies": {
+    "@google/generative-ai": "^0.24.1",
     "@upstash/redis": "^1.38.0",
     "bullmq": "^5.76.10",
     "compression": "^1.8.1",
@@ -16,16 +17,15 @@
     "helmet": "^8.1.0",
     "ioredis": "^5.10.1",
     "multer": "^2.1.1",
-    "node-telegram-bot-api": "^0.67.0",
     "pdf-parse": "^2.4.5",
     "pg": "^8.20.0",
-    "pm2": "^7.0.1",
     "telegraf": "^4.16.3"
   },
   "engines": {
     "node": ">=20.0.0 <22.0.0"
   },
   "devDependencies": {
-    "nodemon": "^3.0.0"
+    "nodemon": "^3.0.0",
+    "pm2": "^7.0.1"
   }
 }

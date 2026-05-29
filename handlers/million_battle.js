@@ -409,7 +409,7 @@ async function showQuestionsPanel(ctx) {
 
 async function handleOwnerCallback(ctx, data) {
   if (data === 'mb_add_q') {
-    await global.setState(ctx.uid, { type: 'mb_add_question', step: 'question' });
+    await require('../utils/stateManager').setState(ctx.uid, { type: 'mb_add_question', step: 'question' });
     return ctx.reply('📝 *إضافة سؤال جديد*\n\nأرسل السؤال (أو صورة مع السؤال كـ caption):', { parse_mode: 'Markdown' }).catch(() => {});
   }
   if (data === 'mb_del_q_menu') {
@@ -438,17 +438,17 @@ async function handleOwnerState(ctx, state) {
     if (!question) return ctx.reply('⚠️ أرسل السؤال كنص أو صورة مع caption').catch(() => {});
     const mediaFileId = msg.photo ? msg.photo[msg.photo.length-1].file_id : msg.video ? msg.video.file_id : null;
     const mediaType   = msg.photo ? 'photo' : msg.video ? 'video' : null;
-    await global.setState(uid, { ...state, step:'option_a', question, mediaFileId, mediaType });
+    await require('../utils/stateManager').setState(uid, { ...state, step:'option_a', question, mediaFileId, mediaType });
     return ctx.reply('🅐 أرسل الخيار A:').catch(() => {});
   }
-  if (step === 'option_a') { await global.setState(uid, { ...state, step:'option_b', option_a:text }); return ctx.reply('🅑 أرسل الخيار B:').catch(() => {}); }
-  if (step === 'option_b') { await global.setState(uid, { ...state, step:'option_c', option_b:text }); return ctx.reply('🅒 أرسل الخيار C:').catch(() => {}); }
-  if (step === 'option_c') { await global.setState(uid, { ...state, step:'option_d', option_c:text }); return ctx.reply('🅓 أرسل الخيار D:').catch(() => {}); }
-  if (step === 'option_d') { await global.setState(uid, { ...state, step:'correct', option_d:text }); return ctx.reply('✅ الإجابة الصحيحة؟ اكتب A أو B أو C أو D:').catch(() => {}); }
+  if (step === 'option_a') { await require('../utils/stateManager').setState(uid, { ...state, step:'option_b', option_a:text }); return ctx.reply('🅑 أرسل الخيار B:').catch(() => {}); }
+  if (step === 'option_b') { await require('../utils/stateManager').setState(uid, { ...state, step:'option_c', option_b:text }); return ctx.reply('🅒 أرسل الخيار C:').catch(() => {}); }
+  if (step === 'option_c') { await require('../utils/stateManager').setState(uid, { ...state, step:'option_d', option_c:text }); return ctx.reply('🅓 أرسل الخيار D:').catch(() => {}); }
+  if (step === 'option_d') { await require('../utils/stateManager').setState(uid, { ...state, step:'correct', option_d:text }); return ctx.reply('✅ الإجابة الصحيحة؟ اكتب A أو B أو C أو D:').catch(() => {}); }
   if (step === 'correct') {
     const correct = text.toUpperCase();
     if (!['A','B','C','D'].includes(correct)) return ctx.reply('⚠️ اكتب A أو B أو C أو D فقط!').catch(() => {});
-    await global.setState(uid, { ...state, step:'difficulty', correct });
+    await require('../utils/stateManager').setState(uid, { ...state, step:'difficulty', correct });
     return ctx.reply('⭐ الصعوبة?\n1 = سهل ⭐\n2 = متوسط ⭐⭐\n3 = صعب ⭐⭐⭐').catch(() => {});
   }
   if (step === 'difficulty') {
@@ -457,7 +457,7 @@ async function handleOwnerState(ctx, state) {
       'INSERT INTO million_questions(question,option_a,option_b,option_c,option_d,correct,media_file_id,media_type,difficulty) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',
       [state.question,state.option_a,state.option_b,state.option_c,state.option_d,state.correct,state.mediaFileId||null,state.mediaType||null,diff]
     );
-    await global.delState(uid);
+    await require('../utils/stateManager').delState(uid);
     return ctx.reply('✅ تم إضافة السؤال! 🎮').catch(() => {});
   }
 }

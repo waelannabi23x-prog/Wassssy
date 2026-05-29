@@ -146,3 +146,26 @@ async function aiChatStream(messages, onChunk, maxTokens = 700) {
 }
 
 module.exports = { aiChat, aiChatStream, groqChat: aiChat };
+
+// ── AI Fallback: Groq → Gemini ──
+async function aiChatWithFallback(messages, systemPrompt) {
+  try {
+    return await aiChat(messages, systemPrompt);
+  } catch(err) {
+    require('./logger').warn('[AI] Groq failed → Gemini:', err.message);
+    if (!process.env.GEMINI_KEY) throw err;
+    try {
+      const { GoogleGenerativeAI } = require('@google/generative-ai');
+      const genAI = new GoogleGenerativeAI(process.env.GEMINI_KEY);
+      const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash' });
+      const prompt = (systemPrompt ? systemPrompt + '\n\n' : '') +
+                     messages.map(m => m.role + ': ' + m.content).join('\n');
+      const result = await model.generateContent(prompt);
+      return result.response.text();
+    } catch(err2) {
+      require('./logger').error('[AI] Gemini failed:', err2.message);
+      throw new Error('كل الـ AI providers فشلوا');
+    }
+  }
+}
+module.exports.aiChatWithFallback = aiChatWithFallback;

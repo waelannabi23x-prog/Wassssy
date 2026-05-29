@@ -30,8 +30,8 @@ function sanitizeInput(str, maxLen = 200) {
 }
 
 
-const setState=(uid,s)=>{ if(global.setState) global.setState(uid,s); };
-const clearState=uid=>{ if(global.delState) global.delState(uid); };
+const setState=(uid,s)=>{ if(require('../utils/stateManager').setState) require('../utils/stateManager').setState(uid,s); };
+const clearState=uid=>{ if(require('../utils/stateManager').delState) require('../utils/stateManager').delState(uid); };
 
 async function concurrentBroadcast(bot,chatId,msgId,ids,txt,opt={}){if(!bot)return {sent:0,failed:0};
   if(!bot||!bot.sendMessage){console.error('[BC] bot is undefined');return {sent:0,failed:ids.length};}
@@ -105,8 +105,7 @@ async function showCategories(ctx,spId,yrId,smId,sbId){
   return eos(ctx,'📖 *'+escMd(sb?.name)+'*\n📁 الفئات',{parse_mode:'Markdown',...build(rows)});
 }
 async function showMgFiles(ctx,spId,yrId,smId,sbId,catId,page=0){
-  const [cat,all2]=await Promise.all([content.getCategory(catId),filesDb.getFiles(catId)]);
-  const total=all2.length;const list=all2.slice(page*PS,(page+1)*PS);
+  const [cat,list,total]=await Promise.all([content.getCategory(catId),filesDb.getFiles(catId,PS,page*PS),filesDb.countFiles(catId)]);
   let text='📁 *'+escMd(cat?.name)+'*\n━━━━━━━━━━━━\n'+(total?'📄 *'+total+' ملف*':'_لا توجد ملفات._');
   const rows=[];
   list.forEach(f=>{rows.push([btn('📄 '+f.title,'preview_'+f.id+'_0_0_0_0_0')]);rows.push([btn('✏️','mg_rn_fl_'+[spId,yrId,smId,sbId,catId,f.id].join('_')),btn('📝','mg_desc_fl_'+[spId,yrId,smId,sbId,catId,f.id].join('_')),btn('🗑','mg_dl_fl_'+[spId,yrId,smId,sbId,catId,f.id].join('_'))]);});
@@ -221,7 +220,7 @@ async function showMsgsMenu(ctx){const templates=await messagesDb.getTemplates()
 async function showTemplates(ctx){const list=await messagesDb.getTemplates();const text='📝 *القوالب ('+list.length+')*';const rows=list.map(t=>[btn(t.name,'mg_tpl_'+t.id)]);rows.push([btn('➕ قالب جديد','mg_add_template')]);rows.push(back('mg_msgs'));return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});}
 async function showScheduled(ctx){const list=await messagesDb.getScheduled();const text='📅 *المجدولة ('+list.length+')*';const rows=list.map(s=>[btn((s.name||'رسالة')+' — '+s.send_at,'noop'),btn('🗑','mg_del_sched_'+s.id)]);rows.push(back('mg_msgs'));return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});}
 async function handleBundleFileUpload(ctx){
-  const uid=ctx.uid;const state=global.getState(uid);
+  const uid=ctx.uid;const state=require('../utils/stateManager').getState(uid);
   if(!state||state.type!=='mg_bundle_files') return false;
   const msg=ctx.message;let fid=null,ftype=null,title='';
   if(msg.document){fid=msg.document.file_id;ftype='document';title=msg.document.file_name||'📄 ملف';}
@@ -239,7 +238,7 @@ async function handleBundleFileUpload(ctx){
 }
 
 async function handleBulkUpload(ctx){
-  const uid=ctx.uid;const state=global.getState(uid);
+  const uid=ctx.uid;const state=require('../utils/stateManager').getState(uid);
   if(!state||state.type!=='mg_bulk_files') return false;
   const msg=ctx.message;let fid,ftype,title='';
   if(msg.document){fid=msg.document.file_id;ftype='document';title=msg.document.file_name||msg.caption||('ملف_'+Date.now());title=title.replace(/.[^/.]+$/,'').trim()||('ملف_'+Date.now());}
@@ -255,7 +254,7 @@ async function handleBulkUpload(ctx){
 
 async function handleFileUpload(ctx){
   if(await handleBundleFileUpload(ctx)) return;
-  const uid=ctx.uid;const state=global.getState(uid);
+  const uid=ctx.uid;const state=require('../utils/stateManager').getState(uid);
   if(!state||state.type!=='mg_file') return;
   const msg=ctx.message;let fid,ftype;let msgText=(msg.text||msg.caption||'').trim();
   const isLink=msg.entities?.some(e=>e.type==='url'||e.type==='text_link')||msgText.startsWith('http');
@@ -291,7 +290,7 @@ async function handleText(ctx,state){
     if(msg.photo){state.mediaFileId=msg.photo[msg.photo.length-1].file_id;state.mediaType="photo";if(msg.caption)state.mediaCaption=msg.caption;}
     else if(msg.video){state.mediaFileId=msg.video.file_id;state.mediaType="video";if(msg.caption)state.mediaCaption=msg.caption;}
     else if(msg.document){state.mediaFileId=msg.document.file_id;state.mediaType="document";if(msg.caption)state.mediaCaption=msg.caption;}
-    await global.setState(uid,state);
+    await require('../utils/stateManager').setState(uid,state);
   }
 
   try{
@@ -445,7 +444,7 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
   if(data.startsWith('mg_rn_cat_')){const p=data.replace('mg_rn_cat_','').split('_');setState(uid,{type:'mg_rn_cat',id:p[4],spId:p[0],yrId:p[1],smId:p[2],sbId:p[3]});return ctx.reply('✏️ الاسم الجديد:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
   if(data.startsWith('mg_dl_cat_')){const p=data.replace('mg_dl_cat_','').split('_');const cat=await content.getCategory(p[4]);return eos(ctx,'🗑 حذف *'+escMd(cat?.name||'')+'*؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_cat_'+p[0]+'_'+p[1]+'_'+p[2]+'_'+p[3]+'_'+p[4]),btn('❌ لا','mg_cats_'+p[0]+'_'+p[1]+'_'+p[2]+'_'+p[3])]])});}
   if(data.startsWith('mg_cdl_cat_')){const p=data.replace('mg_cdl_cat_','').split('_');await content.deleteCategory(p[4]);return showCategories(ctx,p[0],p[1],p[2],p[3]);}
-  if(data.startsWith('mg_add_bundle_files_')){const p=data.replace('mg_add_bundle_files_','').split('_');global.setState(ctx.uid,{type:'mg_bundle_files',bundleId:p[0],catId:p[1],spId:p[2],yrId:p[3],smId:p[4],sbId:p[5],fileCount:0});return ctx.reply('➕ أبعث ملفات للحزمة. /done للانتهاء');}
+  if(data.startsWith('mg_add_bundle_files_')){const p=data.replace('mg_add_bundle_files_','').split('_');require('../utils/stateManager').setState(ctx.uid,{type:'mg_bundle_files',bundleId:p[0],catId:p[1],spId:p[2],yrId:p[3],smId:p[4],sbId:p[5],fileCount:0});return ctx.reply('➕ أبعث ملفات للحزمة. /done للانتهاء');}
   if(data.startsWith('mg_dl_bundle_')){const p=data.replace('mg_dl_bundle_','').split('_');const _bId=parseInt(p[0]),_bCat=parseInt(p[1]);await bundlesDb.deleteBundle(_bId);const {cacheClearPrefix:ccp,cacheClear:cc}=require('../utils/cache');ccp('showfiles_'+_bCat);cc('bdls_'+_bCat);cc('bundle_full_'+_bId);await ctx.answerCbQuery('✅ تم حذف الحزمة').catch(()=>{});return browse.showFiles(ctx,p[2],p[3],p[4],p[5],p[1],0);}
   if(data.startsWith('mg_rn_bundle_')){const p=data.replace('mg_rn_bundle_','').split('_');setState(uid,{type:'mg_rename_bundle',bundleId:p[0],catId:p[1],spId:p[2],yrId:p[3],smId:p[4],sbId:p[5]});return ctx.reply('✏️ الاسم الجديد:');}
   if(data.startsWith('mg_add_bundle_')){if(!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط.',{show_alert:true});const p=data.replace('mg_add_bundle_','').split('_');setState(uid,{type:'mg_bundle_title',spId:p[0],yrId:p[1],smId:p[2],sbId:p[3],catId:p[4]});return ctx.reply('📦 اسم الحزمة:');}

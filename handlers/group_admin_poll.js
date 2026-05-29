@@ -111,7 +111,7 @@ async function refreshPollMessage(ctx, pollId) {
       try {
         const m = await ctx.telegram.getChatMember(poll.chat_id, ctx.from.id);
         isAdmin = ['administrator','creator'].includes(m?.status);
-      } catch(_) {}
+      } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
     }
     const text = buildPollText(poll, options);
     const rows = buildPollButtons(pollId, options, poll.is_closed, isAdmin);
