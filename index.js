@@ -176,6 +176,7 @@ async function launch() {
   try {
     await initSchema();
     await migrateGroupTables().catch(() => {});
+    await require('./handlers/group_panel').migrateGroupPanel().catch(() => {});
     await notesH.initNotes().catch(()=>{});
     await initPersistentStates();
     logger.info('✅ DB ready');

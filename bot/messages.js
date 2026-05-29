@@ -1,5 +1,6 @@
 'use strict';
 const https = require('https');
+const groupPanel = require('../handlers/group_panel');
 
 module.exports.registerMessages = function(bot, deps) {
   const {
@@ -137,6 +138,7 @@ module.exports.registerMessages = function(bot, deps) {
     if (s?.type === 'mg_file')         return manage.handleFileUpload(ctx);
     if (s?.type === 'mg_tpl_content')  return manage.handleText(ctx, s);
     if (s?.type === 'mg_notify_groups_msg') return manage.handleText(ctx, s);
+    if (s?.type?.startsWith('gp_')) return groupPanel.handleMedia(ctx, s);
   });
 
   // ── Text ──
