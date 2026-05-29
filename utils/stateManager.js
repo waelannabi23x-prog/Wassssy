@@ -1,6 +1,4 @@
 'use strict';
 const { setState, delState, getState } = require('./redis');
-const { initPersistentStates } = (function() {
-  return { initPersistentStates: async () => {} };
-})();
+async function initPersistentStates() {}
 module.exports = { setState, delState, getState, initPersistentStates };
