@@ -1,0 +1,59 @@
+#!/bin/bash
+cd ~/study-bot-backup-20260407_011636
+
+cat > bans_insert.cjs << 'JSEOF'
+const fs = require('fs');
+let c = fs.readFileSync('bot/commands.js', 'utf8');
+
+const newCmds = [
+  '',
+  "  bot.command('ban', async ctx => {",
+  '    if (!ctx.isOwner) return;',
+  "    if (ctx.chat?.type !== 'private') return;",
+  "    const parts = (ctx.message.text || '').split(/\\s+/);",
+  '    const targetId = parseInt(parts[1]);',
+  "    if (!targetId) return ctx.reply('Usage: /ban ID').catch(() => {});",
+  '    try {',
+  '      await usersDb.ban(targetId);',
+  "      cacheClear('ban_' + targetId);",
+  "      return ctx.reply('Banned: ' + targetId).catch(() => {});",
+  "    } catch(e) { ctx.reply('Error: ' + e.message).catch(() => {}); }",
+  '  });',
+  '',
+  "  bot.command('unban', async ctx => {",
+  '    if (!ctx.isOwner) return;',
+  "    if (ctx.chat?.type !== 'private') return;",
+  "    const parts = (ctx.message.text || '').split(/\\s+/);",
+  '    const targetId = parseInt(parts[1]);',
+  "    if (!targetId) return ctx.reply('Usage: /unban ID').catch(() => {});",
+  '    try {',
+  '      await usersDb.unban(targetId);',
+  "      cacheClear('ban_' + targetId);",
+  "      return ctx.reply('Unbanned: ' + targetId).catch(() => {});",
+  "    } catch(e) { ctx.reply('Error: ' + e.message).catch(() => {}); }",
+  '  });',
+  '',
+  "  bot.command('bans', async ctx => {",
+  '    if (!ctx.isOwner) return;',
+  "    if (ctx.chat?.type !== 'private') return;",
+  '    try {',
+  "      const list = await dbAll('SELECT id, first_name, username FROM users WHERE is_banned=1 LIMIT 50');",
+  "      if (!list.length) return ctx.reply('No banned users').catch(() => {});",
+  "      let text = 'Banned (' + list.length + '):\\n';",
+  '      list.forEach((u, i) => {',
+  "        text += (i+1) + '. ' + (u.first_name||'user') + (u.username?' @'+u.username:'') + ' ID:' + u.id + '\\n';",
+  '      });',
+  '      ctx.reply(text).catch(() => {});',
+  "    } catch(e) { ctx.reply('Error: ' + e.message).catch(() => {}); }",
+  '  });',
+  ''
+].join('\n');
+
+c = c.replace("  bot.command('start'", newCmds + "  bot.command('start'");
+fs.writeFileSync('bot/commands.js', c);
+console.log('done');
+JSEOF
+
+node bans_insert.cjs
+node --check bot/commands.js && echo "OK" || echo "ERROR"
+rm bans_insert.cjs

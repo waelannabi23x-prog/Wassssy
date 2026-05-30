@@ -44,9 +44,6 @@ async function resolveTarget(ctx) {
 
 // ── Helper: السبب من النص ──
 function getReason(ctx, skip = 2) {
-  const parts = (ctx.message?.text || '').split(/\s+/);
-  return parts.slice(skip).join(' ') || '';
-}
 
 // ══════════════════════════════════════════════════════════
 // 🤖 تسجيل جميع أوامر القروب
