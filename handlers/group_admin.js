@@ -37,9 +37,7 @@ async function handleNewMember(bot, chatId, userId, firstName) {
     // تحقق من welcome_enabled
     const welcomeCheck = await get('SELECT welcome_enabled FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null);
     if (welcomeCheck && welcomeCheck.welcome_enabled === 0) return;
-    const [grp, welcomeSettings] = await Promise.all([
-      get('SELECT specialty_id, welcome_enabled, welcome_msg, welcome_photo FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null),
-    ]);
+    const grp = await get('SELECT specialty_id, welcome_enabled, welcome_msg, welcome_photo FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null);
 
     const spec = grp?.specialty_id
       ? await get('SELECT name FROM specialties WHERE id=$1', [grp.specialty_id]).catch(() => null)
