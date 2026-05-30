@@ -3,7 +3,7 @@ const { all, get, run } = require('./db');
 const { cacheGet, cacheSet, cacheClear, cacheClearPrefix } = require('../utils/cache');
 const J='SELECT f.*,c.name as cat_name,s.name as sub_name FROM files f JOIN categories c ON f.category_id=c.id JOIN subjects s ON c.subject_id=s.id';
 const getFile=async id=>{var k='file_'+id;var cv=cacheGet(k);if(cv)return cv;var r=await get(J+' WHERE f.id=$1 AND f.is_deleted=0',[id]);if(r)cacheSet(k,r,600000);return r;};
-const getFiles=async (catId,limit=1000,offset=0)=>{var k=`files_cat___`;var cv=cacheGet(k);if(cv)return cv;var r=await all(J+` WHERE f.category_id=$1 AND f.is_deleted=0 ORDER BY f.uploaded_at DESC LIMIT $2 OFFSET $3`,[catId,limit,offset]);cacheSet(k,r,600000);return r;};
+const getFiles=async (catId,limit=1000,offset=0)=>{var k=`files_cat_${catId}_${offset}`;var cv=cacheGet(k);if(cv)return cv;var r=await all(J+` WHERE f.category_id=$1 AND f.is_deleted=0 ORDER BY f.uploaded_at DESC LIMIT $2 OFFSET $3`,[catId,limit,offset]);cacheSet(k,r,600000);return r;};
 const countFiles=async catId=>{var r=await get(`SELECT COUNT(*) as n FROM files WHERE category_id=$1 AND is_deleted=0`,[catId]);return parseInt(r?.n||0);};
 const invalidateFilesCache=catId=>{cacheClearPrefix('files_cat_'+catId);cacheClearPrefix('showfiles_');};
 const addFile=async(catId,title,desc,fileId,fileType,uploadedBy)=>{

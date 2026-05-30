@@ -183,6 +183,12 @@ async function migrateGroupTables() {
     // أعمدة جديدة في group_chats
     `ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS rules           TEXT`,
     `ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS goodbye_enabled INTEGER DEFAULT 0`,
+    `ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS welcome_msg      TEXT`,
+    `ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS welcome_enabled  INTEGER DEFAULT 1`,
+    `ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS welcome_photo    TEXT`,
+    `ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS welcome_msg      TEXT`,
+    `ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS welcome_enabled  INTEGER DEFAULT 1`,
+    `ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS welcome_photo    TEXT`,
   ];
 
   for (const q of queries) {
