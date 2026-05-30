@@ -140,7 +140,9 @@ async function addChannel(channelId, channelName, channelUrl) {
 
 // ── حذف قناة ─────────────────────────────────────
 async function removeChannel(id) {
-  await run('UPDATE required_channels SET is_active=0 WHERE id=$1', [id]);
+  // يقبل id التسلسلي أو channel_id
+  const col = String(id).startsWith('-') ? 'channel_id' : 'id';
+  await run('UPDATE required_channels SET is_active=0 WHERE ' + col + '=$1', [id]);
   cacheClear('required_channels');
 }
 
