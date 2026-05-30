@@ -45,19 +45,17 @@ async function mainMenu(ctx){
   const text='🛠 *لوحة الإدارة*\n\n📚 التخصصات: *'+specs0.length+'*\n📁 الملفات: *'+files0+'*\n🔧 الصيانة: *'+(global.maintenanceMode?'🔴 مفعّل':'🟢 متوقف')+'*';
   const rows=[[btn('📂 المحتوى','mg_content')],[btn('📊 الإحصائيات','mg_analytics'),btn('📜 السجلات','mg_logs')]];
   if(isOwner(ctx.uid)){
-    console.log('[mainMenu] uid='+ctx.uid+' isOwner='+isOwner(ctx.uid));
     rows.push([btn('📢 بث','mg_broadcast'),btn('👥 المستخدمون','mg_users')]);
     rows.push([btn('👑 الإداريون','mg_admins')]);
-    rows.push([btn('👥 القروبات','grp_main'),btn('🎮 ألعاب القروب','mb_panel')]);
+    rows.push([btn('👥 القروبات','grp_main')]);
     rows.push([btn('💾 نسخ احتياطي','mg_backup'),btn(global.maintenanceMode?'🟢 إيقاف الصيانة':'🔴 وضع الصيانة','mg_maint')]);
     rows.push([btn('♻️ استعادة','mg_restore'),btn('🗑 سلة المحذوفات','mg_trash')]);
-    rows.push([btn('🔔 إشعار للمستخدمين','mg_notify'),btn('📣 إشعار القروبات','mg_notify_groups')]);
+    rows.push([btn('🔔 إشعار للمستخدمين','mg_notify')]);
     if(process.env.CHANNEL_ID) rows.push([btn('📢 نشر في القناة','mg_post_channel')]);
     rows.push([btn('🚩 البلاغات','mg_reports'),btn('📨 نظام الرسائل','mg_msgs')]);
     rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp')]);
   }
   if(isOwner(ctx.uid)){
-    console.log('[mainMenu] uid='+ctx.uid+' isOwner='+isOwner(ctx.uid));
     const appVisible = global._appPublic || false;
     rows.push([btn('📱 فتح Mini App','mg_open_app'), btn(appVisible ? '👁 ظاهر للكل' : '🔒 مخفي عن المستخدمين', 'mg_toggle_app')]);
   }
