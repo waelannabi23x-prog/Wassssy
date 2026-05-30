@@ -157,6 +157,8 @@ module.exports.registerMessages = function(bot, deps) {
   bot.on('text', async ctx => {
     try {
       if (ctx.message.text.startsWith('/')) return;
+      const _tid = 't_' + ctx.message?.message_id + '_' + (ctx.from?.id || '');
+      if (isDupMsg(_tid)) return;
       const uid = ctx.uid, s = require('../utils/stateManager').getState(uid);
       if (!s) return;
       const txt = ctx.message.text.trim();
