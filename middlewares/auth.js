@@ -129,9 +129,10 @@ async function authMiddleware(ctx, next) {
         if (res.ok) {
           ctx.answerCbQuery('✅ مرحباً بك!').catch(() => {});
           ctx.deleteMessage().catch(() => {});
+          await new Promise(r => setTimeout(r, 500));
           const name = ctx.from?.first_name || 'Student';
-          await new Promise(r => setTimeout(r, 300));
-          return startHandler.showMainMenu(ctx, name);
+          ctx.from && await ctx.telegram.sendMessage(ctx.from.id, '/start').catch(() => {});
+          return startHandler(ctx);
         }
         // لم يشترك بعد
         ctx.answerCbQuery('❌ لم تشترك بعد! اشترك أولاً ثم تحقق', { show_alert: true }).catch(() => {});
