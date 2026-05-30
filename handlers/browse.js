@@ -268,7 +268,8 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
 }
 
 async function _showSimilar(ctx, f, spId, yrId, smId, sbId, catId) {
-  if (!catId || catId === 0) return;
+  if (!catId || catId === 0) catId = f.category_id;
+  if (!catId) return;
   const simKey = 'similar_' + f.id + '_' + catId;
   let similar = cacheGet(simKey);
   if (!similar) {
