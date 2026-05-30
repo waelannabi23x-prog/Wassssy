@@ -150,6 +150,31 @@ startHandler.clearAiMode = async function(uid) {
   if (state?.type === 'ai_mode') await require('../utils/stateManager').delState(uid);
 };
 
+
+async function showWelcome(telegram, chatId, from, name) {
+  const uid = from?.id;
+  if (!uid) return;
+  try {
+    const spRow = await usersDb.getSpecialty(uid);
+    const _spId = spRow?.specialty_id || null;
+    const sp = _spId && _spId != 0 ? await content.getSpec(_spId) : null;
+    const hour = new Date(Date.now() + 3600000).getHours();
+    const timeGreet = hour < 5 ? '🌙' : hour < 12 ? '🌅 صباح النور' : hour < 18 ? '☀️ مساء الخير' : '🌙 مساء النور';
+    const specLine = sp ? '🎓 *' + escMd(sp.name) + '*' : '';
+    const welcome = timeGreet + ' *' + escMd(name) + '*\n━━━━━━━━━━━━━━━━━━━━\n' + (specLine ? specLine + '\n\n' : '\n') + '📚 *منصتك الأكاديمية* — اختر ما تريد:';
+    const rows = [
+      [{ text: '📚 تصفح المحتوى', callback_data: 'browse' }],
+      [{ text: '🔍 بحث سريع', callback_data: 'search_prompt' }, { text: '🆕 أحدث الملفات', callback_data: 'latest' }],
+      [{ text: '⭐ مفضلاتي', callback_data: 'favorites' }, { text: '🗂 آخر ما شاهدت', callback_data: 'history' }],
+      [{ text: '🤖 المساعد الذكي', callback_data: 'ai_prompt' }, { text: '📝 ملاحظاتي', callback_data: 'notes_show' }],
+      [{ text: '👤 ملفي', callback_data: 'profile' }, { text: '📊 إحصائياتي', callback_data: 'stats' }],
+      [{ text: sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', callback_data: 'change_sp' }],
+    ];
+    await telegram.sendMessage(chatId, welcome, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } });
+  } catch(e) {}
+}
+
 module.exports = startHandler;
 module.exports.showMainMenu = showMainMenu;
+module.exports.showWelcome = showWelcome;
 module.exports.askSpecialty = askSpecialty;

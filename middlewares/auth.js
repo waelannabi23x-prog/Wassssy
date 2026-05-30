@@ -130,13 +130,7 @@ async function authMiddleware(ctx, next) {
           ctx.answerCbQuery('✅ مرحباً بك!').catch(() => {});
           ctx.deleteMessage().catch(() => {});
           const name = ctx.from?.first_name || 'Student';
-          // نبني الواجهة ونرسلها كرسالة جديدة
-          const fakeCtx = Object.assign({}, ctx, {
-            message: { text: '/start', chat: ctx.chat, from: ctx.from, message_id: 0 },
-            reply: (text, extra) => ctx.telegram.sendMessage(ctx.chat.id, text, extra),
-            replyWithPhoto: (fid, extra) => ctx.telegram.sendPhoto(ctx.chat.id, fid, extra),
-          });
-          return startHandler.showMainMenu(fakeCtx, name);
+          return startHandler.showWelcome(ctx.telegram, ctx.chat.id, ctx.from, name);
         }
         // لم يشترك بعد
         ctx.answerCbQuery('❌ لم تشترك بعد! اشترك أولاً ثم تحقق', { show_alert: true }).catch(() => {});
