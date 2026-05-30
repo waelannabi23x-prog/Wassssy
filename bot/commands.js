@@ -267,6 +267,7 @@ module.exports = function registerCommands(bot, deps) {
 
   bot.command('channels', async ctx => {
     if (!ctx.isOwner) return ctx.reply('للمالك فقط').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    cacheClear('required_channels');
     const list = await getChannels().catch(() => []);
     if (!list.length) return ctx.reply('لا توجد قنوات').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     const txt = list.map(ch => ch.id + '. ' + ch.channel_name + ' ' + ch.channel_url).join('\n');
