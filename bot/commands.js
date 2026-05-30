@@ -265,6 +265,21 @@ module.exports = function registerCommands(bot, deps) {
     return ctx.reply('تم الحذف ' + id).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   });
 
+
+  bot.command('cleanchannels', async ctx => {
+    if (!ctx.isOwner) return ctx.reply("للمالك فقط").catch(() => {});
+    const { cacheGet, cacheClear } = require('../utils/cache');
+    cacheClear('required_channels');
+    const list = await getChannels().catch(() => []);
+    if (!list.length) return ctx.reply("لا توجد قنوات").catch(() => {});
+    const rows = list.map(ch => [{
+      text: "🗑 " + (ch.channel_name || ch.channel_id),
+      callback_data: "del_channel_" + ch.channel_id
+    }]);
+    return ctx.reply("اختر القناة للحذف:", {
+      reply_markup: { inline_keyboard: rows }
+    }).catch(() => {});
+  });
   bot.command('channels', async ctx => {
     if (!ctx.isOwner) return ctx.reply('للمالك فقط').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     cacheClear('required_channels');

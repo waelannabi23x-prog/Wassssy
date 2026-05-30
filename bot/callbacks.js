@@ -231,6 +231,25 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'sp_',         fn: (ctx, d) => browse.showYears(ctx, safeInt(d.substring(3))) },                                    // ✅ specialty → years
 
     // Admin (آخر شيء — prefix قصير)
+
+    // del_channel
+    { p: 'del_channel_', fn: async (ctx, d) => {
+      if (!ctx.isOwner) return ctx.answerCbQuery("للمالك فقط", { show_alert: true }).catch(() => {});
+      const channelId = d.replace('del_channel_', '');
+      const { removeChannel } = require('../utils/channelGuard');
+      const { cacheClear } = require('../utils/cache');
+      await removeChannel(channelId).catch(() => {});
+      cacheClear('required_channels');
+      ctx.answerCbQuery('تم الحذف').catch(() => {});
+      const { getChannels } = require("../utils/channelGuard");
+      const list = await getChannels().catch(() => []);
+      if (!list.length) return ctx.editMessageText("لا توجد قنوات").catch(() => ctx.reply("لا توجد قنوات").catch(() => {}));
+      const rows = list.map(ch => [{
+        text: "🗑 " + (ch.channel_name || ch.channel_id),
+        callback_data: "del_channel_" + ch.channel_id
+      }]);
+      return ctx.editMessageReplyMarkup({ inline_keyboard: rows }).catch(() => {});
+    }},
     { p: 'leave_grp_', fn: async (ctx, d) => {
       if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       const chatId = parseInt(d.substring(10));
