@@ -35,11 +35,7 @@ async function handleNewMember(bot, chatId, userId, firstName) {
 
     // جلب إعدادات الترحيب + تخصص القروب
     const [grp, welcomeSettings] = await Promise.all([
-      get('SELECT specialty_id FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null),
-      get(
-        'SELECT image_file_id, message FROM group_welcome WHERE chat_id=$1 OR chat_id=0 ORDER BY chat_id DESC LIMIT 1',
-        [chatId]
-      ).catch(() => null),
+      get('SELECT specialty_id, welcome_enabled, welcome_msg, welcome_photo FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null),
     ]);
 
     const spec = grp?.specialty_id
@@ -88,7 +84,9 @@ async function handleNewMember(bot, chatId, userId, firstName) {
 
     const parse = welcomeSettings?.message ? 'Markdown' : 'MarkdownV2';
 
-    if (welcomeSettings?.image_file_id) {
+    if (grp?.welcome_photo && grp.welcome_photo.startsWith('CAA')) {
+      await bot.telegram.sendSticker(chatId, grp.welcome_photo).catch(() => {});
+    } else if (welcomeSettings?.image_file_id) {
       await bot.telegram.sendPhoto(chatId, welcomeSettings.image_file_id, {
         caption:    welcomeMsg,
         parse_mode: parse,

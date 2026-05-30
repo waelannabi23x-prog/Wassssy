@@ -172,6 +172,7 @@ async function handleMedia(ctx, state) {
     if (msg.photo)         { fileId = msg.photo[msg.photo.length-1].file_id; mediaType = 'photo'; }
     else if (msg.video)    { fileId = msg.video.file_id;    mediaType = 'video'; }
     else if (msg.document) { fileId = msg.document.file_id; mediaType = 'document'; }
+    else if (msg.sticker)  { fileId = msg.sticker.file_id;  mediaType = 'sticker'; }
     return _doBroadcast(ctx, state.spId, caption || 'اشعار من الادارة', fileId, mediaType);
   }
 
@@ -207,6 +208,8 @@ async function _doBroadcast(ctx, spId, text, fileId, mediaType) {
         return ctx.telegram.sendPhoto(g.chat_id, fileId, { caption: msgText, parse_mode: 'Markdown' });
       else if (mediaType === 'video' && fileId)
         return ctx.telegram.sendVideo(g.chat_id, fileId, { caption: msgText, parse_mode: 'Markdown' });
+      else if (mediaType === 'sticker' && fileId)
+        return ctx.telegram.sendSticker(g.chat_id, fileId);
       else if (mediaType === 'document' && fileId)
         return ctx.telegram.sendDocument(g.chat_id, fileId, { caption: msgText, parse_mode: 'Markdown' });
       else

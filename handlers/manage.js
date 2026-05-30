@@ -292,6 +292,7 @@ async function handleText(ctx,state){
     if(msg.photo){state.mediaFileId=msg.photo[msg.photo.length-1].file_id;state.mediaType="photo";if(msg.caption)state.mediaCaption=msg.caption;}
     else if(msg.video){state.mediaFileId=msg.video.file_id;state.mediaType="video";if(msg.caption)state.mediaCaption=msg.caption;}
     else if(msg.document){state.mediaFileId=msg.document.file_id;state.mediaType="document";if(msg.caption)state.mediaCaption=msg.caption;}
+    else if(msg.sticker){state.mediaFileId=msg.sticker.file_id;state.mediaType="sticker";}
     await require('../utils/stateManager').setState(uid,state);
   }
 
@@ -335,6 +336,7 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
             if(mType==='photo'&&mFileId) return ctx.telegram.sendPhoto(g.chat_id,mFileId,{caption:msgText,parse_mode:'Markdown'});
             else if(mType==='video'&&mFileId) return ctx.telegram.sendVideo(g.chat_id,mFileId,{caption:msgText,parse_mode:'Markdown'});
             else if(mType==='document'&&mFileId) return ctx.telegram.sendDocument(g.chat_id,mFileId,{caption:msgText,parse_mode:'Markdown'});
+            else if(mType==='sticker'&&mFileId) return ctx.telegram.sendSticker(g.chat_id,mFileId);
             else return ctx.telegram.sendMessage(g.chat_id,msgText,{parse_mode:'Markdown'});
           }));
           results.forEach(r=>r.status==='fulfilled'?gSent++:gFail++);

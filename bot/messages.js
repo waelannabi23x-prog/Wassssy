@@ -232,6 +232,16 @@ module.exports.registerMessages = function(bot, deps) {
   });
 
   // ── Inline Query ──
+  // ── Stickers ──
+  bot.on('sticker', async ctx => {
+    if (ctx.chat?.type !== 'private') return;
+    const sticker = ctx.message.sticker;
+    const s = global.getState(ctx.uid);
+    if (s?.type?.startsWith('gp_')) return groupPanel.handleMedia(ctx, s);
+    // رد بنفس الـ sticker
+    await ctx.replyWithSticker(sticker.file_id).catch(() => {});
+  });
+
   bot.on('inline_query', async ctx => {
     const q = (ctx.inlineQuery?.query || '').trim();
     if (q.length < 2) { ctx.answerInlineQuery([], { cache_time: 5 }); return; }
