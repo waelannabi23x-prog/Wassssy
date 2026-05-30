@@ -244,6 +244,27 @@ module.exports.registerMessages = function(bot, deps) {
 
   // ── Inline Query ──
   // ── Stickers ──
+
+  bot.on('chat_member', async ctx => {
+    try {
+      const chat   = ctx.chatMember?.chat;
+      const member = ctx.chatMember?.new_chat_member;
+      const old    = ctx.chatMember?.old_chat_member;
+      if (!chat || chat.type === "private") return;
+      if (member?.user?.is_bot) return;
+      const wasOut = ["left","kicked"].includes(old?.status);
+      const isIn   = ["member","restricted","administrator","creator"].includes(member?.status);
+      const isOut  = ["left","kicked"].includes(member?.status);
+      if (wasOut && isIn) {
+        const { handleNewMember } = require('../handlers/group_admin');
+        handleNewMember(bot, chat.id, member.user.id, member.user.first_name).catch(() => {});
+      }
+      if (!wasOut && isOut) {
+        const { handleMemberLeft } = require('../handlers/group_admin');
+        handleMemberLeft(bot, chat.id, member.user.id, member.user.first_name).catch(() => {});
+      }
+    } catch(e) {}
+  });
   bot.on('sticker', async ctx => {
     if (ctx.chat?.type !== 'private') return;
     const sticker = ctx.message.sticker;
@@ -288,3 +309,4 @@ module.exports.registerMessages = function(bot, deps) {
     } catch(_) { ctx.answerInlineQuery([], { cache_time: 5 }); }
   });
 };
+// placeholder
