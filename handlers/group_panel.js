@@ -185,6 +185,12 @@ async function handleMedia(ctx, state) {
         await ctx.telegram.sendPhoto(state.chatId, msg.photo[msg.photo.length-1].file_id, { caption: caption || 'رسالة من الادارة', parse_mode: 'Markdown' });
       else if (msg.video)
         await ctx.telegram.sendVideo(state.chatId, msg.video.file_id, { caption: caption || 'رسالة من الادارة', parse_mode: 'Markdown' });
+      else if (msg.voice)
+        await ctx.telegram.sendVoice(state.chatId, msg.voice.file_id);
+      else if (msg.sticker)
+        await ctx.telegram.sendSticker(state.chatId, msg.sticker.file_id);
+      else if (msg.audio)
+        await ctx.telegram.sendAudio(state.chatId, msg.audio.file_id);
       return ctx.reply('تم الارسال!').catch(() => {});
     } catch (e) { return ctx.reply('فشل: ' + e.message).catch(() => {}); }
   }
