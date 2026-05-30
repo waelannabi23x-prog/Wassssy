@@ -252,6 +252,34 @@ function setupGroupCommands(bot) {
   // ════════════════════════════════════
   // 🗑 /kick — طرد عضو (مشرف)
   // ════════════════════════════════════
+
+  bot.command('bans', grpOnly, adminOnly, async ctx => {
+    try {
+      const { bans } = require('../database/group_db');
+      const list = await bans.list(ctx.chat.id);
+      let text = 'Banned list:\n';
+      list.forEach((b, i) => {
+        const d = new Date(b.created_at).toLocaleDateString('ar-DZ');
+        text += (i+1) + '. ID:' + b.user_id + ' - ' + (b.reason||'no reason') + ' - ' + d + '\n';
+      });
+      ctx.reply(text).catch(() => {});
+    } catch(e) { ctx.reply('خطأ: '+e.message).catch(() => {}); }
+  });
+
+
+  bot.command('bans', grpOnly, adminOnly, async ctx => {
+    try {
+      const { bans } = require('../database/group_db');
+      const list = await bans.list(ctx.chat.id);
+      if (!list.length) return ctx.reply('✅ لا يوجد محظورون').catch(() => {});
+      let text = 'Banned list:\n';
+      list.forEach((b, i) => {
+        const d = new Date(b.created_at).toLocaleDateString('ar-DZ');
+        text += (i+1) + '. ID:' + b.user_id + ' - ' + (b.reason||'no reason') + ' - ' + d + '\n';
+      });
+      ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => {});
+    } catch(e) { ctx.reply('❌ ' + e.message).catch(() => {}); }
+  });
   bot.command('kick', grpOnly, adminOnly, async ctx => {
     const target = await resolveTarget(ctx);
     if (!target) {
