@@ -285,7 +285,7 @@ async function handleText(ctx,state){
   const done=(msg,cb)=>{clearState(uid);ctx.reply(msg,{parse_mode:'Markdown',...build([[btn('◀️ رجوع',cb)]])});};
   
   // احفظ الوسائط في الـ state
-  if(state.type==='mg_notify_groups_msg'){
+  if(state.type==='mg_notify_groups_msg'||state.type==='mg_msg_user_content'){
     const msg=ctx.message;
     if(msg.photo){state.mediaFileId=msg.photo[msg.photo.length-1].file_id;state.mediaType="photo";if(msg.caption)state.mediaCaption=msg.caption;}
     else if(msg.video){state.mediaFileId=msg.video.file_id;state.mediaType="video";if(msg.caption)state.mediaCaption=msg.caption;}
@@ -317,6 +317,7 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
       case 'mg_desc_fl':await filesDb.updateDesc(state.id,text);done('✅ تم التحديث!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_'));break;
       case 'mg_admin_search':{clearState(uid);const [fr,ur]=await Promise.all([filesDb.search(text),usersDb.searchUsers(text)]);let resp='🔍 *بحث: "'+escMd(text)+'"*\n\n';if(fr.length){resp+='📄 *ملفات ('+fr.length+'):*\n';fr.slice(0,5).forEach(f=>{resp+='• '+escMd(f.title)+' ('+escMd(f.sub_name)+')\n';});}if(ur.length){resp+='\n👥 *مستخدمون ('+ur.length+'):*\n';ur.slice(0,5).forEach(u=>{resp+='• '+escMd(u.first_name||'ID:'+u.id)+(u.username?' @'+escMd(u.username):'')+'\n';});}if(!fr.length&&!ur.length) resp+='_لا نتائج._';ctx.reply(resp,{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
       case 'mg_broadcast':{clearState(uid);const ids=await usersDb.allIds();const total_bc=ids.length;const sm=await ctx.reply('📢 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total_bc,{parse_mode:'Markdown'});const bcRes=await concurrentBroadcast(ctx.telegram,ctx.chat.id,sm.message_id,ids,'📢 *إعلان*\n\n'+text,{parse_mode:'Markdown'});ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ *اكتمل!*\n`[██████████] 100%`\n✅ '+bcRes.sent+' | ❌ '+bcRes.failed,{...build([back('mg_menu')]),parse_mode:'Markdown'}).catch(err => { require('../utils/logger').debug("[silent]", err.message); });break;}
+      case 'mg_msg_user_id':{setState(uid,{...state,type:'mg_msg_user_content',targetId:text.replace('@','')});ctx.reply('📝 ارسل الرسالة (نص، صورة، فيديو، sticker، voice):',{parse_mode:'Markdown'});break;}
       case 'mg_notify_sp_msg':{clearState(uid);const spUsers=await usersDb.getUsersBySpecialty(state.spId);await safeAdd(broadcastQueue,'broadcast-sp',{userIds:spUsers,message:'🔔 '+text,parseMode:'Markdown',fromUid:uid});ctx.reply('📤 جاري الإرسال لـ *'+spUsers.length+'* مستخدم — ستصلك النتيجة',{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
       case 'mg_notify_groups_msg':{
         clearState(uid);
@@ -363,8 +364,7 @@ async function handleCallback(ctx,data){
   if(data==='mg_admins') return showAdmins(ctx);
   if(data==='mg_trash') return showTrash(ctx);
   if(data==='mg_search_prompt'){setState(uid,{type:'mg_admin_search'});return ctx.reply('🔍 بحث:\nأدخل اسم ملف أو مستخدم:');}
-  if(data==='mg_notify_sp'){const specs=await content.getSpecs();const rows=specs.map(s=>[btn('🎓 '+s.name,'mg_notify_sp_'+s.id)]);rows.push(back('mg_menu'));return eos(ctx,'🎓 اختر تخصص لإرسال الإشعار:',{parse_mode:'Markdown',...build(rows)});}
-  if(data==='mg_notify_groups'){const specs=await content.getSpecs();const rows=specs.map(s=>[btn('🎓 '+s.name,'mg_ng_sp_'+s.id)]);rows.push([btn('📣 كل القروبات','mg_ng_sp_0')],[btn('◀️ رجوع','mg_menu')]);return ctx.reply('📣 إشعار القروبات\n\nاختر التخصص:',{...build(rows)}).catch(e=>ctx.reply('❌ '+e.message));}
+  if(data==='mg_notify'){setState(uid,{type:'mg_msg_user_id'});return ctx.reply('ID: ارسل ID المستخدم',{parse_mode:'Markdown',...build([back('mg_menu')])});}
   if(data.startsWith('mg_ng_sp_')){const spId=data.replace('mg_ng_sp_','');setState(uid,{type:'mg_notify_groups_msg',spId});return ctx.reply('📝 رسالة الإشعار لـ '+(spId==='0'?'كل القروبات':'التخصص')+':\n_(أو /cancel)_',{parse_mode:'Markdown'});}
   if(data.startsWith('mg_notify_sp_')&&!data.startsWith('mg_notify_sp_msg')){const spId=data.replace('mg_notify_sp_','');setState(uid,{type:'mg_notify_sp_msg',spId});return ctx.reply('📝 رسالة الإشعار:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
   if(data==='mg_post_channel'){
