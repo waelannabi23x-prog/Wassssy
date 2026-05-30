@@ -261,7 +261,35 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
     if (f.file_type==='link') await ctx.reply(caption+'\n\n🔗 '+f.file_id, { parse_mode:'Markdown', ...kb });
     else if (f.file_type==='photo') await ctx.replyWithPhoto(f.file_id, { caption, parse_mode:'Markdown', ...kb });
     else await ctx.replyWithDocument(f.file_id, { caption, parse_mode:'Markdown', ...kb });
+
+    // ملفات مشابهة من نفس القسم
+    _showSimilar(ctx, f, spId, yrId, smId, sbId, catId).catch(() => {});
   } catch(e) { ctx.reply('❌ تعذر إرسال الملف.').catch(function(){}); }
+}
+
+async function _showSimilar(ctx, f, spId, yrId, smId, sbId, catId) {
+  if (!catId || catId === 0) return;
+  const simKey = 'similar_' + f.id + '_' + catId;
+  let similar = cacheGet(simKey);
+  if (!similar) {
+    similar = await all(
+      'SELECT f.id, f.title, f.file_type FROM files f WHERE f.category_id=$1 AND f.id!=$2 AND f.is_deleted=0 ORDER BY f.downloads DESC LIMIT 4',
+      [catId, f.id]
+    ).catch(() => []);
+    if (similar.length) cacheSet(simKey, similar, 600000);
+  }
+  if (!similar || !similar.length) return;
+
+  const rows = similar.map(s => {
+    const icon = s.file_type === 'photo' ? '🖼' : s.file_type === 'link' ? '🔗' : '📄';
+    return [btn(icon + ' ' + s.title.substring(0, 35), 'fl_' + s.id + '_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId)];
+  });
+  rows.push([btn('◀️ رجوع', 'ct_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId), btn('🏠', 'main_menu')]);
+
+  await ctx.reply('📚 من نفس القسم:', {
+    parse_mode: 'Markdown',
+    ...build(rows)
+  }).catch(() => {});
 }
 
 async function showBundle(ctx, bundleId, spId, yrId, smId, sbId, catId) {
