@@ -337,4 +337,4 @@ async function sendBundle(ctx, bundleId, spId, yrId, smId, sbId, catId) {
   await ctx.reply('✅ اكتمل الإرسال!', {...build([[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]])});
 }
 
-module.exports = { _showSimilarPublic: async function(ctx, f) { return require('./browse')._showSimilar && require('./browse')._showSimilar(ctx, f, 0, 0, 0, 0, f.category_id).catch(()=>{}); }, showSpecs, showYears, showSemesters, showSubjects, showCategories, showFiles, showPreview, showReportMenu, doReport, showComments, sendFile, showBundle, sendBundle };
+module.exports = { _showSimilar, showSpecs, showYears, showSemesters, showSubjects, showCategories, showFiles, showPreview, showReportMenu, doReport, showComments, sendFile, showBundle, sendBundle };

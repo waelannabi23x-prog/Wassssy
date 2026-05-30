@@ -50,7 +50,7 @@ async function startHandler(ctx) {
           interactions.addHistory(uid, fid).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
           filesDb.incDownloads(fid).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
           // ملفات مشابهة
-          require('./browse')._showSimilarPublic && require('./browse')._showSimilarPublic(ctx, f).catch(() => {});
+          require('./browse')._showSimilar(ctx, f, 0, 0, 0, 0, f.category_id).catch(() => {});
         } catch (e) { await ctx.reply('❌ تعذر إرسال الملف'); }
       }
     }
