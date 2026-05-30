@@ -239,7 +239,7 @@ module.exports.registerMessages = function(bot, deps) {
     const s = require('../utils/stateManager').getState(ctx.uid);
     if (s?.type?.startsWith('gp_')) return groupPanel.handleMedia(ctx, s);
     // رد بنفس الـ sticker
-    await ctx.replyWithSticker(sticker.file_id).catch(() => {});
+    // لا ترد تلقائياً
   });
 
   bot.on('inline_query', async ctx => {

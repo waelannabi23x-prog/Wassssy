@@ -34,6 +34,9 @@ async function handleNewMember(bot, chatId, userId, firstName) {
     cacheClear('grp_count_' + chatId);
 
     // جلب إعدادات الترحيب + تخصص القروب
+    // تحقق من welcome_enabled
+    const welcomeCheck = await get('SELECT welcome_enabled FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null);
+    if (welcomeCheck && welcomeCheck.welcome_enabled === 0) return;
     const [grp, welcomeSettings] = await Promise.all([
       get('SELECT specialty_id, welcome_enabled, welcome_msg, welcome_photo FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null),
     ]);
@@ -73,8 +76,8 @@ async function handleNewMember(bot, chatId, userId, firstName) {
 
 🔗 [ملفّك الشخصي](tg://user?id=${uid})`;
 
-    const welcomeMsg = welcomeSettings?.message
-      ? welcomeSettings.message
+    const welcomeMsg = grp?.welcome_msg
+      ? grp.welcome_msg
           .replace('{name}', firstName || 'عضو')
           .replace('{spec}', spec?.name || '')
           .replace('{id}',   userId)
@@ -82,12 +85,12 @@ async function handleNewMember(bot, chatId, userId, firstName) {
           .replace('{time}', time)
       : defaultMsg;
 
-    const parse = welcomeSettings?.message ? 'Markdown' : 'MarkdownV2';
+    const parse = grp?.welcome_msg ? 'Markdown' : 'MarkdownV2';
 
     if (grp?.welcome_photo && grp.welcome_photo.startsWith('CAA')) {
       await bot.telegram.sendSticker(chatId, grp.welcome_photo).catch(() => {});
-    } else if (welcomeSettings?.image_file_id) {
-      await bot.telegram.sendPhoto(chatId, welcomeSettings.image_file_id, {
+    } else if (grp?.welcome_photo) {
+      await bot.telegram.sendPhoto(chatId, grp.welcome_photo, {
         caption:    welcomeMsg,
         parse_mode: parse,
       }).catch(e => console.error('[Welcome Photo]', e.message));
