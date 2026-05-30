@@ -200,6 +200,7 @@ module.exports.registerMessages = function(bot, deps) {
         return browse.showComments(ctx, s.fid, s.spId, s.yrId, s.smId, s.sbId, s.catId);
       }
       if ((s?.type || '').startsWith('mg_') && ctx.isAdmin) return manage.handleText(ctx, s);
+      if ((s?.type || '').startsWith('gp_') && ctx.isAdmin) return groupPanel.handleText(ctx, txt, s);
     } catch(e) { logger.error('[TextHandler]', e.message, { uid: ctx.from?.id }); }
   });
 
