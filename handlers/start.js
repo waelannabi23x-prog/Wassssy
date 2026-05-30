@@ -13,6 +13,16 @@ const safeInt = v => { const n = parseInt(v); return isNaN(n) ? 0 : n; };
 async function startHandler(ctx) {
   const uid = ctx.uid;
   const name = ctx.from?.first_name || 'Student';
+
+  // تحقق من الاشتراك
+  if (!ctx.isOwner && !ctx.isAdmin && ctx.chat?.type === 'private') {
+    const guard = require('../utils/channelGuard');
+    const res = await guard.checkAllChannels({ telegram: ctx.telegram }, uid);
+    if (!res.ok) {
+      const { text, buttons } = guard.buildSubscribeMessage(res.missing, name);
+      return ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(() => {});
+    }
+  }
   const rawText = ctx.message?.text || '';
   const payload = rawText.includes(' ') ? rawText.split(' ')[1] : ctx.startPayload || null;
 
