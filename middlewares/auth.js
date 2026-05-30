@@ -127,12 +127,13 @@ async function authMiddleware(ctx, next) {
         guard.clearSubCache(uid);
         const res = await guard.checkAllChannels({ telegram: ctx.telegram }, uid);
         if (res.ok) {
-          await ctx.deleteMessage().catch(()=>{});
-                    const name = ctx.from?.first_name || 'Student';
+          ctx.answerCbQuery('✅ تم التحقق! مرحباً بك', { show_alert: false }).catch(() => {});
+          await ctx.deleteMessage().catch(() => {});
+          const name = ctx.from?.first_name || 'Student';
           return startHandler.showMainMenu(ctx, name);
         }
-        // ✅ لم يشترك — أعد عرض القنوات المتبقية فقط
-        ctx.answerCbQuery('❌ لم تشترك بعد في كل القنوات!', { show_alert: true }).catch(()=>{});
+        // لم يشترك بعد
+        ctx.answerCbQuery('❌ لم تشترك بعد! اشترك أولاً ثم تحقق', { show_alert: true }).catch(() => {});
         const { text, buttons } = guard.buildSubscribeMessage(res.missing, ctx.from?.first_name);
         return ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } })
           .catch(() => ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(()=>{}));
