@@ -3,6 +3,14 @@ const https = require('https');
 const groupPanel = require('../handlers/group_panel');
 
 module.exports.registerMessages = function(bot, deps) {
+  // dedup للرسائل
+  const _msgSeen = new Set();
+  function isDupMsg(id) {
+    if (_msgSeen.has(id)) return true;
+    _msgSeen.add(id);
+    setTimeout(() => _msgSeen.delete(id), 30000);
+    return false;
+  }
   const {
     ownerH, GrpBuf, GrpMsgs, handleAiChat, handleOwnerAI,
     manage, browse, userH, bundlesDb, filesDb, adminsDb,
@@ -27,6 +35,8 @@ module.exports.registerMessages = function(bot, deps) {
 
   // ── Message (group) ──
   bot.on('message', async (ctx, next) => {
+    const _mid = ctx.message?.message_id + '_' + (ctx.from?.id || '');
+    if (isDupMsg(_mid)) return;
     if (ctx.chat?.type === 'private' && ctx.from?.id === OWNER_ID && ctx.message?.text?.startsWith('!'))
       return ownerH.handle(ctx, ctx.message.text);
 
