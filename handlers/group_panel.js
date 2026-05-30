@@ -146,6 +146,7 @@ async function handleText(ctx, text, state) {
   if (state.type === 'gp_msgone') {
     await require('../utils/stateManager').delState(ctx.uid);
     try {
+      console.log('[gp_msgone] sending to:', state.chatId);
       await ctx.telegram.sendMessage(state.chatId, '📢 *رسالة من الادارة*\n\n' + text, { parse_mode: 'Markdown' });
       return ctx.reply('تم الارسال!', kbBuild([[kbBtn('◀️ رجوع', 'gp_view_' + state.chatId)]])).catch(() => {});
     } catch (e) { return ctx.reply('فشل: ' + e.message).catch(() => {}); }
