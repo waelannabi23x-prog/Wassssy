@@ -236,7 +236,7 @@ module.exports.registerMessages = function(bot, deps) {
   bot.on('sticker', async ctx => {
     if (ctx.chat?.type !== 'private') return;
     const sticker = ctx.message.sticker;
-    const s = global.getState(ctx.uid);
+    const s = require('../utils/stateManager').getState(ctx.uid);
     if (s?.type?.startsWith('gp_')) return groupPanel.handleMedia(ctx, s);
     // رد بنفس الـ sticker
     await ctx.replyWithSticker(sticker.file_id).catch(() => {});
