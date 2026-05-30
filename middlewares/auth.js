@@ -1,6 +1,8 @@
 'use strict';
 
 const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
+const guard        = require('../utils/channelGuard');
+const startHandler = require('../handlers/start');
 const { getSetting, get: dbGet } = require('../database/db');
 const { get, run, getP } = require('../database/db');
 
