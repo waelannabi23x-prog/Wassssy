@@ -173,6 +173,7 @@ async function handleMedia(ctx, state) {
     else if (msg.video)    { fileId = msg.video.file_id;    mediaType = 'video'; }
     else if (msg.document) { fileId = msg.document.file_id; mediaType = 'document'; }
     else if (msg.sticker)  { fileId = msg.sticker.file_id;  mediaType = 'sticker'; }
+    else if (msg.voice)    { fileId = msg.voice.file_id;    mediaType = 'voice'; }
     return _doBroadcast(ctx, state.spId, caption || 'اشعار من الادارة', fileId, mediaType);
   }
 
@@ -210,6 +211,8 @@ async function _doBroadcast(ctx, spId, text, fileId, mediaType) {
         return ctx.telegram.sendVideo(g.chat_id, fileId, { caption: msgText, parse_mode: 'Markdown' });
       else if (mediaType === 'sticker' && fileId)
         return ctx.telegram.sendSticker(g.chat_id, fileId);
+      else if (mediaType === 'voice' && fileId)
+        return ctx.telegram.sendVoice(g.chat_id, fileId);
       else if (mediaType === 'document' && fileId)
         return ctx.telegram.sendDocument(g.chat_id, fileId, { caption: msgText, parse_mode: 'Markdown' });
       else
@@ -234,7 +237,7 @@ module.exports = { showMainMenu, showGroupPanel, handleCallback, handleText, han
 // ══════════════════════════════════════════════════════════
 async function showMainMenu(ctx) {
   const groups  = await all('SELECT COUNT(*) AS cnt FROM group_chats').then(r => r[0]?.cnt || 0).catch(() => 0);
-  const channels = await all('SELECT COUNT(*) AS cnt FROM group_chats WHERE is_channel=1').then(r => r[0]?.cnt || 0).catch(() => 0);
+  const channels = await all('SELECT COUNT(*) AS cnt FROM group_chats WHERE specialty_id IS NOT NULL').then(r => r[0]?.cnt || 0).catch(() => 0);
 
   const rows = [
     [kbBtn('👥 إدارة القروبات',         'gp_panel')],

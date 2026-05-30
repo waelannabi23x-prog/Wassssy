@@ -337,6 +337,7 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
             else if(mType==='video'&&mFileId) return ctx.telegram.sendVideo(g.chat_id,mFileId,{caption:msgText,parse_mode:'Markdown'});
             else if(mType==='document'&&mFileId) return ctx.telegram.sendDocument(g.chat_id,mFileId,{caption:msgText,parse_mode:'Markdown'});
             else if(mType==='sticker'&&mFileId) return ctx.telegram.sendSticker(g.chat_id,mFileId);
+            else if(mType==='voice'&&mFileId) return ctx.telegram.sendVoice(g.chat_id,mFileId);
             else return ctx.telegram.sendMessage(g.chat_id,msgText,{parse_mode:'Markdown'});
           }));
           results.forEach(r=>r.status==='fulfilled'?gSent++:gFail++);
