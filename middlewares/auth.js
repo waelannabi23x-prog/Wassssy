@@ -128,11 +128,9 @@ async function authMiddleware(ctx, next) {
         const res = await guard.checkAllChannels({ telegram: ctx.telegram }, uid);
         if (res.ok) {
           ctx.answerCbQuery('✅ مرحباً بك!').catch(() => {});
-          ctx.deleteMessage().catch(() => {});
-          await new Promise(r => setTimeout(r, 500));
+          await ctx.deleteMessage().catch(() => {});
           const name = ctx.from?.first_name || 'Student';
-          ctx.from && await ctx.telegram.sendMessage(ctx.from.id, '/start').catch(() => {});
-          return startHandler(ctx);
+          return startHandler.showMainMenu(ctx, name);
         }
         // لم يشترك بعد
         ctx.answerCbQuery('❌ لم تشترك بعد! اشترك أولاً ثم تحقق', { show_alert: true }).catch(() => {});
