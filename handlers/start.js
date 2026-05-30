@@ -81,12 +81,12 @@ async function showMainMenu(ctx, name) {
   }
 
   const { sp } = menuData;
-  const hour = new Date().getHours();
-  const timeGreet = hour < 5 ? '🌙' : hour < 12 ? '🌅 صباح النور' : hour < 18 ? '☀️ مساء الخير' : '🌙 مساء النور';
+  const hour = new Date(Date.now() + 3600000).getHours(); // UTC+1 Algeria
+  const timeGreet = hour < 5  ? '🌙 مساء النور'  :
+                    hour < 12 ? '🌅 صباح النور'  :
+                    hour < 18 ? '☀️ مساء الخير'  : '🌙 مساء النور';
 
-  let welcome = timeGreet + ' ' + escMd(ctx.from?.first_name || '') + '\n';
-  if (sp) welcome += '🎓 ' + sp.name + '\n';
-  welcome += '📚 منصتك الأكاديمية — اختر ما تريد:';
+  const specLine = sp ? '🎓 *' + escMd(sp.name) + '*' : '🎓 اختر تخصصك';
 
   // ── آخر ملف للمستخدم ──
   let lastFileBtn = null;
@@ -94,48 +94,38 @@ async function showMainMenu(ctx, name) {
     const hist = await interactions.getHistory(uid, 1).catch(() => []);
     if (hist?.length) {
       const lf = hist[0];
-      const shortTitle = (lf.title || '').substring(0, 22);
+      const shortTitle = (lf.title || '').substring(0, 20);
       lastFileBtn = btn('▶️ استكمال: ' + shortTitle, 'preview_' + lf.id + '_0_0_0_0_0');
     }
   } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
-  // ══════════════════════════════════════════
-  // الأزرار — ملونة بالـ emoji
-  // 🟥 أحمر   = التصفح الرئيسي
-  // 🟩 أخضر   = المواد والملفات
-  // 🟦 أزرق   = مميزات إضافية
-  // 🟨 أصفر   = شخصي
-  // ══════════════════════════════════════════
-  const rows = [];
+  const welcome =
+    timeGreet + ' *' + escMd(ctx.from?.first_name || 'Student') + '*\n' +
+    '━━━━━━━━━━━━━━━━━━━━\n' +
+    specLine + '\n\n' +
+    '📚 *منصتك الأكاديمية* — اختر ما تريد:';
 
-  // ── 🟥 تصفح المحتوى (أحمر — الأهم) ──
-  rows.push([btn('📚 تصفح المحتوى', 'browse')]);
+  const rows = [
+    [btn('📚 تصفح المحتوى', 'browse')],
+    [
+      btn('🔍 بحث سريع',     'search_prompt'),
+      btn('🆕 أحدث الملفات', 'latest'),
+    ],
+    [
+      btn('⭐ مفضلاتي',      'favorites'),
+      btn('🗂 آخر ما شاهدت', 'history'),
+    ],
+    [
+      btn('🤖 المساعد الذكي', 'ai_prompt'),
+      btn('📝 ملاحظاتي',     'notes_show'),
+    ],
+    [
+      btn('👤 ملفي',         'profile'),
+      btn('📊 إحصائياتي',    'stats'),
+    ],
+    [btn(sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', 'change_sp')],
+  ];
 
-  // ── 🟩 بحث + أحدث (أخضر — محتوى) ──
-  rows.push([
-    btn('🔍 بحث سريع', 'search_prompt'),
-    btn('🆕 أحدث الملفات', 'latest'),
-  ]);
-
-  // ── 🟩 مفضلة + سجل (أخضر) ──
-  rows.push([
-    btn('⭐ مفضلاتي', 'favorites'),
-    btn('🗂 آخر ما شاهدت', 'history'),
-  ]);
-
-  // ── 🤖 AI ──
-  rows.push([btn('🤖 المساعد الذكي', 'ai_prompt'), btn('📝 ملاحظاتي', 'notes_show')]);
-
-  // ── 🟦 ملفي + إحصائيات (أزرق) ──
-  rows.push([
-    btn('👤 ملفي', 'profile'),
-    btn('📊 إحصائياتي', 'stats'),
-  ]);
-
-  // ── 🟨 تغيير تخصص (أصفر) ──
-  rows.push([btn(sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', 'change_sp')]);
-
-  // ── آخر ملف ──
   if (lastFileBtn) rows.push([lastFileBtn]);
 
   // ── لوحة الإدارة ──

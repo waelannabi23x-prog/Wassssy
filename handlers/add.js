@@ -4,7 +4,6 @@ const { groqChat } = require('../utils/groq_client');
 const { all } = require('../database/db');
 const filesDb = require('../database/files');
 const { build, btn } = require('../utils/keyboard');
-.replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
 
 async function classifyFile(filename, subjects, categories) {
   var subList = subjects.map(function(s) { return s.name; }).join(', ');
