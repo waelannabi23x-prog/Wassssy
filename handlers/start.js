@@ -49,6 +49,8 @@ async function startHandler(ctx) {
             await ctx.replyWithDocument(f.file_id, { caption: cap, parse_mode: 'Markdown', ...kb });
           interactions.addHistory(uid, fid).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
           filesDb.incDownloads(fid).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+          // ملفات مشابهة
+          require('./browse')._showSimilarPublic && require('./browse')._showSimilarPublic(ctx, f).catch(() => {});
         } catch (e) { await ctx.reply('❌ تعذر إرسال الملف'); }
       }
     }
