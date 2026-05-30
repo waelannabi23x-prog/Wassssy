@@ -176,6 +176,7 @@ async function launch() {
   try {
     await initSchema();
     await migrateGroupTables().catch(() => {});
+    require("./utils/cache").clearAllSubCache();
     await require('./handlers/group_panel').migrateGroupPanel().catch(() => {});
     await notesH.initNotes().catch(()=>{});
     await initPersistentStates();

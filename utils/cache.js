@@ -147,7 +147,9 @@ async function cacheMGet(keys) {
   return results;
 }
 
-module.exports = { cacheMGet,
+function clearAllSubCache() { for (const k of store.keys()) if (k.startsWith("sub_ok_")) store.delete(k); }
+
+module.exports = { cacheMGet, clearAllSubCache,
   cacheGet, cacheSet, cacheClear, cacheClearPrefix,
   cacheGetAsync, cacheSetAsync,
   cacheWarmup, cacheStats, getCacheSize, getCacheKeys,
