@@ -63,6 +63,7 @@ async function showBroadcastSpecPicker(ctx) {
 
 async function handleCallback(ctx, data) {
   const uid = ctx.uid;
+  console.log('[gp] data='+data);
   if (data === 'gp_panel') return showGroupPanel(ctx);
   if (data === 'gp_broadcast_sp') return showBroadcastSpecPicker(ctx);
 
