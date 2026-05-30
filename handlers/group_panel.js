@@ -69,13 +69,13 @@ async function handleCallback(ctx, data) {
 
   if (data.startsWith('gp_broadcast_')) {
     const spId = data.replace('gp_broadcast_', '');
-    await global.setState(uid, { type: 'gp_broadcast_msg', spId });
+    await require('../utils/stateManager').setState(uid, { type: 'gp_broadcast_msg', spId });
     return ctx.reply('📢 *ارسال رسالة للقروبات*\n\nارسل الرسالة:\n نص فقط\n صورة مع caption\n فيديو مع caption\n\n_(او /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
   }
 
   if (data.startsWith('gp_msgone_')) {
     const chatId = data.replace('gp_msgone_', '');
-    await global.setState(uid, { type: 'gp_msgone', chatId });
+    await require('../utils/stateManager').setState(uid, { type: 'gp_msgone', chatId });
     return ctx.reply('📢 ارسل الرسالة لهذا القروب:\n_(او /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
   }
 
@@ -104,13 +104,13 @@ async function handleCallback(ctx, data) {
 
   if (data.startsWith('gp_setwelcome_')) {
     const chatId = data.replace('gp_setwelcome_', '');
-    await global.setState(uid, { type: 'gp_set_welcome', chatId });
+    await require('../utils/stateManager').setState(uid, { type: 'gp_set_welcome', chatId });
     return ctx.reply('✏️ ارسل نص رسالة الترحيب:\n\nالمتغيرات: {name} اسم العضو | {id} معرفه | {date} التاريخ\n\n_(او /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
   }
 
   if (data.startsWith('gp_setwphoto_')) {
     const chatId = data.replace('gp_setwphoto_', '');
-    await global.setState(uid, { type: 'gp_set_wphoto', chatId });
+    await require('../utils/stateManager').setState(uid, { type: 'gp_set_wphoto', chatId });
     return ctx.reply('🖼 ارسل صورة الترحيب:\n_(او /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
   }
 
@@ -135,16 +135,16 @@ async function handleCallback(ctx, data) {
 async function handleText(ctx, text, state) {
   if (state.type === 'gp_set_welcome') {
     await run('UPDATE group_chats SET welcome_msg=$1 WHERE chat_id=$2', [text, state.chatId]);
-    await global.delState(ctx.uid);
+    await require('../utils/stateManager').delState(ctx.uid);
     await ctx.reply('تم تحديث رسالة الترحيب!').catch(() => {});
     return showGroupDetail(ctx, state.chatId);
   }
   if (state.type === 'gp_broadcast_msg') {
-    await global.delState(ctx.uid);
+    await require('../utils/stateManager').delState(ctx.uid);
     return _doBroadcast(ctx, state.spId, text, null, null);
   }
   if (state.type === 'gp_msgone') {
-    await global.delState(ctx.uid);
+    await require('../utils/stateManager').delState(ctx.uid);
     try {
       await ctx.telegram.sendMessage(state.chatId, '📢 *رسالة من الادارة*\n\n' + text, { parse_mode: 'Markdown' });
       return ctx.reply('تم الارسال!', kbBuild([[kbBtn('◀️ رجوع', 'gp_view_' + state.chatId)]])).catch(() => {});
@@ -161,13 +161,13 @@ async function handleMedia(ctx, state) {
     if (!photo?.length) return ctx.reply('ارسل صورة صحيحة').catch(() => {});
     const fileId = photo[photo.length - 1].file_id;
     await run('UPDATE group_chats SET welcome_photo=$1 WHERE chat_id=$2', [fileId, state.chatId]);
-    await global.delState(ctx.uid);
+    await require('../utils/stateManager').delState(ctx.uid);
     await ctx.reply('تم تحديث صورة الترحيب!').catch(() => {});
     return showGroupDetail(ctx, state.chatId);
   }
 
   if (state.type === 'gp_broadcast_msg') {
-    await global.delState(ctx.uid);
+    await require('../utils/stateManager').delState(ctx.uid);
     let fileId, mediaType;
     if (msg.photo)         { fileId = msg.photo[msg.photo.length-1].file_id; mediaType = 'photo'; }
     else if (msg.video)    { fileId = msg.video.file_id;    mediaType = 'video'; }
@@ -176,7 +176,7 @@ async function handleMedia(ctx, state) {
   }
 
   if (state.type === 'gp_msgone') {
-    await global.delState(ctx.uid);
+    await require('../utils/stateManager').delState(ctx.uid);
     try {
       if (msg.photo)
         await ctx.telegram.sendPhoto(state.chatId, msg.photo[msg.photo.length-1].file_id, { caption: caption || 'رسالة من الادارة', parse_mode: 'Markdown' });
