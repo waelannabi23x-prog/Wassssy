@@ -73,7 +73,8 @@ module.exports.registerMessages = function(bot, deps) {
         }, 1500);
         return;
       }
-      return next();
+      // في القروب لا نمرر للـ handlers الأخرى
+      return;
     }
     return next();
   });
