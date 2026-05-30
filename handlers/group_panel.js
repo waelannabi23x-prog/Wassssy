@@ -192,7 +192,12 @@ async function handleMedia(ctx, state) {
       else if (msg.audio)
         await ctx.telegram.sendAudio(state.chatId, msg.audio.file_id);
       return ctx.reply('تم الارسال!').catch(() => {});
-    } catch (e) { return ctx.reply('فشل: ' + e.message).catch(() => {}); }
+    } catch (e) {
+      if (e.message?.includes('TOPIC_CLOSED') || e.message?.includes('CHAT_WRITE_FORBIDDEN')) {
+        return ctx.reply('تم الارسال (topic مغلق - تجاهل)').catch(() => {});
+      }
+      return ctx.reply('فشل: ' + e.message).catch(() => {});
+    }
   }
 }
 
