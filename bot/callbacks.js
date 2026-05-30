@@ -1,4 +1,5 @@
 'use strict';
+const groupPanel = require('../handlers/group_panel');
 
 module.exports.registerCallbacks = function(bot, deps) {
   const {
@@ -206,6 +207,8 @@ module.exports.registerCallbacks = function(bot, deps) {
     }},
 
     // Group
+    { p: 'grp_main',    fn: (ctx, d) => groupPanel.showMainMenu(ctx) },
+    { p: 'gp_',         fn: (ctx, d) => groupPanel.handleCallback(ctx, d) },
     { p: 'grp_sp_',     fn: hGrpSp },
     { p: 'grp_dl_',     fn: hGrpDl },
 

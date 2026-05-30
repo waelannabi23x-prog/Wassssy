@@ -224,4 +224,26 @@ async function _doBroadcast(ctx, spId, text, fileId, mediaType) {
   ).catch(() => {});
 }
 
-module.exports = { showGroupPanel, handleCallback, handleText, handleMedia, migrateGroupPanel };
+module.exports = { showMainMenu, showGroupPanel, handleCallback, handleText, handleMedia, migrateGroupPanel };
+
+// ══════════════════════════════════════════════════════════
+// القائمة الرئيسية للقروبات
+// ══════════════════════════════════════════════════════════
+async function showMainMenu(ctx) {
+  const groups  = await all('SELECT COUNT(*) AS cnt FROM group_chats').then(r => r[0]?.cnt || 0).catch(() => 0);
+  const channels = await all('SELECT COUNT(*) AS cnt FROM group_chats WHERE is_channel=1').then(r => r[0]?.cnt || 0).catch(() => 0);
+
+  const rows = [
+    [kbBtn('👥 إدارة القروبات',         'gp_panel')],
+    [kbBtn('📣 إشعار القروبات',          'mg_notify_groups')],
+    [kbBtn('🎮 ألعاب القروب',            'mb_panel')],
+    [kbBtn('◀️ رجوع',                   'mg_menu')],
+  ];
+
+  return eos(ctx,
+    '👥 *القروبات والقنوات*\n' +
+    '━━━━━━━━━━━━━━━━━━\n\n' +
+    '👥 القروبات: *' + groups + '*\n',
+    { parse_mode: 'Markdown', ...kbBuild(rows) }
+  );
+}
