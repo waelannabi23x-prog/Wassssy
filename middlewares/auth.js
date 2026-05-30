@@ -75,7 +75,7 @@ async function authMiddleware(ctx, next) {
     const cachedAdmin = _admCache.get(uid);
     const cachedBan   = cacheGet('ban_' + uid);
     const cachedSub   = cacheGet('sub_ok_' + uid);
-    if (cachedAdmin && cachedBan !== undefined && (cachedSub || !ctx.chat || ctx.chat.type !== 'private')) {
+    if (cachedAdmin && cachedBan !== undefined && (cachedSub === true || ctx.chat?.type !== 'private')) {
       ctx.isAdmin    = cachedAdmin.data.isAdmin;
       ctx.adminPerms = cachedAdmin.data.perms;
       if (!ctx.isAdmin && cachedBan === 1) return ctx.answerCbQuery('🚫 أنت محظور').catch(()=>{});
