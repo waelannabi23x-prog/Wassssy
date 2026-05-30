@@ -249,10 +249,12 @@ module.exports = function registerCommands(bot, deps) {
   bot.command('addchannel', async ctx => {
     if (!ctx.isOwner) return ctx.reply('للمالك فقط').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     const args = ctx.message.text.split(' ').slice(1);
-    if (args.length < 3) return ctx.reply('الصيغة: /addchannel @ch الاسم الرابط').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    const cid = args[0];
+    if (args.length < 2) return ctx.reply('الصيغة: /addchannel الاسم الرابط').catch(() => {});
     const url = args[args.length - 1];
-    const nm = args.slice(1, args.length - 1).join(' ');
+    const nm  = args.slice(0, args.length - 1).join(' ');
+    // استخرج channel_id من الرابط أو استخدم الاسم
+    let cid = url.replace('https://t.me/', '@');
+    if (!cid.startsWith('@') && !cid.startsWith('-')) cid = nm;
     await addChannel(cid, nm, url).catch(e => ctx.reply('خطا: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); }));
     return ctx.reply('تمت الاضافة: ' + nm).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   });
