@@ -533,4 +533,12 @@ function register(bot) {
   logger.info('[GuessGame] ✅ registered');
 }
 
-module.exports = { register, startInvite };
+async function handleCallback(ctx) {
+  const d = ctx.callbackQuery?.data || '';
+  const jm = d.match(/^gg_join_(-?d+)_(d+)$/);
+  if (jm) return handleJoin(ctx, jm[1], jm[2]);
+  const cm = d.match(/^gg_cf_(-?d+)_(d+)_(yes|no)$/);
+  if (cm) return handleConfirm(ctx, cm[1], cm[2], cm[3]);
+}
+
+module.exports = { register, startInvite, handleCallback };
