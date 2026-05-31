@@ -268,16 +268,23 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
 }
 
 async function _showSimilar(ctx, f, spId, yrId, smId, sbId, catId) {
-  console.log('[Similar] catId='+catId+' f.category_id='+f?.category_id);
   if (!catId || catId === 0) catId = f.category_id;
   if (!catId) return;
   const simKey = 'similar_' + f.id + '_' + catId;
   let similar = cacheGet(simKey);
   if (!similar) {
+    // ابحث في نفس القسم أولاً
     similar = await all(
       'SELECT f.id, f.title, f.file_type FROM files f WHERE f.category_id=$1 AND f.id!=$2 AND f.is_deleted=0 ORDER BY f.downloads DESC LIMIT 4',
       [catId, f.id]
     ).catch(() => []);
+    // إذا ما في نتائج — ابحث في نفس المادة
+    if (!similar.length) {
+      similar = await all(
+        'SELECT f.id, f.title, f.file_type FROM files f JOIN categories c ON f.category_id=c.id WHERE c.subject_id=(SELECT subject_id FROM categories WHERE id=$1) AND f.id!=$2 AND f.is_deleted=0 ORDER BY f.downloads DESC LIMIT 4',
+        [catId, f.id]
+      ).catch(() => []);
+    }
     if (similar.length) cacheSet(simKey, similar, 600000);
   }
   if (!similar || !similar.length) return;
@@ -288,6 +295,7 @@ async function _showSimilar(ctx, f, spId, yrId, smId, sbId, catId) {
   });
   rows.push([btn('◀️ رجوع', 'ct_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId), btn('🏠', 'main_menu')]);
 
+  console.log('[Similar] found='+similar.length);
   await ctx.reply('📚 من نفس القسم:', {
     parse_mode: 'Markdown',
     ...build(rows)
