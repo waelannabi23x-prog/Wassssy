@@ -146,11 +146,11 @@ bot.use(async (ctx, next) => {
   return next();
 });
 
-// ── game callbacks قبل auth ──
+// ── انا: انضمام للعبة خمن قبل auth ──
 bot.use(async (ctx, next) => {
-  if (ctx.updateType === 'callback_query') {
-    const d = ctx.callbackQuery?.data || '';
-    if (d.startsWith('gg_')) return guessGame.handleCallback(ctx);
+  const txt = (ctx.message?.text || '').trim();
+  if (ctx.chat?.type !== 'private' && /^انا$/i.test(txt)) {
+    return guessGame.handleJoin(ctx).catch(() => next());
   }
   return next();
 });
