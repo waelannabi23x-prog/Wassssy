@@ -505,8 +505,10 @@ function register(bot) {
   // deep link: /start guess_GAMEID — لما لاعب يفتح البوت من زر اللعبة
   bot.start(async (ctx) => {
     const payload = ctx.startPayload || '';
+    if (!payload.startsWith('guess_')) return;
     const uid = s(ctx.from.id);
     const pv  = _pvStates.get(uid);
+    if (!pv) {
       return ctx.reply('⚠️ انتهت اللعبة أو لم تُدعَ لأي تحدٍّ حالياً.').catch(() => {});
     }
     await ctx.reply(
