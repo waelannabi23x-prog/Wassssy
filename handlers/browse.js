@@ -152,7 +152,7 @@ async function showFiles(ctx, spId, yrId, smId, sbId, catId, page) {
   var rows = list.map(function(f) {
     var fav = favMap[f.id]||false;
     var typeIcon = f.file_type==='link'?'🔗':f.file_type==='photo'?'🖼️':'📄';
-    return [btn(typeIcon+' '+f.title, 'preview_'+f.id+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId), btn(fav?'⭐':'☆','fav_'+f.id)];
+    return [btn(typeIcon+' '+f.title, 'fl_'+f.id+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId), btn(fav?'⭐':'☆','fav_'+f.id)];
   });
   if (total > PS) {
     var nav = [];
