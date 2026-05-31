@@ -137,11 +137,6 @@ bot.use(async (ctx, next) => {
 bot.use(rateLimit);
 
 // ── خمن وcallbacks اللعبة قبل auth ──
-bot.on('callback_query', async (ctx, next) => {
-  const d = ctx.callbackQuery?.data || '';
-  if (d.startsWith('gg_')) return guessGame.handleCallback(ctx);
-  return next();
-});
 
 bot.use(async (ctx, next) => {
   const txt = (ctx.message?.text || '').trim();
@@ -151,6 +146,14 @@ bot.use(async (ctx, next) => {
   return next();
 });
 
+// ── game callbacks قبل auth ──
+bot.use(async (ctx, next) => {
+  if (ctx.updateType === 'callback_query') {
+    const d = ctx.callbackQuery?.data || '';
+    if (d.startsWith('gg_')) return guessGame.handleCallback(ctx);
+  }
+  return next();
+});
 bot.use(authMiddleware);
 bot.catch((err, ctx) => {
   if (!err.message.includes('is not modified'))
