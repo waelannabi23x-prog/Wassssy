@@ -139,7 +139,8 @@ bot.use(rateLimit);
 bot.use(async (ctx, next) => {
   const txt = (ctx.message?.text || '').trim();
   if (ctx.chat?.type !== 'private' && /^خمن$/i.test(txt)) {
-    return guessGame.startInvite(ctx);
+    ctx.reply('🔧 debug: وصل').catch(()=>{});
+    return guessGame.startInvite(ctx).catch(e => ctx.reply('❌ خطأ: ' + e.message).catch(()=>{}));
   }
   return next();
 });
