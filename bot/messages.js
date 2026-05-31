@@ -86,6 +86,9 @@ module.exports.registerMessages = function(bot, deps) {
         }, 1500);
         return;
       }
+      // مرر لـ game handlers أولاً
+      const _gtxt = ctx.message?.text?.trim();
+      if (_gtxt && (/^خمن$/i.test(_gtxt) || /^تخمين[:\s]+/i.test(_gtxt))) return next();
       // في القروب لا نمرر للـ handlers الأخرى
       return;
     }
