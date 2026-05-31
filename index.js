@@ -134,6 +134,16 @@ bot.use(async (ctx, next) => {
   return next();
 });
 bot.use(rateLimit);
+
+// ── خمن يشتغل قبل auth ──
+bot.use(async (ctx, next) => {
+  const txt = (ctx.message?.text || '').trim();
+  if (ctx.chat?.type !== 'private' && /^خمن$/i.test(txt)) {
+    return guessGame.startInvite(ctx);
+  }
+  return next();
+});
+
 bot.use(authMiddleware);
 bot.catch((err, ctx) => {
   if (!err.message.includes('is not modified'))

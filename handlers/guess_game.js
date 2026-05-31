@@ -533,4 +533,4 @@ function register(bot) {
   logger.info('[GuessGame] ✅ registered');
 }
 
-module.exports = { register };
+module.exports = { register, startInvite };
