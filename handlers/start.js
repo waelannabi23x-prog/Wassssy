@@ -168,7 +168,6 @@ async function showWelcome(telegram, chatId, from, name) {
       [{ text: '📚 تصفح المحتوى', callback_data: 'browse' }],
       [{ text: '🔍 بحث سريع', callback_data: 'search_prompt' }, { text: '🆕 أحدث الملفات', callback_data: 'latest' }],
       [{ text: '⭐ مفضلاتي', callback_data: 'favorites' }, { text: '🗂 آخر ما شاهدت', callback_data: 'history' }],
-      [{ text: '🤖 المساعد الذكي', callback_data: 'ai_prompt' }, { text: '📝 ملاحظاتي', callback_data: 'notes_show' }],
       [{ text: '👤 ملفي', callback_data: 'profile' }, { text: '📊 إحصائياتي', callback_data: 'stats' }],
       [{ text: sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', callback_data: 'change_sp' }],
     ];

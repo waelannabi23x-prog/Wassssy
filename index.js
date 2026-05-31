@@ -16,7 +16,6 @@ const { cacheWarmup, cacheClear, cacheClearPrefix } = require('./utils/cache');
 const { startScheduler }  = require('./utils/scheduler');
 const { initPersistentStates } = require('./utils/stateManager');
 const { CBDedup, GrpBuf, GrpMsgs } = require('./bot/services');
-const notesH = require('./handlers/notes');
 
 // ── Handlers ──
 const startHandler  = require('./handlers/start');
@@ -152,7 +151,6 @@ require('./bot/commands')(bot, {
 // ── Callbacks ──
 const { registerCallbacks } = require('./bot/callbacks');
 registerCallbacks(bot, {
-  CBDedup, cbRes, startHandler, manage, browse, userH, notesH,
   bundlesDb, contentDb, usersDb, interactions, commentsDb,
   cacheClear, cacheClearPrefix, kbBtn, kbBuild, eos, logger,
   safeInt, tagAll, muteAll, unmuteAll,
@@ -178,7 +176,6 @@ async function launch() {
     await migrateGroupTables().catch(() => {});
     require("./utils/cache").clearAllSubCache();
     await require('./handlers/group_panel').migrateGroupPanel().catch(() => {});
-    await notesH.initNotes().catch(()=>{});
     await initPersistentStates();
     logger.info('✅ DB ready');
 

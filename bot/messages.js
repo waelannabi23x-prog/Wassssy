@@ -23,7 +23,6 @@ module.exports.registerMessages = function(bot, deps) {
   const { eos } = require('../utils/helpers');
   const commentsDb = require('../database/comments');
   const tools = require('../handlers/owner_tools');
-  const notesH = require('../handlers/notes');
 
   // ── Media Group Collector ──
   const MGColl = {
@@ -109,7 +108,6 @@ module.exports.registerMessages = function(bot, deps) {
       }
     }
 
-    if (s?.type === 'note_add') return notesH.handleNoteInput(ctx, s);
     if (await tools.trySmartUpload(ctx)) return;
     if (s?.type === 'mg_bundle_files') return manage.handleBundleFileUpload(ctx);
     if (s?.type === 'mg_bulk_files')   return manage.handleBulkUpload(ctx);
@@ -158,7 +156,6 @@ module.exports.registerMessages = function(bot, deps) {
     if (ctx.chat?.type !== 'private') return;
     if (!ctx.isAdmin && !ctx.isOwner) return;
     const s = require('../utils/stateManager').getState(ctx.uid);
-    if (s?.type === 'note_add') return notesH.handleNoteInput(ctx, s);
     if (s?.type === 'mg_bulk_files')   return manage.handleBulkUpload(ctx);
     if (s?.type === 'mg_bundle_files') return manage.handleBundleFileUpload(ctx);
     if (s?.type === 'mg_file')         return manage.handleFileUpload(ctx);
@@ -182,7 +179,6 @@ module.exports.registerMessages = function(bot, deps) {
         if (ctx.isOwner && await handleOwnerAI(ctx, txt, null, null)) return;
         if (await handleAiChat(ctx, txt)) return;
       }
-      if (s.type === 'note_add') return notesH.handleNoteInput(ctx, s);
       if (s.type === 'mg_file')       return manage.handleFileUpload(ctx);
       if (s.type === 'mg_bulk_prefix') return manage.handleText(ctx, s);
       if (s.type === 'mg_bulk_files' && txt !== '/done') return manage.handleText(ctx, s);
