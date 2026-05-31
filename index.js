@@ -278,8 +278,8 @@ bot.start(async (ctx, next) => {
 bot.launch({ drop_pending_updates: true });
     }
 
-    millionaire.register(bot);
     guessGame.register(bot);
+    millionaire.register(bot);
     global.__bot = bot;
 
 // ── BullMQ Workers — بعد ما يكون bot جاهز ──
