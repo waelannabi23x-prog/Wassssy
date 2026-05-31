@@ -3,7 +3,7 @@ const groupPanel = require('../handlers/group_panel');
 
 module.exports.registerCallbacks = function(bot, deps) {
   const {
-    CBDedup, cbRes, startHandler, manage, browse, userH, notesH,
+    CBDedup, cbRes, startHandler, manage, browse, userH,
     bundlesDb, contentDb, usersDb, interactions, commentsDb,
     cacheClear, cacheClearPrefix, kbBtn, kbBuild, eos,
     logger, safeInt, tagAll, muteAll, unmuteAll,
@@ -83,8 +83,6 @@ module.exports.registerCallbacks = function(bot, deps) {
     }],
     ['noop',       () => {}],
     ['main_menu',  ctx => startHandler(ctx)],
-    ['notes_show', ctx => notesH.showNotes(ctx)],
-    ['note_add',   ctx => notesH.startAddNote(ctx)],
     
     ['mg_open_app', async ctx => {
       const url = process.env.WEBHOOK_URL + '/app/app_index.html';
@@ -222,7 +220,6 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'bundle_',     fn: (ctx, d) => { const p = d.split('_'); return browse.showBundle(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }},
     { p: 'bdl_',        fn: (ctx, d) => { const p = d.split('_'); return browse.sendBundle(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }},
     { p: 'fl_',         fn: (ctx, d) => { const p = d.split('_'); return browse.sendFile(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }},
-    { p: 'note_', fn: (ctx, d) => notesH.handleCallback(ctx, d) },
     { p: 'ml_',         fn: (ctx)    => million.handleCallback(bot, ctx) },
     { p: 'ct_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showFiles(ctx, p[1], p[2], p[3], p[4], p[5]); }},
     { p: 'sb_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showCategories(ctx, p[1], p[2], p[3], p[4]); }},

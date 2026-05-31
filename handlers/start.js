@@ -129,7 +129,7 @@ async function showMainMenu(ctx, name) {
     ],
     [
       btn('🤖 المساعد الذكي', 'ai_prompt'),
-      btn('📝 ملاحظاتي',     'notes_show'),
+      
     ],
     [
       btn('👤 ملفي',         'profile'),
