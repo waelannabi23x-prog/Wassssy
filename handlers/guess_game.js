@@ -203,28 +203,40 @@ async function handleConfirm(ctx, chatId, gameId, answer) {
 }
 
 async function _requestPhoto(telegram, game, player) {
+  const BOT = process.env.BOT_USERNAME || '';
+  const opp = player.id === game.p1.id ? game.p2 : game.p1;
+
+  // سجّل الـ pvState أولاً حتى لو ما أرسلنا
+  _pvStates.set(s(player.id), {
+    gameKey: game.key,
+    chatId:  s(game.chatId),
+    step:    'waiting_photo',
+    photo:   null,
+    name:    null,
+  });
+
   try {
     await telegram.sendMessage(player.id,
-      `🎮 *تحدي "خمن" — الجولة بدأت!*\n\n` +
-      `⚔️ منافسك: *${esc(name(player.id === game.p1.id ? game.p2 : game.p1))}*\n\n` +
-      `📸 *الخطوة 1/2:* أرسل لي الصورة التي تريد أن يخمنها منافسك.\n` +
-      `_ستُكشف للمنافس فقط بعد انتهاء اللعبة._`,
+      `🎮 *تحدي "خمن"!*\n\n` +
+      `⚔️ منافسك: *${esc(name(opp))}*\n\n` +
+      `📸 أرسل لي الصورة التي تريد أن يخمنها منافسك.\n` +
+      `_ستُكشف له فقط بعد انتهاء اللعبة._`,
       { parse_mode: 'Markdown' }
     );
-    _pvStates.set(s(player.id), {
-      gameKey: game.key,
-      chatId:  s(game.chatId),
-      step:    'waiting_photo',
-      photo:   null,
-      name:    null,
-    });
+    logger.info(`[GuessGame] PV sent to ${player.id}`);
   } catch (e) {
     logger.warn(`[GuessGame] PV unreachable for ${player.id}: ${e.message}`);
-    const BOT = process.env.BOT_USERNAME || '';
+    // ← زر مباشر بدل رسالة نصية مربكة
     await telegram.sendMessage(game.chatId,
-      `⚠️ ${mention(player)}: يبدو أنك لم تبدأ المحادثة مع البوت بعد.\n` +
-      `[اضغط هنا لبدئها](https://t.me/${BOT}?start=guess) ثم سيصلك الطلب.`,
-      { parse_mode: 'Markdown', disable_web_page_preview: true }
+      `📩 ${mention(player)} اضغط الزر وابدأ البوت في الخاص لإرسال صورتك:`,
+      {
+        parse_mode: 'Markdown',
+        reply_markup: {
+          inline_keyboard: [[
+            { text: '🤖 افتح البوت وأرسل صورتك', url: `https://t.me/${BOT}?start=guess_${game.id}` }
+          ]]
+        }
+      }
     ).catch(() => {});
   }
 }
@@ -489,6 +501,19 @@ async function _cancelGame(telegram, chatId, gameId, fromStatus, msg) {
 
 /* ═══════════ REGISTER ═══════════ */
 function register(bot) {
+
+  // deep link: /start guess_GAMEID — لما لاعب يفتح البوت من زر اللعبة
+  bot.start(async (ctx) => {
+    const payload = ctx.startPayload || '';
+    const uid = s(ctx.from.id);
+    const pv  = _pvStates.get(uid);
+      return ctx.reply('⚠️ انتهت اللعبة أو لم تُدعَ لأي تحدٍّ حالياً.').catch(() => {});
+    }
+    await ctx.reply(
+      '📸 أرسل لي الصورة التي تريد أن يخمنها منافسك.',
+      { parse_mode: 'Markdown' }
+    ).catch(() => {});
+  });
 
   // أمر التشغيل في القروب
   bot.hears(/^خمن$/i, async ctx => {
