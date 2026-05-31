@@ -15,7 +15,7 @@ async function showLatest(ctx) {
   var k = 'latest_15', list = cacheGet(k);
   if (!list) { list = await filesDb.recentFiles(15); cacheSet(k, list, 120000); }
   if (!list.length) return eos(ctx, '🆕 لا توجد ملفات بعد.', build([back('main_menu')]));
-  var rows = list.map(f => [btn('📄 ' + f.title + ' · ' + f.sub_name, 'preview_' + f.id + '_0_0_0_0_0')]);
+  var rows = list.map(f => [btn('📄 ' + f.title + ' · ' + f.sub_name, 'fl_' + f.id + '_0_0_0_0_0')]);
   rows.push(back('main_menu'));
   return eos(ctx, '🆕 *آخر الملفات (' + list.length + ')*', { parse_mode: 'Markdown', ...build(rows) });
 }
@@ -24,7 +24,7 @@ async function showRecommended(ctx) {
   var uid = ctx.uid, k = 'rec_' + uid, list = cacheGet(k);
   if (!list) { list = await interactions.getRecommended(uid, 10); cacheSet(k, list, 300000); }
   if (!list.length) return showLatest(ctx);
-  var rows = list.map(f => [btn('📄 ' + f.title + ' · ' + f.sub_name, 'preview_' + f.id + '_0_0_0_0_0')]);
+  var rows = list.map(f => [btn('📄 ' + f.title + ' · ' + f.sub_name, 'fl_' + f.id + '_0_0_0_0_0')]);
   rows.push(back('main_menu'));
   return eos(ctx, '🎯 *موصى به لك*', { parse_mode: 'Markdown', ...build(rows) });
 }
@@ -40,7 +40,7 @@ async function showNewInSpecialty(ctx) {
     cacheSet(k, list, 120000);
   }
   if (!list.length) return showLatest(ctx);
-  var rows = list.map(f => [btn('📄 ' + f.title + ' · ' + f.sub_name, 'preview_' + f.id + '_0_0_0_0_0')]);
+  var rows = list.map(f => [btn('📄 ' + f.title + ' · ' + f.sub_name, 'fl_' + f.id + '_0_0_0_0_0')]);
   rows.push(back('main_menu'));
   return eos(ctx, '🆕 *الجديد في تخصصك (' + list.length + ')*', { parse_mode: 'Markdown', ...build(rows) });
 }
