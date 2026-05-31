@@ -77,7 +77,27 @@ async function startInvite(ctx) {
   game.inviteMsgId = m.message_id;
   trackMsg(chatId, m.message_id);
 
+  // ── عداد تنازلي يتحدث كل 10 ثواني ──
+  const _cdStart = Date.now();
+  const _cdInterval = setInterval(async () => {
+    const g = _games.get(chatId);
+    if (!g || g.status !== 'waiting') { clearInterval(_cdInterval); return; }
+    const elapsed = Math.floor((Date.now() - _cdStart) / 1000);
+    const left    = INVITE_SECS - elapsed;
+    if (left <= 0) { clearInterval(_cdInterval); return; }
+    const bar = '█'.repeat(Math.floor(left/6)) + '░'.repeat(10 - Math.floor(left/6));
+    await ctx.telegram.editMessageText(chatId, game.inviteMsgId, null,
+      `🎮 *تحدي جديد من ${mention(user)}!*\n\n` +
+      `🖼️ كل لاعب يختار صورة سرية، والآخر يحاول تخمينها خلال 5 دقائق عبر الحوار الحر.\n\n` +
+      `✏️ اكتب *انا* للانضمام\n` +
+      `⏳ ${bar} *${left}ث*`,
+      { parse_mode: 'Markdown' }
+    ).catch(() => {});
+  }, 10000);
+  game._cdInterval = _cdInterval;
+
   game.inviteTimer = setTimeout(async () => {
+    clearInterval(_cdInterval);
     const g = _games.get(chatId);
     if (!g || g.status !== 'waiting') return;
     g.status = 'ended';
@@ -105,6 +125,7 @@ async function handleJoin(ctx) {
   }
 
   clearTimeout(game.inviteTimer);
+  clearInterval(game._cdInterval);
   game.status = 'collecting';
   game.p2     = { ...user };
 
