@@ -86,9 +86,13 @@ module.exports.registerMessages = function(bot, deps) {
         }, 1500);
         return;
       }
-      // مرر لـ game handlers أولاً
+      // game handler
       const _gtxt = ctx.message?.text?.trim();
-      if (_gtxt && (/^خمن$/i.test(_gtxt) || /^تخمين[:\s]+/i.test(_gtxt))) return next();
+      if (_gtxt) {
+        const guessGame = require('../handlers/game_guess');
+        if (/^خمن$/i.test(_gtxt)) { guessGame._startChallenge && guessGame._startChallenge(bot, ctx); return; }
+        if (/^تخمين[:\s]+/i.test(_gtxt)) { guessGame._handleGuess && guessGame._handleGuess(bot, ctx); return; }
+      }
       // في القروب لا نمرر للـ handlers الأخرى
       return;
     }

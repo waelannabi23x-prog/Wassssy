@@ -582,4 +582,4 @@ function register(bot) {
   });
 }
 
-module.exports = { register, initGuessDB };
+module.exports = { register, initGuessDB, _startChallenge: startChallenge, _handleGuess: handleGuessAttempt };
