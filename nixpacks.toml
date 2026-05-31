@@ -1,8 +1,8 @@
 [phases.setup]
-nixPkgs = ["nodejs_20", "python3", "gcc"]
+nixPkgs = ["nodejs_20"]
 
 [phases.install]
 cmds = ["npm ci --omit=dev"]
 
 [start]
-cmd = "node --max-old-space-size=512 --expose-gc index.js"
+cmd = "node_modules/.bin/pm2-runtime ecosystem.config.js"
