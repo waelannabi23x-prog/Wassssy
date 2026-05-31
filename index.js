@@ -150,6 +150,7 @@ bot.use(async (ctx, next) => {
 bot.use(async (ctx, next) => {
   const txt = (ctx.message?.text || '').trim();
   if (ctx.chat?.type !== 'private' && /^[أاآ]نا$/i.test(txt)) {
+    ctx.telegram.sendMessage(ctx.chat.id, '🔍 txt=[' + txt + '] len=' + txt.length).catch(()=>{});
     return guessGame.handleJoin(ctx).catch(e => { ctx.telegram.sendMessage(ctx.chat.id, "❌ join err: " + e.message).catch(()=>{}); return next(); });
   }
   return next();
