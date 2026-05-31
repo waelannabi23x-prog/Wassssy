@@ -33,10 +33,24 @@ module.exports.registerMessages = function(bot, deps) {
   };
   setInterval(() => { for (const k of MGColl._g.keys()) MGColl._g.delete(k); }, 30000).unref();
 
+  // ── Anti-Spam Map ──
+  const _spamMap = new Map();
+  setInterval(() => { const cut=Date.now()-10000; for(const[k,v] of _spamMap) if(v.last<cut) _spamMap.delete(k); }, 10000).unref();
+
   // ── Message (group) ──
   bot.on('message', async (ctx, next) => {
     const _mid = ctx.message?.message_id + '_' + (ctx.from?.id || '');
     if (isDupMsg(_mid)) return;
+
+    // Anti-spam في القروبات
+    if (ctx.chat?.type !== 'private' && ctx.from && !ctx.isAdmin && !ctx.isOwner) {
+      const uid = ctx.from.id;
+      const now = Date.now();
+      const sp = _spamMap.get(uid) || { count: 0, last: now };
+      if (now - sp.last < 3000) { sp.count++; sp.last = now; _spamMap.set(uid, sp); }
+      else { _spamMap.set(uid, { count: 1, last: now }); }
+      if (sp.count > 8) { ctx.deleteMessage().catch(()=>{}); return; }
+    }
     if (ctx.chat?.type === 'private' && ctx.from?.id === OWNER_ID && ctx.message?.text?.startsWith('!'))
       return ownerH.handle(ctx, ctx.message.text);
 

@@ -143,7 +143,7 @@ async function handleAiChat(ctx, text) {
   const uid = ctx.uid;
 
   if (!checkAiLimit(uid)) {
-    return ctx.reply('⏳ أنت سريع جداً! انتظر دقيقة ثم حاول.', {
+    return ctx.reply('⏳ خويا استنى شوية! ما تقدرش تبعث أكثر من 10 رسائل في دقيقة.\n\nحاول بعد لحظة 😄', {
       reply_markup: { inline_keyboard: [[{ text: '🏠 القائمة', callback_data: 'main_menu' }]] }
     });
   }

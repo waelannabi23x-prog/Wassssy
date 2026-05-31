@@ -22,6 +22,7 @@ async function tick() {
   try {
     await processScheduled();
     await processGroupNotifications();
+    await sendWeeklyReport();
     await cleanup();
   } catch (e) {
     logger.error('[Sched]', e.message);
@@ -128,6 +129,38 @@ async function processGroupNotifications() {
       if (bi + NOTIFY_BATCH < recent.length) await sleep(1000);
     }
   } catch (_) {}
+}
+
+
+async function sendWeeklyReport() {
+  if (!_bot || !_owners.length) return;
+  const now = new Date();
+  if (now.getDay() !== 0) return; // الأحد فقط
+  const hour = now.getHours();
+  if (hour !== 9) return; // الساعة 9 صباحاً
+
+  try {
+    const { all } = require('../database/db');
+    const [newUsers, topFiles, totalDl, activeUsers] = await Promise.all([
+      all("SELECT COUNT(*) AS cnt FROM users WHERE joined_at > NOW() - INTERVAL '7 days'").then(r => r[0]?.cnt || 0),
+      all("SELECT title, downloads FROM files WHERE is_deleted=0 ORDER BY downloads DESC LIMIT 5"),
+      all("SELECT SUM(downloads) AS cnt FROM files WHERE is_deleted=0").then(r => r[0]?.cnt || 0),
+      all("SELECT COUNT(*) AS cnt FROM users WHERE last_active > NOW() - INTERVAL '7 days'").then(r => r[0]?.cnt || 0),
+    ]);
+
+    let text = '📊 *التقرير الأسبوعي*\n━━━━━━━━━━━━━━━━━━\n\n';
+    text += '👥 مستخدمون جدد: *' + newUsers + '*\n';
+    text += '🟢 نشطون هذا الأسبوع: *' + activeUsers + '*\n';
+    text += '⬇️ إجمالي التحميلات: *' + totalDl + '*\n\n';
+    text += '🏆 *الأكثر تحميلاً:*\n';
+    topFiles.forEach((f, i) => {
+      text += (i+1) + '. ' + (f.title||'').substring(0,30) + ' — ' + f.downloads + '\n';
+    });
+
+    for (const oid of _owners) {
+      _bot.telegram.sendMessage(oid, text, { parse_mode: 'Markdown' }).catch(() => {});
+    }
+  } catch(e) { logger.error('[WeeklyReport]', e.message); }
 }
 
 async function cleanup() {

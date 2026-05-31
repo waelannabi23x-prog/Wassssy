@@ -255,6 +255,7 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
   if (!f) return ctx.reply('❌ الملف غير موجود.').catch(function(){});
   filesDb.incDownloads(fid).catch(function(){});
   interactions.addHistory(uid, fid).catch(function(){});
+  try { require('../database/points').awardPoints(uid, 'download').catch(()=>{}); } catch(_) {}
   var caption = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 '+escMd(f.description)+'\n':'')+'📁 '+escMd(f.cat_name||'عام')+'  |  📖 '+escMd(f.sub_name||'عام');
   var kb = build([[btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid)],[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]]);
   try {
@@ -330,8 +331,8 @@ async function sendBundle(ctx, bundleId, spId, yrId, smId, sbId, catId) {
     try { await ctx.replyWithMediaGroup(photos.map(function(f){return{type:'photo',media:f.file_id,caption:f.file_title||f.title||''};})); }
     catch(e) { for(var i=0;i<photos.length;i++) await ctx.replyWithPhoto(photos[i].file_id,{caption:photos[i].file_title||''}).catch(function(){}); }
   }
-  for(var i=0;i<videos.length;i++) await ctx.replyWithVideo(videos[i].file_id,{caption:videos[i].file_title||''}).catch(function(){});
-  for(var i=0;i<docs.length;i++) await ctx.replyWithDocument(docs[i].file_id,{caption:docs[i].file_title||''}).catch(function(){});
+  if(videos.length) await Promise.all(videos.map(function(f){return ctx.replyWithVideo(f.file_id,{caption:f.file_title||''}).catch(function(){});}));
+  if(docs.length) await Promise.all(docs.map(function(f){return ctx.replyWithDocument(f.file_id,{caption:f.file_title||''}).catch(function(){});}));
   for(var i=0;i<audios.length;i++) {
     if(audios[i].real_type==='voice') await ctx.replyWithVoice(audios[i].file_id).catch(function(){});
     else await ctx.replyWithAudio(audios[i].file_id,{caption:audios[i].file_title||''}).catch(function(){});

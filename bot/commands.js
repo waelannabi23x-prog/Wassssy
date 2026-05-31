@@ -12,6 +12,21 @@ module.exports = function registerCommands(bot, deps) {
 
 
   // Ban commands (owner only - private)
+
+  bot.command('top', async ctx => {
+    try {
+      const list = await dbAll('SELECT u.first_name, u.username, p.total_points, p.downloads_count FROM user_points p JOIN users u ON u.id=p.user_id ORDER BY p.total_points DESC LIMIT 10');
+      if (!list.length) return ctx.reply("No data yet").catch(() => {});
+      const medals = ['🥇','🥈','🥉'];
+      let text = '🏆 Top 10\n━━━━━━━━━━━━━━━━━━\n\n';
+      list.forEach((u, i) => {
+        const medal = medals[i] || (i+1) + '.';
+        const name = (u.first_name || 'user').substring(0, 15);
+        text += medal + ' ' + name + ' — ' + (u.total_points||0) + ' pts | ' + (u.downloads_count||0) + ' dl\n';
+      });
+      ctx.reply(text).catch(() => {});
+    } catch(e) { ctx.reply("Error").catch(() => {}); }
+  });
   bot.command('ban', async ctx => {
     if (!ctx.isOwner) return;
     if (ctx.chat?.type !== 'private') return;

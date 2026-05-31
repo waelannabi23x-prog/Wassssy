@@ -272,8 +272,57 @@ function buildAnnouncementMessage(title, body, footer) {
 // ══════════════════════════════════════════════════════════
 // Exports
 // ══════════════════════════════════════════════════════════
+
+// ══════════════════════════════════════════════════════════
+// 🔔 إشعار ذكي للمستخدمين عند إضافة ملف في تخصصهم
+// ══════════════════════════════════════════════════════════
+async function notifyUsersNewFile(bot, fileInfo) {
+  if (!bot || !fileInfo?.specialty_id) return;
+  try {
+    const { all } = require('../database/db');
+    const { cacheGet, cacheSet } = require('./cache');
+
+    // جلب المستخدمين المشتركين في هذا التخصص (فقط النشطين آخر 30 يوم)
+    const users = await all(
+      "SELECT u.id FROM users u JOIN user_specialties us ON u.id=us.user_id WHERE us.specialty_id=$1 AND u.is_banned=0 AND u.last_active > NOW() - INTERVAL '30 days' LIMIT 500",
+      [fileInfo.specialty_id]
+    ).catch(() => []);
+
+    if (!users.length) return;
+
+    const botUsername = await bot.telegram.getMe().then(m => m.username).catch(() => '');
+    const icon = { document: '📄', photo: '🖼', video: '🎬', link: '🔗' }[fileInfo.file_type] || '📎';
+    const text =
+      '🆕 *ملف جديد في تخصصك!*\n' +
+      '━━━━━━━━━━━━━━━━━━\n\n' +
+      icon + ' *' + (fileInfo.title || '') + '*\n' +
+      (fileInfo.sub_name ? '📖 ' + fileInfo.sub_name + '\n' : '') +
+      '\n⬇️ اضغط للتحميل المباشر';
+
+    const btn = botUsername ? [[{ text: '⬇️ تحميل', url: 'https://t.me/' + botUsername + '?start=file_' + fileInfo.id }]] : [];
+
+    let sent = 0;
+    const BATCH = 25;
+    for (let i = 0; i < users.length; i += BATCH) {
+      const chunk = users.slice(i, i + BATCH);
+      await Promise.allSettled(chunk.map(u =>
+        bot.telegram.sendMessage(u.id, text, {
+          parse_mode: 'Markdown',
+          reply_markup: btn.length ? { inline_keyboard: btn } : undefined
+        }).catch(() => {})
+      ));
+      sent += chunk.length;
+      if (i + BATCH < users.length) await new Promise(r => setTimeout(r, 1000));
+    }
+    console.log('[SmartNotify] Sent to', sent, 'users for file', fileInfo.id);
+  } catch(e) {
+    console.error('[SmartNotify]', e.message);
+  }
+}
+
 module.exports = {
   notifyGroupsNewFile,
+  notifyUsersNewFile,
   notifyGroupsCustom,
   broadcastToSpecialty,
   postToChannel,
