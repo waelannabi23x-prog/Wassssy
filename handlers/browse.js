@@ -295,7 +295,6 @@ async function _showSimilar(ctx, f, spId, yrId, smId, sbId, catId) {
   });
   rows.push([btn('◀️ رجوع', 'ct_' + spId + '_' + yrId + '_' + smId + '_' + sbId + '_' + catId), btn('🏠', 'main_menu')]);
 
-  console.log('[Similar] found='+similar.length);
   await ctx.reply('📚 من نفس القسم:', {
     parse_mode: 'Markdown',
     ...build(rows)
