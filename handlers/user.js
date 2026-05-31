@@ -48,7 +48,28 @@ async function showNewInSpecialty(ctx) {
 async function showFavorites(ctx) {
   var uid = ctx.uid, favs = await interactions.getFavs(uid);
   if (!favs.length) return eos(ctx, '⭐ *المفضلة*\n\nلا توجد ملفات محفوظة.', { parse_mode: 'Markdown', ...build([back('main_menu')]) });
-  var rows = favs.map(f => [btn('📄 ' + f.title, 'preview_' + f.id + '_0_0_0_0_0'), btn('🗑', 'unfav_' + f.id)]);
+  // تجميع حسب المادة
+  var grouped = {}, order = [];
+  favs.forEach(f => {
+    var key = f.sub_name || f.cat_name || 'عام';
+    if (!grouped[key]) { grouped[key] = []; order.push(key); }
+    grouped[key].push(f);
+  });
+  var rows = [];
+  order.forEach(sub => {
+    rows.push([btn('📖 ' + sub, 'noop')]);
+    grouped[sub].forEach(f => {
+      var icon = f.file_type==='link'?'🔗':f.file_type==='photo'?'🖼️':'📄';
+      rows.push([btn(icon+' '+f.title, 'fl_'+f.id+'_0_0_0_0_0'), btn('🗑','unfav_'+f.id)]);
+    });
+  });
+  rows.push(back('main_menu'));
+  return eos(ctx, '⭐ *المفضلة ('+favs.length+')*', { parse_mode:'Markdown', ...build(rows) });
+}
+
+async function _showFavorites_UNUSED(ctx) {
+  var uid = ctx.uid, favs = await interactions.getFavs(uid);
+  var rows = favs.map(f => [btn('📄 ' + f.title, 'fl_' + f.id + '_0_0_0_0_0'), btn('🗑', 'unfav_' + f.id)]);
   rows.push(back('main_menu'));
   return eos(ctx, '⭐ *المفضلة (' + favs.length + ')*', { parse_mode: 'Markdown', ...build(rows) });
 }
@@ -69,7 +90,7 @@ async function toggleFav(ctx, fid, remove) {
 async function showHistory(ctx) {
   var uid = ctx.uid, hist = await interactions.getHistory(uid);
   if (!hist.length) return eos(ctx, '📂 *السجل*\n\nلم تشاهد أي ملفات بعد.', { parse_mode: 'Markdown', ...build([back('main_menu')]) });
-  var rows = hist.map(f => [btn('📄 ' + f.title, 'preview_' + f.id + '_0_0_0_0_0')]);
+  var rows = hist.map(f => [btn('📄 ' + f.title, 'fl_' + f.id + '_0_0_0_0_0')]);
   rows.push(back('main_menu'));
   rows.push([btn('🗑 مسح سجلي','clear_my_history')]);
   return eos(ctx, '📂 *السجل (' + hist.length + ')*', { parse_mode: 'Markdown', ...build(rows) });
@@ -162,7 +183,7 @@ async function handleSearch(ctx, query) {
   }
 
   var rows = results.map(function(f) {
-    var row = [btn('📄 ' + f.title + ' · ' + f.sub_name, 'preview_' + f.id + '_0_0_0_0_0')];
+    var row = [btn('📄 ' + f.title + ' · ' + f.sub_name, 'fl_' + f.id + '_0_0_0_0_0')];
     if (ctx.isAdmin) row.push(btn('🗑', 'search_del_' + f.id + '|' + encodeURIComponent(query)));
     return row;
   });
