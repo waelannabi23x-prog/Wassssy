@@ -240,16 +240,15 @@ async function handleAiChat(ctx, text) {
       _aiTimers.delete(uid);
     }, 3600000));
 
-    if (ctx.chat?.type === 'private') {
-      await ctx.reply(reply, {
-        reply_markup: { inline_keyboard: [[
+    // أضف أزرار للرسالة الموجودة بدل إرسال رسالة جديدة
+    if (msgId && ctx.chat?.type === 'private') {
+      ctx.telegram.editMessageReplyMarkup(chatId, msgId, null, {
+        inline_keyboard: [[
           { text: '📄 بحث عن ملف', callback_data: 'search_prompt' },
-          { text: '🔄 محادثة جديدة', callback_data: 'ai_reset'    },
-          { text: '🏠 القائمة',      callback_data: 'main_menu'   }
-        ]] }
-      });
-    } else {
-      await ctx.reply(reply);
+          { text: '🔄 محادثة جديدة', callback_data: 'ai_reset' },
+          { text: '🏠 القائمة', callback_data: 'main_menu' }
+        ]]
+      }).catch(() => {});
     }
     return true;
   } catch (e) {
