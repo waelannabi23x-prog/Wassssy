@@ -268,6 +268,7 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
 }
 
 async function _showSimilar(ctx, f, spId, yrId, smId, sbId, catId) {
+  console.log('[Similar] catId='+catId+' f.category_id='+f?.category_id);
   if (!catId || catId === 0) catId = f.category_id;
   if (!catId) return;
   const simKey = 'similar_' + f.id + '_' + catId;
