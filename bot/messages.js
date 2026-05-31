@@ -90,7 +90,7 @@ module.exports.registerMessages = function(bot, deps) {
       const _gtxt = ctx.message?.text?.trim();
       if (_gtxt) {
         const guessGame = require('../handlers/game_guess');
-        if (/^خمن$/i.test(_gtxt)) { guessGame._startChallenge && guessGame._startChallenge(bot, ctx); return; }
+        if (/^خمن$/i.test(_gtxt)) { console.log('[Guess] triggered by', ctx.from?.id); guessGame._startChallenge && guessGame._startChallenge(bot, ctx).catch(e=>console.error('[Guess]',e.message)); return; }
         if (/^تخمين[:\s]+/i.test(_gtxt)) { guessGame._handleGuess && guessGame._handleGuess(bot, ctx); return; }
       }
       // في القروب لا نمرر للـ handlers الأخرى
