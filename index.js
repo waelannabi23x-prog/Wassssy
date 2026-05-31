@@ -24,6 +24,7 @@ const browse        = require('./handlers/browse');
 const userH         = require('./handlers/user');
 const million       = require('./handlers/million');
 const millionaire   = require('./handlers/millionaire');
+const guessGame     = require('./handlers/guess_game');
 const tools         = require('./handlers/owner_tools');
 const ownerH        = require('./handlers/owner');
 const contentDb     = require('./database/content');
@@ -278,6 +279,7 @@ bot.launch({ drop_pending_updates: true });
     }
 
     millionaire.register(bot);
+    guessGame.register(bot);
     global.__bot = bot;
 
 // ── BullMQ Workers — بعد ما يكون bot جاهز ──
