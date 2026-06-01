@@ -128,8 +128,9 @@ bot.use(async (ctx, next) => {
   if (ctx.chat?.type !== 'private') {
     if (ctx.callbackQuery) return next();
     const t = ctx.message?.text || '';
-    const _isGame = t && (/^خمن$/.test(t.trim()) || /^تخمين[:\s]+/.test(t.trim()));
-    if (ctx.message && !_isGame && !['/search', '/setsp', '/dlt', '/done', '/cancel', '/new', '/top'].some(p => t.startsWith(p)))
+    const _isGame = t && (/^خمن$/.test(t.trim()) || /^تخمين[:\s]+/.test(t.trim()) || /^[أاآ]نا$/.test(t.trim()));
+    const _gameOn = guessGame.isGameActive(ctx.chat?.id);
+    if (ctx.message && !_isGame && !_gameOn && !['/search', '/setsp', '/dlt', '/done', '/cancel', '/new', '/top'].some(p => t.startsWith(p)))
       return ctx.deleteMessage().catch(() => {});
   }
   return next();

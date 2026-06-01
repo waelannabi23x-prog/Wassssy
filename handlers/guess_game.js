@@ -410,4 +410,8 @@ function register(bot) {
   logger.info('[GuessGame] ✅ registered');
 }
 
-module.exports = { register, startInvite, handleJoin };
+function isGameActive(chatId) {
+  const game = _games.get(String(chatId));
+  return game && game.status !== 'ended';
+}
+module.exports = { register, startInvite, handleJoin, isGameActive };
