@@ -12,6 +12,24 @@ function normalizeArabic(q) {
 }
 
 const express = require('express');
+// ── Cached Admin Check ──
+const _adminCache = new Map();
+async function _isAdmin(uid) {
+  const now = Date.now();
+  const hit = _adminCache.get(uid);
+  if (hit && now - hit.ts < 7200000) return hit.v;
+  const row = await get('SELECT permissions FROM admins WHERE user_id=$1', [uid]).catch(() => null);
+  const v = !!row;
+  _adminCache.set(uid, { v, ts: now });
+  return v;
+}
+function _isOwnerUid(uid) {
+  return String(uid) === String(process.env.OWNER_ID || '0');
+}
+async function _checkAdmin(uid) {
+  return _isOwnerUid(uid) || await _isAdmin(uid);
+}
+
 // ── API Cache Helper ──
 const _AC = (key, ttl, fn) => async (req, res, next) => {
   try {
@@ -161,6 +179,9 @@ router.post('/send/:id', auth, async (req, res) => {
 
 router.get('/favorites', auth, async (req, res) => {
   try {
+    const _favCk = 'favs_' + req.tgUser.id;
+    const _favHit = cacheGet(_favCk);
+    if (_favHit) return res.json(_favHit);
     const rows = await all(`SELECT f.*, s.name as sub_name FROM favorites fv JOIN files f ON f.id=fv.file_id LEFT JOIN subjects s ON s.id=(SELECT semester_id FROM categories c JOIN subjects sb ON sb.id=c.subject_id WHERE c.id=f.category_id LIMIT 1) WHERE fv.user_id=$1 AND f.is_deleted=0 ORDER BY f.uploaded_at DESC`, [parseInt(req.tgUser.id)]);
     res.json(rows);
   } catch(e) { res.json([]); }
@@ -200,7 +221,9 @@ router.post('/rate/:id', auth, async (req, res) => {
     const { rating } = req.body;
     if (!rating || rating < 1 || rating > 5) return res.status(400).json({ error: 'invalid' });
     await run(`INSERT INTO ratings(user_id,file_id,rating) VALUES($1,$2,$3) ON CONFLICT(user_id,file_id) DO UPDATE SET rating=$3`, [parseInt(req.tgUser.id), req.params.id, rating]);
-    const avg = await get(`SELECT AVG(rating) as avg, COUNT(*) as cnt FROM ratings WHERE file_id=$1`, [parseInt(req.params.id)]);
+    const _rCk = 'rating_' + req.params.id;
+  let avg = cacheGet(_rCk);
+  if (!avg) { avg = await get(`SELECT AVG(rating) as avg, COUNT(*) as cnt FROM ratings WHERE file_id=$1`, [parseInt(req.params.id)]); if(avg) cacheSet(_rCk, avg, 300000); }
     try { require('../handlers/xp').onRating(global.__bot, parseInt(req.tgUser.id)).catch(()=>{}); } catch(_) {}
     res.json({ ok: true, avg: avg.avg, cnt: avg.cnt });
   } catch(e) { res.status(500).json({ error: e.message }); }
@@ -222,6 +245,9 @@ router.get('/admin/stats', auth, async (req, res) => {
   const adm = await get('SELECT * FROM admins WHERE user_id=$1', [uid]);
   if (!isOwner && !adm) return res.status(403).json({ error: 'forbidden' });
   try {
+    const _statsCk = 'admin_stats';
+    const _statsCached = cacheGet(_statsCk);
+    if (_statsCached) return res.json(_statsCached);
     const [users, files, downloads, favs, comments, specs, admins] = await Promise.all([
       get('SELECT COUNT(*) as c FROM users WHERE is_banned=0'),
       get('SELECT COUNT(*) as c FROM files WHERE is_deleted=0'),
@@ -231,10 +257,14 @@ router.get('/admin/stats', auth, async (req, res) => {
       get('SELECT COUNT(*) as c FROM specialties WHERE is_deleted=0'),
       get('SELECT COUNT(*) as c FROM admins'),
     ]);
-    const recentUsers = await all('SELECT id,first_name,last_name,username,last_active,joined_at FROM users ORDER BY joined_at DESC LIMIT 10');
-    const topFiles = await all('SELECT f.id,f.title,f.downloads,f.file_type FROM files f WHERE f.is_deleted=0 ORDER BY f.downloads DESC LIMIT 10');
-    const bannedCount = await get('SELECT COUNT(*) as c FROM users WHERE is_banned=1');
-    res.json({ users: users.c, files: files.c, downloads: downloads.c, favs: favs.c, comments: comments.c, specs: specs.c, admins: admins.c, banned: bannedCount.c, recentUsers, topFiles });
+    const [recentUsers, topFiles, bannedCount] = await Promise.all([
+      all('SELECT id,first_name,last_name,username,last_active,joined_at FROM users ORDER BY joined_at DESC LIMIT 10'),
+      all('SELECT f.id,f.title,f.downloads,f.file_type FROM files f WHERE f.is_deleted=0 ORDER BY f.downloads DESC LIMIT 10'),
+      get('SELECT COUNT(*) as c FROM users WHERE is_banned=1'),
+    ]);
+    const _statsResult = { users: users.c, files: files.c, downloads: downloads.c, favs: favs.c, comments: comments.c, specs: specs.c, admins: admins.c, banned: bannedCount.c, recentUsers, topFiles };
+    cacheSet(_statsCk, _statsResult, 120000);
+    res.json(_statsResult);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 

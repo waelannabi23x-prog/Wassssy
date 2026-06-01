@@ -16,8 +16,8 @@ function getPg() {
       ssl: process.env.DATABASE_URL?.includes('localhost') ? false : { rejectUnauthorized: false },
       max:                         20,   // كان 8 — رفعناه لـ 20
       min:                         2,    // دائماً connection جاهزة
-      idleTimeoutMillis:           30000,
-      connectionTimeoutMillis:     10000,
+      idleTimeoutMillis:           20000,
+      connectionTimeoutMillis:     3000,
       statement_timeout:           20000,
       keepAlive:                   true,
       keepAliveInitialDelayMillis: 10000,
