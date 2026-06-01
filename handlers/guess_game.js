@@ -408,20 +408,9 @@ async function endGame(telegram, chatId) {
 /* ══════ REGISTER ══════ */
 function register(bot) {
 
-  // PV: صورة ونص
-  bot.on('photo', async (ctx, next) => {
-    if (ctx.chat?.type !== 'private') return next();
-    const handled = await handlePvMessage(ctx).catch(() => false);
-    if (!handled) return next();
-  });
-
-  // تخمينات في القروب + نص PV
+  // تخمينات في القروب فقط (PV يُعالج في bypass قبل auth)
   bot.on('text', async (ctx, next) => {
-    if (ctx.chat?.type === 'private') {
-      const handled = await handlePvMessage(ctx).catch(() => false);
-      if (handled) return;
-      return next();
-    }
+    if (ctx.chat?.type === 'private') return next();
     const handled = await handleGuess(ctx).catch(() => false);
     if (handled) return;
     return next();
