@@ -243,8 +243,11 @@ async function handlePvMessage(ctx) {
       await ctx.reply('📷 أرسل *صورة* فقط.', { parse_mode: 'Markdown' }).catch(() => {});
       return true;
     }
+    if (pv._lock) return true; // منع double-processing
+    pv._lock = true;
     pv.photo = photo[photo.length - 1].file_id;
     pv.step  = 'waiting_name';
+    delete pv._lock;
     await ctx.reply(
       `✅ *تم استلام الصورة!*\n\n✏️ الآن اكتب الاسم الصحيح للصورة.\nمثال: \`برج إيفل\``,
       { parse_mode: 'Markdown' }
@@ -253,11 +256,18 @@ async function handlePvMessage(ctx) {
   }
 
   if (pv.step === 'waiting_name') {
+    // إذا أرسل صورة بدل نص في هذه المرحلة
+    if (ctx.message?.photo) {
+      await ctx.reply('✅ الصورة محفوظة بالفعل! ✏️ الآن اكتب *الاسم* فقط نصاً.', { parse_mode: 'Markdown' }).catch(() => {});
+      return true;
+    }
     const txt = ctx.message?.text?.trim();
     if (!txt) { await ctx.reply('✏️ اكتب الاسم نصاً.').catch(() => {}); return true; }
-
+    if (pv._lock) return true;
+    pv._lock = true;
     pv.name = txt;
     pv.step = 'done';
+    delete pv._lock;
 
     const game = _games.get(pv.chatId);
     if (!game || game.status !== 'collecting') {
@@ -422,6 +432,25 @@ async function endGame(telegram, chatId) {
 
 /* ══════ REGISTER ══════ */
 function register(bot) {
+
+  // حالة اللعبة في PV
+  bot.command('gamestatus', async ctx => {
+    if (ctx.chat?.type !== 'private') return;
+    const uid = s(ctx.from.id);
+    const pv  = _pvStates.get(uid);
+    if (!pv) return ctx.reply('لا توجد لعبة نشطة لك حالياً.').catch(() => {});
+    const stepMap = { waiting_photo: '📸 في انتظار صورتك', waiting_name: '✏️ في انتظار اسم الصورة', done: '✅ جاهز' };
+    ctx.reply(
+      `🎮 *حالة لعبتك:*
+${stepMap[pv.step] || pv.step}
+
+` +
+      (pv.step === 'waiting_photo' ? '📸 أرسل الصورة السرية الآن' : '') +
+      (pv.step === 'waiting_name'  ? '✏️ اكتب اسم الصورة التي أرسلتها' : ''),
+      { parse_mode: 'Markdown' }
+    ).catch(() => {});
+  });
+
 
   // تخمينات في القروب فقط (PV يُعالج في bypass قبل auth)
   bot.on('text', async (ctx, next) => {

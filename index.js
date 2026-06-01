@@ -169,7 +169,10 @@ bot.use(async (ctx, next) => {
   if (ctx.chat?.type !== 'private') return next();
   const uid = String(ctx.from?.id || '');
   if (guessGame.hasPvState(uid)) {
-    return guessGame.handlePvDirect(ctx).catch(() => next());
+    return guessGame.handlePvDirect(ctx).catch(e => {
+    require('./utils/logger').error('[GuessGame PV]', e.message);
+    return next();
+  });
   }
   return next();
 });
