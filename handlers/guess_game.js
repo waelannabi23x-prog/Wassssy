@@ -8,7 +8,7 @@
 const logger = require('../utils/logger');
 
 const INVITE_SECS  = 60;
-const COLLECT_SECS = 120;
+const COLLECT_SECS = 300;
 const GAME_SECS    = 300;
 
 const _games    = new Map(); // chatId → game
@@ -45,7 +45,7 @@ async function startInvite(ctx) {
   const ex = _games.get(chatId);
   if (ex && ex.status !== 'ended') {
     const w = await ctx.telegram.sendMessage(chatId,
-      `⚠️ يوجد تحدٍّ نشط، انتظر حتى ينتهي.`
+      `⏳ *يوجد تحدٍّ نشط بالفعل!*\nانتظر انتهاءه ثم ابدأ جولة جديدة.`
     ).catch(() => null);
     if (w) setTimeout(() => ctx.telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 5000);
     ctx.telegram.deleteMessage(chatId, ctx.message.message_id).catch(() => {});
@@ -65,8 +65,14 @@ async function startInvite(ctx) {
   _games.set(chatId, game);
 
   const m = await ctx.telegram.sendMessage(chatId,
-    `🎮 *تحدي جديد من ${mention(user)}!*\n\n` +
-    `🖼️ كل لاعب يختار صورة سرية، والآخر يحاول تخمينها خلال 5 دقائق عبر الحوار الحر.\n\n` +
+    `🎮 *تحدي جديد!*\n` +
+    `┄┄┄┄┄┄┄┄┄┄\n` +
+    `👤 المتحدي: ${mention(user)}\n\n` +
+    `📖 *كيف تلعب؟*\n` +
+    `┌ كل لاعب يختار صورة سرية\n` +
+    `├ ترسلها للبوت في الخاص\n` +
+    `├ تتحدثون بحرية في القروب\n` +
+    `└ أول من يخمن صورة خصمه يفوز!\n\n` +
     `✏️ اكتب *انا* للانضمام\n` +
     `⏳ تنتهي الدعوة خلال *60 ثانية*`,
     { parse_mode: 'Markdown' }
@@ -136,10 +142,12 @@ async function handleJoin(ctx) {
 
   // رسالة المشاركين
   const m = await ctx.telegram.sendMessage(chatId,
-    `⚔️ *بدأ التحدي!*\n\n` +
+    `✅ *اكتملت المباراة!*\n` +
+    `┄┄┄┄┄┄┄┄┄┄\n` +
     `🔴 ${mention(game.p1)}\n` +
     `🔵 ${mention(game.p2)}\n\n` +
-    `📩 سيصلكم طلب الصورة في الخاص...`,
+    `📲 *تحقق من رسائلك الخاصة مع البوت*\n` +
+    `⏳ عندكم *5 دقائق* لإرسال الصور`,
     { parse_mode: 'Markdown' }
   ).catch(() => null);
 
@@ -160,7 +168,10 @@ async function handleJoin(ctx) {
     _pvStates.delete(s(g.p2.id));
     const miss = [g.p1, g.p2].filter(p => !p.ready).map(p => uname(p)).join(' و ');
     const r = await ctx.telegram.sendMessage(chatId,
-      `❌ انتهى وقت إرسال الصور.\n*${esc(miss)}* لم يرسل صورته.`,
+      `⚠️ *انتهت الجولة*\n` +
+    `┄┄┄┄┄┄┄┄┄┄\n` +
+    `${esc(miss)} لم يرسل صورته في الوقت المحدد.\n` +
+    `اكتب *خمن* لبدء جولة جديدة!`,
       { parse_mode: 'Markdown' }
     ).catch(() => null);
     await cleanGroup(ctx.telegram, chatId, r?.message_id);
@@ -181,10 +192,12 @@ async function _requestPhoto(telegram, game, player) {
 
   try {
     await telegram.sendMessage(player.id,
-      `🎮 *تحدي "خمن"!*\n\n` +
+      `🎮 *تحدي خمن — مرحباً!*\n` +
+      `┄┄┄┄┄┄┄┄┄┄\n` +
       `⚔️ منافسك: *${esc(uname(opp))}*\n\n` +
-      `📸 أرسل لي الصورة التي تريد أن يخمنها منافسك.\n` +
-      `_ستُكشف له فقط بعد انتهاء اللعبة._`,
+      `📸 *الخطوة 1:* أرسل لي الصورة السرية\n` +
+      `_لن يراها منافسك إلا بعد انتهاء اللعبة_\n\n` +
+      `⏳ عندك 5 دقائق للإرسال`,
       { parse_mode: 'Markdown' }
     );
   } catch (e) {
@@ -279,11 +292,13 @@ async function beginGame(telegram, game) {
   await cleanGroup(telegram, chatId, null);
 
   const m = await telegram.sendMessage(chatId,
-    `⚔️ *بدأت المباراة!*\n\n` +
+    `⚔️ *انطلقت المباراة!*\n` +
+    `┄┄┄┄┄┄┄┄┄┄\n` +
     `🔴 ${mention(game.p1)}\n` +
     `🔵 ${mention(game.p2)}\n\n` +
-    `💬 تحدثوا بحرية وخمّنوا صور بعض.\n` +
-    `🎯 اكتب: \`تخمين: [الاسم]\`\n⏱️ *5 دقائق*`,
+    `💬 تحدثوا بحرية وتبادلوا الأسئلة\n` +
+    `🎯 للتخمين اكتب: \`تخمين: الاسم\`\n` +
+    `⏱️ المدة: *5 دقائق* — بالتوفيق! 🍀`,
     { parse_mode: 'Markdown' }
   ).catch(() => null);
 
@@ -344,9 +359,11 @@ async function handleWin(telegram, game, winner, loser) {
   await cleanGroup(telegram, chatId, null);
 
   const r = await telegram.sendMessage(chatId,
-    `🏆 *فاز ${mention(winner)}!*\n\n` +
-    `✅ خمّن صورة ${mention(loser)} بشكل صحيح!\n` +
-    `الإجابة: *${esc(loser.name)}* 🎉`,
+    `🏆 *انتهت المباراة!*\n` +
+    `┄┄┄┄┄┄┄┄┄┄\n` +
+    `👑 الفائز: ${mention(winner)}\n` +
+    `✅ خمّن الإجابة الصحيحة: *${esc(loser.name)}*\n\n` +
+    `📸 كشف الصور:`,
     { parse_mode: 'Markdown' }
   ).catch(() => null);
 
@@ -373,7 +390,10 @@ async function endGame(telegram, chatId) {
   await cleanGroup(telegram, chatId, null);
 
   await telegram.sendMessage(chatId,
-    `⏰ *انتهى الوقت!*\nلم يتمكن أحد من التخمين الصحيح.\n📸 كشف الصور:`,
+    `⏰ *انتهت المباراة!*\n` +
+    `┄┄┄┄┄┄┄┄┄┄\n` +
+    `🤝 تعادل — لم يتمكن أحد من التخمين\n\n` +
+    `📸 كشف الصور:`,
     { parse_mode: 'Markdown' }
   ).catch(() => {});
 
