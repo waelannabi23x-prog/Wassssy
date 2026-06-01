@@ -74,6 +74,15 @@ const app = express();
 app.disable('x-powered-by');
 app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'", "'unsafe-inline'", 'telegram.org', '*.telegram.org'], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", 'data:', 'https:'], connectSrc: ["'self'", 'https://api.telegram.org'] } } }));
 app.use(compression({ level: 6, threshold: 512 }));
+
+// ── Cache Headers للـ API ──
+app.use('/api', (req, res, next) => {
+  if (req.method === 'GET') {
+    res.set('Cache-Control', 'private, max-age=10');
+    res.set('Vary', 'Accept-Encoding');
+  }
+  next();
+});
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(require('path').join(__dirname, 'public'), { etag: false, maxAge: 0, setHeaders: (res) => { res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate'); } }));
 app.set('trust proxy', 1);

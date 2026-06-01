@@ -12,6 +12,17 @@ function normalizeArabic(q) {
 }
 
 const express = require('express');
+// ── API Cache Helper ──
+const _AC = (key, ttl, fn) => async (req, res, next) => {
+  try {
+    const hit = cacheGet(key + (req.query ? JSON.stringify(req.query) : ''));
+    if (hit) return res.json(hit);
+    const data = await fn(req);
+    cacheSet(key + (req.query ? JSON.stringify(req.query) : ''), data, ttl);
+    res.json(data);
+  } catch(e) { next(e); }
+};
+
 // ── Async error wrapper — يمنع unhandled rejections ──
 const wrap = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 

@@ -199,7 +199,11 @@ async function initSchema() {
       "CREATE INDEX IF NOT EXISTS idx_bundle_files     ON bundle_files(bundle_id)",
 
       // ✅ جدد — تسرّع أكثر الـ queries استخداماً
-      "CREATE INDEX IF NOT EXISTS idx_files_uploaded   ON files(uploaded_at DESC)",               // latest files
+      "CREATE INDEX IF NOT EXISTS idx_files_uploaded   ON files(uploaded_at DESC)",
+      "CREATE INDEX IF NOT EXISTS idx_reports_status   ON reports(status,created_at DESC)",
+      "CREATE INDEX IF NOT EXISTS idx_files_search     ON files USING gin(to_tsvector('simple', title))",
+      "CREATE INDEX IF NOT EXISTS idx_group_chats_spec ON group_chats(specialty_id)",
+      "CREATE INDEX IF NOT EXISTS idx_users_banned     ON users(is_banned,joined_at DESC)",               // latest files
       "CREATE INDEX IF NOT EXISTS idx_users_banned     ON users(is_banned)",                      // ban check
       "CREATE INDEX IF NOT EXISTS idx_history_file     ON history(file_id)",                      // file stats
       "CREATE INDEX IF NOT EXISTS idx_comments_del     ON comments(file_id, is_deleted)",         // comments query
