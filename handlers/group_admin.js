@@ -74,13 +74,21 @@ async function handleNewMember(bot, chatId, userId, firstName) {
 
 🔗 [ملفّك الشخصي](tg://user?id=${uid})`;
 
+    // عدد الأعضاء للرسالة المخصصة
+    let customMemberCount = '';
+    try { const c2 = await bot.telegram.getChatMembersCount(chatId); customMemberCount = String(c2); } catch(_) {}
+
     const welcomeMsg = grp?.welcome_msg
       ? grp.welcome_msg
-          .replace('{name}', firstName || 'عضو')
-          .replace('{spec}', spec?.name || '')
-          .replace('{id}',   userId)
-          .replace('{date}', date)
-          .replace('{time}', time)
+          .replace(/{name}/g,         firstName || 'عضو')
+          .replace(/{spec}/g,         spec?.name || '')
+          .replace(/{id}/g,           userId)
+          .replace(/{date}/g,         date)
+          .replace(/{time}/g,         time)
+          .replace(/{member_count}/g, customMemberCount)
+          .replace(/{profile}/g,      `[الملف الشخصي](tg://user?id=${userId})`)
+          .replace(/{count}/g,        customMemberCount)
+          .replace(/{group}/g,        ctx?.chat?.title || '')
       : defaultMsg;
 
     const parse = grp?.welcome_msg ? 'Markdown' : 'MarkdownV2';
