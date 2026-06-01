@@ -155,6 +155,15 @@ bot.use(async (ctx, next) => {
   }
   return next();
 });
+// ── PV اللعبة قبل auth ──
+bot.use(async (ctx, next) => {
+  if (ctx.chat?.type !== 'private') return next();
+  const uid = String(ctx.from?.id || '');
+  if (guessGame.hasPvState(uid)) {
+    return guessGame.handlePvDirect(ctx).catch(() => next());
+  }
+  return next();
+});
 bot.use(authMiddleware);
 bot.catch((err, ctx) => {
   if (!err.message.includes('is not modified'))

@@ -414,4 +414,12 @@ function isGameActive(chatId) {
   const game = _games.get(String(chatId));
   return game && game.status !== 'ended';
 }
-module.exports = { register, startInvite, handleJoin, isGameActive };
+function hasPvState(uid) {
+  return _pvStates.has(String(uid));
+}
+
+async function handlePvDirect(ctx) {
+  return handlePvMessage(ctx);
+}
+
+module.exports = { register, startInvite, handleJoin, isGameActive, hasPvState, handlePvDirect };
