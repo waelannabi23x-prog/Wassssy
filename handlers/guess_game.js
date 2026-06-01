@@ -125,12 +125,12 @@ async function handleJoin(ctx) {
   const game   = _games.get(chatId);
 
   if (!game || game.status !== 'waiting') return;
-//  if (s(user.id) === s(game.p1.id)) {
-//    const w = await ctx.telegram.sendMessage(chatId, `😄 ${mention(user)} لا تستطيع التحدي مع نفسك!`, { parse_mode: 'Markdown' }).catch(() => null);
-//    ctx.telegram.deleteMessage(chatId, ctx.message.message_id).catch(() => {});
-//    if (w) { trackMsg(chatId, w.message_id); setTimeout(() => ctx.telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 4000); }
-//    return;
-//  }
+  if (s(user.id) === s(game.p1.id)) {
+    const w = await ctx.telegram.sendMessage(chatId, `😄 ${mention(user)} لا تستطيع التحدي مع نفسك!`, { parse_mode: 'Markdown' }).catch(() => null);
+    ctx.telegram.deleteMessage(chatId, ctx.message.message_id).catch(() => {});
+    if (w) { trackMsg(chatId, w.message_id); setTimeout(() => ctx.telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 4000); }
+    return;
+  }
 
   clearTimeout(game.inviteTimer);
   clearInterval(game._cdInterval);
