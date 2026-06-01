@@ -318,6 +318,25 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
       case 'mg_admin_search':{clearState(uid);const [fr,ur]=await Promise.all([filesDb.search(text),usersDb.searchUsers(text)]);let resp='🔍 *بحث: "'+escMd(text)+'"*\n\n';if(fr.length){resp+='📄 *ملفات ('+fr.length+'):*\n';fr.slice(0,5).forEach(f=>{resp+='• '+escMd(f.title)+' ('+escMd(f.sub_name)+')\n';});}if(ur.length){resp+='\n👥 *مستخدمون ('+ur.length+'):*\n';ur.slice(0,5).forEach(u=>{resp+='• '+escMd(u.first_name||'ID:'+u.id)+(u.username?' @'+escMd(u.username):'')+'\n';});}if(!fr.length&&!ur.length) resp+='_لا نتائج._';ctx.reply(resp,{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
       case 'mg_broadcast':{clearState(uid);const ids=await usersDb.allIds();const total_bc=ids.length;const sm=await ctx.reply('📢 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total_bc,{parse_mode:'Markdown'});const bcRes=await concurrentBroadcast(ctx.telegram,ctx.chat.id,sm.message_id,ids,'📢 *إعلان*\n\n'+text,{parse_mode:'Markdown'});ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ *اكتمل!*\n`[██████████] 100%`\n✅ '+bcRes.sent+' | ❌ '+bcRes.failed,{...build([back('mg_menu')]),parse_mode:'Markdown'}).catch(err => { require('../utils/logger').debug("[silent]", err.message); });break;}
       case 'mg_msg_user_id':{setState(uid,{...state,type:'mg_msg_user_content',targetId:text.replace('@','')});ctx.reply('📝 ارسل الرسالة (نص، صورة، فيديو، sticker، voice):',{parse_mode:'Markdown'});break;}
+      case 'mg_msg_user_content':{
+        clearState(uid);
+        const tId = parseInt(state.targetId);
+        if(isNaN(tId)) { ctx.reply('❌ ID غير صحيح.'); break; }
+        const msgTxt = '📩 *رسالة من الإدارة*\n\n' + (state.mediaCaption || text || '');
+        const mFid   = state.mediaFileId || null;
+        const mType  = state.mediaType   || null;
+        try {
+          if      (mType==='photo'    && mFid) await ctx.telegram.sendPhoto   (tId, mFid, {caption: msgTxt, parse_mode:'Markdown'});
+          else if (mType==='video'    && mFid) await ctx.telegram.sendVideo   (tId, mFid, {caption: msgTxt, parse_mode:'Markdown'});
+          else if (mType==='document' && mFid) await ctx.telegram.sendDocument(tId, mFid, {caption: msgTxt, parse_mode:'Markdown'});
+          else if (mType==='sticker'  && mFid) await ctx.telegram.sendSticker (tId, mFid);
+          else if (mType==='voice'    && mFid) await ctx.telegram.sendVoice   (tId, mFid);
+          else await ctx.telegram.sendMessage(tId, msgTxt, {parse_mode:'Markdown'});
+          ctx.reply('✅ تم الإرسال للمستخدم ' + tId, {parse_mode:'Markdown', ...build([back('mg_menu')])});
+        } catch(e) {
+          ctx.reply('❌ فشل الإرسال: ' + e.message + '\nتحقق من الـ ID أو أن المستخدم لم يحجب البوت.', build([back('mg_menu')]));
+        }
+        break;}
       case 'mg_notify_sp_msg':{clearState(uid);const spUsers=await usersDb.getUsersBySpecialty(state.spId);await safeAdd(broadcastQueue,'broadcast-sp',{userIds:spUsers,message:'🔔 '+text,parseMode:'Markdown',fromUid:uid});ctx.reply('📤 جاري الإرسال لـ *'+spUsers.length+'* مستخدم — ستصلك النتيجة',{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
       case 'mg_notify_groups_msg':{
         clearState(uid);
