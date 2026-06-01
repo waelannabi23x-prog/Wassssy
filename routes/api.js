@@ -127,23 +127,36 @@ router.post('/fav/:id', auth, async (req, res) => {
 // إرسال الملف للمستخدم عبر البوت
 router.post('/send/:id', auth, async (req, res) => {
   const uid = parseInt(req.tgUser.id);
-  const f = await filesDb.getFile(parseInt(req.params.id));
+  const fid = parseInt(req.params.id);
+
+  // Cache الملف 10 دقائق
+  const _ck = 'file_' + fid;
+  let f = cacheGet(_ck);
+  if (!f) { f = await filesDb.getFile(fid); if (f) cacheSet(_ck, f, 600000); }
   if (!f) return res.status(404).json({ error: 'Not found' });
-  try {
-    const bot = global.__bot;
-    if (!bot) return res.status(500).json({ error: 'Bot unavailable' });
-    const cap = `📄 *${f.title}*${f.cat_name ? '\n📁 ' + f.cat_name : ''}${f.sub_name ? ' | 📖 ' + f.sub_name : ''}`;
-    if (f.file_type === 'link') await bot.telegram.sendMessage(uid, cap + '\n\n🔗 ' + f.file_id, { parse_mode: 'Markdown' });
-    else if (f.file_type === 'photo') await bot.telegram.sendPhoto(uid, f.file_id, { caption: cap, parse_mode: 'Markdown' });
-    else await bot.telegram.sendDocument(uid, f.file_id, { caption: cap, parse_mode: 'Markdown' });
-    filesDb.incDownloads(parseInt(req.params.id));
-    interactions.addHistory(uid, req.params.id).catch(() => {});
-    // ── XP: downloader gets XP ──
-    try { require('../handlers/xp').onDownload(global.__bot, parseInt(uid)).catch(()=>{}); } catch(_) {}
-    // ── XP: uploader gets passive XP ──
-    try { if(f.uploaded_by && f.uploaded_by !== parseInt(uid)) require('../handlers/xp').onFileDownloaded(global.__bot, parseInt(f.uploaded_by)).catch(()=>{}); } catch(_) {}
-    res.json({ ok: true });
-  } catch(e) { res.status(500).json({ error: e.message }); }
+
+  const bot = global.__bot;
+  if (!bot) return res.status(500).json({ error: 'Bot unavailable' });
+
+  // ✅ رد فوري للعميل — لا ينتظر Telegram
+  res.json({ ok: true });
+
+  // إرسال في الخلفية
+  setImmediate(async () => {
+    try {
+      const cap = `📄 *${f.title}*${f.cat_name ? '\n📁 ' + f.cat_name : ''}${f.sub_name ? ' | 📖 ' + f.sub_name : ''}`;
+      if      (f.file_type === 'link')  await bot.telegram.sendMessage (uid, cap + '\n\n🔗 ' + f.file_id, { parse_mode: 'Markdown' });
+      else if (f.file_type === 'photo') await bot.telegram.sendPhoto   (uid, f.file_id, { caption: cap, parse_mode: 'Markdown' });
+      else                              await bot.telegram.sendDocument(uid, f.file_id, { caption: cap, parse_mode: 'Markdown' });
+      filesDb.incDownloads(fid);
+      interactions.addHistory(uid, String(fid)).catch(() => {});
+      try { require('../handlers/xp').onDownload(bot, uid).catch(()=>{}); } catch(_) {}
+      try { if(f.uploaded_by && f.uploaded_by !== uid) require('../handlers/xp').onFileDownloaded(bot, f.uploaded_by).catch(()=>{}); } catch(_) {}
+    } catch(e) {
+      // أرسل خطأ للمستخدم مباشرة
+      bot.telegram.sendMessage(uid, '❌ حدث خطأ أثناء إرسال الملف، حاول مجدداً.').catch(() => {});
+    }
+  });
 });
 
 router.get('/favorites', auth, async (req, res) => {

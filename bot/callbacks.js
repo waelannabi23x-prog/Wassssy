@@ -28,18 +28,19 @@ module.exports.registerCallbacks = function(bot, deps) {
   }
 
   async function hGrpDl(ctx, d) {
-    if (!ctx.isOwner) return ctx.answerCbQuery('🚫').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    if (!ctx.isOwner) return ctx.answerCbQuery('🚫').catch(() => {});
+    // ✅ رد فوري على الزر
+    ctx.answerCbQuery('📤 جاري الإرسال...').catch(() => {});
     try {
       const f = await filesDb.getFile(d.substring(7));
-      if (!f) return ctx.answerCbQuery('❌ غير موجود').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+      if (!f) return;
       const cap = '📄 ' + f.title + (f.sub_name ? '\n📚 ' + f.sub_name : '');
       let sm;
       if (f.file_type === 'photo')     sm = await ctx.telegram.sendPhoto(ctx.chat.id, f.file_id, { caption: cap });
       else if (f.file_type === 'link') sm = await ctx.telegram.sendMessage(ctx.chat.id, cap + '\n🔗 ' + f.file_id);
       else                              sm = await ctx.telegram.sendDocument(ctx.chat.id, f.file_id, { caption: cap });
-      if (sm?.message_id) await dbRun('INSERT INTO group_bot_msgs(chat_id,message_id) VALUES($1,$2)', [ctx.chat.id, sm.message_id]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-      ctx.answerCbQuery('✅ تم الإرسال').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
+      if (sm?.message_id) dbRun('INSERT INTO group_bot_msgs(chat_id,message_id) VALUES($1,$2)', [ctx.chat.id, sm.message_id]).catch(() => {});
+    } catch(e) { logger.error('[hGrpDl]', e.message); }
   }
 
   async function hSearchDel(ctx, d) {

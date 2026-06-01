@@ -1,4 +1,15 @@
 'use strict';
+
+// ── Browse Cache Helper ──
+const { cacheGet: _bcGet, cacheSet: _bcSet } = require('../utils/cache');
+async function _cached(key, ttl, fn) {
+  const hit = _bcGet(key);
+  if (hit !== undefined && hit !== null) return hit;
+  const data = await fn();
+  _bcSet(key, data, ttl);
+  return data;
+}
+
 var { reg: cbReg }   = require('../utils/cbRegistry');
 var common           = require('../utils/common');
 var escMd            = common.escMd;
