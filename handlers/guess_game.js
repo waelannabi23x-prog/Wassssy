@@ -8,7 +8,7 @@
 const logger = require('../utils/logger');
 
 const INVITE_SECS  = 60;
-const COLLECT_SECS = 300;
+const COLLECT_SECS = 600;
 const GAME_SECS    = 300;
 
 const _games    = new Map(); // chatId → game
@@ -43,7 +43,9 @@ async function startInvite(ctx) {
   const user   = ctx.from;
 
   const ex = _games.get(chatId);
-  if (ex && ex.status !== 'ended') {
+  const _uid = s(user.id);
+  const _pvBusy = _pvStates.has(_uid);
+  if ((ex && ex.status !== 'ended') || _pvBusy) {
     const w = await ctx.telegram.sendMessage(chatId,
       `⏳ *يوجد تحدٍّ نشط بالفعل!*\nانتظر انتهاءه ثم ابدأ جولة جديدة.`
     ).catch(() => null);
@@ -157,6 +159,19 @@ async function handleJoin(ctx) {
   for (const player of [game.p1, game.p2]) {
     await _requestPhoto(ctx.telegram, game, player);
   }
+
+  // تحذير دقيقتين قبل انتهاء الوقت
+  setTimeout(async () => {
+    const g = _games.get(chatId);
+    if (!g || g.status !== 'collecting') return;
+    const pending = [g.p1, g.p2].filter(p => !p.ready).map(p => mention(p)).join(' و ');
+    if (!pending) return;
+    const w = await ctx.telegram.sendMessage(chatId,
+      `⚠️ تبقّت *دقيقتان* لإرسال الصور!\n📲 ${pending} تحقق من رسائلك الخاصة مع البوت.`,
+      { parse_mode: 'Markdown' }
+    ).catch(() => null);
+    if (w) setTimeout(() => ctx.telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 110000);
+  }, (COLLECT_SECS - 120) * 1000);
 
   // Timeout للجمع
   game.collectTimer = setTimeout(async () => {
