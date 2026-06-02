@@ -272,6 +272,8 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
   try {
     if (f.file_type==='link') await ctx.reply(caption+'\n\n🔗 '+f.file_id, { parse_mode:'Markdown', ...kb });
     else if (f.file_type==='photo') await ctx.replyWithPhoto(f.file_id, { caption, parse_mode:'Markdown', ...kb });
+    else if (f.file_type==='video') await ctx.replyWithVideo(f.file_id, { caption, parse_mode:'Markdown', ...kb });
+    else if (f.file_type==='audio') await ctx.replyWithAudio(f.file_id, { caption, parse_mode:'Markdown', ...kb });
     else await ctx.replyWithDocument(f.file_id, { caption, parse_mode:'Markdown', ...kb });
 
     // ملفات مشابهة من نفس القسم
