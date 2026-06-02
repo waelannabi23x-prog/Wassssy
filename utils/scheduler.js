@@ -53,25 +53,38 @@ async function processScheduled() {
 
 // ✅ إرسال متوازي حقيقي مع rate control
 async function dispatchScheduled(msg) {
-  let uids = [];
-  if (msg.target === 'all') {
-    const r = await all('SELECT id FROM users WHERE is_banned = 0');
-    uids = r.map(x => x.id);
-  } else if (msg.target === 'specialty' && msg.specialty_id) {
-    const r = await all('SELECT user_id FROM user_specialties WHERE specialty_id = $1', [msg.specialty_id]);
-    uids = r.map(x => x.user_id);
-  }
-  if (!uids.length) return { sent: 0, failed: 0 };
+  // ✅ Pagination — 500 مستخدم كل مرة بدل تحميل الكل
+  const PAGE = 500;
+  let sent = 0, failed = 0, offset = 0;
 
-  let sent = 0, failed = 0;
-  for (let i = 0; i < uids.length; i += CFG.batchSize) {
-    const chunk = uids.slice(i, i + CFG.batchSize);
-    const results = await Promise.allSettled(
-      chunk.map(uid => sendMsg(uid, msg))
-    );
-    results.forEach(r => r.status === 'fulfilled' ? sent++ : failed++);
-    if (i + CFG.batchSize < uids.length) await sleep(CFG.batchDelayMs);
+  while (true) {
+    let rows;
+    if (msg.target === 'all') {
+      rows = await all(
+        'SELECT id FROM users WHERE is_banned=0 ORDER BY id LIMIT $1 OFFSET $2',
+        [PAGE, offset]
+      );
+    } else if (msg.target === 'specialty' && msg.specialty_id) {
+      rows = await all(
+        'SELECT user_id as id FROM user_specialties WHERE specialty_id=$1 ORDER BY user_id LIMIT $2 OFFSET $3',
+        [msg.specialty_id, PAGE, offset]
+      );
+    } else { break; }
+
+    if (!rows.length) break;
+
+    for (let i = 0; i < rows.length; i += CFG.batchSize) {
+      const chunk = rows.slice(i, i + CFG.batchSize);
+      const results = await Promise.allSettled(chunk.map(r => sendMsg(r.id, msg)));
+      results.forEach(r => r.status === 'fulfilled' ? sent++ : failed++);
+      if (i + CFG.batchSize < rows.length) await sleep(CFG.batchDelayMs);
+    }
+
+    offset += PAGE;
+    if (rows.length < PAGE) break;
+    await sleep(500);
   }
+
   return { sent, failed };
 }
 

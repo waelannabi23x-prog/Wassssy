@@ -28,33 +28,8 @@ const addFile=async(catId,title,desc,fileId,fileType,uploadedBy)=>{
   return newFile;
 };
 // ✅ Batched downloads counter — flushes every 10s
-const _dlBuf=new Map();
-let _dlTimer=null;
-async function _flushDownloads(){
-  if(!_dlBuf.size)return;
-  const entries=[..._dlBuf.entries()];_dlBuf.clear();
-  const {getPg}=require('./db');const pg=getPg();
-  if(pg){
-    // Single query with CASE WHEN for all IDs
-    const ids=entries.map(e=>e[0]);
-    const ph=ids.map((_,i)=>'$'+(i+1)).join(',');
-    const vals=entries.flatMap(e=>[e[0],e[1]]);
-    // Build: UPDATE files SET downloads=downloads+CASE id WHEN x THEN n ...
-    const cases=entries.map((e,i)=>'WHEN $'+(i*2+1)+' THEN downloads+$'+(i*2+2)).join(' ');
-    await pg.query(
-      'UPDATE files SET downloads=CASE id '+cases+' ELSE downloads END WHERE id IN ('+ph+')',
-      vals
-    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-  } else {
-    for(const[id,cnt]of entries) await run('UPDATE files SET downloads=downloads+$1 WHERE id=$2',[cnt,id]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-  }
-  for(const[id]of entries)cacheClear('file_'+id);
-}
-const incDownloads=id=>{
-  _dlBuf.set(id,(_dlBuf.get(id)||0)+1);
-  if(!_dlTimer){_dlTimer=setTimeout(()=>{_dlTimer=null;_flushDownloads();},10000);if(_dlTimer.unref)_dlTimer.unref();}
-  return Promise.resolve();
-};
+const { batchDownload } = require('./db');
+const incDownloads = id => batchDownload(parseInt(id));
 const softDelete=async id=>{if(global._clearSearchCache)global._clearSearchCache();var f=await get('SELECT category_id FROM files WHERE id=$1',[id]);await run('UPDATE files SET is_deleted=1 WHERE id=$1',[id]);cacheClear('file_'+id);cacheClear('prev_static_'+id);cacheClear('similar_'+id);if(f)invalidateFilesCache(f.category_id);};
 const restore=async id=>{if(global._clearSearchCache)global._clearSearchCache();var f=await get('SELECT category_id FROM files WHERE id=$1',[id]);await run('UPDATE files SET is_deleted=0 WHERE id=$1',[id]);cacheClear('file_'+id);if(f)invalidateFilesCache(f.category_id);};
 const rename=async(id,title)=>{if(global._clearSearchCache)global._clearSearchCache();var f=await get('SELECT category_id FROM files WHERE id=$1',[id]);await run('UPDATE files SET title=$1 WHERE id=$2',[title,id]);cacheClear('file_'+id);if(f)invalidateFilesCache(f.category_id);};

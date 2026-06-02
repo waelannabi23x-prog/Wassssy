@@ -32,7 +32,10 @@ function getPg() {
     // Keepalive ping كل 25 ثانية
     const _kpTimer = setInterval(() => {
       if (!pgPool) { clearInterval(_kpTimer); return; }
-      pgPool.query('SELECT 1').catch(() => { pgPool = null; clearInterval(_kpTimer); });
+      pgPool.query('SELECT 1').catch(e => {
+        // لا نحذف الـ pool — هو يعيد الاتصال تلقائياً
+        require('./logger').warn('[DB] keepalive failed (auto-recovering):', e.message);
+      });
     }, 25000);
     _kpTimer.unref();
 
@@ -304,5 +307,5 @@ async function getP(name, values) {
   return rows?.[0] || null;
 }
 
-module.exports = { batchDownload, queryP, getP, get, all, run, transaction, getPg, getSQLite, initSchema, getSetting, setSetting, saveDB };
+module.exports = { batchDownload, queryP, getP, get, all, run, transaction, getPg, initSchema, getSetting, setSetting, saveDB };
 // هذا السطر ما يضاف هنا — شغّل الكومند التالي مباشرة على DB
