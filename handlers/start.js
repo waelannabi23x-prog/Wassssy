@@ -48,10 +48,6 @@ async function startHandler(ctx) {
           else if (f.file_type === 'link')
             await ctx.reply(cap + '\n\n🔗 ' + f.file_id, { parse_mode: 'Markdown', ...kb });
           else
-            await ctx.replyWithVideo(f.file_id, { caption: cap, parse_mode: 'Markdown', ...kb });
-          else if (f.file_type === 'audio')
-            await ctx.replyWithAudio(f.file_id, { caption: cap, parse_mode: 'Markdown', ...kb });
-          else
             await ctx.replyWithDocument(f.file_id, { caption: cap, parse_mode: 'Markdown', ...kb });
           interactions.addHistory(uid, fid).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
           filesDb.incDownloads(fid).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
