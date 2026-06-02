@@ -56,7 +56,7 @@ module.exports.registerCallbacks = function(bot, deps) {
   async function hMgTtype(ctx, d) {
     const i = d.indexOf('_', 9), tt = d.substring(9, i), nm = decodeURIComponent(d.substring(i + 1));
     if (tt === 'text' || tt === 'link') {
-      await require('../utils/stateManager').setState(ctx.uid, { type: 'mg_tpl_content', name: nm, tplType: tt, fileId: '' });
+      await require('../utils/stateManager').setState(ctx.from?.id, { type: 'mg_tpl_content', name: nm, tplType: tt, fileId: '' });
       return ctx.reply(tt === 'link' ? '🔗 اكتب الرابط:' : '✏️ اكتب المحتوى:').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
     await require('../utils/stateManager').setState(ctx.uid, { type: 'mg_tpl_file', name: nm, tplType: tt, fileId: '' });
