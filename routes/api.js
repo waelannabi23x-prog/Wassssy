@@ -327,8 +327,7 @@ router.post('/admin/delfile/:id', auth, async (req, res) => {
 router.get('/admin/groups', auth, async (req, res) => {
   const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
   const uid = parseInt(req.tgUser.id);
-  const adm = await get('SELECT * FROM admins WHERE user_id=$1', [uid]);
-  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+  if (!await _checkAdmin(uid) && uid !== OWNER_ID) return res.status(403).json({ error: 'forbidden' });
   try {
     const rows = await all(`SELECT gc.*, sp.name as sp_name, COUNT(gm.user_id) as members FROM group_chats gc LEFT JOIN specialties sp ON gc.specialty_id=sp.id LEFT JOIN group_members gm ON gc.chat_id=gm.chat_id GROUP BY gc.chat_id, gc.title, gc.specialty_id, gc.notify_new_files, gc.joined_at, sp.name ORDER BY members DESC`);
     res.json(rows);
@@ -367,8 +366,7 @@ router.post('/admin/broadcast', auth, async (req, res) => {
 router.get('/admin/specialties', auth, async (req, res) => {
   const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
   const uid = parseInt(req.tgUser.id);
-  const adm = await get('SELECT * FROM admins WHERE user_id=$1', [uid]);
-  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+  if (!await _checkAdmin(uid) && uid !== OWNER_ID) return res.status(403).json({ error: 'forbidden' });
   const rows = await all('SELECT * FROM specialties WHERE is_deleted=0 ORDER BY id');
   res.json(rows);
 });
@@ -376,8 +374,7 @@ router.get('/admin/specialties', auth, async (req, res) => {
 router.get('/admin/reports', auth, async (req, res) => {
   const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
   const uid = parseInt(req.tgUser.id);
-  const adm = await get('SELECT * FROM admins WHERE user_id=$1', [uid]);
-  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+  if (!await _checkAdmin(uid) && uid !== OWNER_ID) return res.status(403).json({ error: 'forbidden' });
   try {
     const rows = await all(`SELECT r.*, f.title as file_title, u.first_name FROM reports r LEFT JOIN files f ON f.id=r.file_id LEFT JOIN users u ON u.id=r.user_id WHERE r.status='pending' ORDER BY r.created_at DESC LIMIT 30`);
     res.json(rows);
@@ -387,8 +384,7 @@ router.get('/admin/reports', auth, async (req, res) => {
 router.post('/admin/report/:id/resolve', auth, async (req, res) => {
   const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
   const uid = parseInt(req.tgUser.id);
-  const adm = await get('SELECT * FROM admins WHERE user_id=$1', [uid]);
-  if (uid !== OWNER_ID && !adm) return res.status(403).json({ error: 'forbidden' });
+  if (!await _checkAdmin(uid) && uid !== OWNER_ID) return res.status(403).json({ error: 'forbidden' });
   await run('UPDATE reports SET status=$1 WHERE id=$2', [req.body.status || 'resolved', req.params.id]);
   res.json({ ok: true });
 });
@@ -848,6 +844,8 @@ router.get('/bundles', auth, async (req, res) => {
 
 router.get('/bundles/category/:catId', auth, async (req, res) => {
   try {
+    const _bck = 'bundles_cat_' + req.params.catId;
+    const _bch = cacheGet(_bck); if (_bch) return res.json(_bch);
     const rows = await all(
       `SELECT b.*, COUNT(bf.id) as files_count
        FROM bundles b
@@ -856,12 +854,15 @@ router.get('/bundles/category/:catId', auth, async (req, res) => {
        GROUP BY b.id ORDER BY b.created_at DESC`,
       [parseInt(req.params.catId)]
     );
+    cacheSet(_bck, rows, 300000);
     res.json(rows);
   } catch(e) { res.json([]); }
 });
 
 router.get('/bundles/:id', auth, async (req, res) => {
   try {
+    const _bdk = 'bundle_' + req.params.id;
+    const _bdh = cacheGet(_bdk); if (_bdh) return res.json(_bdh);
     const b = await get('SELECT * FROM bundles WHERE id=$1 AND is_deleted=0', [parseInt(req.params.id)]);
     if (!b) return res.status(404).json({ error: 'not found' });
     const files = await all(
@@ -871,7 +872,9 @@ router.get('/bundles/:id', auth, async (req, res) => {
        ORDER BY bf.sort_order ASC`,
       [parseInt(req.params.id)]
     );
-    res.json({ ...b, files });
+    const _bdRes = { ...b, files };
+    cacheSet(_bdk, _bdRes, 300000);
+    res.json(_bdRes);
   } catch(e) { res.status(500).json({ error: e.message }); }
 });
 
