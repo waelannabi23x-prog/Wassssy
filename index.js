@@ -263,7 +263,6 @@ async function launch() {
     });
 
     setupGroupCommands(bot);
-  guessGame.register(bot);
 const apiRoutes = require('./routes/api');
     app.use('/api', apiRoutes);
 
