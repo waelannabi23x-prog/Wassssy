@@ -268,6 +268,7 @@ module.exports.registerCallbacks = function(bot, deps) {
 
   // ── Main callback handler ──
   bot.on('callback_query', async ctx => {
+    if (!ctx.from) return;
     const _raw = ctx.callbackQuery?.data, cbId = ctx.callbackQuery?.id;
     if (!_raw || CBDedup.isDupe(cbId)) return;
 
