@@ -55,6 +55,7 @@ async function startHandler(ctx) {
           require('./browse')._showSimilar(ctx, f, 0, 0, 0, 0, f.category_id).catch(() => {});
         } catch (e) { await ctx.reply('❌ تعذر إرسال الملف'); }
       }
+      return; // لا تكمل للقائمة
     }
   }
 
