@@ -14,13 +14,21 @@ function normalizeArabic(q) {
 const express = require('express');
 // ── Cached Admin Check ──
 const _adminCache = new Map();
+const { cacheGetAsync: _cgA, cacheSetAsync: _csA } = require('../utils/cache');
 async function _isAdmin(uid) {
   const now = Date.now();
   const hit = _adminCache.get(uid);
   if (hit && now - hit.ts < 7200000) return hit.v;
+  // فحص Redis أولاً
+  const rHit = await _cgA('adm_' + uid).catch(() => null);
+  if (rHit !== null && rHit !== undefined) {
+    _adminCache.set(uid, { v: !!rHit, ts: now });
+    return !!rHit;
+  }
   const row = await get('SELECT permissions FROM admins WHERE user_id=$1', [uid]).catch(() => null);
   const v = !!row;
   _adminCache.set(uid, { v, ts: now });
+  await _csA('adm_' + uid, v ? 1 : 0, 7200000).catch(() => {});
   return v;
 }
 function _isOwnerUid(uid) {

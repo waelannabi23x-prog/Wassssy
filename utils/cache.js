@@ -49,7 +49,7 @@ const { getRedisClient } = require('./redisClient');
 const _getUpstash = getRedisClient;
 
 // مفاتيح مهمة تُخزَّن في Upstash (تبقى بعد restart)
-const PERSIST_PREFIXES = ['precomp_', 'ban_', 'sub_ok_'];
+const PERSIST_PREFIXES = ['precomp_', 'ban_', 'sub_ok_', 'adm_', 'admin_stats'];
 
 function _shouldPersist(key) {
   return PERSIST_PREFIXES.some(p => key.startsWith(p));

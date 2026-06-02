@@ -1,6 +1,6 @@
 'use strict';
 
-const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
+const { cacheGet, cacheSet, cacheClear, cacheGetAsync, cacheSetAsync } = require('../utils/cache');
 const guard        = require('../utils/channelGuard');
 const startHandler = require('../handlers/start');
 const { getSetting, get: dbGet } = require('../database/db');
@@ -85,10 +85,10 @@ async function authMiddleware(ctx, next) {
     }
   }
 
-  const banCached = cacheGet('ban_' + uid);
+  const banCached = await cacheGetAsync('ban_' + uid);
   const [info, banRow] = await Promise.all([
     getAdminInfo(uid),
-    banCached === undefined ? getP('getBan', [uid]) : Promise.resolve(null),
+    banCached === null ? getP('getBan', [uid]) : Promise.resolve(null),
   ]);
   ctx.isAdmin    = info.isAdmin;
   ctx.adminPerms = info.perms;
@@ -97,7 +97,7 @@ async function authMiddleware(ctx, next) {
     let banned = banCached;
     if (banned === undefined) {
       banned = banRow?.is_banned ? 1 : 0;
-      cacheSet('ban_' + uid, banned, 3600000); // 30min
+      await cacheSetAsync('ban_' + uid, banned, 3600000); // 30min — يُحفظ في Redis
     }
     if (banned === 1) {
       return ctx.reply('🚫 أنت محظور من استخدام البوت.').catch(() => {});
