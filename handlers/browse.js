@@ -25,6 +25,7 @@ var filesDb          = require('../database/files');
 var interactions     = require('../database/interactions');
 var { build, btn, back, backMenu } = require('../utils/keyboard');
 var { eos }          = require('../utils/helpers');
+var { all } = require('../database/db');
 var PS = 8;
 
 async function getPathData(spId, yrId, smId, sbId, catId) {
