@@ -207,7 +207,7 @@ async function initSchema() {
       "CREATE INDEX IF NOT EXISTS idx_files_search     ON files USING gin(to_tsvector('simple', title))",
       "CREATE INDEX IF NOT EXISTS idx_group_chats_spec ON group_chats(specialty_id)",
       "CREATE INDEX IF NOT EXISTS idx_users_banned     ON users(is_banned,joined_at DESC)",               // latest files
-      "CREATE INDEX IF NOT EXISTS idx_users_banned     ON users(is_banned)",                      // ban check
+      // REMOVED duplicate: idx_users_banned simple (composite one above covers it)
       "CREATE INDEX IF NOT EXISTS idx_history_file     ON history(file_id)",                      // file stats
       "CREATE INDEX IF NOT EXISTS idx_comments_del     ON comments(file_id, is_deleted)",         // comments query
       "CREATE INDEX IF NOT EXISTS idx_ai_history_user  ON ai_history(user_id, created_at DESC)",  // AI chat history
@@ -226,6 +226,11 @@ async function initSchema() {
 
       logger.info('✅ Indexes جاهزة (' + IDX.length + ')');
   }
+
+  // Migration: history unique constraint
+  try { if(pg) await pg.query('ALTER TABLE history ADD COLUMN IF NOT EXISTS date DATE DEFAULT CURRENT_DATE'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('DELETE FROM history h1 USING history h2 WHERE h1.id > h2.id AND h1.user_id = h2.user_id AND h1.file_id = h2.file_id'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE history ADD CONSTRAINT IF NOT EXISTS hist_user_file_unique UNIQUE (user_id, file_id)'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
   // Migration: used_count
   try { if(pg) await pg.query('ALTER TABLE million_questions ADD COLUMN IF NOT EXISTS used_count INTEGER DEFAULT 0'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }

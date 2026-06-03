@@ -101,16 +101,6 @@ setInterval(() => {
   for (const [k, v] of _floodMap) if (v.t < cut) _floodMap.delete(k);
 }, 60000).unref();
 
-// ── In-Flight dedup (يمنع تكرار نفس الطلب) ──
-const _inFlight = new Map();
-function dedupExec(uid, key, fn) {
-  const k = `${uid}_${key}`;
-  if (_inFlight.has(k)) return _inFlight.get(k);
-  const p = fn().finally(() => _inFlight.delete(k));
-  _inFlight.set(k, p);
-  return p;
-}
-global.dedupRequest = dedupExec;
 
 const rateLimit = (ctx, next) => {
   const uid = ctx.from?.id;

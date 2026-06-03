@@ -26,3 +26,6 @@ old_data.sql
 data/
 *.log
 *.sh
+
+backup.sql
+fix_admin_routes.cjs

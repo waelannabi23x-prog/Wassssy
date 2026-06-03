@@ -2,7 +2,8 @@
 const fs   = require('fs');
 const path = require('path');
 
-const LOG_DIR  = path.join(__dirname, '..', 'logs');
+const LOG_DIR    = path.join(__dirname, '..', 'logs');
+const IS_RAILWAY = !!process.env.RAILWAY_ENVIRONMENT || !!process.env.RAILWAY_SERVICE_NAME;
 const ERR_LOG  = path.join(LOG_DIR, 'app.log');
 const MAX_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_KEEP = 3;
@@ -25,7 +26,7 @@ function _rotate() {
 }
 
 function _flush() {
-  if (!buf) return;
+  if (!buf || IS_RAILWAY) return;
   _rotate();
   const d = buf; buf = '';
   fs.appendFile(ERR_LOG, d, () => {});
