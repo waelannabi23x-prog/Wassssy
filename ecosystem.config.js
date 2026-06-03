@@ -2,7 +2,7 @@ module.exports = {
   apps: [{
     name: 'study-bot',
     script: 'index.js',
-    instances: process.env.WEB_CONCURRENCY || 2,
+    instances: 1,
     exec_mode: 'cluster',
     max_memory_restart: '380M',
     node_args: '--max-old-space-size=380 --optimize-for-size --expose-gc',
