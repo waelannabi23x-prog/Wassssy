@@ -1,4 +1,3 @@
-require('express-async-errors');
 'use strict';
 
 
