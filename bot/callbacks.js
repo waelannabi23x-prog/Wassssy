@@ -280,8 +280,14 @@ module.exports.registerCallbacks = function(bot, deps) {
     try {
       if (data.startsWith('gs_')) { await handleSettingsCallback(ctx, data); return; }
 
-      if (ctx.chat?.type !== 'private' && !data.startsWith('grp_') && !data.startsWith('del_channel_'))
-        return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+      if (ctx.chat?.type !== 'private') {
+        const _grpOk = data.startsWith('grp_') || data.startsWith('del_channel_')
+          || data.startsWith('gs_') || data.startsWith('grp_unban_')
+          || data.startsWith('grp_unmute_') || data === 'check_subscription'
+          || data === 'refresh_channels';
+        if (!_grpOk)
+          return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+      }
 
       // Pre-warm بالتوازي
       // Pre-warm aggressive
