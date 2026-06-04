@@ -53,6 +53,7 @@ async function mainMenu(ctx){
     rows.push([btn('🔔 إشعار للمستخدمين','mg_notify')]);
     if(process.env.CHANNEL_ID) rows.push([btn('📢 نشر في القناة','mg_post_channel')]);
     rows.push([btn('🚩 البلاغات','mg_reports'),btn('📨 نظام الرسائل','mg_msgs')]);
+    rows.push([btn('📢 القنوات والإعلانات','mg_channels_menu')]);
     rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp')]);
   }
   if(isOwner(ctx.uid)){
@@ -397,6 +398,35 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
       case 'mg_notify_msg':{clearState(uid);const nIds=await interactions.getActiveUsers(7);await safeAdd(broadcastQueue,'broadcast-all',{userIds:nIds,message:'🔔 *إشعار*\n\n'+text,parseMode:'Markdown',fromUid:uid});ctx.reply('📤 جاري الإرسال لـ *'+nIds.length+'* مستخدم — ستصلك النتيجة لما ينتهي',{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
       case 'mg_add_admin_id':{const tid=parseInt(text);if(isNaN(tid)){clearState(uid);return ctx.reply('❌ ID غير صحيح.');}await adminsDb.add(tid,uid);await interactions.addLog(uid,'add_admin','ID: '+tid);if(global.invalidateAdmin) global.invalidateAdmin(tid);const specs=await content.getSpecs();const spRows=specs.map(s=>[btn('🎓 '+s.name,'mg_admin_sp_'+tid+'_'+s.id)]);spRows.push([btn('كل التخصصات','mg_admin_sp_'+tid+'_0')]);clearState(uid);ctx.reply('اختر تخصص المشرف:',{...build(spRows)});try{ctx.telegram.sendMessage(tid,'🎉 تمت إضافتك مشرفاً',{parse_mode:'Markdown'});}catch(_){}break;}
       case 'mg_maint_msg':global.maintenanceModeMsg=text;clearState(uid);ctx.reply('✅ تم تحديث رسالة الصيانة',build([back('mg_menu')]));break;
+      case 'mg_awaiting_channel': {
+        const parts = text.split(' ');
+        const cidRaw = parts[0];
+        const nm = parts.slice(1).join(' ') || cidRaw;
+        let cid = cidRaw.startsWith('@') ? cidRaw
+          : cidRaw.startsWith('https://t.me/') ? '@' + cidRaw.replace('https://t.me/','').split('/')[0]
+          : cidRaw.startsWith('-') ? cidRaw
+          : '@' + cidRaw;
+        const url = cid.startsWith('@')
+          ? 'https://t.me/' + cid.replace('@','')
+          : cidRaw;
+        const { addChannel } = require('../utils/channelGuard');
+        await addChannel(cid, nm, url).catch(e => { clearState(uid); return ctx.reply('❌ ' + e.message).catch(()=>{}); });
+        clearState(uid);
+        cacheClear('required_channels');
+        await ctx.reply('✅ *تمت إضافة القناة!*\n📢 ' + nm + '\n🆔 `' + cid + '`', { parse_mode: 'Markdown' }).catch(()=>{});
+        return showChannelsMenu(ctx);
+      }
+      case 'mg_awaiting_ad_title': {
+        setState(uid, { type: 'mg_awaiting_ad_body', adTitle: text });
+        return ctx.reply('📝 أرسل نص الإعلان (أو /skip للتخطي):', { parse_mode: 'Markdown', ...build([[btn('⏭ تخطي', 'mg_skip_adbody')]]) }).catch(()=>{});
+      }
+      case 'mg_awaiting_ad_body': {
+        const title = state.adTitle || 'إعلان';
+        await dbRun('INSERT INTO ads(title,body,created_by) VALUES($1,$2,$3)', [title, text, uid]).catch(()=>{});
+        clearState(uid);
+        await ctx.reply('✅ *تم حفظ الإعلان!*', { parse_mode: 'Markdown' }).catch(()=>{});
+        return showAdsMenu(ctx);
+      }
       case 'mg_tpl_name':setState(uid,{...state,type:'mg_tpl_content',name:text,tplType:'auto',fileId:''});ctx.reply('📨 *'+escMd(text)+'*\n\nأرسل محتوى الرسالة:',{parse_mode:'Markdown',...build([[btn('❌ إلغاء','mg_templates')]])});break;
       case 'mg_tpl_content':{try{const msg2=ctx.message;let tplType='text',fileId='',tplContent=text||'';if(msg2.photo){tplType='photo';fileId=msg2.photo[msg2.photo.length-1].file_id;tplContent=msg2.caption||'';}else if(msg2.document){tplType='document';fileId=msg2.document.file_id;tplContent=msg2.caption||'';}else if(msg2.video){tplType='video';fileId=msg2.video.file_id;tplContent=msg2.caption||'';}else if(msg2.audio){tplType='audio';fileId=msg2.audio.file_id;tplContent=msg2.caption||'';}else if(text&&(text.startsWith('http')||text.startsWith('www'))){tplType='link';fileId=text;tplContent=text;}await messagesDb.addTemplate(state.name,tplType,tplContent,fileId);const savedTpl=await messagesDb.getTemplates();const lastTpl=savedTpl[0];clearState(uid);ctx.reply('✅ *تم حفظ القالب!*\nالنوع: '+tplType,{parse_mode:'Markdown',...build([[btn('📤 إرسال الآن','mg_send_now_'+lastTpl.id)],[btn('👥 كل المستخدمين','mg_sched_all_'+lastTpl.id)],[btn('🎓 تخصص معين','mg_sched_sp_'+lastTpl.id)],[btn('💾 حفظ فقط','mg_templates')]])});}catch(e){clearState(uid);ctx.reply(e.message==='exists'?'❌ قالب موجود!':'❌ '+e.message);}break;}
       case 'mg_sched_time':{try{await messagesDb.addScheduled(state.tplId,state.target,state.spId||0,text);clearState(uid);ctx.reply('✅ تمت الجدولة!',build([[btn('📅 المجدولة','mg_scheduled')]]));}catch(e){clearState(uid);ctx.reply('❌ '+e.message);}break;}
@@ -517,6 +547,56 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
   if(data.startsWith('mg_dl_fl_')){const p=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);if(!p.includes('full')&&!p.includes('delete')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});const pr=data.replace('mg_dl_fl_','').split('_');const f=await filesDb.getFile(pr[5]);return eos(ctx,'🗑 نقل *'+escMd(f?.title||'الملف')+'* للسلة؟',{parse_mode:'Markdown',...build([[btn('✅ نعم','mg_cdl_fl_'+pr.join('_')),btn('❌ لا','mg_fls_'+pr.slice(0,5).join('_'))]])});}
   if(data.startsWith('mg_cdl_fl_')){const p=data.replace('mg_cdl_fl_','').split('_');await filesDb.softDelete(p[5]);return showMgFiles(ctx,p[0],p[1],p[2],p[3],p[4]);}
   }catch(e){console.error('[CB]',e.message);ctx.reply('❌ '+e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });}
+}
+
+// ══════════════════════════════════════════
+// 📢 نظام القنوات والإعلانات
+// ══════════════════════════════════════════
+
+async function showChannelsMenu(ctx) {
+  const { getChannels } = require('../utils/channelGuard');
+  const list = await getChannels().catch(() => []);
+  let text = '📢 *القنوات والإعلانات*\n';
+  text += '━━━━━━━━━━━━━━━\n\n';
+  text += '📌 *قنوات الاشتراك الإجباري:* ' + list.length + '\n\n';
+  if (list.length) {
+    list.forEach((ch, i) => {
+      text += (i+1) + '. *' + escMd(ch.channel_name||'قناة') + '*\n';
+      text += '   🔗 ' + (ch.channel_url||ch.channel_id) + '\n';
+    });
+  } else {
+    text += '_لا توجد قنوات مضافة_\n';
+  }
+  const rows = [];
+  // زر حذف لكل قناة
+  list.forEach(ch => {
+    rows.push([btn('🗑 حذف: ' + (ch.channel_name||ch.channel_id).substring(0,25), 'mg_delch_' + ch.channel_id)]);
+  });
+  rows.push([btn('➕ إضافة قناة', 'mg_addchannel')]);
+  rows.push([btn('📣 إدارة الإعلانات', 'mg_ads_menu')]);
+  rows.push(back('mg_menu'));
+  return eos(ctx, text, { parse_mode: 'Markdown', ...build(rows) });
+}
+
+async function showAdsMenu(ctx) {
+  const ads = await all("SELECT * FROM ads WHERE is_deleted=0 ORDER BY is_pinned DESC, created_at DESC LIMIT 10").catch(() => []);
+  let text = '📣 *الإعلانات*\n━━━━━━━━━━━━━━━\n\n';
+  if (!ads.length) {
+    text += '_لا توجد إعلانات_\n';
+  } else {
+    ads.forEach((ad, i) => {
+      text += (i+1) + '. ' + (ad.icon||'📌') + ' *' + escMd(ad.title) + '*';
+      text += (ad.is_pinned ? ' 📌' : '') + '\n';
+      if (ad.body) text += '   ' + escMd(ad.body.substring(0,50)) + '...\n';
+    });
+  }
+  const rows = ads.map(ad => [
+    btn((ad.is_pinned?'📌 ':'') + ad.title.substring(0,20), 'mg_ad_' + ad.id),
+    btn('🗑', 'mg_delad_' + ad.id)
+  ]);
+  rows.push([btn('➕ إضافة إعلان', 'mg_addad')]);
+  rows.push([btn('◀️ رجوع', 'mg_channels_menu')]);
+  return eos(ctx, text, { parse_mode: 'Markdown', ...build(rows) });
 }
 
 module.exports={mainMenu,handleCallback,handleText,handleFileUpload,handleBulkUpload,showUserProfile,showUsers,handleBundleFileUpload};
