@@ -120,7 +120,7 @@ async function checkAllChannels(bot, userId) {
   const missing = results.filter(ch => !ch.subscribed);
   const ok = missing.length === 0;
 
-  if (ok) cacheSet(cacheKey, true, 60000); // ✅ دقيقة واحدة cache إيجابي
+  if (ok) cacheSet(cacheKey, true, 30000); // ✅ 30 ثانية — يتحقق كل 30 ثانية
 
   return { ok, missing };
 }

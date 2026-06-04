@@ -127,6 +127,8 @@ async function authMiddleware(ctx, next) {
         // ⚡ أجب فوراً + امسح الكاش + افحص من جديد
         ctx.answerCbQuery('🔄 جاري التحقق...').catch(()=>{});
         guard.clearSubCache(uid);
+        // تأخير صغير للتأكد إن Telegram سجّل الاشتراك
+        await new Promise(r => setTimeout(r, 1500));
         const res = await guard.checkAllChannels({ telegram: ctx.telegram }, uid);
         if (res.ok) {
           ctx.answerCbQuery('✅ مرحباً بك!').catch(() => {});
@@ -142,13 +144,14 @@ async function authMiddleware(ctx, next) {
       }
 
       if (!cbData || !cbData.startsWith('del_channel_')) {
-          // ✅ لا نتجاوز subscription check للـ callbacks
+        // ✅ تحقق دائماً — الكاش 30 ثانية فقط
         const subCached = require('../utils/cache').cacheGet('sub_ok_' + uid);
         if (!subCached) {
           const res2 = await guard.checkAllChannels({ telegram: ctx.telegram }, uid);
           if (!res2.ok) {
+            guard.clearSubCache(uid); // امسح الكاش فوراً عند الفشل
             const { text, buttons } = guard.buildSubscribeMessage(res2.missing, ctx.from && ctx.from.first_name);
-            if (cbData) ctx.answerCbQuery('').catch(()=>{});
+            if (cbData) ctx.answerCbQuery('❌ يجب الاشتراك أولاً', { show_alert: true }).catch(()=>{});
             if (cbData) {
               return ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } })
                 .catch(() => ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(()=>{}));
