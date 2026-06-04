@@ -179,7 +179,7 @@ bot.use(async (ctx, next) => {
 bot.use(authMiddleware);
 bot.catch((err, ctx) => {
   if (!err.message.includes('is not modified'))
-    logger.error(`[BotErr] \${err.message}`, { uid: ctx.from?.id, type: ctx.updateType });
+    logger.error(`[BotErr] ${err.message}`, { uid: ctx.from?.id, type: ctx.updateType });
   if (!ctx.callbackQuery) ctx.reply('⚠️ حدث خطأ. حاول مجدداً.').catch(() => {});
 });
 
