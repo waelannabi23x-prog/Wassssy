@@ -318,31 +318,32 @@ module.exports = function registerCommands(bot, deps) {
       ).catch(() => {});
     }
 
-    // أول argument هو الـ username أو ID
-    const cidRaw = args[0];
-    const nm = args.slice(1).join(' ') || cidRaw;
+    // استخرج الـ URL إذا موجود
+    const urlArg = args.find(a => a.startsWith('https://t.me/') || a.startsWith('http://t.me/'));
+    const otherArgs = args.filter(a => !a.startsWith('https://') && !a.startsWith('http://'));
 
-    // استخرج channel_id بشكل صحيح
+    const cidRaw = otherArgs[0];
+    const nm = otherArgs.slice(1).join(' ') || cidRaw;
+
+    // استخرج channel_id
     let cid;
     if (cidRaw.startsWith('-')) {
-      // رقم سالب = channel ID مباشر
       cid = cidRaw;
     } else if (cidRaw.startsWith('@')) {
-      // username مباشر
       cid = cidRaw;
     } else if (cidRaw.startsWith('https://t.me/')) {
-      // رابط → استخرج username
       const part = cidRaw.replace('https://t.me/', '').split('/')[0];
       cid = part.startsWith('+') ? cidRaw : '@' + part;
     } else {
-      // افتراضي = أضف @
       cid = '@' + cidRaw;
     }
 
-    // بناء الرابط
-    const url = cid.startsWith('@')
-      ? 'https://t.me/' + cid.replace('@', '')
-      : (args.find(a => a.startsWith('https://')) || cid);
+    // بناء الرابط — الأولوية للرابط المعطى
+    const url = urlArg
+      ? urlArg
+      : cid.startsWith('@')
+        ? 'https://t.me/' + cid.replace('@', '')
+        : cid;
 
     try {
       await addChannel(cid, nm, url);
