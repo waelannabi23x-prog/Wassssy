@@ -12,7 +12,18 @@ function isGroup(ctx) {
   return ['supergroup', 'group'].includes(ctx.chat?.type);
 }
 function isAdmin(ctx) {
-  return ctx.isOwner || ctx.isAdmin;
+  if (ctx.isOwner || ctx.isAdmin) return true;
+  // تحقق من صلاحيات Telegram مباشرة
+  const status = ctx.message?.from?.id === ctx.botInfo?.id;
+  return false;
+}
+
+async function isTgAdmin(ctx) {
+  if (ctx.isOwner || ctx.isAdmin) return true;
+  try {
+    const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+    return ['administrator', 'creator'].includes(member?.status);
+  } catch { return false; }
 }
 // استخرج المستخدم المستهدف (reply أو mention أو ID)
 async function getTarget(ctx) {
@@ -58,7 +69,7 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   bot.command('ban', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!isAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
     delCmd(ctx);
     const target = await getTarget(ctx);
     if (!target) return ctx.reply('⚠️ رد على رسالة المستخدم أو اكتب:\n`/ban @username السبب`', { parse_mode: 'Markdown' }).catch(() => {});
@@ -86,7 +97,7 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   bot.command('unban', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!isAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
     delCmd(ctx);
     const target = await getTarget(ctx);
     if (!target) return ctx.reply('⚠️ `/unban @username`', { parse_mode: 'Markdown' }).catch(() => {});
@@ -105,7 +116,7 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   bot.command('kick', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!isAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
     delCmd(ctx);
     const target = await getTarget(ctx);
     if (!target) return ctx.reply('⚠️ رد على رسالة المستخدم أو `/kick @username`', { parse_mode: 'Markdown' }).catch(() => {});
@@ -124,7 +135,7 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   bot.command('mute', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!isAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
     delCmd(ctx);
     const args = ctx.message.text.split(' ').slice(1);
 
@@ -160,7 +171,7 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   bot.command('unmute', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!isAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
     delCmd(ctx);
     const args = ctx.message.text.split(' ').slice(1);
     if (!args.length || args[0] === 'all') {
@@ -182,7 +193,7 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   bot.command('warn', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!isAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
     delCmd(ctx);
     const target = await getTarget(ctx);
     if (!target) return ctx.reply('⚠️ رد على رسالة المستخدم', { parse_mode: 'Markdown' }).catch(() => {});
@@ -196,7 +207,7 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   bot.command('unwarn', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!isAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
     delCmd(ctx);
     const target = await getTarget(ctx);
     if (!target) return ctx.reply('⚠️ رد على رسالة المستخدم').catch(() => {});
@@ -210,7 +221,7 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   bot.command('warns', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!isAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
     delCmd(ctx);
     const target = await getTarget(ctx);
     if (!target) return ctx.reply('⚠️ رد على رسالة المستخدم').catch(() => {});
@@ -230,7 +241,7 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   bot.command('pin', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!isAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
     delCmd(ctx);
     const replyMsg = ctx.message.reply_to_message;
     if (!replyMsg) return ctx.reply('⚠️ رد على الرسالة اللي تبغي تثبتها').catch(() => {});
@@ -244,7 +255,7 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   bot.command('unpin', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!isAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
     delCmd(ctx);
     try {
       await ctx.telegram.unpinAllChatMessages(ctx.chat.id);
@@ -258,7 +269,7 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   bot.command('all', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!isAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
     const args = ctx.message.text.split(' ').slice(1).join(' ');
     delCmd(ctx);
     try { await tagAll(ctx, ctx.chat.id, args || null); }
@@ -267,7 +278,7 @@ function setupGroupCommands(bot) {
 
   bot.command('tag', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!isAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
     const args = ctx.message.text.split(' ').slice(1).join(' ');
     delCmd(ctx);
     try { await tagAll(ctx, ctx.chat.id, args || null); }
@@ -279,7 +290,7 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   bot.command('settings', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!isAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
     delCmd(ctx);
     return showGroupSettings(bot, ctx, ctx.chat.id);
   });
@@ -307,7 +318,7 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   bot.command('adminhelp', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!isAdmin(ctx)) return;
+    if (!await isTgAdmin(ctx)) return;
     delCmd(ctx);
     const text =
       '🛡 *أوامر الإدارة*\n' +
@@ -343,7 +354,7 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   bot.command('million', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!isAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
     return million.showQuestionsPanel(ctx);
   });
   bot.command('stopmillion', async ctx => {
@@ -355,7 +366,7 @@ function setupGroupCommands(bot) {
   // Callbacks من القروب (ban/unban/mute من الأزرار)
   // ══════════════════════════════════════════
   bot.action(/^grp_unban_(\d+)$/, async ctx => {
-    if (!isAdmin(ctx)) return ctx.answerCbQuery('🚫').catch(() => {});
+    if (!await isTgAdmin(ctx)) return ctx.answerCbQuery('🚫').catch(() => {});
     const userId = parseInt(ctx.match[1]);
     try {
       await ctx.telegram.unbanChatMember(ctx.chat.id, userId);
@@ -366,7 +377,7 @@ function setupGroupCommands(bot) {
   });
 
   bot.action(/^grp_unmute_(\d+)$/, async ctx => {
-    if (!isAdmin(ctx)) return ctx.answerCbQuery('🚫').catch(() => {});
+    if (!await isTgAdmin(ctx)) return ctx.answerCbQuery('🚫').catch(() => {});
     const userId = parseInt(ctx.match[1]);
     try {
       await unmuteMember(ctx, ctx.chat.id, userId);
