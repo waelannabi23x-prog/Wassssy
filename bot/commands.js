@@ -323,7 +323,9 @@ module.exports = function registerCommands(bot, deps) {
     const otherArgs = args.filter(a => !a.startsWith('https://') && !a.startsWith('http://'));
 
     const cidRaw = otherArgs[0];
-    const nm = otherArgs.slice(1).join(' ') || cidRaw;
+    // الاسم = كل شيء بعد الـ username بدون الرابط
+    const nmParts = otherArgs.slice(1).filter(a => !a.startsWith('https://') && !a.startsWith('http://'));
+    const nm = nmParts.join(' ') || cidRaw.replace('@','');
 
     // استخرج channel_id
     let cid;

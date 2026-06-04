@@ -598,8 +598,13 @@ async function showChannelsMenu(ctx) {
   text += '📌 *قنوات الاشتراك الإجباري:* ' + list.length + '\n\n';
   if (list.length) {
     list.forEach((ch, i) => {
-      text += (i+1) + '. *' + escMd(ch.channel_name||'قناة') + '*\n';
-      text += '   🔗 ' + (ch.channel_url||ch.channel_id) + '\n';
+      // تنظيف الاسم من الروابط إذا اندمجت
+      const rawName = (ch.channel_name||'قناة').replace(/https?:\/\/\S+/g, '').trim();
+      const name = escMd(rawName || ch.channel_id);
+      const url = ch.channel_url || ('https://t.me/' + (ch.channel_id||'').replace('@',''));
+      text += (i+1) + '. *' + name + '*\n';
+      text += '   🆔 `' + (ch.channel_id||'') + '`\n';
+      text += '   🔗 ' + url + '\n\n';
     });
   } else {
     text += '_لا توجد قنوات مضافة_\n';
