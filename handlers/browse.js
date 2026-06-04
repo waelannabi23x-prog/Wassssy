@@ -254,32 +254,45 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
   fid = safeInt(fid);
   var uid = ctx.uid;
   var backCb = catId!==0?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
-  ctx.answerCbQuery('').catch(function(){});
-  ctx.sendChatAction('upload_document').catch(function(){});
-  ctx.deleteMessage().catch(function(){});
+
+  // ⚡ 1. رد فوري — يشيل الـ spinner قبل أي شيء
+  ctx.answerCbQuery('📥 جاري التحميل...').catch(function(){});
+
+  // ⚡ 2. جلب البيانات + sendChatAction بالتوازي — بدون انتظار
   var _fkey = 'file_'+fid;
   var _fcached = cacheGet(_fkey);
-  var results = await Promise.all([
-    _fcached ? Promise.resolve(_fcached) : filesDb.getFile(fid).then(function(f){ if(f)cacheSet(_fkey,f,1800000); return f; }),
-    interactions.isFav(uid, fid).catch(function(){ return false; })
+  var [results] = await Promise.all([
+    Promise.all([
+      _fcached ? Promise.resolve(_fcached) : filesDb.getFile(fid).then(function(f){ if(f)cacheSet(_fkey,f,1800000); return f; }),
+      interactions.isFav(uid, fid).catch(function(){ return false; })
+    ]),
+    ctx.sendChatAction('upload_document').catch(function(){}),
   ]);
   var f=results[0], fav=results[1];
   if (!f) return ctx.reply('❌ الملف غير موجود.').catch(function(){});
+
+  // ⚡ 3. حذف الرسالة القديمة + إرسال الملف بالتوازي
+  var caption = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 '+escMd(f.description)+'\n':'')+'📁 '+escMd(f.cat_name||'عام')+'  |  📖 '+escMd(f.sub_name||'عام');
+  var kb = build([[btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid)],[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]]);
+
+  var sendP;
+  if      (f.file_type==='link')  sendP = ctx.reply(caption+'\n\n🔗 '+f.file_id, { parse_mode:'Markdown', ...kb });
+  else if (f.file_type==='photo') sendP = ctx.replyWithPhoto(f.file_id, { caption, parse_mode:'Markdown', ...kb });
+  else if (f.file_type==='video') sendP = ctx.replyWithVideo(f.file_id, { caption, parse_mode:'Markdown', ...kb });
+  else if (f.file_type==='audio') sendP = ctx.replyWithAudio(f.file_id, { caption, parse_mode:'Markdown', ...kb });
+  else                             sendP = ctx.replyWithDocument(f.file_id, { caption, parse_mode:'Markdown', ...kb });
+
+  // ⚡ 4. حذف القديمة + إرسال الجديدة + سجل بالتوازي — لا انتظار
+  await Promise.all([
+    ctx.deleteMessage().catch(function(){}),
+    sendP.catch(function(e){ ctx.reply('❌ تعذر إرسال الملف.').catch(function(){}); }),
+  ]);
+
+  // ⚡ 5. عمليات الخلفية — لا تأخر المستخدم أبداً
   filesDb.incDownloads(fid);
   interactions.addHistory(uid, fid).catch(function(){});
   try { require('../database/points').awardPoints(uid, 'download').catch(()=>{}); } catch(_) {}
-  var caption = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 '+escMd(f.description)+'\n':'')+'📁 '+escMd(f.cat_name||'عام')+'  |  📖 '+escMd(f.sub_name||'عام');
-  var kb = build([[btn(fav?'⭐ محفوظ':'☆ حفظ','fav_'+fid)],[btn('◀️ رجوع',backCb),btn('🏠','main_menu')]]);
-  try {
-    if (f.file_type==='link') await ctx.reply(caption+'\n\n🔗 '+f.file_id, { parse_mode:'Markdown', ...kb });
-    else if (f.file_type==='photo') await ctx.replyWithPhoto(f.file_id, { caption, parse_mode:'Markdown', ...kb });
-    else if (f.file_type==='video') await ctx.replyWithVideo(f.file_id, { caption, parse_mode:'Markdown', ...kb });
-    else if (f.file_type==='audio') await ctx.replyWithAudio(f.file_id, { caption, parse_mode:'Markdown', ...kb });
-    else await ctx.replyWithDocument(f.file_id, { caption, parse_mode:'Markdown', ...kb });
-
-    // ملفات مشابهة من نفس القسم
-    _showSimilar(ctx, f, spId, yrId, smId, sbId, catId).catch(() => {});
-  } catch(e) { ctx.reply('❌ تعذر إرسال الملف.').catch(function(){}); }
+  _showSimilar(ctx, f, spId, yrId, smId, sbId, catId).catch(function(){});
 }
 
 async function _showSimilar(ctx, f, spId, yrId, smId, sbId, catId) {
