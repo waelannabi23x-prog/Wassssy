@@ -1,5 +1,5 @@
 'use strict';
-const { addChannel, removeChannel, getChannels, notifyUsersNewChannel } = require('../utils/channelGuard');
+const { addChannel, removeChannel, getChannels } = require('../utils/channelGuard');
 
 module.exports = function registerCommands(bot, deps) {
   const {
@@ -349,7 +349,6 @@ module.exports = function registerCommands(bot, deps) {
 
     try {
       const _res = await addChannel(cid, nm, url, bot);
-      notifyUsersNewChannel({ telegram: bot.telegram }, nm).catch(() => {});
       const list = await getChannels().catch(() => []);
       let text = '✅ *تمت الإضافة!*\n\n';
       text += '📢 *' + nm + '*\n';
