@@ -15,39 +15,82 @@ async function migrateGroupPanel() {
 }
 
 async function showGroupPanel(ctx) {
-  const groups = await all('SELECT * FROM group_chats ORDER BY title');
-  const rows = groups.map(g => [kbBtn('👥 ' + (g.title || 'قروب ' + g.chat_id), 'gp_view_' + g.chat_id)]);
-  rows.push([kbBtn('📢 رسالة للكل', 'gp_broadcast_0'), kbBtn('🎓 رسالة لتخصص', 'gp_broadcast_sp')]);
+  const groups = await all('SELECT * FROM group_chats ORDER BY title').catch(() => []);
+  const total = groups.length;
+
+  let text = '📋 *لوحة إدارة القروبات*\n';
+  text += '━━━━━━━━━━━━━━━━━━\n\n';
+  text += '👥 *القروبات المسجلة:* ' + total + '\n';
+
+  const rows = [];
+
+  if (!groups.length) {
+    text += '\n_لا توجد قروبات بعد_\n';
+    text += '_أضف البوت لقروب وسيظهر هنا_';
+  } else {
+    groups.forEach(g => {
+      const sp = g.specialty_id ? '🎓' : '📚';
+      const w  = g.welcome_enabled ? '✅' : '❌';
+      rows.push([kbBtn(sp + ' ' + (g.title || 'قروب ' + g.chat_id).substring(0,30) + ' ' + w, 'gp_view_' + g.chat_id)]);
+    });
+  }
+
+  rows.push([
+    kbBtn('📢 رسالة للكل',    'gp_broadcast_0'),
+    kbBtn('🎓 رسالة لتخصص', 'gp_broadcast_sp'),
+  ]);
   rows.push([kbBtn('🎮 ألعاب القروب', 'mb_panel')]);
   rows.push([kbBtn('◀️ رجوع', 'mg_menu')]);
-  return eos(ctx, '📋 *لوحة إدارة القروبات*\n━━━━━━━━━━━━━━━━━━\n👥 ' + groups.length + ' قروب مسجل', { parse_mode: 'Markdown', ...kbBuild(rows) });
+
+  return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
 
 async function showGroupDetail(ctx, chatId) {
-  const g = await get('SELECT * FROM group_chats WHERE chat_id=$1', [chatId]);
+  const [g, spec, mc, warns, bans] = await Promise.all([
+    get('SELECT * FROM group_chats WHERE chat_id=$1', [chatId]),
+    get('SELECT s.name FROM specialties s JOIN group_chats g ON g.specialty_id=s.id WHERE g.chat_id=$1', [chatId]).catch(() => null),
+    get('SELECT COUNT(*) AS cnt FROM group_members WHERE chat_id=$1', [chatId]).catch(() => ({ cnt: 0 })),
+    get('SELECT COUNT(*) AS cnt FROM group_warns WHERE chat_id=$1', [chatId]).catch(() => ({ cnt: 0 })),
+    get('SELECT COUNT(*) AS cnt FROM group_bans WHERE chat_id=$1', [chatId]).catch(() => ({ cnt: 0 })),
+  ]);
   if (!g) return ctx.answerCbQuery('غير موجود', { show_alert: true }).catch(() => {});
-  const spec = g.specialty_id ? await get('SELECT name FROM specialties WHERE id=$1', [g.specialty_id]).catch(() => null) : null;
-  const mc = await get('SELECT COUNT(*) AS cnt FROM group_members WHERE chat_id=$1', [chatId]).catch(() => ({ cnt: 0 }));
-  const wIcon   = g.welcome_enabled  ? '🟢' : '🔴';
-  const byeIcon = g.goodbye_enabled  ? '🟢' : '🔴';
-  const notIcon = g.notify_new_files ? '🟢' : '🔴';
-  const text =
-    '👥 *' + (g.title || 'قروب') + '*\n' +
-    '━━━━━━━━━━━━━━━━━━\n' +
-    'ID: `' + chatId + '`\n' +
-    'التخصص: *' + (spec?.name || 'غير محدد') + '*\n' +
-    'الأعضاء: *' + mc.cnt + '*\n\n' +
-    wIcon   + ' رسالة ترحيب\n' +
-    byeIcon + ' رسالة وداع\n' +
-    notIcon + ' اشعار ملفات\n\n' +
-    'نص الترحيب:\n_' + (g.welcome_msg || 'افتراضي').substring(0, 100) + '_';
+
+  const on  = '🟢';
+  const off = '🔴';
+
+  let text = '👥 *' + (g.title || 'قروب').substring(0,30) + '*\n';
+  text += '━━━━━━━━━━━━━━━━━━\n\n';
+  text += '🆔 `' + chatId + '`\n';
+  text += '🎓 التخصص: *' + (spec?.name || 'غير محدد') + '*\n';
+  text += '👤 الأعضاء المسجلون: *' + mc.cnt + '*\n';
+  text += '⚠️ التحذيرات: *' + warns.cnt + '* | 🚫 المحظورون: *' + bans.cnt + '*\n\n';
+  text += '━━━━━━━━━━━━━━━━━━\n';
+  text += '⚙️ *الإعدادات:*\n';
+  text += (g.welcome_enabled  ? on : off) + ' رسالة الترحيب\n';
+  text += (g.goodbye_enabled  ? on : off) + ' رسالة الوداع\n';
+  text += (g.notify_new_files ? on : off) + ' إشعار الملفات الجديدة\n';
+  text += (g.anti_spam        ? on : off) + ' مكافحة السبام\n';
+  text += (g.anti_link        ? on : off) + ' حجب الروابط\n';
+  text += (g.anti_flood       ? on : off) + ' مكافحة الفلود\n';
+
   const rows = [
-    [kbBtn('✏️ رسالة الترحيب', 'gp_setwelcome_' + chatId), kbBtn('🖼 صورة الترحيب', 'gp_setwphoto_' + chatId)],
-    [kbBtn(g.welcome_enabled  ? '🔴 ايقاف الترحيب'       : '🟢 تفعيل الترحيب',       'gp_togglew_'      + chatId)],
-    [kbBtn(g.goodbye_enabled  ? '🔴 ايقاف الوداع'        : '🟢 تفعيل الوداع',         'gp_togglebye_'    + chatId)],
-    [kbBtn(g.notify_new_files ? '🔕 ايقاف اشعار الملفات' : '🔔 تفعيل اشعار الملفات', 'gp_togglenotify_' + chatId)],
-    [kbBtn('🎓 تغيير التخصص', 'gp_setspec_' + chatId)],
-    [kbBtn('📢 راسل هذا القروب', 'gp_msgone_' + chatId)],
+    // ── الترحيب ──
+    [kbBtn('✏️ رسالة الترحيب', 'gp_setwelcome_' + chatId),
+     kbBtn('🖼 صورة الترحيب',  'gp_setwphoto_'  + chatId)],
+    // ── تبديل الإعدادات ──
+    [kbBtn(g.welcome_enabled  ? '🔴 إيقاف الترحيب'  : '🟢 تفعيل الترحيب',  'gp_togglew_'      + chatId),
+     kbBtn(g.goodbye_enabled  ? '🔴 إيقاف الوداع'   : '🟢 تفعيل الوداع',   'gp_togglebye_'    + chatId)],
+    [kbBtn(g.notify_new_files ? '🔕 إيقاف الإشعار'  : '🔔 تفعيل الإشعار',  'gp_togglenotify_' + chatId),
+     kbBtn('🎓 تغيير التخصص',                                                'gp_setspec_'      + chatId)],
+    // ── الحماية ──
+    [kbBtn(g.anti_spam  ? '🔴 إيقاف Anti-Spam'  : '🛡 تفعيل Anti-Spam',  'gp_togglespam_'  + chatId),
+     kbBtn(g.anti_link  ? '🔴 السماح بالروابط'   : '🔗 حجب الروابط',      'gp_togglelink_'  + chatId)],
+    [kbBtn(g.anti_flood ? '🔴 إيقاف Anti-Flood' : '🌊 تفعيل Anti-Flood', 'gp_toggleflood_' + chatId)],
+    // ── إجراءات ──
+    [kbBtn('📢 راسل هذا القروب', 'gp_msgone_'  + chatId),
+     kbBtn('📊 إحصائيات',        'grp_stats_'  + chatId)],
+    [kbBtn('👥 الأعضاء',         'grp_main_'   + chatId),
+     kbBtn('🚪 مغادرة القروب',   'leave_grp_'  + chatId)],
     [kbBtn('◀️ رجوع', 'gp_panel')],
   ];
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
@@ -64,6 +107,23 @@ async function showBroadcastSpecPicker(ctx) {
 async function handleCallback(ctx, data) {
   const uid = ctx.uid;
   if (data === 'gp_panel') return showGroupPanel(ctx);
+
+  // ── تبديل anti-spam/link/flood ──
+  const gpToggles = {
+    'gp_togglespam_':  'anti_spam',
+    'gp_togglelink_':  'anti_link',
+    'gp_toggleflood_': 'anti_flood',
+  };
+  for (const [prefix, col] of Object.entries(gpToggles)) {
+    if (data.startsWith(prefix)) {
+      const cid = data.replace(prefix, '');
+      const cur = await get('SELECT ' + col + ' FROM group_chats WHERE chat_id=$1', [cid]).catch(() => null);
+      const newVal = cur?.[col] ? 0 : 1;
+      await run('UPDATE group_chats SET ' + col + '=$1 WHERE chat_id=$2', [newVal, cid]).catch(() => {});
+      ctx.answerCbQuery(newVal ? '✅ تم التفعيل' : '❌ تم الإيقاف').catch(() => {});
+      return showGroupDetail(ctx, cid);
+    }
+  }
   if (data === 'gp_broadcast_sp') return showBroadcastSpecPicker(ctx);
 
   if (data.startsWith('gp_broadcast_')) {
