@@ -191,9 +191,9 @@ async function showUsers(ctx, page=0, filter='all') {
 
   // ── أزرار فلتر ──
   const filterRow = [
-    btn(filter==='all'  ? '✅ النشطون' : '🟢 النشطون',  'mg_users_f_all'),
-    btn(filter==='banned'? '✅ محظورون' : '🚫 محظورون', 'mg_users_f_banned'),
-    btn(filter==='new'  ? '✅ جدد'     : '🆕 جدد',      'mg_users_f_new'),
+    btn(filter==='all'   ? '✅ النشطون' : '🟢 النشطون',  'mg_uf.all'),
+    btn(filter==='banned'? '✅ محظورون' : '🚫 محظورون',  'mg_uf.banned'),
+    btn(filter==='new'   ? '✅ جدد'     : '🆕 جدد',      'mg_uf.new'),
   ];
 
   // ── أزرار المستخدمين — زر واحد فقط لكل مستخدم ──
@@ -206,8 +206,8 @@ async function showUsers(ctx, page=0, filter='all') {
 
   // ── Navigation ──
   const nav = [];
-  if (page > 0)                      nav.push(btn('⬅️ السابق', 'mg_users_p' + (page-1) + '_' + filter));
-  if ((page+1) * PAGE_SIZE < total)  nav.push(btn('التالي ➡️', 'mg_users_p' + (page+1) + '_' + filter));
+  if (page > 0)                      nav.push(btn('⬅️ السابق', 'mg_up.' + (page-1) + '.' + filter));
+  if ((page+1) * PAGE_SIZE < total)  nav.push(btn('التالي ➡️', 'mg_up.' + (page+1) + '.' + filter));
 
   const rows = [filterRow, ...userRows];
   if (nav.length) rows.push(nav);
@@ -467,12 +467,12 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
   if(data.startsWith('mg_profile_')) return showUserProfile(ctx,data.replace('mg_profile_',''));
   if(data.startsWith('mg_ban_')){const bid=parseInt(data.replace('mg_ban_',''));await usersDb.ban(bid);cacheClearPrefix('admin_users_');cacheClear('ban_'+bid);await interactions.addLog(uid,'ban',String(bid));return showUsers(ctx);}
   if(data.startsWith('mg_unban_')){const ubid=parseInt(data.replace('mg_unban_',''));await usersDb.unban(ubid);cacheClearPrefix('admin_users_');cacheClear('ban_'+ubid);return showUsers(ctx);}
-  if(data.startsWith('mg_users_f_')) {
-    const filter = data.replace('mg_users_f_','');
+  if(data.startsWith('mg_uf.')) {
+    const filter = data.replace('mg_uf.','');
     return showUsers(ctx, 0, filter);
   }
-  if(data.startsWith('mg_users_p')) {
-    const parts = data.replace('mg_users_p','').split('_');
+  if(data.startsWith('mg_up.')) {
+    const parts = data.replace('mg_up.','').split('.');
     const pg = parseInt(parts[0]);
     const filter = parts[1] || 'all';
     return showUsers(ctx, pg, filter);
