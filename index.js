@@ -126,21 +126,9 @@ const rateLimit = (ctx, next) => {
 bot.use(async (ctx, next) => {
   if (ctx.chat?.type !== 'private') {
     if (ctx.callbackQuery) return next();
-    const t = ctx.message?.text || '';
-    const _isGame = t && (/^خمن$/.test(t.trim()) || /^تخمين[:\s]+/.test(t.trim()) || /^[أاآ]نا$/.test(t.trim()));
-    const _gameOn = guessGame.isGameActive(ctx.chat?.id);
-    // أوامر مسموح بها في القروب (لا تُحذف)
-    const _allowedCmds = [
-      '/search', '/setsp', '/dlt', '/done', '/cancel', '/new', '/top',
-      '/ban', '/unban', '/kick', '/mute', '/unmute', '/warn', '/unwarn',
-      '/warns', '/pin', '/unpin', '/all', '/tag', '/settings', '/stats',
-      '/rules', '/adminhelp', '/million', '/stopmillion', '/start', '/help'
-    ];
-    const _isCmd = t.startsWith('/');
-    const _isAllowed = _allowedCmds.some(p => t.startsWith(p));
-    // لا تمسح: الأوامر المسموحة، رسائل اللعبة، رسائل البوت نفسه
-    if (ctx.message && !_isGame && !_gameOn && !_isAllowed)
-      return ctx.deleteMessage().catch(() => {});
+    // ✅ لا نمسح أي رسالة من المستخدمين — البوت مش فلتر رسائل
+    // المسح يصير فقط عبر anti-spam أو أوامر الأدمن يدوياً
+    return next();
   }
   return next();
 });
