@@ -147,7 +147,7 @@ bot.use(async (ctx, next) => {
 // ── تخمين: guess قبل auth ──
 bot.use(async (ctx, next) => {
   const txt = (ctx.message?.text || '').trim();
-  if (ctx.chat?.type !== 'private' && /^تخمين[:s:]+/i.test(txt)) {
+  if (ctx.chat?.type !== 'private' && /^تخمين[:\s:]+/i.test(txt)) {
     const handled = await guessGame.handleGuessMsg(ctx).catch(() => false);
     if (handled) return;
   }
