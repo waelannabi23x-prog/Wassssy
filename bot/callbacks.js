@@ -1,4 +1,5 @@
 'use strict';
+const { handleSettingsCallback } = require('../handlers/group_commands');
 const groupPanel = require('../handlers/group_panel');
 
 module.exports.registerCallbacks = function(bot, deps) {
@@ -277,6 +278,8 @@ module.exports.registerCallbacks = function(bot, deps) {
     ctx.answerCbQuery('').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); // أجب فوراً — يشيل الـ spinner
 
     try {
+      if (data.startsWith('gs_')) { await handleSettingsCallback(ctx, data); return; }
+
       if (ctx.chat?.type !== 'private' && !data.startsWith('grp_') && !data.startsWith('del_channel_'))
         return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
