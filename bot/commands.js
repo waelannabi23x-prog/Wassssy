@@ -261,49 +261,122 @@ module.exports = function registerCommands(bot, deps) {
     { parse_mode: 'Markdown' }
   ).catch(err => { require('../utils/logger').debug("[silent]", err.message); }));
 
+  // ── /channels — لوحة إدارة القنوات التفاعلية ──
+  async function showChannelsPanel(ctx, msg) {
+    const { cacheClear } = require('../utils/cache');
+    cacheClear('required_channels');
+    const list = await getChannels().catch(() => []);
+
+    let text = '📢 *قنوات الاشتراك الإجباري*\n';
+    text += '━━━━━━━━━━━━━━━\n\n';
+
+    if (!list.length) {
+      text += '_لا توجد قنوات مضافة حالياً_\n\n';
+      text += '💡 لإضافة قناة أرسل:\n`/addchannel @username اسم_القناة`\n\nمثال:\n`/addchannel @mychannel قناتي`';
+    } else {
+      list.forEach((ch, i) => {
+        text += (i+1) + '. *' + (ch.channel_name||'قناة') + '*\n';
+        text += '   🔗 ' + (ch.channel_url||ch.channel_id) + '\n';
+        text += '   🆔 `' + ch.channel_id + '`\n\n';
+      });
+      text += '\n💡 لإضافة قناة جديدة:\n`/addchannel @username اسم_القناة`';
+    }
+
+    const rows = list.map(ch => [{
+      text: '🗑 حذف: ' + (ch.channel_name||ch.channel_id).substring(0,20),
+      callback_data: 'del_channel_' + ch.channel_id
+    }]);
+
+    rows.push([{ text: '🔄 تحديث', callback_data: 'refresh_channels' }]);
+
+    const extra = { parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } };
+    if (msg) {
+      return ctx.telegram.editMessageText(ctx.chat.id, msg.message_id, null, text, extra).catch(() =>
+        ctx.reply(text, extra).catch(() => {})
+      );
+    }
+    return ctx.reply(text, extra).catch(() => {});
+  }
+
+  bot.command('channels', async ctx => {
+    if (!ctx.isOwner) return ctx.reply('🚫 للمالك فقط').catch(() => {});
+    return showChannelsPanel(ctx, null);
+  });
+
   bot.command('addchannel', async ctx => {
-    if (!ctx.isOwner) return ctx.reply('للمالك فقط').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    if (!ctx.isOwner) return ctx.reply('🚫 للمالك فقط').catch(() => {});
     const args = ctx.message.text.split(' ').slice(1);
-    if (args.length < 2) return ctx.reply('الصيغة: /addchannel الاسم الرابط').catch(() => {});
-    const url = args[args.length - 1];
-    const nm  = args.slice(0, args.length - 1).join(' ');
-    // استخرج channel_id من الرابط أو استخدم الاسم
-    let cid = url.replace('https://t.me/', '@');
-    if (!cid.startsWith('@') && !cid.startsWith('-')) cid = nm;
-    await addChannel(cid, nm, url).catch(e => ctx.reply('خطا: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); }));
-    return ctx.reply('تمت الاضافة: ' + nm).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+
+    if (!args.length) {
+      return ctx.reply(
+        '📢 *إضافة قناة اشتراك إجباري*\n\n' +
+        'الصيغة:\n`/addchannel @username اسم_القناة`\n\n' +
+        'أمثلة:\n' +
+        '`/addchannel @mychannel قناتي الرئيسية`\n' +
+        '`/addchannel -1001234567890 قناتي`',
+        { parse_mode: 'Markdown' }
+      ).catch(() => {});
+    }
+
+    // أول argument هو الـ username أو ID
+    const cidRaw = args[0];
+    const nm = args.slice(1).join(' ') || cidRaw;
+
+    // استخرج channel_id بشكل صحيح
+    let cid;
+    if (cidRaw.startsWith('-')) {
+      // رقم سالب = channel ID مباشر
+      cid = cidRaw;
+    } else if (cidRaw.startsWith('@')) {
+      // username مباشر
+      cid = cidRaw;
+    } else if (cidRaw.startsWith('https://t.me/')) {
+      // رابط → استخرج username
+      const part = cidRaw.replace('https://t.me/', '').split('/')[0];
+      cid = part.startsWith('+') ? cidRaw : '@' + part;
+    } else {
+      // افتراضي = أضف @
+      cid = '@' + cidRaw;
+    }
+
+    // بناء الرابط
+    const url = cid.startsWith('@')
+      ? 'https://t.me/' + cid.replace('@', '')
+      : (args.find(a => a.startsWith('https://')) || cid);
+
+    try {
+      await addChannel(cid, nm, url);
+      const list = await getChannels().catch(() => []);
+      let text = '✅ *تمت الإضافة!*\n\n';
+      text += '📢 *' + nm + '*\n';
+      text += '🆔 `' + cid + '`\n';
+      text += '🔗 ' + url + '\n\n';
+      text += '📊 *إجمالي القنوات: ' + list.length + '*';
+      const rows = [[{ text: '📋 عرض كل القنوات', callback_data: 'refresh_channels' }]];
+      return ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } }).catch(() => {});
+    } catch(e) {
+      return ctx.reply('❌ خطأ: ' + e.message).catch(() => {});
+    }
   });
 
   bot.command('removechannel', async ctx => {
-    if (!ctx.isOwner) return ctx.reply('للمالك فقط').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    const id = parseInt(ctx.message.text.split(' ')[1]);
-    if (!id) return ctx.reply('ارسل رقم القناة').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    await removeChannel(id).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    return ctx.reply('تم الحذف ' + id).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    if (!ctx.isOwner) return ctx.reply('🚫 للمالك فقط').catch(() => {});
+    const arg = ctx.message.text.split(' ')[1];
+    if (!arg) {
+      // عرض قائمة للاختيار
+      return showChannelsPanel(ctx, null);
+    }
+    const { cacheClear } = require('../utils/cache');
+    await removeChannel(arg).catch(() => {});
+    cacheClear('required_channels');
+    return ctx.reply('✅ تم حذف القناة').catch(() => {});
   });
 
-
-  bot.command('cleanchannels', async ctx => {
-    if (!ctx.isOwner) return ctx.reply("للمالك فقط").catch(() => {});
-    const { cacheGet, cacheClear } = require('../utils/cache');
-    cacheClear('required_channels');
-    const list = await getChannels().catch(() => []);
-    if (!list.length) return ctx.reply("لا توجد قنوات").catch(() => {});
-    const rows = list.map(ch => [{
-      text: "🗑 " + (ch.channel_name || ch.channel_id),
-      callback_data: "del_channel_" + ch.channel_id
-    }]);
-    return ctx.reply("اختر القناة للحذف:", {
-      reply_markup: { inline_keyboard: rows }
-    }).catch(() => {});
-  });
-  bot.command('channels', async ctx => {
-    if (!ctx.isOwner) return ctx.reply('للمالك فقط').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    cacheClear('required_channels');
-    const list = await getChannels().catch(() => []);
-    if (!list.length) return ctx.reply('لا توجد قنوات').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    const txt = list.map(ch => ch.id + '. ' + ch.channel_name + ' ' + ch.channel_url).join('\n');
-    return ctx.reply('القنوات:\n' + txt).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  // ── callback: refresh_channels ──
+  bot.action('refresh_channels', async ctx => {
+    if (!ctx.isOwner) return ctx.answerCbQuery('🚫').catch(() => {});
+    ctx.answerCbQuery('🔄 تحديث...').catch(() => {});
+    return showChannelsPanel(ctx, ctx.callbackQuery.message);
   });
 
 };
