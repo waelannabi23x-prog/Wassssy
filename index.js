@@ -129,7 +129,17 @@ bot.use(async (ctx, next) => {
     const t = ctx.message?.text || '';
     const _isGame = t && (/^خمن$/.test(t.trim()) || /^تخمين[:\s]+/.test(t.trim()) || /^[أاآ]نا$/.test(t.trim()));
     const _gameOn = guessGame.isGameActive(ctx.chat?.id);
-    if (ctx.message && !_isGame && !_gameOn && !['/search', '/setsp', '/dlt', '/done', '/cancel', '/new', '/top'].some(p => t.startsWith(p)))
+    // أوامر مسموح بها في القروب (لا تُحذف)
+    const _allowedCmds = [
+      '/search', '/setsp', '/dlt', '/done', '/cancel', '/new', '/top',
+      '/ban', '/unban', '/kick', '/mute', '/unmute', '/warn', '/unwarn',
+      '/warns', '/pin', '/unpin', '/all', '/tag', '/settings', '/stats',
+      '/rules', '/adminhelp', '/million', '/stopmillion', '/start', '/help'
+    ];
+    const _isCmd = t.startsWith('/');
+    const _isAllowed = _allowedCmds.some(p => t.startsWith(p));
+    // لا تمسح: الأوامر المسموحة، رسائل اللعبة، رسائل البوت نفسه
+    if (ctx.message && !_isGame && !_gameOn && !_isAllowed)
       return ctx.deleteMessage().catch(() => {});
   }
   return next();
