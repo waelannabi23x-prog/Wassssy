@@ -17,8 +17,8 @@ async function getChannelInfo(bot, channelId) {
 /** مسح sub_ok لكل المستخدمين من الذاكرة */
 function _clearAllSubCache() {
   try {
-    const { getCacheKeys, cacheClear: cc } = require('./cache');
-    getCacheKeys().filter(k => k.startsWith('sub_ok_')).forEach(k => cc(k));
+    const { cacheClearPrefix } = require('./cache');
+    cacheClearPrefix('sub_ok_');
   } catch (_) {}
 }
 
@@ -156,6 +156,7 @@ async function checkAllChannels(bot, userId) {
 
   // ✅ cache إيجابي 30 ثانية فقط (حتى يبقى الفحص حساس)
   if (ok) cacheSet(cacheKey, true, 30_000);
+  else cacheClear(cacheKey); // ← مش مشترك = لا كاش أبداً
 
   return { ok, missing };
 }
@@ -185,6 +186,7 @@ async function addChannel(channelId, channelName, channelUrl, bot) {
   // ✅ مسح كاش القنوات + كاش اشتراك كل المستخدمين
   cacheClear('required_channels');
   cacheClear('chname_' + channelId);
+  _clearAllSubCache(); // ← قناة جديدة = كل المستخدمين يُعاد التحقق منهم
   _clearAllSubCache(); // يجبر الكل على إعادة التحقق
 
   console.log('[ChannelGuard] ✅ أُضيفت القناة:', channelId, channelName);

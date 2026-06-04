@@ -149,10 +149,10 @@ async function authMiddleware(ctx, next) {
         if (!subCached) {
           const res2 = await guard.checkAllChannels({ telegram: ctx.telegram }, uid);
           if (!res2.ok) {
-            await guard.clearSubCache(uid); // امسح الكاش فوراً عند الفشل
-            const { text, buttons } = guard.buildSubscribeMessage(res2.missing, ctx.from && ctx.from.first_name);
-            if (cbData) ctx.answerCbQuery('❌ يجب الاشتراك أولاً', { show_alert: true }).catch(()=>{});
+            guard.clearSubCache(uid); // لا كاش للمحجوبين
+            const { text, buttons } = guard.buildSubscribeMessage(res2.missing, ctx.from?.first_name);
             if (cbData) {
+              ctx.answerCbQuery('❌ يجب الاشتراك أولاً', { show_alert: true }).catch(()=>{});
               return ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } })
                 .catch(() => ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(()=>{}));
             }
