@@ -137,51 +137,86 @@ async function showAnalytics(ctx){
 
 async function showLogs(ctx){const _lk='admin_logs';const _lc=cacheGet(_lk);const logs=_lc||await interactions.getLogs(20);if(!_lc) cacheSet(_lk,logs,60000);let text='📜 *آخر السجلات*\n\n';if(logs.length) logs.forEach(l=>{text+='• '+(escMd(l.first_name)||'ID:'+l.user_id)+': '+l.action+(l.details?' — '+l.details:'')+'\n';});else text+='_لا توجد سجلات._';return eos(ctx,text,{parse_mode:'Markdown',...build([back('mg_menu')])});}
 
-async function showUsers(ctx, page=0) {
-  const PAGE_SIZE = 8; // أقل أزرار = أسرع + Telegram لا يرفض
-  const _uk = 'admin_users7_' + page;
+async function showUsers(ctx, page=0, filter='all') {
+  const PAGE_SIZE = 15;
+  const _uk = 'admin_users_' + page + '_' + filter;
   const _uc = cacheGet(_uk);
   let list, total;
+
   if (_uc) { list = _uc.list; total = _uc.total; }
   else {
+    const whereClause = filter === 'banned'
+      ? "WHERE is_banned=1"
+      : filter === 'new'
+      ? "WHERE joined_at > NOW() - INTERVAL '24 hours'"
+      : "WHERE last_active > NOW() - INTERVAL '7 days'";
+
     [list, total] = await Promise.all([
-      usersDb.getAll(page, PAGE_SIZE),
-      usersDb.countActive ? usersDb.countActive() : usersDb.count()
+      require('../database/db').all(
+        `SELECT id, first_name, last_name, username, is_banned, last_active, joined_at
+         FROM users ${whereClause}
+         ORDER BY last_active DESC NULLS LAST
+         LIMIT $1 OFFSET $2`,
+        [PAGE_SIZE, page * PAGE_SIZE]
+      ),
+      require('../database/db').get(
+        `SELECT COUNT(*) as c FROM users ${whereClause}`
+      ).then(r => parseInt(r?.c || 0))
     ]);
     cacheSet(_uk, { list, total }, 30000);
   }
 
   const pages = Math.ceil(total / PAGE_SIZE) || 1;
-  let text = '👥 *النشطون خلال 7 أيام (' + total + ')*\n━━━━━━━━━━\n\n';
+  const filterLabel = { all: '🟢 النشطون 7 أيام', banned: '🚫 المحظورون', new: '🆕 جدد اليوم' }[filter];
 
-  list.forEach((u, i) => {
-    const num = page * PAGE_SIZE + i + 1;
-    const name = escMd((u.first_name || 'مجهول').substring(0, 18));
-    const username = u.username ? ' @' + escMd(u.username.substring(0, 12)) : '';
-    const banned = u.is_banned ? ' 🚫' : '';
-    const days = u.last_active ? Math.floor((Date.now() - new Date(u.last_active)) / 86400000) : '?';
-    text += num + '. ' + name + username + banned + ' (' + days + 'd)\n';
-  });
+  let text = '👥 *المستخدمون — ' + filterLabel + '*\n';
+  text += '📊 الإجمالي: *' + total + '* | صفحة *' + (page+1) + '/' + pages + '*\n';
+  text += '━━━━━━━━━━━━━━━\n\n';
 
-  const rows = list.map(u => [
-    btn('👤 ' + (u.first_name || u.id).toString().substring(0, 18), 'mg_profile_' + u.id),
-    btn(u.is_banned ? '✅ رفع' : '🚫 حظر', (u.is_banned ? 'mg_unban_' : 'mg_ban_') + u.id)
+  if (!list.length) {
+    text += '_لا يوجد مستخدمون_';
+  } else {
+    list.forEach((u, i) => {
+      const num = page * PAGE_SIZE + i + 1;
+      const name = escMd((u.first_name || 'مجهول').substring(0, 15));
+      const uname = u.username ? ' @' + escMd(u.username.substring(0, 12)) : '';
+      const status = u.is_banned ? ' 🚫' : '';
+      const days = u.last_active
+        ? Math.floor((Date.now() - new Date(u.last_active)) / 86400000)
+        : '?';
+      const daysText = days === 0 ? 'اليوم' : days + 'ي';
+      text += num + '. ' + name + uname + status + ' `' + u.id + '` _(' + daysText + ')_\n';
+    });
+  }
+
+  // ── أزرار فلتر ──
+  const filterRow = [
+    btn(filter==='all'  ? '✅ النشطون' : '🟢 النشطون',  'mg_users_f_all'),
+    btn(filter==='banned'? '✅ محظورون' : '🚫 محظورون', 'mg_users_f_banned'),
+    btn(filter==='new'  ? '✅ جدد'     : '🆕 جدد',      'mg_users_f_new'),
+  ];
+
+  // ── أزرار المستخدمين — زر واحد فقط لكل مستخدم ──
+  const userRows = list.map(u => [
+    btn(
+      (u.is_banned ? '🚫 ' : '👤 ') + (u.first_name || 'ID:' + u.id).substring(0, 20),
+      'mg_profile_' + u.id
+    )
   ]);
 
+  // ── Navigation ──
   const nav = [];
-  if (page > 0) nav.push(btn('⬅️', 'mg_users_p' + (page - 1)));
-  nav.push(btn((page + 1) + '/' + pages, 'noop'));
-  if ((page + 1) * PAGE_SIZE < total) nav.push(btn('➡️', 'mg_users_p' + (page + 1)));
+  if (page > 0)                      nav.push(btn('⬅️ السابق', 'mg_users_p' + (page-1) + '_' + filter));
+  if ((page+1) * PAGE_SIZE < total)  nav.push(btn('التالي ➡️', 'mg_users_p' + (page+1) + '_' + filter));
+
+  const rows = [filterRow, ...userRows];
   if (nav.length) rows.push(nav);
   rows.push(back('mg_menu'));
 
-  // إرسال رسالة جديدة دائماً بدل التعديل (يحل مشكلة الصمت)
-  if (ctx.callbackQuery) ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  if (ctx.callbackQuery) ctx.deleteMessage().catch(() => {});
   return ctx.reply(text, { parse_mode: 'Markdown', ...build(rows) }).catch(e => {
-    console.error('[showUsers reply]', e.message);
-    // إذا فشل Markdown، ابعث بدون تنسيق
-    const plain = text.replace(/[*_`]/g, '');
-    return ctx.reply(plain, build(rows)).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    const plain = text.replace(/[*_`_]/g, '');
+    return ctx.reply(plain, build(rows)).catch(() => {});
   });
 }
 
@@ -436,7 +471,16 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
   if(data.startsWith('mg_profile_')) return showUserProfile(ctx,data.replace('mg_profile_',''));
   if(data.startsWith('mg_ban_')){const bid=parseInt(data.replace('mg_ban_',''));await usersDb.ban(bid);cacheClearPrefix('admin_users_');cacheClear('ban_'+bid);await interactions.addLog(uid,'ban',String(bid));return showUsers(ctx);}
   if(data.startsWith('mg_unban_')){const ubid=parseInt(data.replace('mg_unban_',''));await usersDb.unban(ubid);cacheClearPrefix('admin_users_');cacheClear('ban_'+ubid);return showUsers(ctx);}
-  if(data.startsWith('mg_users_p')) return showUsers(ctx,parseInt(data.replace('mg_users_p','')));
+  if(data.startsWith('mg_users_f_')) {
+    const filter = data.replace('mg_users_f_','');
+    return showUsers(ctx, 0, filter);
+  }
+  if(data.startsWith('mg_users_p')) {
+    const parts = data.replace('mg_users_p','').split('_');
+    const pg = parseInt(parts[0]);
+    const filter = parts[1] || 'all';
+    return showUsers(ctx, pg, filter);
+  }
   if(data.startsWith('mg_restore_fl_')){await filesDb.restore(data.replace('mg_restore_fl_',''));return showTrash(ctx);}
   if(data==='mg_empty_trash'){return eos(ctx,'⚠️ حذف الكل نهائياً؟',build([[btn('✅ تأكيد','mg_confirm_empty')],[btn('❌ إلغاء','mg_trash')]]));}
   if(data==='mg_confirm_empty'){await dbRun('DELETE FROM files WHERE is_deleted=1');return eos(ctx,'✅ تم حذف السلة!',{parse_mode:'Markdown',...build([back('mg_menu')])});}
