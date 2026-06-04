@@ -140,10 +140,19 @@ async function addChannel(channelId, channelName, channelUrl) {
 
 // ── حذف قناة ─────────────────────────────────────
 async function removeChannel(id) {
-  // يقبل id التسلسلي أو channel_id
-  const col = String(id).startsWith('-') ? 'channel_id' : 'id';
-  await run('UPDATE required_channels SET is_active=0 WHERE ' + col + '=$1', [id]);
+  const sid = String(id);
+  // رقم سالب = channel_id عددي | @ = username | رقم موجب = id تسلسلي
+  let col;
+  if (sid.startsWith('-') || sid.startsWith('@')) {
+    col = 'channel_id';
+  } else if (/^\d+$/.test(sid)) {
+    col = 'id';
+  } else {
+    col = 'channel_id';
+  }
+  await run('UPDATE required_channels SET is_active=0 WHERE ' + col + '=$1', [sid]);
   cacheClear('required_channels');
+  console.log('[ChannelGuard] Removed channel:', sid, 'by', col);
 }
 
 // ── بناء رسالة الاشتراك ──────────────────────────
