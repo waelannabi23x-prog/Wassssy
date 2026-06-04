@@ -348,13 +348,14 @@ module.exports = function registerCommands(bot, deps) {
         : cid;
 
     try {
-      await addChannel(cid, nm, url);
+      const _res = await addChannel(cid, nm, url, bot);
       const list = await getChannels().catch(() => []);
       let text = '✅ *تمت الإضافة!*\n\n';
       text += '📢 *' + nm + '*\n';
       text += '🆔 `' + cid + '`\n';
       text += '🔗 ' + url + '\n\n';
       text += '📊 *إجمالي القنوات: ' + list.length + '*';
+      if (_res && _res.warning) text += '\n\n' + _res.warning;
       const rows = [[{ text: '📋 عرض كل القنوات', callback_data: 'refresh_channels' }]];
       return ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } }).catch(() => {});
     } catch(e) {
@@ -380,6 +381,22 @@ module.exports = function registerCommands(bot, deps) {
     if (!ctx.isOwner) return ctx.answerCbQuery('🚫').catch(() => {});
     ctx.answerCbQuery('🔄 تحديث...').catch(() => {});
     return showChannelsPanel(ctx, ctx.callbackQuery.message);
+  });
+
+  bot.command('checkchannels', async ctx => {
+    if (!ctx.isOwner) return ctx.reply('للمالك فقط').catch(()=>{});
+    const guard = require('../utils/channelGuard');
+    const { cacheClear } = require('../utils/cache');
+    cacheClear('required_channels');
+    const list = await guard.getChannels().catch(()=>[]);
+    if (!list.length) return ctx.reply('لا توجد قنوات').catch(()=>{});
+    const lines = await Promise.all(list.map(async (ch) => {
+      const v = await guard.validateBotInChannel({telegram:ctx.telegram}, ch.channel_id).catch(()=>({ok:false}));
+      const icon = v.ok ? '✅' : '❌';
+      const note = v.ok ? 'البوت ادمن' : 'اضف البوت كادمن!';
+      return icon + ' ' + (ch.channel_name||ch.channel_id) + ' - ' + note;
+    }));
+    return ctx.reply('فحص القنوات:' + lines.join(String.fromCharCode(10))).catch(()=>{});
   });
 
 };
