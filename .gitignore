@@ -29,3 +29,4 @@ data/
 
 backup.sql
 fix_admin_routes.cjs
+backup.sql
