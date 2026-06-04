@@ -475,4 +475,4 @@ async function handlePvDirect(ctx) {
   return handlePvMessage(ctx);
 }
 
-module.exports = { register, startInvite, handleJoin, isGameActive, hasPvState, handlePvDirect };
+module.exports = { register, startInvite, handleJoin, isGameActive, hasPvState, handlePvDirect, handleGuessMsg: handleGuess };
