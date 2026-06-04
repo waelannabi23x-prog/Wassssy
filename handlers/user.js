@@ -103,7 +103,22 @@ async function showProgress(ctx) {
   var k = 'progress_' + uid, cached = cacheGet(k);
   if (cached) return eos(ctx, cached.text, { parse_mode: 'Markdown', ...build(cached.kb) });
   var sp = await content.getSpec(spId);
-  var subjects = await all('SELECT s.name as sub_name,COUNT(DISTINCT f.id) as total,COUNT(DISTINCT CASE WHEN h.user_id=$1 THEN h.file_id END) as seen FROM subjects s JOIN semesters sm ON s.semester_id=sm.id JOIN years y ON sm.year_id=y.id JOIN categories c ON c.subject_id=s.id JOIN files f ON f.category_id=c.id AND f.is_deleted=0 LEFT JOIN history h ON h.file_id=f.id AND h.user_id=$1 WHERE y.specialty_id=$2 AND s.is_deleted=0 GROUP BY s.id,s.name ORDER BY seen DESC,total DESC',[uid,spId]);
+  var subjects = await all(
+    `SELECT s.id, s.name as sub_name,
+            COUNT(DISTINCT f.id) as total,
+            COUNT(DISTINCT h.file_id) as seen
+     FROM subjects s
+     JOIN semesters sm ON s.semester_id = sm.id
+     JOIN years y ON sm.year_id = y.id
+     JOIN categories c ON c.subject_id = s.id
+     JOIN files f ON f.category_id = c.id AND f.is_deleted = 0
+     LEFT JOIN history h ON h.file_id = f.id AND h.user_id = $1
+     WHERE y.specialty_id = $2
+       AND s.is_deleted = 0
+     GROUP BY s.id, s.name
+     ORDER BY seen DESC, total DESC`,
+    [uid, spId]
+  );
   if (!subjects.length) return eos(ctx, '📭 لا يوجد محتوى في تخصصك بعد.', { parse_mode: 'Markdown', ...build([back('main_menu')]) });
   var tf=0,ts=0; subjects.forEach(s=>{tf+=parseInt(s.total);ts+=parseInt(s.seen);});
   var op=tf?Math.round(ts/tf*100):0;

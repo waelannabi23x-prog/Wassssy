@@ -50,7 +50,7 @@ const addHistory = (uid, fid) => {
     const cut = now - 10000;
     for (const [kk, ts] of _histDedup) if (ts < cut) _histDedup.delete(kk);
   }
-  const _p = run('INSERT INTO history(user_id,file_id) VALUES($1,$2)', [uid, fid]);
+  const _p = run('INSERT INTO history(user_id,file_id,viewed_at) VALUES($1,$2,NOW()) ON CONFLICT(user_id,file_id) DO UPDATE SET viewed_at=NOW()', [uid, fid]);
   try { const {awardPoints}=require('./points'); awardPoints(uid,'download').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); } catch(_){}
   return _p;
 };
