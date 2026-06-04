@@ -191,32 +191,30 @@ async function showAllMembers(ctx, chatId) {
     let members = cacheGet(cacheKey);
 
     if (!members) {
+      // 1. جلب المسجلين في DB
       members = await all(
-        'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 ORDER BY updated_at DESC LIMIT 200',
+        'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 ORDER BY updated_at DESC LIMIT 500',
         [chatId]
       ).catch(() => []);
 
-      // أضف الأدمنز من Telegram إن لم يكونوا موجودين
+      // 2. جلب الأدمنز من Telegram وإضافتهم
       try {
         const admins = await ctx.telegram.getChatAdministrators(chatId).catch(() => []);
         for (const a of admins) {
           if (!a?.user || a.user.is_bot) continue;
           if (!members.find(m => String(m.user_id) === String(a.user.id))) {
-            members.push({
-              user_id:    a.user.id,
-              first_name: (a.user.first_name || 'Admin') + ' 👑',
-            });
-            run(
-              `INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at)
-               VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)
-               ON CONFLICT(chat_id,user_id) DO UPDATE SET first_name=EXCLUDED.first_name`,
-              [chatId, a.user.id, a.user.username || '', a.user.first_name || 'Admin']
-            ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+            members.push({ user_id: a.user.id, first_name: (a.user.first_name||'Admin')+' 👑' });
           }
+          run(
+            `INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at)
+             VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)
+             ON CONFLICT(chat_id,user_id) DO UPDATE SET first_name=EXCLUDED.first_name, updated_at=CURRENT_TIMESTAMP`,
+            [chatId, a.user.id, a.user.username||'', a.user.first_name||'Admin']
+          ).catch(() => {});
         }
       } catch (_) {}
 
-      cacheSet(cacheKey, members, 300000);
+      cacheSet(cacheKey, members, 120000); // كاش دقيقتين فقط
     }
 
     const tgTotal = await ctx.telegram.getChatMembersCount(chatId).catch(() => 0);
@@ -255,6 +253,9 @@ async function showAllMembers(ctx, chatId) {
           { text: '🔊 تفعيل الكل',  callback_data: 'unmute_all_' + chatId },
         ],
         [
+          { text: '📥 تسجيل الأعضاء', callback_data: 'grp_reg_btn_' + chatId },
+        ],
+        [
           { text: '🗑 إغلاق',       callback_data: 'close_list_' + chatId },
         ],
       ],
@@ -279,6 +280,36 @@ async function showAllMembers(ctx, chatId) {
 // ══════════════════════════════════════════════════════════
 // 🏷️ منشن الكل — مع رسالة مخصصة
 // ══════════════════════════════════════════════════════════
+// ══════════════════════════════════════════
+// 📥 تسجيل الأعضاء — يطلب من الكل يضغط زر
+// ══════════════════════════════════════════
+async function registerMembers(ctx, chatId) {
+  try {
+    ctx.answerCbQuery('📤 جاري الإرسال...').catch(() => {});
+    ctx.deleteMessage().catch(() => {});
+
+    const text =
+      '📋 *تسجيل الأعضاء*\n\n' +
+      '👋 اضغط الزر أدناه لتسجيل نفسك في قائمة الأعضاء\n' +
+      '_هذا يساعد البوت على منشنك عند الحاجة_';
+
+    const msg = await ctx.reply(text, {
+      parse_mode: 'Markdown',
+      reply_markup: {
+        inline_keyboard: [[{
+          text: '✅ سجّل نفسي',
+          callback_data: 'grp_register_' + chatId
+        }]]
+      }
+    }).catch(() => null);
+
+    // احذف الرسالة بعد 5 دقائق
+    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 300000);
+  } catch(e) {
+    console.error('[registerMembers]', e.message);
+  }
+}
+
 async function tagAll(ctx, chatId, customMessage) {
   try {
     ctx.answerCbQuery('⏳ جاري المنشن…').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
@@ -726,6 +757,7 @@ module.exports = {
   handleNewMember,
   handleMemberLeft,
   showAllMembers,
+  registerMembers,
   tagAll,
   muteAll,
   unmuteAll,

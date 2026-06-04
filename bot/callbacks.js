@@ -281,6 +281,28 @@ module.exports.registerCallbacks = function(bot, deps) {
       if (data.startsWith('gs_')) { await handleSettingsCallback(ctx, data); return; }
 
       if (ctx.chat?.type !== 'private') {
+        // تسجيل عضو من القروب
+        if (data.startsWith('grp_reg_btn_')) {
+          const regChatId = data.replace('grp_reg_btn_', '');
+          const { registerMembers } = require('../handlers/group_admin');
+          ctx.answerCbQuery('').catch(() => {});
+          return registerMembers(ctx, regChatId);
+        }
+
+        if (data.startsWith('grp_register_')) {
+          const regChatId = data.replace('grp_register_', '');
+          const u = ctx.from;
+          require('../database/db').run(
+            `INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at)
+             VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)
+             ON CONFLICT(chat_id,user_id) DO UPDATE SET first_name=EXCLUDED.first_name, updated_at=CURRENT_TIMESTAMP`,
+            [regChatId, u.id, u.username||'', u.first_name||'']
+          ).catch(() => {});
+          require('../utils/cache').cacheClear('grp_members_' + regChatId);
+          ctx.answerCbQuery('✅ تم تسجيلك!').catch(() => {});
+          return;
+        }
+
         const _grpOk = data.startsWith('grp_') || data.startsWith('del_channel_')
           || data.startsWith('gs_') || data.startsWith('grp_unban_')
           || data.startsWith('grp_unmute_') || data === 'check_subscription'
