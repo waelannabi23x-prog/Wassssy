@@ -438,6 +438,43 @@ async function handleCallback(ctx,data){
   const uid=ctx.uid;
   try{
   if(data==='mg_content') return showContent(ctx);
+
+  // ── القنوات والإعلانات ──
+  if(data==='mg_channels_menu') return showChannelsMenu(ctx);
+  if(data==='mg_ads_menu') return showAdsMenu(ctx);
+  if(data==='mg_addchannel') {
+    setState(uid, { type: 'mg_awaiting_channel' });
+    return eos(ctx, '📢 *إضافة قناة*\n\nأرسل بهذا الشكل:\n`@username اسم_القناة`\n\nمثال:\n`@mychannel قناتي`', { parse_mode: 'Markdown', ...build([[btn('❌ إلغاء','mg_channels_menu')]]) });
+  }
+  if(data.startsWith('mg_delch_')) {
+    const chId = data.replace('mg_delch_','');
+    const { removeChannel } = require('../utils/channelGuard');
+    await removeChannel(chId).catch(()=>{});
+    cacheClear('required_channels');
+    return showChannelsMenu(ctx);
+  }
+  if(data==='mg_addad') {
+    setState(uid, { type: 'mg_awaiting_ad_title' });
+    return eos(ctx, '📣 *إعلان جديد*\n\nأرسل عنوان الإعلان:', { parse_mode: 'Markdown', ...build([[btn('❌ إلغاء','mg_ads_menu')]]) });
+  }
+  if(data.startsWith('mg_delad_')) {
+    const adId = parseInt(data.replace('mg_delad_',''));
+    await dbRun('UPDATE ads SET is_deleted=1 WHERE id=$1',[adId]).catch(()=>{});
+    return showAdsMenu(ctx);
+  }
+  if(data.startsWith('mg_pinad_')) {
+    const adId = parseInt(data.replace('mg_pinad_',''));
+    const ad = await require('../database/db').get('SELECT is_pinned FROM ads WHERE id=$1',[adId]).catch(()=>null);
+    if(ad) await dbRun('UPDATE ads SET is_pinned=$1 WHERE id=$2',[ad.is_pinned?0:1,adId]).catch(()=>{});
+    return showAdsMenu(ctx);
+  }
+  if(data.startsWith('mg_ad_')) {
+    const adId = parseInt(data.replace('mg_ad_',''));
+    const ad = await require('../database/db').get('SELECT * FROM ads WHERE id=$1',[adId]).catch(()=>null);
+    if(!ad) return eos(ctx,'❌ غير موجود',build([[btn('◀️ رجوع','mg_ads_menu')]]));
+    const text = (ad.icon||'📌')+' *'+escMd(ad.title)+'*\n\n'+(ad.body?escMd(ad.body)+'\n\n':'')+(ad.link?'🔗 '+ad.link+'\n':'')+'📌 مثبت: '+(ad.is_pinned?'نعم':'لا');
+    return eos(ctx, text, { parse_mode:'Markdown', ...build([[btn(ad.is_pinned?'📌 إلغاء التثبيت':'📌 تثبيت','mg_pinad_'+adId)],[btn('🗑 حذف','mg_delad_'+adId)],[btn('◀️ رجوع','mg_ads_menu')]]) });
+  }
   if(data==='mg_analytics') return showAnalytics(ctx);
   if(data==='mg_logs') return showLogs(ctx);
   if(data==='mg_users'){try{const p=ctx.isOwner?['full']:await adminsDb.getPerms(ctx.uid);if(!p.includes('full')&&!p.includes('view_users')) return ctx.answerCbQuery('ليس لديك صلاحية',{show_alert:true});return await showUsers(ctx);}catch(e){console.error('[mg_users]',e.message);return ctx.reply('❌ خطأ: '+e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });}}
