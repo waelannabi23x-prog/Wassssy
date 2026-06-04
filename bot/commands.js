@@ -349,7 +349,7 @@ module.exports = function registerCommands(bot, deps) {
 
     try {
       const _res = await addChannel(cid, nm, url, bot);
-      notifyUsersNewChannel(bot, nm).catch(() => {});
+      notifyUsersNewChannel({ telegram: bot.telegram }, nm).catch(() => {});
       const list = await getChannels().catch(() => []);
       let text = '✅ *تمت الإضافة!*\n\n';
       text += '📢 *' + nm + '*\n';
