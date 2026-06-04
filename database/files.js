@@ -29,7 +29,7 @@ const addFile=async(catId,title,desc,fileId,fileType,uploadedBy)=>{
 };
 // ✅ Batched downloads counter — flushes every 10s
 const { batchDownload } = require('./db');
-const incDownloads = id => batchDownload(parseInt(id));
+const incDownloads = id => { batchDownload(parseInt(id)); return Promise.resolve(); };
 const softDelete=async id=>{if(global._clearSearchCache)global._clearSearchCache();var f=await get('SELECT category_id FROM files WHERE id=$1',[id]);await run('UPDATE files SET is_deleted=1 WHERE id=$1',[id]);cacheClear('file_'+id);cacheClear('prev_static_'+id);cacheClear('similar_'+id);if(f)invalidateFilesCache(f.category_id);};
 const restore=async id=>{if(global._clearSearchCache)global._clearSearchCache();var f=await get('SELECT category_id FROM files WHERE id=$1',[id]);await run('UPDATE files SET is_deleted=0 WHERE id=$1',[id]);cacheClear('file_'+id);if(f)invalidateFilesCache(f.category_id);};
 const rename=async(id,title)=>{if(global._clearSearchCache)global._clearSearchCache();var f=await get('SELECT category_id FROM files WHERE id=$1',[id]);await run('UPDATE files SET title=$1 WHERE id=$2',[title,id]);cacheClear('file_'+id);if(f)invalidateFilesCache(f.category_id);};

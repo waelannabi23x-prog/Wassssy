@@ -265,7 +265,7 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
   ]);
   var f=results[0], fav=results[1];
   if (!f) return ctx.reply('❌ الملف غير موجود.').catch(function(){});
-  filesDb.incDownloads(fid).catch(function(){});
+  filesDb.incDownloads(fid);
   interactions.addHistory(uid, fid).catch(function(){});
   try { require('../database/points').awardPoints(uid, 'download').catch(()=>{}); } catch(_) {}
   var caption = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 '+escMd(f.description)+'\n':'')+'📁 '+escMd(f.cat_name||'عام')+'  |  📖 '+escMd(f.sub_name||'عام');
