@@ -232,6 +232,9 @@ async function initSchema() {
   try { if(pg) await pg.query('DELETE FROM history h1 USING history h2 WHERE h1.id > h2.id AND h1.user_id = h2.user_id AND h1.file_id = h2.file_id'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query('ALTER TABLE history ADD CONSTRAINT IF NOT EXISTS hist_user_file_unique UNIQUE (user_id, file_id)'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
+  // Migration: history unique constraint
+  try { if(pg) await pg.query('ALTER TABLE history ADD CONSTRAINT hist_user_file_unique UNIQUE (user_id, file_id)'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+
   // Migration: used_count
   try { if(pg) await pg.query('ALTER TABLE million_questions ADD COLUMN IF NOT EXISTS used_count INTEGER DEFAULT 0'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_mq_used ON million_questions(used_count) WHERE is_active=1'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
