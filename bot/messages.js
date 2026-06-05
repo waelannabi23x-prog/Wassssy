@@ -233,8 +233,7 @@ module.exports.registerMessages = function(bot, deps) {
     if (!global._cachedBotId) { try { global._cachedBotId = (await ctx.telegram.getMe()).id; } catch(_) { return; } }
     if (member?.user?.id !== global._cachedBotId) {
       if (oldMember?.status === 'left' && member?.status !== 'left') {
-        const { handleNewMember } = require('../handlers/group_admin');
-        await handleNewMember(bot, chat.id, member.user.id, member.user.first_name);
+        // handleNewMember called via chat_member event below
       }
       return;
     }

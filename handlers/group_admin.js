@@ -69,7 +69,7 @@ async function handleNewMember(bot, chatId, userId, firstName) {
 
 👤 *${name}* انضم لعائلتنا!
 
-🆔 المعرّف: ${uid}
+🆔 المعرّف: [${uid}](tg://user?id=${uid})
 📅 تاريخ الانضمام: ${date}
 🕐 الساعة: ${time}${specLine}${memberCount}
 
