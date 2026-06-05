@@ -199,6 +199,8 @@ registerCallbacks(bot, {
 });
 
 // ── Messages ──
+setupGroupCommands(bot);
+
 const { registerMessages } = require('./bot/messages');
 registerMessages(bot, {
   ownerH, GrpBuf, GrpMsgs, handleAiChat, handleOwnerAI,
@@ -259,8 +261,6 @@ async function launch() {
         ts: Date.now(),
       });
     });
-
-    setupGroupCommands(bot);
 
   // ══════════════════════════════════════════
   // 📥 تسجيل القروب تلقائياً عند إضافة البوت
