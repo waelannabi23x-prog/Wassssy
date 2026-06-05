@@ -261,6 +261,68 @@ async function launch() {
     });
 
     setupGroupCommands(bot);
+
+  // ══════════════════════════════════════════
+  // 📥 تسجيل القروب تلقائياً عند إضافة البوت
+  // ══════════════════════════════════════════
+  bot.on('my_chat_member', async ctx => {
+    try {
+      const update = ctx.myChatMember;
+      const chat   = update?.chat;
+      const member = update?.new_chat_member;
+      if (!chat || !['group','supergroup'].includes(chat.type)) return;
+
+      if (['member','administrator'].includes(member?.status)) {
+        // البوت أُضيف للقروب
+        await dbRun(
+          `INSERT INTO group_chats(chat_id, title, specialty_id, welcome_enabled, goodbye_enabled, notify_new_files)
+           VALUES($1,$2,0,1,0,1)
+           ON CONFLICT(chat_id) DO UPDATE SET title=$2`,
+          [chat.id, chat.title || '']
+        ).catch(() => {});
+        logger.info('[GroupReg] ✅ أُضيف البوت لـ: ' + (chat.title||chat.id));
+
+      } else if (['left','kicked'].includes(member?.status)) {
+        // البوت أُزيل من القروب
+        await dbRun(
+          'UPDATE group_chats SET is_active=0 WHERE chat_id=$1',
+          [chat.id]
+        ).catch(() => {});
+        logger.info('[GroupReg] 🚪 خرج البوت من: ' + (chat.title||chat.id));
+      }
+    } catch(e) {
+      logger.error('[my_chat_member]', e.message);
+    }
+  });
+
+  // ══════════════════════════════════════════
+  // 📝 تسجيل رسائل القروب + تسجيل الأعضاء
+  // ══════════════════════════════════════════
+  bot.on('message', async (ctx, next) => {
+    try {
+      const chat = ctx.chat;
+      if (!['group','supergroup'].includes(chat?.type)) return next();
+
+      // تسجيل القروب إذا ما موجود
+      dbRun(
+        `INSERT INTO group_chats(chat_id, title) VALUES($1,$2)
+         ON CONFLICT(chat_id) DO UPDATE SET title=$2`,
+        [chat.id, chat.title || '']
+      ).catch(() => {});
+
+      // تسجيل العضو
+      const u = ctx.from;
+      if (u && !u.is_bot) {
+        dbRun(
+          `INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at)
+           VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)
+           ON CONFLICT(chat_id,user_id) DO UPDATE SET updated_at=CURRENT_TIMESTAMP`,
+          [chat.id, u.id, u.username||'', u.first_name||'']
+        ).catch(() => {});
+      }
+    } catch(_) {}
+    return next();
+  });
 const apiRoutes = require('./routes/api');
     app.use('/api', apiRoutes);
 

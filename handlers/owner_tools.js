@@ -74,13 +74,26 @@ exports.batchPromote = async (ctx) => {
 };
 
 exports.listGroups = async (ctx) => {
-  const groups = await db.all('SELECT gc.chat_id, gc.title, sp.name as spec FROM group_chats gc LEFT JOIN specialties sp ON gc.specialty_id=sp.id');
-  if (!groups.length) return ctx.reply('البوت ليس في أي قروب.');
-  let text = 'قروبات البوت:\n\n';
+  const groups = await db.all(
+    `SELECT gc.chat_id, gc.title, sp.name as spec,
+            gc.welcome_enabled, gc.is_active,
+            (SELECT COUNT(*) FROM group_members gm WHERE gm.chat_id=gc.chat_id) as members
+     FROM group_chats gc
+     LEFT JOIN specialties sp ON gc.specialty_id=sp.id
+     WHERE gc.is_active=1 OR gc.is_active IS NULL
+     ORDER BY gc.title`
+  );
+  if (!groups.length) return ctx.reply('📭 البوت ليس في أي قروب حالياً.\n\nأضف البوت لقروب وسيظهر هنا تلقائياً.');
+
+  let text = '👥 *قروبات البوت (' + groups.length + ')*\n━━━━━━━━━━━━\n\n';
   const rows = [];
-  groups.forEach(g => {
-    text += 'ID: ' + g.chat_id + '\n' + (g.title || 'بدون اسم') + '\n\n';
-    rows.push([btn('خروج: ' + (g.title || g.chat_id).substring(0, 20), 'leave_grp_' + g.chat_id)]);
+  groups.forEach((g, i) => {
+    const sp = g.spec ? '🎓 ' + g.spec : '📚 غير محدد';
+    const w  = g.welcome_enabled ? '✅' : '❌';
+    text += (i+1) + '. *' + (g.title||'قروب').substring(0,25) + '*\n';
+    text += '   👤 ' + (g.members||0) + ' | ' + sp + ' | ترحيب: ' + w + '\n';
+    text += '   🆔 `' + g.chat_id + '`\n\n';
+    rows.push([btn('⚙️ ' + (g.title||g.chat_id).substring(0,20), 'gp_view_' + g.chat_id)]);
   });
   ctx.reply(text, { parse_mode: 'Markdown', ...build(rows) });
 };

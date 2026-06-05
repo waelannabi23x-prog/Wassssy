@@ -235,6 +235,9 @@ async function initSchema() {
   // Migration: history unique constraint
   try { if(pg) await pg.query('ALTER TABLE history ADD CONSTRAINT hist_user_file_unique UNIQUE (user_id, file_id)'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
+  // Migration: group_chats is_active column
+  try { if(pg) await pg.query('ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+
   // Migration: group_bans + anti_spam columns
   try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS group_bans (id SERIAL PRIMARY KEY, chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL, banned_by BIGINT, reason TEXT, banned_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(chat_id, user_id))`); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query('ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS anti_spam INTEGER DEFAULT 0'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
