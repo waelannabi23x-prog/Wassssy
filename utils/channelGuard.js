@@ -263,16 +263,7 @@ async function notifyUsersNewChannel(bot, channelName) {
     
     if (!users.length) return;
     
-    const text = '📢 *تنبيه مهم!*
-
-' +
-      'تم إضافة قناة اشتراك إجباري جديدة:
-' +
-      '📣 *' + channelName + '*
-
-' +
-      'يرجى الاشتراك للاستمرار في استخدام البوت.';
-    
+    const text = '📢 *تنبيه مهم!*\n\nتم إضافة قناة اشتراك إجباري جديدة:\n📣 *' + channelName + '*\n\nيرجى الاشتراك للاستمرار في استخدام البوت.';
     // إرسال للمستخدمين بـ chunks
     for (let i = 0; i < users.length; i += 20) {
       const chunk = users.slice(i, i + 20);
