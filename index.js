@@ -116,7 +116,7 @@ const rateLimit = (ctx, next) => {
   u.c++;
   // حد 4 ضغطات كل 2 ثانية
   if (u.c > 4) {
-    if (u.c === 5) ctx.answerCbQuery('⚠️ إبطاء قليلاً...', { show_alert: false }).catch(() => {});
+    if (u.c === 5 && ctx.callbackQuery) ctx.answerCbQuery('⚠️ إبطاء قليلاً...', { show_alert: false }).catch(() => {});
     return; // تجاهل بدون رد
   }
   return next();

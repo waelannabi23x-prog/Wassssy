@@ -104,12 +104,12 @@ async function handleNewMember(bot, chatId, userId, firstName) {
       await bot.telegram.sendPhoto(chatId, grp.welcome_photo, {
         caption:    welcomeMsg,
         parse_mode: parse,
-      }).catch(e => console.error('[Welcome Photo]', e.message));
+      })undefined
     } else {
       await bot.telegram.sendMessage(chatId, welcomeMsg, {
         parse_mode:           parse,
         disable_web_page_preview: true,
-      }).catch(e => console.error('[Welcome]', e.message));
+      })undefined
     }
   } catch (e) {
     console.error('[Welcome]', e.message);
