@@ -1,4 +1,14 @@
 'use strict';
+
+// ── dedup: منع تكرار رسالة الترحيب ──────────────────
+const _welcomeDedup = new Map();
+function _isWelcomeDupe(chatId, userId) {
+  const key = chatId + '_' + userId;
+  if (_welcomeDedup.has(key)) return true;
+  _welcomeDedup.set(key, true);
+  setTimeout(() => _welcomeDedup.delete(key), 8000);
+  return false;
+}
 const { run, all, get } = require('../database/db');
 const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
 
@@ -65,18 +75,21 @@ async function handleNewMember(bot, chatId, userId, firstName) {
     } catch (_) {}
 
     const defaultMsg =
-`🎊 *أهلاً وسهلاً بك!*
+`🎉 أهلاً وسهلاً بـ *${name}*!
 
-👤 *${name}* انضم لعائلتنا!
+┌─────────────────────┐
+│ 🆔 المعرّف: [${uid}](tg://user?id=${uid})
+│ 📅 ${date}  🕐 ${time}${specLine}${memberCount}
+└─────────────────────┘
 
-🆔 المعرّف: [${uid}](tg://user?id=${uid})
-📅 تاريخ الانضمام: ${date}
-🕐 الساعة: ${time}${specLine}${memberCount}
+📚 *أهلاً في مجتمعنا الأكاديمي!*
 
-💡 يُمنع السبّ والإزعاج
-📚 تفاعل معنا وشارك دراستك!
+🔹 احترم الجميع واحرص على التعاون
+🔹 شارك ملفاتك وأسئلتك بحرية
+🔹 استخدم البوت للوصول للمكتبة
 
-🔗 [ملفّك الشخصي](tg://user?id=${uid})`;
+🔗 [ملفّك الشخصي](tg://user?id=${uid})
+━━━━━━━━━━━━━━━━━━━━`;
 
     let groupTitle = ''; try { const _gc = await bot.telegram.getChat(chatId).catch(()=>null); if(_gc?.title) groupTitle=_gc.title; } catch(_){}
     // عدد الأعضاء للرسالة المخصصة
@@ -106,10 +119,12 @@ async function handleNewMember(bot, chatId, userId, firstName) {
         parse_mode: parse,
       }).catch(() => {});
     } else {
-      await bot.telegram.sendMessage(chatId, welcomeMsg, {
+      const wm = await bot.telegram.sendMessage(chatId, welcomeMsg, {
         parse_mode:           parse,
         disable_web_page_preview: true,
-      }).catch(() => {});
+      }).catch(() => null);
+      // auto-delete بعد دقيقتين
+      if (wm) setTimeout(() => bot.telegram.deleteMessage(chatId, wm.message_id).catch(() => {}), 120000);
     }
   } catch (e) {
     console.error('[Welcome]', e.message);

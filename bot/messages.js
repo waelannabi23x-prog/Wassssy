@@ -50,10 +50,7 @@ module.exports.registerMessages = function(bot, deps) {
 
       // ── Welcome message ──
       if (ctx.message?.new_chat_members?.length) {
-        const { handleNewMember } = require('../handlers/group_admin');
-        for (const m of ctx.message.new_chat_members) {
-          if (!m.is_bot) handleNewMember(bot, ctx.chat.id, m.id, m.first_name).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-        }
+        // handled by chat_member event to avoid duplicates
         return;
       }
 
