@@ -65,20 +65,16 @@ async function handleNewMember(bot, chatId, userId, firstName) {
     } catch (_) {}
 
     const defaultMsg =
-`╔══════════════════╗
-🎊 *أهلاً وسهلاً بك\\!*
-╚══════════════════╝
+`🎊 *أهلاً وسهلاً بك!*
 
-🌟 *${name}* انضم لعائلتنا\\!
+👤 *${name}* انضم لعائلتنا!
 
-┌─────────────────────┐
-│ 🆔 *المعرّف:* ||${uid}||
-│ 📅 *تاريخ الانضمام:* ${escV2(date)}
-│ 🕐 *الساعة:* ${escV2(time)}${specLine}${memberCount}
-└─────────────────────┘
+🆔 المعرّف: ${uid}
+📅 تاريخ الانضمام: ${date}
+🕐 الساعة: ${time}${specLine}${memberCount}
 
-💡 *يُمنع* السبّ والإزعاج
-📚 تفاعل معنا وشارك دراستك\\!
+💡 يُمنع السبّ والإزعاج
+📚 تفاعل معنا وشارك دراستك!
 
 🔗 [ملفّك الشخصي](tg://user?id=${uid})`;
 
@@ -100,7 +96,7 @@ async function handleNewMember(bot, chatId, userId, firstName) {
           .replace(/{group}/g,        groupTitle)
       : defaultMsg;
 
-    const parse = grp?.welcome_msg ? 'Markdown' : 'MarkdownV2';
+    const parse = 'Markdown';
 
     if (grp?.welcome_photo && grp.welcome_photo.startsWith('CAA')) {
       await bot.telegram.sendSticker(chatId, grp.welcome_photo).catch(() => {});
@@ -140,9 +136,8 @@ async function handleMemberLeft(bot, chatId, userId, firstName) {
     ).catch(() => null);
 
     if (grp?.goodbye_enabled) {
-      const name = escV2(firstName || 'عضو');
-      const msg = `👋 *${name}* غادر القروب\\.\n\nنتمنى لك التوفيق في مسيرتك\\! 🌟`;
-      await bot.telegram.sendMessage(chatId, msg, { parse_mode: 'MarkdownV2' })
+      const msg = `👋 *${firstName || 'عضو'}* غادر القروب.\n\nنتمنى لك التوفيق! 🌟`;
+      await bot.telegram.sendMessage(chatId, msg, { parse_mode: 'Markdown' })
         .catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
   } catch (e) {
