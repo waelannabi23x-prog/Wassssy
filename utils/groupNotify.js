@@ -90,7 +90,7 @@ async function notifyGroupsNewFile(bot, fileInfo) {
         const typeIcon = { document: '📄', photo: '🖼', video: '🎬', link: '🔗' }[fileInfo.file_type] || '📎';
 
         const caption =
-          `🆕 *ملف جديد أُضيف للمكتبة\\!*\n` +
+          `🆕 *ملف جديد أُضيف للمكتبة!*\n` +
           `━━━━━━━━━━━━━━━━━━━━\n\n` +
           `${typeIcon} *${(fileInfo.title || "")}*\n` +
           (fileInfo.cat_name ? `📁 *القسم:* ${(fileInfo.cat_name || "")}\n` : '') +

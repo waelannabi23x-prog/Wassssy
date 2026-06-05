@@ -82,11 +82,11 @@ module.exports.registerMessages = function(bot, deps) {
 
       // 🔗 Anti-Link: حجب الروابط
       if (grpSettings.anti_link && txt) {
-        const hasLink = /https?:\/\/|t\.me\/|telegram\.me\/|bit\.ly\/|tinyurl\.com\//i.test(txt);
+        const hasLink = /https?:\/\/|t. me\/|telegram. me\/|bit. ly\/|tinyurl. com\//i.test(txt);
         if (hasLink) {
           ctx.deleteMessage().catch(() => {});
           const warn = await ctx.reply(
-            '🔗 ' + (ctx.from.first_name||'') + ' الروابط ممنوعة في هذا القروب\!',
+            '🔗 ' + (ctx.from.first_name||'') + ' الروابط ممنوعة في هذا القروب!',
             { parse_mode: 'Markdown' }
           ).catch(() => null);
           if (warn) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, warn.message_id).catch(() => {}), 5000);

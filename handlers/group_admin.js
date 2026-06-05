@@ -557,14 +557,14 @@ async function warnMember(ctx, chatId, targetUserId, reason) {
       // حظر تلقائي بعد 3 تحذيرات
       try {
         await ctx.telegram.banChatMember(chatId, targetUserId);
-        actionText = `\n🚫 *تم الحظر تلقائياً* بعد ${MAX_WARNS} تحذيرات\\!`;
+        actionText = `\n🚫 *تم الحظر تلقائياً* بعد ${MAX_WARNS} تحذيرات!`;
         // إعادة ضبط التحذيرات
         await run('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, targetUserId]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       } catch (_) {
         actionText = `\n⚠️ *تعذّر الحظر* — يرجى المراجعة يدوياً`;
       }
     } else if (count === MAX_WARNS - 1) {
-      actionText = `\n⚠️ *تحذير أخير\\!* — تحذير آخر = حظر فوري`;
+      actionText = `\n⚠️ *تحذير أخير!* — تحذير آخر = حظر فوري`;
     }
 
     const msg = await ctx.reply(
