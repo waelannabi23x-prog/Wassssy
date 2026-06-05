@@ -54,7 +54,7 @@ async function handleNewMember(bot, chatId, userId, firstName) {
     const { date, time } = algeriaTime();
     const name     = (firstName || 'عضو');
     const uid      = userId;
-    const specName = spec?.name ? escV2(spec.name) : '';
+    const specName = spec?.name ? spec.name : '';
     const specLine = specName ? `\n🎓 التخصص: *${specName}*` : '';
 
     // عدد الأعضاء الحاليين
@@ -230,7 +230,7 @@ async function showAllMembers(ctx, chatId) {
 
     members.slice(0, 50).forEach((m, i) => {
       const icon = (m.first_name || '').includes('👑') ? '' : '👤 ';
-      text += `${i + 1}\\. ${icon}${m.first_name || 'مجهول'}\n`;
+      text += `${i + 1}. ${icon}${m.first_name || 'مجهول'}\n`;
     });
 
     if (members.length > 50) {
