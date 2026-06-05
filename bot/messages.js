@@ -168,7 +168,7 @@ module.exports.registerMessages = function(bot, deps) {
     if (s?.type === 'mg_file')         return manage.handleFileUpload(ctx);
     if (s?.type === 'mg_tpl_content')  return manage.handleText(ctx, s);
     if (s?.type === 'mg_notify_groups_msg') return manage.handleText(ctx, s);
-    if (s?.type?.startsWith('gp_')) return groupPanel.handleMedia(ctx, s);
+    if (s?.type?.startsWith('gp_') || s?.type?.startsWith('mg_awaiting')) return groupPanel.handleMedia(ctx, s);
   });
 
   // ── Text ──
@@ -231,7 +231,7 @@ module.exports.registerMessages = function(bot, deps) {
         return browse.showComments(ctx, s.fid, s.spId, s.yrId, s.smId, s.sbId, s.catId);
       }
       if ((s?.type || '').startsWith('mg_') && ctx.isAdmin) return manage.handleText(ctx, s);
-      if ((s?.type || '').startsWith('gp_') && ctx.isAdmin) return groupPanel.handleText(ctx, txt, s);
+      if ((s?.type || '').startsWith('gp_')) return groupPanel.handleText(ctx, txt, s);
     } catch(e) { logger.error('[TextHandler]', e.message, { uid: ctx.from?.id }); }
   });
 
@@ -290,7 +290,7 @@ module.exports.registerMessages = function(bot, deps) {
     if (ctx.chat?.type !== 'private') return;
     const sticker = ctx.message.sticker;
     const s = require('../utils/stateManager').getState(ctx.uid);
-    if (s?.type?.startsWith('gp_')) return groupPanel.handleMedia(ctx, s);
+    if (s?.type?.startsWith('gp_') || s?.type?.startsWith('mg_awaiting')) return groupPanel.handleMedia(ctx, s);
     // رد بنفس الـ sticker
     // لا ترد تلقائياً
   });
