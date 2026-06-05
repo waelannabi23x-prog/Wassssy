@@ -193,10 +193,22 @@ async function handleCallback(ctx, data) {
 
 async function handleText(ctx, text, state) {
   if (state.type === 'gp_set_welcome') {
-    await run('UPDATE group_chats SET welcome_msg=$1 WHERE chat_id=$2', [text, state.chatId]);
+    // حفظ في الجدولين
+    await run('UPDATE group_chats SET welcome_msg=$1 WHERE chat_id=$2', [text, state.chatId]).catch(() => {});
+    await run(
+      `INSERT INTO group_welcome(chat_id, message, updated_at) VALUES($1,$2,NOW())
+       ON CONFLICT(chat_id) DO UPDATE SET message=$2, updated_at=NOW()`,
+      [state.chatId, text]
+    ).catch(() => {});
     await require('../utils/stateManager').delState(ctx.uid);
-    await ctx.reply('تم تحديث رسالة الترحيب!').catch(() => {});
+    await ctx.reply('✅ تم حفظ رسالة الترحيب!\n\n📝 المتغيرات:\n`{name}` الاسم | `{id}` المعرف\n`{spec}` التخصص | `{date}` التاريخ\n`{count}` عدد الأعضاء | `{group}` اسم القروب', { parse_mode: 'Markdown' }).catch(() => {});
     return showGroupDetail(ctx, state.chatId);
+  }
+  if (state.type === 'gp_set_wphoto') {
+    // صورة ترحيب — يجب أن تكون صورة
+    await require('../utils/stateManager').delState(ctx.uid);
+    await ctx.reply('⚠️ أرسل صورة وليس نصاً').catch(() => {});
+    return;
   }
   if (state.type === 'gp_broadcast_msg') {
     await require('../utils/stateManager').delState(ctx.uid);
@@ -213,6 +225,21 @@ async function handleText(ctx, text, state) {
 }
 
 async function handleMedia(ctx, state) {
+  // صورة الترحيب
+  if (state.type === 'gp_set_wphoto') {
+    const photo = ctx.message?.photo;
+    const fileId = photo ? photo[photo.length - 1].file_id : null;
+    if (!fileId) return ctx.reply('⚠️ أرسل صورة صحيحة').catch(() => {});
+    await run(
+      `INSERT INTO group_welcome(chat_id, image_file_id, updated_at) VALUES($1,$2,NOW())
+       ON CONFLICT(chat_id) DO UPDATE SET image_file_id=$2, updated_at=NOW()`,
+      [state.chatId, fileId]
+    ).catch(() => {});
+    await run('UPDATE group_chats SET welcome_photo=$1 WHERE chat_id=$2', [fileId, state.chatId]).catch(() => {});
+    await require('../utils/stateManager').delState(ctx.uid);
+    await ctx.reply('✅ تم حفظ صورة الترحيب!').catch(() => {});
+    return showGroupDetail(ctx, state.chatId);
+  }
   const msg = ctx.message;
   const caption = msg.caption || '';
 
@@ -226,6 +253,12 @@ async function handleMedia(ctx, state) {
     return showGroupDetail(ctx, state.chatId);
   }
 
+  if (state.type === 'gp_set_wphoto') {
+    // صورة ترحيب — يجب أن تكون صورة
+    await require('../utils/stateManager').delState(ctx.uid);
+    await ctx.reply('⚠️ أرسل صورة وليس نصاً').catch(() => {});
+    return;
+  }
   if (state.type === 'gp_broadcast_msg') {
     await require('../utils/stateManager').delState(ctx.uid);
     let fileId, mediaType;

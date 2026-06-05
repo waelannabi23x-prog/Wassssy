@@ -112,7 +112,7 @@ async function _checkChannel(bot, userId, channelId) {
     }
 
     console.warn('[ChannelGuard] Unknown error — uid:', userId, 'ch:', channelId, msg);
-    return true;
+    return false; // ← خطأ غير معروف = نمنع (أأمن)
   }
 }
 
@@ -155,8 +155,8 @@ async function checkAllChannels(bot, userId) {
   const ok      = missing.length === 0;
 
   // ✅ cache إيجابي 30 ثانية فقط (حتى يبقى الفحص حساس)
-  if (ok) cacheSet(cacheKey, true, 30_000);
-  else cacheClear(cacheKey); // ← مش مشترك = لا كاش أبداً
+  if (ok) cacheSet(cacheKey, true, 20_000); // 20 ثانية فقط
+  else cacheClear(cacheKey);
 
   return { ok, missing };
 }
@@ -187,6 +187,8 @@ async function addChannel(channelId, channelName, channelUrl, bot) {
   cacheClear('required_channels');
   cacheClear('chname_' + channelId);
   _clearAllSubCache(); // ← قناة جديدة = كل المستخدمين يُعاد التحقق منهم
+  // تأكد إن الكاش الجديد ما يُبنى من القديم
+  cacheClear('required_channels');
   _clearAllSubCache(); // يجبر الكل على إعادة التحقق
 
   console.log('[ChannelGuard] ✅ أُضيفت القناة:', channelId, channelName);
@@ -246,6 +248,44 @@ async function clearSubCache(userId) {
 }
 
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+//  PUBLIC: إشعار المستخدمين النشطين بقناة جديدة
+// ─────────────────────────────────────────────────────────────
+async function notifyUsersNewChannel(bot, channelName) {
+  try {
+    const { all: dbAll } = require('../database/db');
+    // جلب المستخدمين النشطين خلال 7 أيام
+    const users = await dbAll(
+      `SELECT id FROM users WHERE is_banned=0 
+       AND last_active > NOW() - INTERVAL '7 days' 
+       LIMIT 1000`
+    ).catch(() => []);
+    
+    if (!users.length) return;
+    
+    const text = '📢 *تنبيه مهم!*
+
+' +
+      'تم إضافة قناة اشتراك إجباري جديدة:
+' +
+      '📣 *' + channelName + '*
+
+' +
+      'يرجى الاشتراك للاستمرار في استخدام البوت.';
+    
+    // إرسال للمستخدمين بـ chunks
+    for (let i = 0; i < users.length; i += 20) {
+      const chunk = users.slice(i, i + 20);
+      await Promise.allSettled(
+        chunk.map(u => bot.telegram.sendMessage(u.id, text, { parse_mode: 'Markdown' }).catch(() => {}))
+      );
+      if (i + 20 < users.length) await new Promise(r => setTimeout(r, 1000));
+    }
+  } catch(e) {
+    console.error('[ChannelGuard] notifyUsers error:', e.message);
+  }
+}
+
 module.exports = {
   getChannels,
   checkAllChannels,
@@ -253,5 +293,6 @@ module.exports = {
   removeChannel,
   buildSubscribeMessage,
   clearSubCache,
+  notifyUsersNewChannel,
   validateBotInChannel,
 };
