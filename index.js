@@ -190,6 +190,62 @@ require('./bot/commands')(bot, {
 });
 
 // ── Callbacks ──
+// ══ Middleware حماية القروبات ══
+const { all: _dbAll, get: _dbGet } = require('./database/db');
+const { cacheGet: _cGet, cacheSet: _cSet } = require('./utils/cache');
+const _spamProtect = new Map();
+setInterval(() => { const cut=Date.now()-10000; for(const[k,v] of _spamProtect) if(v.last<cut) _spamProtect.delete(k); }, 10000).unref();
+
+bot.use(async (ctx, next) => {
+  if (ctx.chat?.type === 'private' || !ctx.message || !ctx.from) return next();
+  if (ctx.isAdmin || ctx.isOwner) return next();
+
+  const uid = ctx.from.id;
+  const cid = ctx.chat.id;
+  const txt = ctx.message?.text || ctx.message?.caption || '';
+  const now = Date.now();
+
+  // جلب إعدادات القروب
+  const sk = 'grp_s_' + cid;
+  let gs = _cGet(sk);
+  if (!gs) {
+    gs = await _dbGet('SELECT anti_spam,anti_link,anti_flood FROM group_chats WHERE chat_id=$1',[cid]).catch(()=>null) || {};
+    _cSet(sk, gs, 60000);
+  }
+
+  // Anti-Flood
+  if (gs.anti_flood) {
+    const key = uid+'_'+cid;
+    const sp = _spamProtect.get(key) || {c:0,t:now};
+    if (now - sp.t < 3000) sp.c++; else { sp.c=1; sp.t=now; }
+    _spamProtect.set(key, sp);
+    if (sp.c > 5) {
+      ctx.deleteMessage().catch(()=>{});
+      if (sp.c === 6) require('./handlers/group_admin').warnMember(ctx,cid,uid,'فلود').catch(()=>{});
+      return;
+    }
+  }
+
+  // Anti-Link
+  if (gs.anti_link && txt && !txt.startsWith('/')) {
+    if (/https?:\/\/|t\.me\/|telegram\.me\//i.test(txt)) {
+      ctx.deleteMessage().catch(()=>{});
+      const m = await ctx.reply('🔗 ' + (ctx.from.first_name||'') + ' الروابط ممنوعة!').catch(()=>null);
+      if (m) setTimeout(()=>ctx.telegram.deleteMessage(cid,m.message_id).catch(()=>{}),5000);
+      return;
+    }
+  }
+
+  // Anti-Spam (رسائل متكررة)
+  if (gs.anti_spam && txt && txt.length > 5 && !txt.startsWith('/')) {
+    const sk2 = 'sp_'+uid+'_'+cid;
+    if (_cGet(sk2) === txt) { ctx.deleteMessage().catch(()=>{}); return; }
+    _cSet(sk2, txt, 10000);
+  }
+
+  return next();
+});
+
 const { registerCallbacks } = require('./bot/callbacks');
 registerCallbacks(bot, {
   CBDedup, cbRes, startHandler, manage, browse, userH,
