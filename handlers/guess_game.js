@@ -1,124 +1,165 @@
 'use strict';
 /**
- * 🎮 لعبة "خمن" — نص فقط، بدون أزرار
- * خمن  ← يبدأ التحدي
- * انا  ← ينضم المنافس
+ * 🎮 لعبة "خمن الصورة" — احترافية
+ * ─────────────────────────────────
+ * خمن     ← يبدأ التحدي في القروب
+ * انا     ← ينضم المنافس
+ * تخمين: [الاسم] ← محاولة التخمين
  */
 
 const logger = require('../utils/logger');
 
-const INVITE_SECS  = 60;
-const COLLECT_SECS = 600;
-const GAME_SECS    = 300;
+// ── الإعدادات ──────────────────────────────────────────
+const CFG = {
+  INVITE_SECS:  60,   // وقت انتظار المنافس
+  COLLECT_SECS: 300,  // وقت إرسال الصور (5 دقائق)
+  GAME_SECS:    300,  // وقت التخمين (5 دقائق)
+  MAX_ATTEMPTS: 5,    // أقصى محاولات لكل لاعب
+  WARN_BEFORE:  60,   // تحذير قبل انتهاء الوقت
+};
 
+// ── الخرائط ────────────────────────────────────────────
 const _games    = new Map(); // chatId → game
 const _pvStates = new Map(); // userId → pvState
 const _toDelete = new Map(); // chatId → [msgIds]
 
-const s    = v => String(v || '');
-const norm = t => s(t).trim().toLowerCase()
-  .replace(/[أإآا]/g,'ا').replace(/ة/g,'ه').replace(/ى/g,'ي').replace(/\s+/g,' ');
-const esc  = t => s(t).replace(/[_*[\]()~`>#+=|{}.!\-]/g,'\\$&');
-const uname = u => u ? ([u.first_name,u.last_name].filter(Boolean).join(' ')||u.username||s(u.id)) : '؟';
-const mention = u => u.username ? `@${u.username}` : `[${esc(uname(u))}](tg://user?id=${u.id})`;
+// ── مساعدات النصوص ─────────────────────────────────────
+const s      = v => String(v || '');
+const norm   = t => s(t).trim().toLowerCase()
+  .replace(/[أإآا]/g, 'ا')
+  .replace(/ة/g, 'ه')
+  .replace(/ى/g, 'ي')
+  .replace(/[\s\-_]/g, '')
+  .replace(/[.,!?؟،؛]/g, '');
 
+// تحقق تقريبي — يقبل إذا كان التشابه 80% فأكثر
+function isSimilar(a, b) {
+  const na = norm(a), nb = norm(b);
+  if (na === nb) return true;
+  if (na.includes(nb) || nb.includes(na)) return true;
+  // Levenshtein distance بسيط
+  if (Math.abs(na.length - nb.length) > 3) return false;
+  let diff = 0;
+  const min = Math.min(na.length, nb.length);
+  for (let i = 0; i < min; i++) if (na[i] !== nb[i]) diff++;
+  diff += Math.abs(na.length - nb.length);
+  return diff <= Math.floor(Math.max(na.length, nb.length) * 0.25);
+}
+
+const uname = u => u ? ([u.first_name, u.last_name].filter(Boolean).join(' ') || u.username || s(u.id)) : '؟';
+const mention = u => u.username ? `@${u.username}` : `[${uname(u)}](tg://user?id=${u.id})`;
+const esc = t => s(t).replace(/[_*[\]()~`>#+=|{}.!\-]/g, '\\$&');
+
+// ── إدارة الرسائل ──────────────────────────────────────
 function trackMsg(chatId, msgId) {
   if (!msgId) return;
   if (!_toDelete.has(chatId)) _toDelete.set(chatId, []);
   _toDelete.get(chatId).push(msgId);
 }
 
-async function cleanGroup(telegram, chatId, keepId) {
-  const ids = _toDelete.get(chatId) || [];
-  await Promise.allSettled(
-    ids.filter(id => id !== keepId)
-       .map(id => telegram.deleteMessage(chatId, id).catch(() => {}))
-  );
+async function cleanGroup(telegram, chatId, keepIds = []) {
+  const ids = (_toDelete.get(chatId) || []).filter(id => !keepIds.includes(id));
+  await Promise.allSettled(ids.map(id => telegram.deleteMessage(chatId, id).catch(() => {})));
   _toDelete.delete(chatId);
 }
 
-/* ══════ PHASE 1 — خمن ══════ */
+function buildTimer(left, total) {
+  const pct   = Math.max(0, Math.min(10, Math.round((left / total) * 10)));
+  const color = left > 60 ? '🟩' : left > 20 ? '🟨' : '🟥';
+  return color.repeat(pct) + '⬛'.repeat(10 - pct) + ` *${left}ث*`;
+}
+
+// ══════════════════════════════════════════════════════
+// PHASE 1 — بدء التحدي (خمن)
+// ══════════════════════════════════════════════════════
 async function startInvite(ctx) {
   const chatId = s(ctx.chat.id);
   const user   = ctx.from;
 
+  // تحقق من لعبة نشطة
   const ex = _games.get(chatId);
-  const _uid = s(user.id);
-  const _pvBusy = _pvStates.has(_uid);
-  if ((ex && ex.status !== 'ended') || _pvBusy) {
+  if (ex && ex.status !== 'ended') {
     const w = await ctx.telegram.sendMessage(chatId,
-      `⏳ *يوجد تحدٍّ نشط بالفعل!*\nانتظر انتهاءه ثم ابدأ جولة جديدة.`
+      `⚠️ يوجد تحدٍّ نشط بالفعل!\nانتظر انتهاءه ثم ابدأ جولة جديدة.`
     ).catch(() => null);
-    if (w) setTimeout(() => ctx.telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 5000);
     ctx.telegram.deleteMessage(chatId, ctx.message.message_id).catch(() => {});
+    if (w) setTimeout(() => ctx.telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 5000);
     return;
   }
 
   ctx.telegram.deleteMessage(chatId, ctx.message.message_id).catch(() => {});
 
-  const gameId = Date.now();
   const game = {
-    id: gameId, chatId,
+    id: Date.now(), chatId,
     status: 'waiting',
-    p1: { ...user }, p2: null,
+    p1: { ...user, attempts: 0 },
+    p2: null,
     inviteMsgId: null,
-    inviteTimer: null, collectTimer: null, gameTimer: null, warnTimer: null,
+    _timers: [],
   };
   _games.set(chatId, game);
 
   const m = await ctx.telegram.sendMessage(chatId,
-    `🎮 *تحدي جديد!*\n` +
-    `┄┄┄┄┄┄┄┄┄┄\n` +
+    `🎮 *تحدي خمن الصورة!*\n` +
+    `━━━━━━━━━━━━━━━━━━\n\n` +
     `👤 المتحدي: ${mention(user)}\n\n` +
-    `📖 *كيف تلعب؟*\n` +
-    `┌ كل لاعب يختار صورة سرية\n` +
-    `├ ترسلها للبوت في الخاص\n` +
-    `├ تتحدثون بحرية في القروب\n` +
-    `└ أول من يخمن صورة خصمه يفوز!\n\n` +
-    `✏️ اكتب *انا* للانضمام\n` +
-    `⏳ تنتهي الدعوة خلال *60 ثانية*`,
+    `📋 *القواعد:*\n` +
+    `📸 كل لاعب يختار صورة سرية\n` +
+    `✉️ يرسلها للبوت في الخاص\n` +
+    `💬 تتحدثون بحرية في القروب\n` +
+    `🎯 اكتب \`تخمين: الاسم\` للفوز\n` +
+    `❌ لديك *${CFG.MAX_ATTEMPTS} محاولات* فقط!\n\n` +
+    `${buildTimer(CFG.INVITE_SECS, CFG.INVITE_SECS)}\n\n` +
+    `✏️ اكتب *انا* للانضمام`,
     { parse_mode: 'Markdown' }
   ).catch(() => null);
 
   if (!m) { _games.delete(chatId); return; }
-
   game.inviteMsgId = m.message_id;
   trackMsg(chatId, m.message_id);
 
-  // ── عداد تنازلي يتحدث كل 10 ثواني ──
-  const _cdStart = Date.now();
-  const _cdInterval = setInterval(async () => {
+  // ── عداد تنازلي كل 10 ثواني ──
+  const start = Date.now();
+  const cdInterval = setInterval(async () => {
     const g = _games.get(chatId);
-    if (!g || g.status !== 'waiting') { clearInterval(_cdInterval); return; }
-    const elapsed = Math.floor((Date.now() - _cdStart) / 1000);
-    const left    = INVITE_SECS - elapsed;
-    if (left <= 0) { clearInterval(_cdInterval); return; }
-    const bar = '█'.repeat(Math.floor(left/6)) + '░'.repeat(10 - Math.floor(left/6));
+    if (!g || g.status !== 'waiting') { clearInterval(cdInterval); return; }
+    const left = Math.max(0, CFG.INVITE_SECS - Math.floor((Date.now() - start) / 1000));
     await ctx.telegram.editMessageText(chatId, game.inviteMsgId, null,
-      `🎮 *تحدي جديد من ${mention(user)}!*\n\n` +
-      `🖼️ كل لاعب يختار صورة سرية، والآخر يحاول تخمينها خلال 5 دقائق عبر الحوار الحر.\n\n` +
-      `✏️ اكتب *انا* للانضمام\n` +
-      `⏳ ${bar} *${left}ث*`,
+      `🎮 *تحدي خمن الصورة!*\n` +
+      `━━━━━━━━━━━━━━━━━━\n\n` +
+      `👤 المتحدي: ${mention(user)}\n\n` +
+      `📋 *القواعد:*\n` +
+      `📸 كل لاعب يختار صورة سرية\n` +
+      `✉️ يرسلها للبوت في الخاص\n` +
+      `💬 تتحدثون بحرية في القروب\n` +
+      `🎯 اكتب \`تخمين: الاسم\` للفوز\n` +
+      `❌ لديك *${CFG.MAX_ATTEMPTS} محاولات* فقط!\n\n` +
+      `${buildTimer(left, CFG.INVITE_SECS)}\n\n` +
+      `✏️ اكتب *انا* للانضمام`,
       { parse_mode: 'Markdown' }
     ).catch(() => {});
   }, 10000);
-  game._cdInterval = _cdInterval;
+  game._timers.push(cdInterval);
 
-  game.inviteTimer = setTimeout(async () => {
-    clearInterval(_cdInterval);
+  // ── timeout انتهاء الدعوة ──
+  const inviteTimeout = setTimeout(async () => {
+    clearInterval(cdInterval);
     const g = _games.get(chatId);
     if (!g || g.status !== 'waiting') return;
     g.status = 'ended';
     _games.delete(chatId);
+    await cleanGroup(ctx.telegram, chatId);
     const r = await ctx.telegram.sendMessage(chatId,
-      `⏰ انتهى وقت الدعوة، لم ينضم أحد.`
+      `⏰ انتهى وقت الدعوة — لم ينضم أحد.\n\nاكتب *خمن* لبدء تحدٍّ جديد!`
     ).catch(() => null);
-    await cleanGroup(ctx.telegram, chatId, null);
     if (r) setTimeout(() => ctx.telegram.deleteMessage(chatId, r.message_id).catch(() => {}), 8000);
-  }, INVITE_SECS * 1000);
+  }, CFG.INVITE_SECS * 1000);
+  game._timers.push(inviteTimeout);
 }
 
-/* ══════ PHASE 2 — انا ══════ */
+// ══════════════════════════════════════════════════════
+// PHASE 2 — الانضمام (انا)
+// ══════════════════════════════════════════════════════
 async function handleJoin(ctx) {
   const chatId = s(ctx.chat.id);
   const user   = ctx.from;
@@ -126,76 +167,77 @@ async function handleJoin(ctx) {
 
   if (!game || game.status !== 'waiting') return;
   if (s(user.id) === s(game.p1.id)) {
-    const w = await ctx.telegram.sendMessage(chatId, `😄 ${mention(user)} لا تستطيع التحدي مع نفسك!`, { parse_mode: 'Markdown' }).catch(() => null);
+    const w = await ctx.telegram.sendMessage(chatId,
+      `😄 ${mention(user)} لا تستطيع التحدي مع نفسك!`,
+      { parse_mode: 'Markdown' }
+    ).catch(() => null);
     ctx.telegram.deleteMessage(chatId, ctx.message.message_id).catch(() => {});
-    if (w) { trackMsg(chatId, w.message_id); setTimeout(() => ctx.telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 4000); }
+    if (w) setTimeout(() => ctx.telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 4000);
     return;
   }
 
-  clearTimeout(game.inviteTimer);
-  clearInterval(game._cdInterval);
+  // أوقف كل timers السابقة
+  game._timers.forEach(t => { clearTimeout(t); clearInterval(t); });
+  game._timers = [];
   game.status = 'collecting';
-  game.p2     = { ...user };
+  game.p2 = { ...user, attempts: 0 };
 
   ctx.telegram.deleteMessage(chatId, ctx.message.message_id).catch(() => {});
+  await cleanGroup(ctx.telegram, chatId);
 
-  // امسح كل رسائل الدعوة
-  await cleanGroup(ctx.telegram, chatId, null);
-
-  // رسالة المشاركين
   const m = await ctx.telegram.sendMessage(chatId,
-    `✅ *اكتملت المباراة!*\n` +
-    `┄┄┄┄┄┄┄┄┄┄\n` +
+    `⚔️ *اكتملت المباراة!*\n` +
+    `━━━━━━━━━━━━━━━━━━\n\n` +
     `🔴 ${mention(game.p1)}\n` +
     `🔵 ${mention(game.p2)}\n\n` +
     `📲 *تحقق من رسائلك الخاصة مع البوت*\n` +
-    `⏳ عندكم *5 دقائق* لإرسال الصور`,
+    `📸 أرسل صورتك السرية خلال *5 دقائق*`,
     { parse_mode: 'Markdown' }
   ).catch(() => null);
-
   if (m) trackMsg(chatId, m.message_id);
 
-  // اطلب الصور في PV
+  // اطلب الصور من اللاعبين
   for (const player of [game.p1, game.p2]) {
     await _requestPhoto(ctx.telegram, game, player);
   }
 
-  // تحذير دقيقتين قبل انتهاء الوقت
-  setTimeout(async () => {
+  // تحذير دقيقتين قبل انتهاء وقت الإرسال
+  const warnT = setTimeout(async () => {
     const g = _games.get(chatId);
     if (!g || g.status !== 'collecting') return;
     const pending = [g.p1, g.p2].filter(p => !p.ready).map(p => mention(p)).join(' و ');
     if (!pending) return;
     const w = await ctx.telegram.sendMessage(chatId,
-      `⚠️ تبقّت *دقيقتان* لإرسال الصور!\n📲 ${pending} تحقق من رسائلك الخاصة مع البوت.`,
+      `⚠️ تبقّت *دقيقتان* لإرسال الصور!\n${pending} افتح الخاص مع البوت`,
       { parse_mode: 'Markdown' }
     ).catch(() => null);
-    if (w) setTimeout(() => ctx.telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 110000);
-  }, (COLLECT_SECS - 120) * 1000);
+    if (w) setTimeout(() => ctx.telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 115000);
+  }, (CFG.COLLECT_SECS - 120) * 1000);
+  game._timers.push(warnT);
 
-  // Timeout للجمع
-  game.collectTimer = setTimeout(async () => {
+  // timeout إرسال الصور
+  const collectT = setTimeout(async () => {
     const g = _games.get(chatId);
     if (!g || g.status !== 'collecting') return;
     g.status = 'ended';
     _games.delete(chatId);
     _pvStates.delete(s(g.p1.id));
-    _pvStates.delete(s(g.p2.id));
-    const miss = [g.p1, g.p2].filter(p => !p.ready).map(p => uname(p)).join(' و ');
+    _pvStates.delete(s(g.p2?.id));
+    const miss = [g.p1, g.p2].filter(p => p && !p.ready).map(p => uname(p)).join(' و ');
+    await cleanGroup(ctx.telegram, chatId);
     const r = await ctx.telegram.sendMessage(chatId,
-      `⚠️ *انتهت الجولة*\n` +
-    `┄┄┄┄┄┄┄┄┄┄\n` +
-    `${esc(miss)} لم يرسل صورته في الوقت المحدد.\n` +
-    `اكتب *خمن* لبدء جولة جديدة!`,
-      { parse_mode: 'Markdown' }
+      `⏰ *انتهى الوقت!*\n\n` +
+      `${miss} لم يرسل صورته في الوقت المحدد.\n\nاكتب *خمن* لبدء جولة جديدة!`
     ).catch(() => null);
-    await cleanGroup(ctx.telegram, chatId, r?.message_id);
-  }, COLLECT_SECS * 1000);
+    if (r) setTimeout(() => ctx.telegram.deleteMessage(chatId, r.message_id).catch(() => {}), 10000);
+  }, CFG.COLLECT_SECS * 1000);
+  game._timers.push(collectT);
 }
 
-/* ══════ REQUEST PHOTO ══════ */
+// ══════════════════════════════════════════════════════
+// طلب الصورة في الخاص
+// ══════════════════════════════════════════════════════
 async function _requestPhoto(telegram, game, player) {
-  const BOT = process.env.BOT_USERNAME || '';
   const opp = s(player.id) === s(game.p1.id) ? game.p2 : game.p1;
 
   _pvStates.set(s(player.id), {
@@ -205,64 +247,84 @@ async function _requestPhoto(telegram, game, player) {
     name:   null,
   });
 
+  const msg =
+    `🎮 *تحدي خمن — مرحباً ${uname(player)}!*\n` +
+    `━━━━━━━━━━━━━━━━━━\n\n` +
+    `⚔️ منافسك: *${uname(opp)}*\n\n` +
+    `📸 *الخطوة الأولى:*\n` +
+    `أرسل لي صورة سرية الآن\n` +
+    `_(لن يراها منافسك إلا بعد انتهاء اللعبة)_\n\n` +
+    `💡 اختر صورة واضحة لها اسم محدد\n` +
+    `مثال: صورة برج إيفل، قطة، سيارة...`;
+
   try {
-    await telegram.sendMessage(player.id,
-      `🎮 *تحدي خمن — مرحباً!*\n` +
-      `┄┄┄┄┄┄┄┄┄┄\n` +
-      `⚔️ منافسك: *${esc(uname(opp))}*\n\n` +
-      `📸 *الخطوة 1:* أرسل لي الصورة السرية\n` +
-      `_لن يراها منافسك إلا بعد انتهاء اللعبة_\n\n` +
-      `⏳ عندك 5 دقائق للإرسال`,
-      { parse_mode: 'Markdown' }
-    );
+    await telegram.sendMessage(player.id, msg, { parse_mode: 'Markdown' });
   } catch (e) {
     logger.warn(`[GuessGame] PV fail ${player.id}: ${e.message}`);
-    const chatId = s(game.chatId);
-    await telegram.sendMessage(chatId,
-      `📩 ${mention(player)} ابدأ البوت في الخاص ثم أرسل صورتك:`,
+    const BOT = process.env.BOT_USERNAME || '';
+    await telegram.sendMessage(s(game.chatId),
+      `📩 ${mention(player)} — افتح البوت في الخاص وأرسل صورتك!`,
       {
         parse_mode: 'Markdown',
         reply_markup: { inline_keyboard: [[
-          { text: '🤖 افتح البوت', url: `https://t.me/${BOT}?start=guess_${game.id}` }
+          { text: '🤖 افتح البوت', url: `https://t.me/${BOT}` }
         ]]}
       }
     ).catch(() => {});
   }
 }
 
-/* ══════ PHASE 3 — PV Collection ══════ */
+// ══════════════════════════════════════════════════════
+// PHASE 3 — استلام الصور في الخاص
+// ══════════════════════════════════════════════════════
 async function handlePvMessage(ctx) {
   if (ctx.chat?.type !== 'private') return false;
   const uid = s(ctx.from.id);
   const pv  = _pvStates.get(uid);
   if (!pv) return false;
 
+  // ── مرحلة 1: انتظار الصورة ──
   if (pv.step === 'waiting_photo') {
     const photo = ctx.message?.photo;
     if (!photo?.length) {
-      await ctx.reply('📷 أرسل *صورة* فقط.', { parse_mode: 'Markdown' }).catch(() => {});
+      await ctx.reply(
+        `📷 أرسل *صورة* فقط.\n_(اضغط على أيقونة المرفقات واختر صورة)_`,
+        { parse_mode: 'Markdown' }
+      ).catch(() => {});
       return true;
     }
-    if (pv._lock) return true; // منع double-processing
+    if (pv._lock) return true;
     pv._lock = true;
     pv.photo = photo[photo.length - 1].file_id;
     pv.step  = 'waiting_name';
     delete pv._lock;
+
     await ctx.reply(
-      `✅ *تم استلام الصورة!*\n\n✏️ الآن اكتب الاسم الصحيح للصورة.\nمثال: \`برج إيفل\``,
+      `✅ *تم استلام الصورة!*\n\n` +
+      `✏️ *الخطوة الثانية:*\n` +
+      `اكتب الاسم الصحيح للصورة\n\n` +
+      `💡 مثال: \`برج إيفل\` أو \`قطة برتقالية\`\n` +
+      `_(هذا الاسم هو ما يجب أن يخمنه منافسك)_`,
       { parse_mode: 'Markdown' }
     ).catch(() => {});
     return true;
   }
 
+  // ── مرحلة 2: انتظار الاسم ──
   if (pv.step === 'waiting_name') {
-    // إذا أرسل صورة بدل نص في هذه المرحلة
     if (ctx.message?.photo) {
-      await ctx.reply('✅ الصورة محفوظة بالفعل! ✏️ الآن اكتب *الاسم* فقط نصاً.', { parse_mode: 'Markdown' }).catch(() => {});
+      await ctx.reply(`✅ الصورة محفوظة!\n✏️ الآن اكتب *الاسم* نصاً فقط.`, { parse_mode: 'Markdown' }).catch(() => {});
       return true;
     }
     const txt = ctx.message?.text?.trim();
-    if (!txt) { await ctx.reply('✏️ اكتب الاسم نصاً.').catch(() => {}); return true; }
+    if (!txt || txt.startsWith('/')) {
+      await ctx.reply(`✏️ اكتب اسم الصورة نصاً.`).catch(() => {});
+      return true;
+    }
+    if (txt.length < 2) {
+      await ctx.reply(`⚠️ الاسم قصير جداً! اكتب اسماً أوضح.`).catch(() => {});
+      return true;
+    }
     if (pv._lock) return true;
     pv._lock = true;
     pv.name = txt;
@@ -271,7 +333,7 @@ async function handlePvMessage(ctx) {
 
     const game = _games.get(pv.chatId);
     if (!game || game.status !== 'collecting') {
-      await ctx.reply('❌ انتهت اللعبة.').catch(() => {});
+      await ctx.reply(`❌ انتهت اللعبة أو انتهى وقتها.`).catch(() => {});
       _pvStates.delete(uid);
       return true;
     }
@@ -284,12 +346,17 @@ async function handlePvMessage(ctx) {
     _pvStates.delete(uid);
 
     await ctx.reply(
-      `✅ *جاهز!*\nالاسم المحفوظ: *${esc(txt)}* 🤫\n\nفي انتظار منافسك...`,
+      `✅ *جاهز تماماً!*\n\n` +
+      `🤫 الاسم المحفوظ: *${esc(txt)}*\n\n` +
+      `⏳ في انتظار منافسك...\n` +
+      `ستبدأ اللعبة تلقائياً عند جاهزية الجميع`,
       { parse_mode: 'Markdown' }
     ).catch(() => {});
 
+    // إذا الاثنان جاهزان — ابدأ اللعبة
     if (game.p1.ready && game.p2.ready) {
-      clearTimeout(game.collectTimer);
+      game._timers.forEach(t => { clearTimeout(t); clearInterval(t); });
+      game._timers = [];
       await beginGame(ctx.telegram, game);
     }
     return true;
@@ -298,164 +365,313 @@ async function handlePvMessage(ctx) {
   return false;
 }
 
-/* ══════ PHASE 4 — Game Active ══════ */
+// ══════════════════════════════════════════════════════
+// PHASE 4 — بداية اللعبة
+// ══════════════════════════════════════════════════════
 async function beginGame(telegram, game) {
-  const chatId = s(game.chatId);
+  const chatId   = s(game.chatId);
   game.status    = 'active';
   game.startedAt = Date.now();
+  game.p1.attempts = 0;
+  game.p2.attempts = 0;
 
+  // أرسل الصور للاعبين (كل لاعب يشوف صورة خصمه)
   for (const player of [game.p1, game.p2]) {
     const opp = s(player.id) === s(game.p1.id) ? game.p2 : game.p1;
-    await telegram.sendMessage(player.id,
-      `🚀 *بدأت اللعبة!*\n\n⚔️ منافسك: *${esc(uname(opp))}*\n\n` +
-      `💬 تحدث معه بحرية في القروب.\n` +
-      `🎯 للتخمين اكتب في القروب:\n\`تخمين: اسم الصورة\`\n\n⏱️ عندك *5 دقائق!* 🍀`,
-      { parse_mode: 'Markdown' }
-    ).catch(() => {});
+    try {
+      await telegram.sendPhoto(player.id, opp.photo, {
+        caption:
+          `🎮 *بدأت اللعبة!*\n\n` +
+          `🖼️ هذي صورة منافسك — خمّن اسمها!\n\n` +
+          `🎯 اكتب في القروب:\n\`تخمين: الاسم\`\n\n` +
+          `❌ لديك *${CFG.MAX_ATTEMPTS} محاولات* فقط!\n` +
+          `⏱️ وقتك *5 دقائق*`,
+        parse_mode: 'Markdown'
+      });
+    } catch(e) {
+      await telegram.sendMessage(player.id,
+        `🚀 *بدأت اللعبة!*\n\nخمّن اسم صورة منافسك في القروب:\n\`تخمين: الاسم\``,
+        { parse_mode: 'Markdown' }
+      ).catch(() => {});
+    }
   }
 
-  await cleanGroup(telegram, chatId, null);
+  await cleanGroup(telegram, chatId);
 
   const m = await telegram.sendMessage(chatId,
     `⚔️ *انطلقت المباراة!*\n` +
-    `┄┄┄┄┄┄┄┄┄┄\n` +
-    `🔴 ${mention(game.p1)}\n` +
-    `🔵 ${mention(game.p2)}\n\n` +
-    `💬 تحدثوا بحرية وتبادلوا الأسئلة\n` +
-    `🎯 للتخمين اكتب: \`تخمين: الاسم\`\n` +
-    `⏱️ المدة: *5 دقائق* — بالتوفيق! 🍀`,
+    `━━━━━━━━━━━━━━━━━━\n\n` +
+    `🔴 ${mention(game.p1)} — ❌ 0/${CFG.MAX_ATTEMPTS}\n` +
+    `🔵 ${mention(game.p2)} — ❌ 0/${CFG.MAX_ATTEMPTS}\n\n` +
+    `💡 كل لاعب استلم صورة خصمه في الخاص\n` +
+    `🎯 اكتب: \`تخمين: اسم الصورة\`\n\n` +
+    `${buildTimer(CFG.GAME_SECS, CFG.GAME_SECS)}\n` +
+    `⏱️ لديكم *5 دقائق* — بالتوفيق! 🍀`,
     { parse_mode: 'Markdown' }
   ).catch(() => null);
 
-  if (m) trackMsg(chatId, m.message_id);
+  if (m) {
+    trackMsg(chatId, m.message_id);
+    game.statusMsgId = m.message_id;
+  }
 
-  game.warnTimer = setTimeout(async () => {
+  // ── عداد تنازلي يحدث الرسالة كل 30 ثانية ──
+  const start = Date.now();
+  const cdInterval = setInterval(async () => {
+    const g = _games.get(chatId);
+    if (!g || g.status !== 'active') { clearInterval(cdInterval); return; }
+    const left = Math.max(0, CFG.GAME_SECS - Math.floor((Date.now() - start) / 1000));
+    if (!g.statusMsgId) return;
+    await telegram.editMessageText(chatId, g.statusMsgId, null,
+      `⚔️ *المباراة جارية!*\n` +
+      `━━━━━━━━━━━━━━━━━━\n\n` +
+      `🔴 ${mention(game.p1)} — ❌ ${game.p1.attempts}/${CFG.MAX_ATTEMPTS}\n` +
+      `🔵 ${mention(game.p2)} — ❌ ${game.p2.attempts}/${CFG.MAX_ATTEMPTS}\n\n` +
+      `🎯 اكتب: \`تخمين: اسم الصورة\`\n\n` +
+      `${buildTimer(left, CFG.GAME_SECS)}`,
+      { parse_mode: 'Markdown' }
+    ).catch(() => {});
+  }, 30000);
+  game._timers.push(cdInterval);
+
+  // ── تحذير قبل دقيقة ──
+  const warnT = setTimeout(async () => {
     const g = _games.get(chatId);
     if (!g || g.status !== 'active') return;
-    const w = await telegram.sendMessage(chatId, `⏰ *تبقّت دقيقة!*`, { parse_mode: 'Markdown' }).catch(() => null);
-    if (w) { trackMsg(chatId, w.message_id); setTimeout(() => telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 50000); }
-  }, (GAME_SECS - 60) * 1000);
+    const w = await telegram.sendMessage(chatId,
+      `⏰ *تبقّت دقيقة واحدة!* سارعوا!`,
+      { parse_mode: 'Markdown' }
+    ).catch(() => null);
+    if (w) setTimeout(() => telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 55000);
+  }, (CFG.GAME_SECS - CFG.WARN_BEFORE) * 1000);
+  game._timers.push(warnT);
 
-  game.gameTimer = setTimeout(() => endGame(telegram, chatId), GAME_SECS * 1000);
+  // ── timeout اللعبة ──
+  const gameT = setTimeout(() => endGame(telegram, chatId), CFG.GAME_SECS * 1000);
+  game._timers.push(gameT);
 }
 
-/* ══════ PHASE 5 — Guess ══════ */
+// ══════════════════════════════════════════════════════
+// PHASE 5 — التخمين (الدالة الرئيسية المُصلحة)
+// ══════════════════════════════════════════════════════
 async function handleGuess(ctx) {
   if (ctx.chat?.type === 'private') return false;
+
   const chatId = s(ctx.chat.id);
   const game   = _games.get(chatId);
-  if (!game || game.status !== 'active') return false;
 
-  const text = ctx.message?.text || '';
-  const m    = text.match(/^تخمين[:\s]+(.+)$/i);
-  if (!m) return false;
+  // ── تحقق من حالة اللعبة ──
+  if (!game) return false;
+  if (game.status !== 'active') return false;
 
-  const guess   = m[1].trim();
+  const text = (ctx.message?.text || '').trim();
+
+  // ── تحقق من صيغة التخمين ──
+  const match = text.match(/^تخمين[:\s]+(.+)$/i);
+  if (!match) return false;
+
+  const guess   = match[1].trim();
   const guesser = ctx.from;
-  const isP1    = s(guesser.id) === s(game.p1.id);
-  const isP2    = s(guesser.id) === s(game.p2.id);
+  const uid     = s(guesser.id);
+
+  // ── تحقق أن المخمن لاعب في المباراة ──
+  const isP1 = uid === s(game.p1.id);
+  const isP2 = uid === s(game.p2?.id);
 
   ctx.telegram.deleteMessage(chatId, ctx.message.message_id).catch(() => {});
 
-  if (!isP1 && !isP2) return true;
-
-  const target = isP1 ? game.p2 : game.p1;
-
-  if (norm(guess) === norm(target.name)) {
-    await handleWin(ctx.telegram, game, guesser, target);
-  } else {
+  if (!isP1 && !isP2) {
     const w = await ctx.telegram.sendMessage(chatId,
-      `❌ *${esc(uname(guesser))}* خمّن: _"${esc(guess)}"_ — غلط! 🤔`,
+      `👀 ${mention(guesser)} لست في هذه المباراة!`,
       { parse_mode: 'Markdown' }
     ).catch(() => null);
-    if (w) { trackMsg(chatId, w.message_id); setTimeout(() => ctx.telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 6000); }
+    if (w) setTimeout(() => ctx.telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 4000);
+    return true;
   }
+
+  // ── المخمن والهدف ──
+  const player = isP1 ? game.p1 : game.p2;
+  const target = isP1 ? game.p2 : game.p1;
+
+  // ── تحقق من المحاولات ──
+  if (player.attempts >= CFG.MAX_ATTEMPTS) {
+    const w = await ctx.telegram.sendMessage(chatId,
+      `🚫 ${mention(guesser)} استنفذت محاولاتك الـ${CFG.MAX_ATTEMPTS}!`,
+      { parse_mode: 'Markdown' }
+    ).catch(() => null);
+    if (w) setTimeout(() => ctx.telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 5000);
+    return true;
+  }
+
+  // ── تحقق من الإجابة ──
+  if (!target.name) {
+    const w = await ctx.telegram.sendMessage(chatId,
+      `⚠️ منافسك لم يرسل اسم صورته بعد!`,
+      { parse_mode: 'Markdown' }
+    ).catch(() => null);
+    if (w) setTimeout(() => ctx.telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 4000);
+    return true;
+  }
+
+  const correct = isSimilar(guess, target.name);
+  player.attempts++;
+
+  if (correct) {
+    // ── فاز! ──
+    await handleWin(ctx.telegram, game, guesser, player, target);
+  } else {
+    // ── خطأ ──
+    const remaining = CFG.MAX_ATTEMPTS - player.attempts;
+    let msg = `❌ *${esc(uname(guesser))}* خمّن: _"${esc(guess)}"_ — خطأ!`;
+
+    if (remaining === 0) {
+      msg += `\n\n💀 *نفدت محاولاتك!*`;
+      // تحقق إذا الاثنان نفدت محاولاتهم
+      const otherPlayer = isP1 ? game.p2 : game.p1;
+      if (otherPlayer.attempts >= CFG.MAX_ATTEMPTS) {
+        await ctx.telegram.sendMessage(chatId, msg, { parse_mode: 'Markdown' }).catch(() => {});
+        await endGame(ctx.telegram, chatId);
+        return true;
+      }
+    } else if (remaining === 1) {
+      msg += `\n\n⚠️ *آخر محاولة!*`;
+    } else {
+      msg += `\n_متبقي: ${remaining} محاولات_`;
+    }
+
+    const w = await ctx.telegram.sendMessage(chatId, msg, { parse_mode: 'Markdown' }).catch(() => null);
+    if (w) setTimeout(() => ctx.telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 7000);
+
+    // تحديث رسالة الحالة
+    if (game.statusMsgId) {
+      const left = Math.max(0, CFG.GAME_SECS - Math.floor((Date.now() - game.startedAt) / 1000));
+      ctx.telegram.editMessageText(chatId, game.statusMsgId, null,
+        `⚔️ *المباراة جارية!*\n` +
+        `━━━━━━━━━━━━━━━━━━\n\n` +
+        `🔴 ${mention(game.p1)} — ❌ ${game.p1.attempts}/${CFG.MAX_ATTEMPTS}\n` +
+        `🔵 ${mention(game.p2)} — ❌ ${game.p2.attempts}/${CFG.MAX_ATTEMPTS}\n\n` +
+        `🎯 اكتب: \`تخمين: اسم الصورة\`\n\n` +
+        `${buildTimer(left, CFG.GAME_SECS)}`,
+        { parse_mode: 'Markdown' }
+      ).catch(() => {});
+    }
+  }
+
   return true;
 }
 
-/* ══════ WIN ══════ */
-async function handleWin(telegram, game, winner, loser) {
-  clearTimeout(game.gameTimer);
-  clearTimeout(game.warnTimer);
+// ══════════════════════════════════════════════════════
+// الفوز
+// ══════════════════════════════════════════════════════
+async function handleWin(telegram, game, winnerUser, winnerPlayer, loserPlayer) {
+  game._timers.forEach(t => { clearTimeout(t); clearInterval(t); });
+  game._timers = [];
   game.status = 'ended';
   const chatId = s(game.chatId);
   _games.delete(chatId);
 
-  await cleanGroup(telegram, chatId, null);
+  await cleanGroup(telegram, chatId);
 
+  // رسالة الفوز في القروب
   const r = await telegram.sendMessage(chatId,
     `🏆 *انتهت المباراة!*\n` +
-    `┄┄┄┄┄┄┄┄┄┄\n` +
-    `👑 الفائز: ${mention(winner)}\n` +
-    `✅ خمّن الإجابة الصحيحة: *${esc(loser.name)}*\n\n` +
+    `━━━━━━━━━━━━━━━━━━\n\n` +
+    `👑 الفائز: ${mention(winnerUser)}\n` +
+    `✅ خمّن الإجابة: *${esc(loserPlayer.name)}*\n\n` +
+    `📊 المحاولات:\n` +
+    `🔴 ${uname(game.p1)}: ${game.p1.attempts} محاولة\n` +
+    `🔵 ${uname(game.p2)}: ${game.p2.attempts} محاولة\n\n` +
     `📸 كشف الصور:`,
     { parse_mode: 'Markdown' }
   ).catch(() => null);
 
-  await telegram.sendPhoto(chatId, game.p1.photo, { caption: `🔴 صورة *${esc(uname(game.p1))}*\nالإجابة: *${esc(game.p1.name)}*`, parse_mode: 'Markdown' }).catch(() => {});
-  await telegram.sendPhoto(chatId, game.p2.photo, { caption: `🔵 صورة *${esc(uname(game.p2))}*\nالإجابة: *${esc(game.p2.name)}*`, parse_mode: 'Markdown' }).catch(() => {});
+  // كشف الصور
+  await telegram.sendPhoto(chatId, game.p1.photo, {
+    caption: `🔴 صورة *${esc(uname(game.p1))}*\n✏️ الإجابة: *${esc(game.p1.name)}*`,
+    parse_mode: 'Markdown'
+  }).catch(() => {});
 
-  for (const p of [winner, { id: loser.id }]) {
-    const msg = s(p.id) === s(winner.id)
-      ? `🏆 *فزت!* تمكنت من تخمين صورة منافسك. 💪`
-      : `😔 *خسرت.*\nمنافسك تمكّن من تخمين صورتك. حظاً أوفر! 🍀`;
+  await telegram.sendPhoto(chatId, game.p2.photo, {
+    caption: `🔵 صورة *${esc(uname(game.p2))}*\n✏️ الإجابة: *${esc(game.p2.name)}*`,
+    parse_mode: 'Markdown'
+  }).catch(() => {});
+
+  // رسائل خاصة
+  for (const p of [game.p1, game.p2]) {
+    const isWinner = s(p.id) === s(winnerUser.id);
+    const msg = isWinner
+      ? `🏆 *فزت!* تمكنت من تخمين صورة منافسك 💪\nالإجابة الصحيحة كانت: *${esc(loserPlayer.name)}*`
+      : `😔 *خسرت* هذه الجولة.\nمنافسك خمّن صورتك! حظاً أوفر 🍀\n\nصورتك كانت: *${esc(winnerPlayer.name)}*`;
     await telegram.sendMessage(p.id, msg, { parse_mode: 'Markdown' }).catch(() => {});
   }
 }
 
-/* ══════ TIMEOUT ══════ */
+// ══════════════════════════════════════════════════════
+// انتهاء الوقت
+// ══════════════════════════════════════════════════════
 async function endGame(telegram, chatId) {
-  const game = _games.get(s(chatId));
+  const cid  = s(chatId);
+  const game = _games.get(cid);
   if (!game || game.status !== 'active') return;
-  clearTimeout(game.gameTimer);
-  clearTimeout(game.warnTimer);
-  game.status = 'ended';
-  _games.delete(s(chatId));
 
-  await cleanGroup(telegram, chatId, null);
+  game._timers.forEach(t => { clearTimeout(t); clearInterval(t); });
+  game._timers = [];
+  game.status = 'ended';
+  _games.delete(cid);
+
+  await cleanGroup(telegram, chatId);
 
   await telegram.sendMessage(chatId,
     `⏰ *انتهت المباراة!*\n` +
-    `┄┄┄┄┄┄┄┄┄┄\n` +
-    `🤝 تعادل — لم يتمكن أحد من التخمين\n\n` +
+    `━━━━━━━━━━━━━━━━━━\n\n` +
+    `🤝 تعادل — لم يتمكن أحد من التخمين!\n\n` +
+    `📊 المحاولات:\n` +
+    `🔴 ${uname(game.p1)}: ${game.p1.attempts}/${CFG.MAX_ATTEMPTS}\n` +
+    `🔵 ${uname(game.p2)}: ${game.p2.attempts}/${CFG.MAX_ATTEMPTS}\n\n` +
     `📸 كشف الصور:`,
     { parse_mode: 'Markdown' }
   ).catch(() => {});
 
-  await telegram.sendPhoto(chatId, game.p1.photo, { caption: `🔴 *${esc(uname(game.p1))}*\nكانت: *"${esc(game.p1.name)}"*`, parse_mode: 'Markdown' }).catch(() => {});
-  await telegram.sendPhoto(chatId, game.p2.photo, { caption: `🔵 *${esc(uname(game.p2))}*\nكانت: *"${esc(game.p2.name)}"*`, parse_mode: 'Markdown' }).catch(() => {});
+  await telegram.sendPhoto(chatId, game.p1.photo, {
+    caption: `🔴 *${esc(uname(game.p1))}*\nكانت: *${esc(game.p1.name)}*`,
+    parse_mode: 'Markdown'
+  }).catch(() => {});
+
+  await telegram.sendPhoto(chatId, game.p2.photo, {
+    caption: `🔵 *${esc(uname(game.p2))}*\nكانت: *${esc(game.p2.name)}*`,
+    parse_mode: 'Markdown'
+  }).catch(() => {});
 
   for (const p of [game.p1, game.p2]) {
-    await telegram.sendMessage(p.id, `⏰ انتهى الوقت! لم يفز أحد. حاولوا مجدداً! 🎮`).catch(() => {});
+    await telegram.sendMessage(p.id,
+      `⏰ انتهى الوقت! تعادل — لم يفز أحد.\nصورة منافسك كانت: *${esc(s(p.id) === s(game.p1.id) ? game.p2.name : game.p1.name)}*`,
+      { parse_mode: 'Markdown' }
+    ).catch(() => {});
   }
 }
 
-/* ══════ REGISTER ══════ */
+// ══════════════════════════════════════════════════════
+// التسجيل
+// ══════════════════════════════════════════════════════
 function register(bot) {
-
-  // حالة اللعبة في PV
+  // حالة اللعبة
   bot.command('gamestatus', async ctx => {
     if (ctx.chat?.type !== 'private') return;
     const uid = s(ctx.from.id);
     const pv  = _pvStates.get(uid);
     if (!pv) return ctx.reply('لا توجد لعبة نشطة لك حالياً.').catch(() => {});
-    const stepMap = { waiting_photo: '📸 في انتظار صورتك', waiting_name: '✏️ في انتظار اسم الصورة', done: '✅ جاهز' };
-    ctx.reply(
-      `🎮 *حالة لعبتك:*
-${stepMap[pv.step] || pv.step}
-
-` +
-      (pv.step === 'waiting_photo' ? '📸 أرسل الصورة السرية الآن' : '') +
-      (pv.step === 'waiting_name'  ? '✏️ اكتب اسم الصورة التي أرسلتها' : ''),
-      { parse_mode: 'Markdown' }
-    ).catch(() => {});
+    const steps = {
+      waiting_photo: '📸 في انتظار صورتك — أرسلها الآن',
+      waiting_name:  '✏️ في انتظار اسم الصورة — اكتبه الآن',
+      done:          '✅ جاهز — في انتظار المنافس'
+    };
+    ctx.reply(`🎮 *حالة لعبتك:*\n${steps[pv.step] || pv.step}`, { parse_mode: 'Markdown' }).catch(() => {});
   });
 
-
-  // تخمينات في القروب فقط (PV يُعالج في bypass قبل auth)
+  // التخمينات في القروب
   bot.on('text', async (ctx, next) => {
     if (ctx.chat?.type === 'private') return next();
-    const handled = await handleGuess(ctx).catch(() => false);
+    const handled = await handleGuess(ctx).catch(e => { logger.error('[GuessGame]', e.message); return false; });
     if (handled) return;
     return next();
   });
@@ -465,8 +681,9 @@ ${stepMap[pv.step] || pv.step}
 
 function isGameActive(chatId) {
   const game = _games.get(String(chatId));
-  return game && game.status !== 'ended';
+  return !!(game && game.status !== 'ended');
 }
+
 function hasPvState(uid) {
   return _pvStates.has(String(uid));
 }
@@ -475,4 +692,12 @@ async function handlePvDirect(ctx) {
   return handlePvMessage(ctx);
 }
 
-module.exports = { register, startInvite, handleJoin, isGameActive, hasPvState, handlePvDirect, handleGuessMsg: handleGuess };
+module.exports = {
+  register,
+  startInvite,
+  handleJoin,
+  isGameActive,
+  hasPvState,
+  handlePvDirect,
+  handleGuessMsg: handleGuess,
+};
