@@ -80,7 +80,6 @@ exports.listGroups = async (ctx) => {
             (SELECT COUNT(*) FROM group_members gm WHERE gm.chat_id=gc.chat_id) as members
      FROM group_chats gc
      LEFT JOIN specialties sp ON gc.specialty_id=sp.id
-     WHERE (gc.is_active=1 OR gc.is_active IS NULL OR gc.is_active=0)
      ORDER BY gc.title`
   );
   if (!groups.length) return ctx.reply('📭 البوت ليس في أي قروب حالياً.\n\nأضف البوت لقروب وسيظهر هنا تلقائياً.');
