@@ -92,9 +92,9 @@ async function notifyGroupsNewFile(bot, fileInfo) {
         const caption =
           `🆕 *ملف جديد أُضيف للمكتبة\\!*\n` +
           `━━━━━━━━━━━━━━━━━━━━\n\n` +
-          `${typeIcon} *${escMd(fileInfo.title)}*\n` +
-          (fileInfo.cat_name ? `📁 *القسم:* ${escMd(fileInfo.cat_name)}\n` : '') +
-          (fileInfo.sub_name ? `📖 *المادة:* ${escMd(fileInfo.sub_name)}\n` : '') +
+          `${typeIcon} *${(fileInfo.title || "")}*\n` +
+          (fileInfo.cat_name ? `📁 *القسم:* ${(fileInfo.cat_name || "")}\n` : '') +
+          (fileInfo.sub_name ? `📖 *المادة:* ${(fileInfo.sub_name || "")}\n` : '') +
           `\n` +
           (mentions ? `👥 ${mentions}\n\n` : '') +
           `⬇️ *اضغط الزر للتحميل*`;
@@ -106,7 +106,7 @@ async function notifyGroupsNewFile(bot, fileInfo) {
           }]],
         };
 
-        const extra = { parse_mode: 'MarkdownV2', reply_markup: btn };
+        const extra = { parse_mode: 'Markdown', reply_markup: btn };
         const fid   = fileInfo.file_id;
         const ftype = fileInfo.file_type || 'document';
 
@@ -244,14 +244,14 @@ async function postToChannel(bot, fileInfo) {
       }]],
     };
 
-    const extra = { caption, parse_mode: 'MarkdownV2', reply_markup: btn };
+    const extra = { caption, parse_mode: 'Markdown', reply_markup: btn };
     const ftype = fileInfo.file_type || 'document';
     const fid   = fileInfo.file_id;
 
     if      (ftype === 'photo' && fid) await bot.telegram.sendPhoto(channelId, fid, extra);
     else if (ftype === 'video' && fid) await bot.telegram.sendVideo(channelId, fid, extra);
     else if (fid)                      await bot.telegram.sendDocument(channelId, fid, extra);
-    else                               await bot.telegram.sendMessage(channelId, caption, { parse_mode: 'MarkdownV2', reply_markup: btn });
+    else                               await bot.telegram.sendMessage(channelId, caption, { parse_mode: 'Markdown', reply_markup: btn });
   } catch (e) {
     console.error('[ChannelPost]', e.message);
   }

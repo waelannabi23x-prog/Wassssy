@@ -52,7 +52,7 @@ async function handleNewMember(bot, chatId, userId, firstName) {
       : null;
 
     const { date, time } = algeriaTime();
-    const name     = escV2(firstName || 'عضو');
+    const name     = (firstName || 'عضو');
     const uid      = userId;
     const specName = spec?.name ? escV2(spec.name) : '';
     const specLine = specName ? `\n🎓 التخصص: *${specName}*` : '';
@@ -61,7 +61,7 @@ async function handleNewMember(bot, chatId, userId, firstName) {
     let memberCount = '';
     try {
       const cnt = await bot.telegram.getChatMembersCount(chatId);
-      memberCount = `\n👥 أنتَ العضو رقم: *${escV2(String(cnt))}*`;
+      memberCount = `\n👥 أنتَ العضو رقم: *${String(cnt)}*`;
     } catch (_) {}
 
     const defaultMsg =
@@ -299,7 +299,7 @@ async function registerMembers(ctx, chatId) {
     }).catch(() => null);
 
     // احذف الرسالة بعد 5 دقائق
-    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 300000);
+    if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(() => {}), 300000);
   } catch(e) {
     console.error('[registerMembers]', e.message);
   }
@@ -571,13 +571,13 @@ async function warnMember(ctx, chatId, targetUserId, reason) {
       `⚠️ *تحذير رسمي*\n` +
       `━━━━━━━━━━━━━━━━━━\n` +
       `👤 المستخدم: [user](tg://user?id=${targetUserId})\n` +
-      `📝 السبب: ${escV2(reason || 'مخالفة القواعد')}\n` +
+      `📝 السبب: ${(reason || 'مخالفة القواعد')}\n` +
       `🔢 التحذير رقم: *${count}/${MAX_WARNS}*` +
       actionText,
-      { parse_mode: 'MarkdownV2' }
+      { parse_mode: 'Markdown' }
     ).catch(() => null);
 
-    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 15000);
+    if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 15000);
   } catch (e) {
     console.error('[Warn]', e.message);
   }
@@ -636,7 +636,7 @@ async function banMember(ctx, chatId, targetUserId, reason, deleteMessages) {
       { parse_mode: 'Markdown' }
     ).catch(() => null);
 
-    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 10000);
+    if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 10000);
   } catch (e) {
     ctx.reply('❌ فشل الحظر: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
@@ -649,7 +649,7 @@ async function unbanMember(ctx, chatId, targetUserId) {
     const msg = await ctx.reply(`✅ تم رفع الحظر عن [العضو](tg://user?id=${targetUserId})`, {
       parse_mode: 'Markdown',
     }).catch(() => null);
-    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 8000);
+    if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 8000);
   } catch (e) {
     ctx.reply('❌ فشل رفع الحظر: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
@@ -681,7 +681,7 @@ async function muteMember(ctx, chatId, targetUserId, durationMinutes) {
       `⏱ المدة: ${durText}`,
       { parse_mode: 'Markdown' }
     ).catch(() => null);
-    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 8000);
+    if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 8000);
   } catch (e) {
     ctx.reply('❌ فشل الإسكات: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
@@ -706,7 +706,7 @@ async function unmuteMember(ctx, chatId, targetUserId) {
       `🔊 *تم تفعيل العضو*\n👤 [العضو](tg://user?id=${targetUserId})`,
       { parse_mode: 'Markdown' }
     ).catch(() => null);
-    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 8000);
+    if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 8000);
   } catch (e) {
     ctx.reply('❌ فشل التفعيل: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
