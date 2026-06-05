@@ -225,6 +225,7 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'bdl_',        fn: (ctx, d) => { const p = d.split('_'); return browse.sendBundle(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }},
     { p: 'fl_',         fn: (ctx, d) => { const p = d.split('_'); return browse.sendFile(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }},
     { p: 'ml_',         fn: (ctx)    => million.handleCallback(bot, ctx) },
+    { p: 'share_',      fn: (ctx)    => { const { handleShare } = require('../handlers/share_summary'); return handleShare(ctx); } },
     { p: 'ct_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showFiles(ctx, p[1], p[2], p[3], p[4], p[5]); }},
     { p: 'sb_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showCategories(ctx, p[1], p[2], p[3], p[4]); }},
     { p: 'sm_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showSubjects(ctx, p[1], p[2], p[3]); }},   // ✅ semester → subjects
@@ -276,17 +277,21 @@ module.exports.registerCallbacks = function(bot, deps) {
     if (!_raw || CBDedup.isDupe(cbId)) return;
 
     const data = cbRes(_raw);
-    ctx.answerCbQuery('').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); // أجب فوراً — يشيل الـ spinner
 
     try {
-      if (data.startsWith('gs_')) { await handleSettingsCallback(ctx, data); return; }
+      if (data.startsWith('gs_')) {
+        ctx.answerCbQuery('').catch(() => {});
+        await handleSettingsCallback(ctx, data);
+        return;
+      }
+
+      // أجب فوراً مرة وحدة فقط
+      ctx.answerCbQuery('').catch(() => {});
 
       if (ctx.chat?.type !== 'private') {
-        // تسجيل عضو من القروب
         if (data.startsWith('grp_main_')) {
           const chatId = data.replace('grp_main_', '');
           const { showAllMembers } = require('../handlers/group_admin');
-          ctx.answerCbQuery('').catch(() => {});
           return showAllMembers(ctx, chatId);
         }
 

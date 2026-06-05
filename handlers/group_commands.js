@@ -12,10 +12,7 @@ function isGroup(ctx) {
   return ['supergroup', 'group'].includes(ctx.chat?.type);
 }
 function isAdmin(ctx) {
-  if (ctx.isOwner || ctx.isAdmin) return true;
-  // تحقق من صلاحيات Telegram مباشرة
-  const status = ctx.message?.from?.id === ctx.botInfo?.id;
-  return false;
+  return ctx.isOwner || ctx.isAdmin;
 }
 
 async function isTgAdmin(ctx) {
@@ -447,7 +444,7 @@ async function handleSettingsCallback(ctx, data) {
       const newVal = current?.[col] ? 0 : 1;
       await run('UPDATE group_chats SET ' + col + '=$1 WHERE chat_id=$2', [newVal, chatId]).catch(() => {});
       ctx.answerCbQuery(newVal ? '✅ تم التفعيل' : '❌ تم الإيقاف').catch(() => {});
-      return showGroupSettings(null, ctx, chatId);
+      return showGroupSettings(bot, ctx, chatId);
     }
   }
 

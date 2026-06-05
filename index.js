@@ -338,8 +338,7 @@ app.use((err, req, res, _next) => {
 // ── Share + Summarize ────────────────────────────────────────────
 const { handleShare, handleSummarize } = require('./handlers/share_summary');
 
-// callback: share_{fileId}
-bot.action(/^share_(\d+)$/, handleShare);
+// share_ callbacks handled in bot/callbacks.js
 
 // commands: /لخص أو /summarize
 bot.command(['لخص', 'summarize', 'sum'], handleSummarize);
@@ -369,7 +368,7 @@ bot.start(async (ctx, next) => {
 
     if (WEBHOOK_URL) {
       await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, {
-        allowed_updates: ['message', 'callback_query', 'my_chat_member', 'chat_member'],
+        allowed_updates: ['message', 'callback_query', 'my_chat_member', 'chat_member', 'inline_query'],
         drop_pending_updates: true,
         max_connections: 40,
         ...(WEBHOOK_SECRET && { secret_token: WEBHOOK_SECRET }),
@@ -383,6 +382,7 @@ bot.launch({ drop_pending_updates: true });
     guessGame.register(bot);
     millionaire.register(bot);
     global.__bot = bot;
+    require('./utils/logger').info('[Launch] ✅ Games registered');
 
 // ── BullMQ Workers — بعد ما يكون bot جاهز ──
 setImmediate(() => {

@@ -50,12 +50,12 @@ module.exports.registerMessages = function(bot, deps) {
 
       // جلب إعدادات القروب (مع cache)
       const settKey = 'grp_settings_' + cid;
-      let grpSettings = require('./utils/cache').cacheGet(settKey);
+      let grpSettings = require('../utils/cache').cacheGet(settKey);
       if (!grpSettings) {
-        grpSettings = await require('./database/db').get(
+        grpSettings = await require('../database/db').get(
           'SELECT anti_spam, anti_link, anti_flood FROM group_chats WHERE chat_id=$1', [cid]
         ).catch(() => null) || {};
-        require('./utils/cache').cacheSet(settKey, grpSettings, 60000); // كاش دقيقة
+        require('../utils/cache').cacheSet(settKey, grpSettings, 60000); // كاش دقيقة
       }
 
       // 🛡 Anti-Flood: أكثر من 5 رسائل في 3 ثواني
@@ -67,7 +67,7 @@ module.exports.registerMessages = function(bot, deps) {
         if (sp.count > 5) {
           ctx.deleteMessage().catch(() => {});
           if (sp.count === 6) {
-            const { warnMember } = require('./handlers/group_admin');
+            const { warnMember } = require('../handlers/group_admin');
             warnMember(ctx, cid, uid, 'فلود - إرسال رسائل بسرعة').catch(() => {});
           }
           return next();
@@ -89,7 +89,7 @@ module.exports.registerMessages = function(bot, deps) {
             '🔗 ' + (ctx.from.first_name||'') + ' الروابط ممنوعة في هذا القروب\!',
             { parse_mode: 'Markdown' }
           ).catch(() => null);
-          if (warn) setTimeout(() => ctx.deleteMessage(warn.message_id).catch(() => {}), 5000);
+          if (warn) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, warn.message_id).catch(() => {}), 5000);
           return next();
         }
       }
@@ -97,12 +97,12 @@ module.exports.registerMessages = function(bot, deps) {
       // 🛡 Anti-Spam: رسائل متكررة
       if (grpSettings.anti_spam && txt && txt.length > 5) {
         const spamKey = 'spam_' + uid + '_' + cid;
-        const lastMsg = require('./utils/cache').cacheGet(spamKey);
+        const lastMsg = require('../utils/cache').cacheGet(spamKey);
         if (lastMsg === txt) {
           ctx.deleteMessage().catch(() => {});
           return next();
         }
-        require('./utils/cache').cacheSet(spamKey, txt, 10000); // 10 ثواني
+        require('../utils/cache').cacheSet(spamKey, txt, 10000); // 10 ثواني
       }
     }
     if (ctx.chat?.type === 'private' && ctx.from?.id === OWNER_ID && ctx.message?.text?.startsWith('!'))
@@ -144,9 +144,9 @@ module.exports.registerMessages = function(bot, deps) {
       // game handler
       const _gtxt = ctx.message?.text?.trim();
       if (_gtxt) {
-        const guessGame = require('../handlers/game_guess');
-        if (/^خمن$/i.test(_gtxt)) { console.log('[Guess] triggered by', ctx.from?.id); guessGame._startChallenge && guessGame._startChallenge(bot, ctx).catch(e=>console.error('[Guess]',e.message)); return; }
-        if (/^تخمين[:\s]+/i.test(_gtxt)) { guessGame._handleGuess && guessGame._handleGuess(bot, ctx); return; }
+        const guessGame = require('../handlers/guess_game');
+        if (/^خمن$/i.test(_gtxt)) { guessGame.startInvite && guessGame.startInvite(ctx).catch(e=>console.error('[Guess]',e.message)); return; }
+        if (/^تخمين[:\s]+/i.test(_gtxt)) { guessGame.handleGuessMsg && guessGame.handleGuessMsg(ctx).catch(()=>{}); return; }
       }
       // في القروب نمرر للـ command handlers
       return next();
@@ -201,10 +201,10 @@ module.exports.registerMessages = function(bot, deps) {
           try { await dbRun('INSERT INTO ' + table + '(' + cols.join(',') + ') VALUES ' + ph + ' ON CONFLICT DO NOTHING', vals); restored += rows.length; }
           catch(e) { errors++; logger.error('[Restore]', table, e.message); }
         }
-        if (msg) ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+        if (msg) ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(() => {});
         ctx.reply('✅ تمت الاستعادة\n\n' + restored + ' سجل | ' + errors + ' خطأ').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       } catch(e) {
-        if (msg) ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+        if (msg) ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(() => {});
         ctx.reply('❌ فشلت الاستعادة: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }
       return;
