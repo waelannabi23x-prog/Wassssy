@@ -93,8 +93,8 @@ module.exports.registerMessages = function(bot, deps) {
         if (/^خمن$/i.test(_gtxt)) { console.log('[Guess] triggered by', ctx.from?.id); guessGame._startChallenge && guessGame._startChallenge(bot, ctx).catch(e=>console.error('[Guess]',e.message)); return; }
         if (/^تخمين[:\s]+/i.test(_gtxt)) { guessGame._handleGuess && guessGame._handleGuess(bot, ctx); return; }
       }
-      // في القروب لا نمرر للـ handlers الأخرى
-      return;
+      // في القروب نمرر للـ command handlers
+      return next();
     }
     // في الخاص — لا next() لأن text/document/photo handlers يشتغلون
     return next();
