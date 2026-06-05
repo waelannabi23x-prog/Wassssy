@@ -171,6 +171,28 @@ module.exports = function registerCommands(bot, deps) {
   });
 
   bot.command('mygroups',  ctx => tools.listGroups(ctx));
+
+  bot.command('syncgroups', async ctx => {
+    if (!ctx.isOwner) return;
+    const { all: dbAll, run: dbRun } = require('../database/db');
+    const groups = await dbAll('SELECT chat_id, title FROM group_chats').catch(() => []);
+    let synced = 0;
+    for (const g of groups) {
+      try {
+        const chat = await ctx.telegram.getChat(g.chat_id);
+        await dbRun(
+          'UPDATE group_chats SET title=$1 WHERE chat_id=$2',
+          [chat.title || g.title, g.chat_id]
+        );
+        synced++;
+      } catch(e) {
+        if (e.message?.includes('kicked') || e.message?.includes('not found')) {
+          await dbRun('DELETE FROM group_chats WHERE chat_id=$1', [g.chat_id]).catch(() => {});
+        }
+      }
+    }
+    ctx.reply('✅ تم مزامنة ' + synced + ' قروب').catch(() => {});
+  });
   bot.command('leavegroup',ctx => tools.leaveGroup(ctx));
 
   bot.command('leaveall', async ctx => {

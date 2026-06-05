@@ -208,6 +208,7 @@ module.exports.registerCallbacks = function(bot, deps) {
     }},
 
     // Group
+    { p: 'grp_main_',   fn: (ctx, d) => { const chatId = d.replace('grp_main_',''); const { showAllMembers } = require('../handlers/group_admin'); return showAllMembers(ctx, chatId); } },
     { p: 'grp_main',    fn: (ctx, d) => groupPanel.showMainMenu(ctx) },
     { p: 'gp_',         fn: (ctx, d) => groupPanel.handleCallback(ctx, d) },
     { p: 'grp_sp_',     fn: hGrpSp },
@@ -282,6 +283,13 @@ module.exports.registerCallbacks = function(bot, deps) {
 
       if (ctx.chat?.type !== 'private') {
         // تسجيل عضو من القروب
+        if (data.startsWith('grp_main_')) {
+          const chatId = data.replace('grp_main_', '');
+          const { showAllMembers } = require('../handlers/group_admin');
+          ctx.answerCbQuery('').catch(() => {});
+          return showAllMembers(ctx, chatId);
+        }
+
         if (data.startsWith('grp_reg_btn_')) {
           const regChatId = data.replace('grp_reg_btn_', '');
           const { registerMembers } = require('../handlers/group_admin');
