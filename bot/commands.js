@@ -7,7 +7,7 @@ module.exports = function registerCommands(bot, deps) {
     browse, contentDb, usersDb, bundlesDb,
     dbAll, cacheClear, logger, OWNER_ID,
     kbBtn, kbBuild, eos, resetChat, millionaire,
-    tagAll, muteAll, unmuteAll, showAllMembers,
+    tagAll, muteAll, unmuteAll, showAllMembers, bank,
   } = deps;
 
 
@@ -527,3 +527,4 @@ module.exports = function registerCommands(bot, deps) {
     return ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => {});
   });
 };
+

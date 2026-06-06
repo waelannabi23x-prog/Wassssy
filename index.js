@@ -26,6 +26,7 @@ const million       = require('./handlers/million');
 const millionaire   = require('./handlers/millionaire');
 const guessGame     = require('./handlers/guess_game');
 const tools         = require('./handlers/owner_tools');
+const bank          = require('./handlers/bank');
 const ownerH        = require('./handlers/owner');
 const contentDb     = require('./database/content');
 const usersDb       = require('./database/users');
@@ -183,7 +184,7 @@ bot.catch((err, ctx) => {
 
 // ── تسجيل الأوامر ──
 require('./bot/commands')(bot, {
-  startHandler, manage, userH, million, tools, browse,
+  startHandler, manage, userH, million, tools, browse, bank,
   contentDb, usersDb, bundlesDb, dbAll, cacheClear,
   logger, OWNER_ID, kbBtn, kbBuild, eos, resetChat,
   millionaire, tagAll, muteAll, unmuteAll, showAllMembers,
@@ -317,6 +318,7 @@ async function launch() {
     await migrateGroupTables().catch(() => {});
     require("./utils/cache").clearAllSubCache();
     await require('./handlers/group_panel').migrateGroupPanel().catch(() => {});
+    await require('./database/db').initBankTables().catch(() => {});
     await initPersistentStates();
     logger.info('✅ DB ready');
 
