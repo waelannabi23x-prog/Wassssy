@@ -66,18 +66,23 @@ async function startInvite(ctx) {
   };
   _games.set(chatId, game);
 
+  const _botUser = await ctx.telegram.getMe().catch(()=>({username:''}));
+  const _botLink = _botUser.username ? `https://t.me/${_botUser.username}` : null;
   const m = await ctx.telegram.sendMessage(chatId,
-    `🎮 *تحدي جديد!*\n` +
-    `┄┄┄┄┄┄┄┄┄┄\n` +
-    `👤 المتحدي: ${mention(user)}\n\n` +
-    `📖 *كيف تلعب؟*\n` +
-    `┌ كل لاعب يختار صورة سرية\n` +
-    `├ ترسلها للبوت في الخاص\n` +
-    `├ تتحدثون بحرية في القروب\n` +
-    `└ أول من يخمن صورة خصمه يفوز!\n\n` +
+    `🎮 *تحدي خمن الصورة!*\n` +
+    `━━━━━━━━━━━━━━━\n` +
+    `👤 *${esc(uname(user))}* يتحدى الجميع!\n\n` +
+    `📸 *طريقة اللعب:*\n` +
+    `1️⃣ أرسل صورة سرية للبوت في الخاص\n` +
+    `2️⃣ اكتب اسمها للبوت\n` +
+    `3️⃣ تحدّث مع منافسك في القروب\n` +
+    `4️⃣ أول من يخمن صورة خصمه يفوز! 🏆\n\n` +
     `✏️ اكتب *انا* للانضمام\n` +
-    `⏳ تنتهي الدعوة خلال *60 ثانية*`,
-    { parse_mode: 'Markdown' }
+    `⏳ *60 ثانية* للانضمام`,
+    {
+      parse_mode: 'Markdown',
+      reply_markup: _botLink ? { inline_keyboard: [[{ text: '🤖 افتح البوت وأرسل صورتك', url: _botLink }]] } : undefined
+    }
   ).catch(() => null);
 
   if (!m) { _games.delete(chatId); return; }
@@ -307,9 +312,12 @@ async function beginGame(telegram, game) {
   for (const player of [game.p1, game.p2]) {
     const opp = s(player.id) === s(game.p1.id) ? game.p2 : game.p1;
     await telegram.sendMessage(player.id,
-      `🚀 *بدأت اللعبة!*\n\n⚔️ منافسك: *${esc(uname(opp))}*\n\n` +
-      `💬 تحدث معه بحرية في القروب.\n` +
-      `🎯 للتخمين اكتب في القروب:\n\`تخمين: اسم الصورة\`\n\n⏱️ عندك *5 دقائق!* 🍀`,
+      `🚀 *انطلقت اللعبة!*\n` +
+      `━━━━━━━━━━━━━━━\n` +
+      `⚔️ منافسك: *${esc(uname(opp))}*\n\n` +
+      `💬 تحدث معه بحرية في القروب\n` +
+      `🎯 للتخمين اكتب في القروب اسم صورة منافسك مباشرة\n\n` +
+      `⏱️ عندك *8 دقائق* — بالتوفيق! 🍀`,
       { parse_mode: 'Markdown' }
     ).catch(() => {});
   }
@@ -317,13 +325,13 @@ async function beginGame(telegram, game) {
   await cleanGroup(telegram, chatId, null);
 
   const m = await telegram.sendMessage(chatId,
-    `⚔️ *انطلقت المباراة!*\n` +
-    `┄┄┄┄┄┄┄┄┄┄\n` +
+    `🔥 *انطلقت المباراة!*\n` +
+    `━━━━━━━━━━━━━━━\n` +
     `🔴 ${mention(game.p1)}\n` +
     `🔵 ${mention(game.p2)}\n\n` +
     `💬 تحدثوا بحرية وتبادلوا الأسئلة\n` +
-    `🎯 للتخمين اكتب: \`تخمين: الاسم\`\n` +
-    `⏱️ المدة: *5 دقائق* — بالتوفيق! 🍀`,
+    `🎯 اكتب اسم صورة منافسك مباشرة\n` +
+    `⏱️ المدة: *8 دقائق* 🍀`,
     { parse_mode: 'Markdown' }
   ).catch(() => null);
 
@@ -385,10 +393,10 @@ async function handleWin(telegram, game, winner, loser) {
 
   const r = await telegram.sendMessage(chatId,
     `🏆 *انتهت المباراة!*\n` +
-    `┄┄┄┄┄┄┄┄┄┄\n` +
-    `👑 الفائز: ${mention(winner)}\n` +
-    `✅ خمّن الإجابة الصحيحة: *${esc(loser.name)}*\n\n` +
-    `📸 كشف الصور:`,
+    `━━━━━━━━━━━━━━━\n` +
+    `👑 *الفائز:* ${mention(winner)} 🎉\n` +
+    `✅ خمّن الإجابة: *${esc(loser.name)}*\n\n` +
+    `📸 *كشف الصور:*`,
     { parse_mode: 'Markdown' }
   ).catch(() => null);
 
@@ -397,8 +405,8 @@ async function handleWin(telegram, game, winner, loser) {
 
   for (const p of [winner, { id: loser.id }]) {
     const msg = s(p.id) === s(winner.id)
-      ? `🏆 *فزت!* تمكنت من تخمين صورة منافسك. 💪`
-      : `😔 *خسرت.*\nمنافسك تمكّن من تخمين صورتك. حظاً أوفر! 🍀`;
+      ? `🏆 *فزت!* أحسنت، خمّنت صورة منافسك! 💪🎊`
+      : `😔 *خسرت هذه الجولة*\nمنافسك كان أسرع! حظاً أوفر المرة القادمة 🍀`;
     await telegram.sendMessage(p.id, msg, { parse_mode: 'Markdown' }).catch(() => {});
   }
 }
