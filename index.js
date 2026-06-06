@@ -379,15 +379,34 @@ async function launch() {
         const title  = chat.title || 'القروب';
         setTimeout(async () => {
           try {
-            await ctx.telegram.sendMessage(addedBy.id,
-              '🎉 شكراً لإضافتي في *' + title + '!*\n\nيمكنك إعداد القروب والتحكم فيه من هنا:',
-              {
-                parse_mode: 'Markdown',
-                reply_markup: { inline_keyboard: [
-                  [{ text: '⚙️ إعداد القروب', url: 'https://t.me/' + un + '?start=setup_' + chatId }]
-                ]}
-              }
-            );
+            // تحقق إذا البوت ادمين
+            const botMember = await ctx.telegram.getChatMember(chatId, ctx.botInfo?.id || (await ctx.telegram.getMe()).id).catch(() => null);
+            const isAdmin = botMember?.status === 'administrator';
+            if (isAdmin) {
+              // البوت ادمين — رسالة ترحيب وإعداد
+              await ctx.telegram.sendMessage(addedBy.id,
+                '✅ تم إضافتي في *' + title + '* كـ ادمين!\n\nيمكنك إعداد القروب والتحكم فيه من هنا:',
+                {
+                  parse_mode: 'Markdown',
+                  reply_markup: { inline_keyboard: [
+                    [{ text: '⚙️ إعداد القروب', url: 'https://t.me/' + un + '?start=setup_' + chatId }]
+                  ]}
+                }
+              );
+            } else {
+              // البوت مش ادمين — رسالة تنبيه وخروج
+              await ctx.telegram.sendMessage(addedBy.id,
+                '⚠️ شكراً على الإضافة في *' + title + '*!\n\n' +
+                'لكن لاحظت أنك لم تمنحني صلاحيات *ادمين*، ولن أتمكن من العمل بشكل صحيح.\n\n' +
+                '📌 *كيف تصلح ذلك؟*\n' +
+                '1\. اذهب لإعدادات القروب\n' +
+                '2\. ادمنز ← أضف ادمن\n' +
+                '3\. اخترني وفعّل الصلاحيات\n\n' +
+                'سأخرج الآن وأعود عند إضافتي كادمين 👋',
+                { parse_mode: 'Markdown' }
+              ).catch(() => {});
+              await ctx.telegram.leaveChat(chatId).catch(() => {});
+            }
           } catch(_) {}
         }, 2000);
       }
