@@ -46,6 +46,21 @@ async function showGroupPanel(ctx) {
 }
 
 async function showGroupDetail(ctx, chatId) {
+  const uid = ctx.uid || ctx.from?.id;
+  const isOwner = uid === parseInt(process.env.OWNER_ID);
+
+  // تحقق من صلاحيات المستخدم
+  if (!isOwner) {
+    try {
+      const member = await ctx.telegram.getChatMember(chatId, uid);
+      if (!['administrator','creator'].includes(member?.status)) {
+        return ctx.answerCbQuery('🚫 ليس لديك صلاحية إدارة هذا القروب', { show_alert: true }).catch(() => {});
+      }
+    } catch(e) {
+      return ctx.answerCbQuery('🚫 تعذر التحقق من صلاحياتك', { show_alert: true }).catch(() => {});
+    }
+  }
+
   const [g, spec, mc, warns, bans] = await Promise.all([
     get('SELECT * FROM group_chats WHERE chat_id=$1', [chatId]),
     get('SELECT s.name FROM specialties s JOIN group_chats g ON g.specialty_id=s.id WHERE g.chat_id=$1', [chatId]).catch(() => null),
