@@ -75,28 +75,30 @@ exports.batchPromote = async (ctx) => {
 
 exports.listGroups = async (ctx) => {
   const uid = ctx.uid || ctx.from?.id;
-  // جلب القروبات اللي المستخدم ادمين فيها والبوت موجود فيها
+  // جلب كل القروبات النشطة
   const groups = await db.all(
-    `SELECT gc.chat_id, gc.title, sp.name as spec,
-            gc.welcome_enabled, gc.is_active,
-            (SELECT COUNT(*) FROM group_members gm WHERE gm.chat_id=gc.chat_id) as members
-     FROM group_chats gc
-     LEFT JOIN specialties sp ON gc.specialty_id=sp.id
-     INNER JOIN group_members adm ON adm.chat_id=gc.chat_id AND adm.user_id=$1 AND adm.is_admin=1
-     WHERE gc.is_active=1
-     ORDER BY gc.title`,
-    [uid]
-  );
-  if (!groups.length) return ctx.reply('📭 أنت لست ادمين في أي قروب يحتوي البوت حالياً.');
+    `SELECT chat_id, title FROM group_chats WHERE is_active=1 ORDER BY title`
+  ).catch(() => []);
 
-  let text = '👥 *قروباتك (' + groups.length + ')*\n━━━━━━━━━━━━\n\n';
+  if (!groups.length) return ctx.reply('📭 البوت ليس في أي قروب حالياً.');
+
+  // فلتر فقط القروبات اللي المستخدم ادمين فيها عبر Telegram API
+  const myGroups = [];
+  for (const g of groups) {
+    try {
+      const member = await ctx.telegram.getChatMember(g.chat_id, uid);
+      if (['administrator','creator'].includes(member?.status)) {
+        myGroups.push(g);
+      }
+    } catch(_) {}
+  }
+
+  if (!myGroups.length) return ctx.reply('📭 أنت لست ادمين في أي قروب يحتوي البوت حالياً.\n\nأضف البوت لقروبك وسيظهر هنا.');
+
+  let text = '👥 *قروباتك (' + myGroups.length + ')*\n━━━━━━━━━━━━\n\nاختر قروب لإدارته:';
   const rows = [];
-  groups.forEach((g, i) => {
-    const sp = g.spec ? '🎓 ' + g.spec : '📚 غير محدد';
-    const w  = g.welcome_enabled ? '✅' : '❌';
-    text += (i+1) + '. *' + (g.title||'قروب').substring(0,25) + '*\n';
-    text += '   👤 ' + (g.members||0) + ' | ' + sp + ' | ترحيب: ' + w + '\n\n';
-    rows.push([btn('⚙️ ' + (g.title||g.chat_id).substring(0,20), 'gp_view_' + g.chat_id)]);
+  myGroups.forEach(g => {
+    rows.push([btn('⚙️ ' + (g.title||g.chat_id).substring(0,25), 'gp_view_' + g.chat_id)]);
   });
   rows.push([btn('🔄 تحديث', 'mygroups_refresh')]);
   ctx.reply(text, { parse_mode: 'Markdown', ...build(rows) });
