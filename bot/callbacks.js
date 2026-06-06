@@ -306,6 +306,11 @@ module.exports.registerCallbacks = function(bot, deps) {
     const data = cbRes(_raw);
 
     try {
+      // ── ألعاب ──
+      if (data === 'mb_panel' || data === 'gp_million_panel' || data === 'gp_guess_panel') {
+        return gamesPanel.handleCallback(ctx, data);
+      }
+
       if (data === 'rules_ok') {
         ctx.answerCbQuery('✅ شكراً! التزم بالقواعد 🙏').catch(() => {});
         ctx.deleteMessage().catch(() => {});
@@ -356,7 +361,8 @@ module.exports.registerCallbacks = function(bot, deps) {
           || data.startsWith('close_list_') || data.startsWith('close_stats_')
           || data.startsWith('grp_stats_') || data === 'rules_ok'
           || data.startsWith('ml_') || data.startsWith('gp_')
-          || data.startsWith('grp_register_') || data.startsWith('grp_reg_btn_');
+          || data.startsWith('grp_register_') || data.startsWith('grp_reg_btn_')
+          || data === 'mb_panel' || data.startsWith('gp_million') || data.startsWith('gp_guess');
         if (!_grpOk)
           return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }

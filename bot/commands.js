@@ -526,5 +526,18 @@ module.exports = function registerCommands(bot, deps) {
       '👨‍💻 Dev ↠ @lweees23';
     return ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => {});
   });
-};
 
+  // ── البنك ──
+  bot.on('message', async (ctx, next) => {
+    if (ctx.chat?.type !== 'private') return next();
+    const txt = ctx.message?.text?.trim();
+    if (!txt) return next();
+    if (txt === 'انشاء حساب' || txt === 'إنشاء حساب') return bank.createAccount(ctx);
+    if (txt === 'فلوسي' || txt === 'رصيدي') return bank.showBalance(ctx);
+    if (txt === 'rip' || txt === 'RIP') return bank.showRip(ctx);
+    const farsiMatch = txt.match(/^فارسي (\d+)/);
+    if (farsiMatch) return bank.transfer(ctx);
+    return next();
+  });
+
+};

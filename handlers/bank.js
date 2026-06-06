@@ -150,5 +150,25 @@ exports.addWinnings = async (userId, firstName, username, amount, note) => {
   } catch(_) { return false; }
 };
 
+exports.showRip = async (ctx) => {
+  const uid = ctx.from.id;
+  const acc = await getAccount(uid);
+  if (!acc) return ctx.reply('❌ ما عندك حساب بنكي! اكتب *انشاء حساب*', { parse_mode: 'Markdown' }).catch(() => {});
+  const { all } = require('../database/db');
+  const txs = await all('SELECT * FROM bank_transactions WHERE to_id=$1 OR from_id=$1 ORDER BY created_at DESC LIMIT 10', [uid]).catch(() => []);
+  let text = '🏦 *حسابك البنكي*' + String.fromCharCode(10);
+  text += '━━━━━━━━━━━━━━━━' + String.fromCharCode(10) + String.fromCharCode(10);
+  text += '👤 ' + (ctx.from.first_name || '') + String.fromCharCode(10);
+  text += '💰 الرصيد: *' + fmt(acc.balance) + '*' + String.fromCharCode(10) + String.fromCharCode(10);
+  if (txs.length) {
+    text += '📋 *آخر المعاملات:*' + String.fromCharCode(10);
+    txs.forEach(t => {
+      const sign = t.to_id === uid ? '➕' : '➖';
+      text += sign + ' ' + fmt(t.amount) + ' — ' + (t.note || t.type) + String.fromCharCode(10);
+    });
+  }
+  return ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => {});
+};
+
 exports.getAccount = getAccount;
 exports.fmt = fmt;
