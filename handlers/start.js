@@ -11,10 +11,10 @@ const { escMd: escMdCommon } = require('../utils/common');
 const safeInt = v => { const n = parseInt(v); return isNaN(n) ? 0 : n; };
 
 async function startHandler(ctx) {
-  const uid = ctx.uid;
-  const name = ctx.from?.first_name || 'Student';
+  const uid  = ctx.uid;
+  const name = ctx.from?.first_name || 'طالب';
 
-  // تحقق من الاشتراك
+  // ── تحقق من الاشتراك ──
   if (!ctx.isOwner && !ctx.isAdmin && ctx.chat?.type === 'private') {
     const guard = require('../utils/channelGuard');
     const res = await guard.checkAllChannels({ telegram: ctx.telegram }, uid);
