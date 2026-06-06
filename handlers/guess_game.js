@@ -79,7 +79,7 @@ async function startInvite(ctx) {
     `3️⃣ تحدّث مع منافسك بحرية\n` +
     `4️⃣ أول من يخمن صورة خصمه يفوز 🏆\n\n` +
     `⏳ *60 ثانية* للانضمام`,
-    { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '🎮 انضمام للعبة', url: _botLink + '?start=join_' + chatId }]] } }
+    { parse_mode: 'Markdown' }
   ).catch(() => null);
 
   if (!m) { _games.delete(chatId); return; }
@@ -147,7 +147,7 @@ async function handleJoin(ctx) {
       ).catch(() => {
         // إذا ما فتح المستخدم البوت — أرسل في القروب
         ctx.telegram.sendMessage(ctx.chat.id,
-          `📌 ${mention(user)} افتح البوت وأرسل صورتك السرية\!`,
+          `📌 ${mention(user)} أرسل صورتك السرية للبوت!`,
           { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '🤖 فتح البوت', url: _bl }]] } }
         ).catch(() => {});
       });
@@ -424,10 +424,17 @@ async function handleWin(telegram, game, winner, loser) {
   await telegram.sendPhoto(chatId, game.p1.photo, { caption: `🔴 صورة *${esc(uname(game.p1))}*\nالإجابة: *${esc(game.p1.name)}*`, parse_mode: 'Markdown' }).catch(() => {});
   await telegram.sendPhoto(chatId, game.p2.photo, { caption: `🔵 صورة *${esc(uname(game.p2))}*\nالإجابة: *${esc(game.p2.name)}*`, parse_mode: 'Markdown' }).catch(() => {});
 
+  // ── إضافة جائزة لعبة خمن للبنك ──
+  try {
+    const bank = require('./bank');
+    await bank.addWinnings(winner.id, winner.first_name, winner.username, 500, 'جائزة لعبة خمن');
+  } catch(_) {}
+
   for (const p of [winner, { id: loser.id }]) {
-    const msg = s(p.id) === s(winner.id)
-      ? `🏆 *فزت!* أحسنت، خمّنت صورة منافسك! 💪🎊`
-      : `😔 *خسرت هذه الجولة*\nمنافسك كان أسرع! حظاً أوفر المرة القادمة 🍀`;
+    const isWinner = s(p.id) === s(winner.id);
+    const msg = isWinner
+      ? '🏆 *فزت!* أحسنت، خمّنت صورة منافسك! 💪🎊\n\n💰 *ربحت 500 $* تم إضافتها لحسابك البنكي!'
+      : '😔 *خسرت هذه الجولة*\nمنافسك كان أسرع! حظاً أوفر المرة القادمة 🍀';
     await telegram.sendMessage(p.id, msg, { parse_mode: 'Markdown' }).catch(() => {});
   }
 }

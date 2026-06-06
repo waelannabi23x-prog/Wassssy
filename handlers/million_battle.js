@@ -360,6 +360,15 @@ async function endGame(ctx, chatId, winner) {
   let text;
   if (winner) {
     try { const { awardPoints } = require('../database/points'); await awardPoints(winner.id, 'rating').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); } catch (_) {}
+    // ── إضافة الجائزة للبنك ──
+    try {
+      const bank = require('./bank');
+      await bank.addWinnings(winner.id, winner.first_name, winner.username, finalPrize, 'جائزة لعبة مليون');
+      await ctx.telegram.sendMessage(winner.id,
+        '💰 *ربحت ' + finalPrize + ' $ في لعبة مليون!*\n💳 تم إضافة الجائزة لحسابك البنكي.',
+        { parse_mode: 'Markdown' }
+      ).catch(() => {});
+    } catch(_) {}
     text =
       `🏆━━━━━━━━━━━━━━━━━━━━━━\n\n` +
       `🎉 *الفائز: ${mention(winner)}*\n\n` +
