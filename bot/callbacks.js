@@ -279,6 +279,11 @@ module.exports.registerCallbacks = function(bot, deps) {
     const data = cbRes(_raw);
 
     try {
+      if (data === 'rules_ok') {
+        ctx.answerCbQuery('✅ شكراً! التزم بالقواعد 🙏').catch(() => {});
+        ctx.deleteMessage().catch(() => {});
+        return;
+      }
       if (data.startsWith('gs_')) {
         ctx.answerCbQuery('').catch(() => {});
         await handleSettingsCallback(ctx, data);

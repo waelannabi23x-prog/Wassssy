@@ -36,6 +36,7 @@ async function showGroupPanel(ctx) {
   }
 
   rows.push([
+    kbBtn('📜 تعديل القواعد', 'gp_setrules_' + chatId),
     kbBtn('📢 رسالة للكل',    'gp_broadcast_0'),
     kbBtn('🎓 رسالة لتخصص', 'gp_broadcast_sp'),
   ]);
@@ -125,6 +126,19 @@ async function handleCallback(ctx, data) {
     }
   }
   if (data === 'gp_broadcast_sp') return showBroadcastSpecPicker(ctx);
+
+  // ── تعديل قواعد القروب ──
+  if (data.startsWith('gp_setrules_')) {
+    const chatId = data.replace('gp_setrules_', '');
+    await require('../utils/stateManager').setState(ctx.from.id, { type: 'gp_set_rules', chatId });
+    return ctx.reply(
+      '📜 *تعديل قواعد القروب*\n\nأرسل القواعد الجديدة:\n_(أو /cancel للإلغاء)_\n\n' +
+      '💡 يمكنك استخدام الأرقام والإيموجي:\n' +
+      '1️⃣ الاحترام المتبادل\n' +
+      '2️⃣ ممنوع الفلود...',
+      { parse_mode: 'Markdown' }
+    ).catch(() => {});
+  }
 
   if (data.startsWith('gp_broadcast_')) {
     const spId = data.replace('gp_broadcast_', '');

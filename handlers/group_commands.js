@@ -306,6 +306,8 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   bot.command('rules', async ctx => {
     if (!isGroup(ctx)) return;
+    // احذف أمر /rules
+    ctx.deleteMessage().catch(() => {});
     const { showGroupRules } = require('./group_admin');
     return showGroupRules(ctx, ctx.chat.id);
   });
