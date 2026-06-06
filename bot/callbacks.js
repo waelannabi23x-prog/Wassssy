@@ -328,7 +328,8 @@ module.exports.registerCallbacks = function(bot, deps) {
           || data.startsWith('unmute_all_') || data.startsWith('tag_all_')
           || data.startsWith('close_list_') || data.startsWith('close_stats_')
           || data.startsWith('grp_stats_') || data === 'rules_ok'
-          || data.startsWith('ml_') || data.startsWith('gp_');
+          || data.startsWith('ml_') || data.startsWith('gp_')
+          || data.startsWith('grp_register_') || data.startsWith('grp_reg_btn_');
         if (!_grpOk)
           return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }
