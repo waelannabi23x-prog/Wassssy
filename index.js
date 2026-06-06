@@ -483,6 +483,17 @@ async function launch() {
         ).catch(() => {});
       }
     } catch(_) {}
+
+    // ── كومندز البنك في القروب ──
+    try {
+      const txt = (ctx.message?.text || '').trim();
+      const bank = require('./handlers/bank');
+      if (/^انشاء حساب$/i.test(txt)) { await bank.createAccount(ctx); return; }
+      if (/^فلوسي$/i.test(txt)) { await bank.showBalance(ctx); return; }
+      if (/^فارسي/i.test(txt)) { await bank.transfer(ctx); return; }
+      if (/^rip /i.test(txt)) { await bank.loan(ctx); return; }
+    } catch(_) {}
+
     return next();
   });
 const apiRoutes = require('./routes/api');
