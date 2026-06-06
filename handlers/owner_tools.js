@@ -74,7 +74,7 @@ exports.batchPromote = async (ctx) => {
 };
 
 exports.listGroups = async (ctx) => {
-  const uid = ctx.uid || ctx.from?.id;
+  const uid = ctx.from?.id || ctx.uid;
   // جلب كل القروبات النشطة
   const groups = await db.all(
     `SELECT chat_id, title FROM group_chats WHERE is_active=1 ORDER BY title`
