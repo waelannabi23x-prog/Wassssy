@@ -524,7 +524,7 @@ module.exports = function registerCommands(bot, deps) {
     let text = '👥 *قروباتك (' + myGroups.length + ')*' + String.fromCharCode(10) + '━━━━━━━━━━━━━━━━' + String.fromCharCode(10) + String.fromCharCode(10);
     const rows = myGroups.map(g => {
       text += '▪️ ' + (g.title || 'قروب') + String.fromCharCode(10);
-      return [b('⚙️ ' + (g.title || g.chat_id).substring(0,25), 'gp_view_' + g.chat_id)];
+      return [b('⚙️ ' + String(g.title || g.chat_id).substring(0,25), 'gp_view_' + g.chat_id)];
     });
     const BOT_UN = process.env.BOT_USERNAME || '';
     rows.push([{ text: '➕ أضف البوت لقروب جديد', url: 'https://t.me/' + BOT_UN + '?startgroup=true' }]);
