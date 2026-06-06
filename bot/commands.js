@@ -292,10 +292,6 @@ module.exports = function registerCommands(bot, deps) {
     return unmuteAll(ctx, ctx.chat.id).catch(() => ctx.reply('❌').catch(err => { require('../utils/logger').debug("[silent]", err.message); }));
   });
 
-  bot.command('help', ctx => ctx.reply(
-    '📚 *أوامر البوت*\n\n/start — الرئيسية\n/search — البحث\n/profile — شخصي\n/stats — إحصائيات\n/cancel — إلغاء\n/ai — مساعد ذكي\n/reset — مسح سياق\n\n👑 *المشرفين:*\n/admin — الإدارة',
-    { parse_mode: 'Markdown' }
-  ).catch(err => { require('../utils/logger').debug("[silent]", err.message); }));
 
   // ── /channels — لوحة إدارة القنوات التفاعلية ──
   async function showChannelsPanel(ctx, msg) {
