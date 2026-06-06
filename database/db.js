@@ -235,6 +235,18 @@ async function initSchema() {
   // Migration: history unique constraint
   try { if(pg) await pg.query('ALTER TABLE history ADD CONSTRAINT hist_user_file_unique UNIQUE (user_id, file_id)'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
+  // Migration: auto_replies table
+  try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS auto_replies (
+    id SERIAL PRIMARY KEY,
+    trigger TEXT NOT NULL,
+    response TEXT NOT NULL,
+    match_type TEXT DEFAULT 'contains',
+    is_active INTEGER DEFAULT 1,
+    created_by BIGINT,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )`); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_auto_replies_active ON auto_replies(is_active)'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+
   // Migration: group_chats is_active column
   try { if(pg) await pg.query('ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 

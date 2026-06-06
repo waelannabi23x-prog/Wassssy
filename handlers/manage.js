@@ -54,6 +54,7 @@ async function mainMenu(ctx){
     if(process.env.CHANNEL_ID) rows.push([btn('📢 نشر في القناة','mg_post_channel')]);
     rows.push([btn('🚩 البلاغات','mg_reports'),btn('📨 نظام الرسائل','mg_msgs')]);
     rows.push([btn('📢 القنوات والإعلانات','mg_channels_menu')]);
+    rows.push([btn('🤖 الردود التلقائية','mg_auto_replies')]);
     rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp')]);
   }
   if(isOwner(ctx.uid)){
@@ -398,6 +399,34 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
       case 'mg_notify_msg':{clearState(uid);const nIds=await interactions.getActiveUsers(7);await safeAdd(broadcastQueue,'broadcast-all',{userIds:nIds,message:'🔔 *إشعار*\n\n'+text,parseMode:'Markdown',fromUid:uid});ctx.reply('📤 جاري الإرسال لـ *'+nIds.length+'* مستخدم — ستصلك النتيجة لما ينتهي',{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
       case 'mg_add_admin_id':{const tid=parseInt(text);if(isNaN(tid)){clearState(uid);return ctx.reply('❌ ID غير صحيح.');}await adminsDb.add(tid,uid);await interactions.addLog(uid,'add_admin','ID: '+tid);if(global.invalidateAdmin) global.invalidateAdmin(tid);const specs=await content.getSpecs();const spRows=specs.map(s=>[btn('🎓 '+s.name,'mg_admin_sp_'+tid+'_'+s.id)]);spRows.push([btn('كل التخصصات','mg_admin_sp_'+tid+'_0')]);clearState(uid);ctx.reply('اختر تخصص المشرف:',{...build(spRows)});try{ctx.telegram.sendMessage(tid,'🎉 تمت إضافتك مشرفاً',{parse_mode:'Markdown'});}catch(_){}break;}
       case 'mg_maint_msg':global.maintenanceModeMsg=text;clearState(uid);ctx.reply('✅ تم تحديث رسالة الصيانة',build([back('mg_menu')]));break;
+      case 'mg_ar_trigger': {
+        setState(uid, { type: 'mg_ar_response', trigger: text });
+        return eos(ctx,
+          '🤖 *إضافة رد تلقائي*\n\n' +
+          '✅ الكلمة: `' + escMd(text) + '`\n\n' +
+          'الخطوة 2/3: أرسل الرد التلقائي:',
+          { parse_mode: 'Markdown', ...build([
+            [btn('❌ إلغاء','mg_auto_replies')]
+          ]) }
+        );
+      }
+      case 'mg_ar_response': {
+        const trigger = state.trigger;
+        const matchType = state.matchType || 'contains';
+        await dbRun(
+          'INSERT INTO auto_replies(trigger,response,match_type,created_by) VALUES($1,$2,$3,$4)',
+          [trigger, text, matchType, uid]
+        ).catch(()=>{});
+        cacheClear('auto_replies_all');
+        clearState(uid);
+        await ctx.reply(
+          '✅ *تم حفظ الرد التلقائي!*\n\n' +
+          '🔍 عند: `' + escMd(trigger) + '`\n' +
+          '↩️ الرد: ' + escMd(text.substring(0,50)),
+          { parse_mode: 'Markdown' }
+        ).catch(()=>{});
+        return showAutoReplies(ctx);
+      }
       case 'mg_awaiting_channel': {
         const parts = text.split(' ');
         const cidRaw = parts[0];
@@ -441,6 +470,32 @@ async function handleCallback(ctx,data){
 
   // ── القنوات والإعلانات ──
   if(data==='mg_channels_menu') return showChannelsMenu(ctx);
+  if(data==='mg_auto_replies') return showAutoReplies(ctx);
+  if(data==='mg_add_ar') {
+    setState(uid, { type: 'mg_ar_trigger' });
+    return eos(ctx,
+      '🤖 *إضافة رد تلقائي*\n\n' +
+      'الخطوة 1/3: أرسل الكلمة أو الجملة التي يراقبها البوت:\n\n' +
+      'مثال: `سلام عليكم` أو `❤️` أو `?`',
+      { parse_mode: 'Markdown', ...build([[btn('❌ إلغاء','mg_auto_replies')]]) }
+    );
+  }
+  if(data.startsWith('mg_del_ar_')) {
+    const arId = parseInt(data.replace('mg_del_ar_',''));
+    await dbRun('UPDATE auto_replies SET is_active=0 WHERE id=$1',[arId]).catch(()=>{});
+    cacheClear('auto_replies_all');
+    ctx.answerCbQuery('✅ تم الحذف').catch(()=>{});
+    return showAutoReplies(ctx);
+  }
+  if(data.startsWith('mg_ar_type_')) {
+    const parts = data.replace('mg_ar_type_','').split('_');
+    const matchType = parts[0];
+    const s = require('../utils/stateManager').getState(uid);
+    if(s?.type === 'mg_ar_response') {
+      setState(uid, { ...s, matchType });
+    }
+    return ctx.answerCbQuery(matchType === 'exact' ? '🎯 مطابقة تامة' : '🔍 يحتوي على').catch(()=>{});
+  }
   if(data==='mg_ads_menu') return showAdsMenu(ctx);
   if(data==='mg_addchannel') {
     setState(uid, { type: 'mg_awaiting_channel' });
@@ -638,6 +693,32 @@ async function showAdsMenu(ctx) {
   ]);
   rows.push([btn('➕ إضافة إعلان', 'mg_addad')]);
   rows.push([btn('◀️ رجوع', 'mg_channels_menu')]);
+  return eos(ctx, text, { parse_mode: 'Markdown', ...build(rows) });
+}
+
+// ══════════════════════════════════════════
+// 🤖 الردود التلقائية
+// ══════════════════════════════════════════
+
+async function showAutoReplies(ctx) {
+  const list = await all('SELECT * FROM auto_replies WHERE is_active=1 ORDER BY id DESC LIMIT 20').catch(() => []);
+  let text = '🤖 *الردود التلقائية*\n━━━━━━━━━━━━━━━\n\n';
+  if (!list.length) {
+    text += '_لا توجد ردود مضافة_\n\n';
+  } else {
+    list.forEach((r, i) => {
+      const icon = r.match_type === 'exact' ? '🎯' : '🔍';
+      text += (i+1) + '. ' + icon + ' `' + escMd(r.trigger.substring(0,20)) + '`\n';
+      text += '   ↩️ ' + escMd(r.response.substring(0,30)) + '\n\n';
+    });
+  }
+  text += '📌 *أنواع المطابقة:*\n🔍 يحتوي على | 🎯 مطابقة تامة';
+
+  const rows = list.map(r => [
+    btn('🗑 ' + r.trigger.substring(0,20), 'mg_del_ar_' + r.id)
+  ]);
+  rows.push([btn('➕ إضافة رد تلقائي', 'mg_add_ar')]);
+  rows.push(back('mg_menu'));
   return eos(ctx, text, { parse_mode: 'Markdown', ...build(rows) });
 }
 

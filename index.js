@@ -226,6 +226,30 @@ bot.use(async (ctx, next) => {
     }
   }
 
+  // 🤖 Auto-Reply
+  if (txt && txt.length > 0) {
+    const arKey = 'auto_replies_all';
+    let arList = _cGet(arKey);
+    if (!arList) {
+      arList = await _dbAll('SELECT * FROM auto_replies WHERE is_active=1').catch(()=>[]);
+      _cSet(arKey, arList, 120000); // كاش دقيقتين
+    }
+    for (const ar of arList) {
+      let matched = false;
+      if (ar.match_type === 'exact') {
+        matched = txt.trim().toLowerCase() === ar.trigger.trim().toLowerCase();
+      } else {
+        matched = txt.toLowerCase().includes(ar.trigger.toLowerCase());
+      }
+      if (matched) {
+        ctx.reply(ar.response, {
+          reply_to_message_id: ctx.message.message_id
+        }).catch(()=>{});
+        break; // رد واحد فقط
+      }
+    }
+  }
+
   // Anti-Link
   if (gs.anti_link && txt && !txt.startsWith('/')) {
     if (/https?:\/\/|t\.me\/|telegram\.me\//i.test(txt)) {
