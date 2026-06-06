@@ -3,6 +3,7 @@ const { handleSettingsCallback } = require('../handlers/group_commands');
 const browse      = require('../handlers/browse');
 const groupPanel  = require('../handlers/group_panel');
 const groupSetup  = require('../handlers/group_setup');
+const gamesPanel  = require('../handlers/games_panel');
 
 module.exports.registerCallbacks = function(bot, deps) {
   const {
