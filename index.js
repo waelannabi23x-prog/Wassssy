@@ -212,29 +212,32 @@ bot.use(async (ctx, next) => {
       arList = await _dbAll('SELECT * FROM auto_replies WHERE is_active=1').catch(()=>[]);
       _cSet(arKey, arList, 120000);
     }
-    // Rotation — كل trigger له عداد خاص
+    // Rotation — رد واحد فقط على الجملة (أول trigger يطابق)
     if (!global._arCounters) global._arCounters = new Map();
 
-    // جمع كل الـ triggers الفريدة المطابقة
-    const triggersMatched = new Set();
+    // ابحث عن أول trigger يطابق الجملة
+    const triggersFound = [];
     for (const ar of arList) {
-      let matched = false;
-      if (ar.match_type === 'exact') {
-        matched = txt.trim().toLowerCase() === ar.trigger.trim().toLowerCase();
-      } else {
-        matched = txt.toLowerCase().includes(ar.trigger.toLowerCase());
-      }
-      if (matched) triggersMatched.add(ar.trigger.toLowerCase());
+      const t = ar.trigger.toLowerCase();
+      let matched = ar.match_type === 'exact'
+        ? txt.trim().toLowerCase() === t
+        : txt.toLowerCase().includes(t);
+      if (matched && !triggersFound.includes(t)) triggersFound.push(t);
     }
 
-    // لكل trigger مطابق — اختر الرد التالي بالـ rotation
-    for (const trigger of triggersMatched) {
-      const responses = arList.filter(ar => ar.trigger.toLowerCase() === trigger);
-      if (!responses.length) continue;
-      const key = cid + '_' + trigger;
-      const idx = (global._arCounters.get(key) || 0) % responses.length;
-      global._arCounters.set(key, idx + 1);
-      ctx.reply(responses[idx].response, { reply_to_message_id: ctx.message.message_id }).catch(()=>{});
+    if (triggersFound.length > 0) {
+      // اختر trigger واحد بـ rotation بين الـ triggers المطابقة
+      const tKey = cid + '_triggers';
+      const tIdx = (global._arCounters.get(tKey) || 0) % triggersFound.length;
+      global._arCounters.set(tKey, tIdx + 1);
+      const chosenTrigger = triggersFound[tIdx];
+
+      // من الـ trigger المختار — rotation على الردود
+      const responses = arList.filter(ar => ar.trigger.toLowerCase() === chosenTrigger);
+      const rKey = cid + '_' + chosenTrigger;
+      const rIdx = (global._arCounters.get(rKey) || 0) % responses.length;
+      global._arCounters.set(rKey, rIdx + 1);
+      ctx.reply(responses[rIdx].response, { reply_to_message_id: ctx.message.message_id }).catch(()=>{});
     }
   }
 
