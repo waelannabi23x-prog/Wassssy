@@ -87,7 +87,7 @@ module.exports.registerCallbacks = function(bot, deps) {
       return ctx.reply('📦 اكتب اسم الحزمة الجديدة:').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }],
     ['noop',       () => {}],
-    ['main_menu',  ctx => startHandler(ctx)],
+    ['main_menu',  ctx => startHandler.showMainMenu(ctx)],
     
     ['mg_open_app', async ctx => {
       const url = process.env.WEBHOOK_URL + '/app/app_index.html';
