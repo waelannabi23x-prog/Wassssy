@@ -66,23 +66,17 @@ async function startInvite(ctx) {
   };
   _games.set(chatId, game);
 
-  const _botUser = await ctx.telegram.getMe().catch(()=>({username:''}));
-  const _botLink = _botUser.username ? `https://t.me/${_botUser.username}` : null;
   const m = await ctx.telegram.sendMessage(chatId,
-    `🎮 *تحدي خمن الصورة!*\n` +
+    `🎮 *تحدي خمن الصورة\!*\n` +
     `━━━━━━━━━━━━━━━\n` +
-    `👤 *${esc(uname(user))}* يتحدى الجميع!\n\n` +
+    `👤 *${esc(uname(user))}* يتحدى الجميع\!\n\n` +
     `📸 *طريقة اللعب:*\n` +
-    `1️⃣ أرسل صورة سرية للبوت في الخاص\n` +
-    `2️⃣ اكتب اسمها للبوت\n` +
-    `3️⃣ تحدّث مع منافسك في القروب\n` +
-    `4️⃣ أول من يخمن صورة خصمه يفوز! 🏆\n\n` +
-    `✏️ اكتب *انا* للانضمام\n` +
+    `1️⃣ اكتب *انا* للانضمام\n` +
+    `2️⃣ افتح البوت وأرسل صورة سرية\n` +
+    `3️⃣ تحدّث مع منافسك بحرية\n` +
+    `4️⃣ أول من يخمن صورة خصمه يفوز\! 🏆\n\n` +
     `⏳ *60 ثانية* للانضمام`,
-    {
-      parse_mode: 'Markdown',
-      reply_markup: _botLink ? { inline_keyboard: [[{ text: '🤖 افتح البوت وأرسل صورتك', url: _botLink }]] } : undefined
-    }
+    { parse_mode: 'MarkdownV2' }
   ).catch(() => null);
 
   if (!m) { _games.delete(chatId); return; }
@@ -136,6 +130,26 @@ async function handleJoin(ctx) {
     if (w) { trackMsg(chatId, w.message_id); setTimeout(() => ctx.telegram.deleteMessage(chatId, w.message_id).catch(() => {}), 4000); }
     return;
   }
+
+  // أرسل زر البوت للاعب الجديد
+  try {
+    const _bu = await ctx.telegram.getMe().catch(()=>({username:''}));
+    if (_bu.username) {
+      const _bl = `https://t.me/${_bu.username}`;
+      await ctx.telegram.sendMessage(user.id,
+        `🎮 *انضممت للتحدي\!*\n\n` +
+        `📸 أرسل صورتك السرية الآن\n` +
+        `ثم اكتب اسمها`,
+        { parse_mode: 'MarkdownV2', reply_markup: { inline_keyboard: [[{ text: '📸 أرسل صورتك هنا', url: _bl }]] } }
+      ).catch(() => {
+        // إذا ما فتح المستخدم البوت — أرسل في القروب
+        ctx.telegram.sendMessage(ctx.chat.id,
+          `📌 ${mention(user)} افتح البوت وأرسل صورتك السرية\!`,
+          { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '🤖 فتح البوت', url: _bl }]] } }
+        ).catch(() => {});
+      });
+    }
+  } catch(_) {}
 
   clearTimeout(game.inviteTimer);
   clearInterval(game._cdInterval);
