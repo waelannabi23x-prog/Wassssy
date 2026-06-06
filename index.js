@@ -380,9 +380,7 @@ async function launch() {
         setTimeout(async () => {
           try {
             await ctx.telegram.sendMessage(addedBy.id,
-              '🎉 شكراً لإضافتي في *' + title + '!*
-
-يمكنك إعداد القروب والتحكم فيه من هنا:',
+              '🎉 شكراً لإضافتي في *' + title + '!*\n\nيمكنك إعداد القروب والتحكم فيه من هنا:',
               {
                 parse_mode: 'Markdown',
                 reply_markup: { inline_keyboard: [
