@@ -9,7 +9,7 @@ const logger = require('../utils/logger');
 
 const INVITE_SECS  = 60;
 const COLLECT_SECS = 600;
-const GAME_SECS    = 300;
+const GAME_SECS    = 480; // 8 دقائق
 
 const _games    = new Map(); // chatId → game
 const _pvStates = new Map(); // userId → pvState

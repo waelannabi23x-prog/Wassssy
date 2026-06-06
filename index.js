@@ -205,7 +205,9 @@ bot.use(async (ctx, next) => {
   const now = Date.now();
 
   // 🤖 Auto-Reply — يشتغل للجميع حتى الأدمنز
-  if (txt && txt.length > 0) {
+  // تجاهل أوامر اللعبة
+  const _isGameMsg = /^(تخمين[:\s]|خمن$|انا$)/i.test(txt.trim());
+  if (txt && txt.length > 0 && !_isGameMsg) {
     const arKey = 'auto_replies_all';
     let arList = _cGet(arKey);
     if (!arList) {
