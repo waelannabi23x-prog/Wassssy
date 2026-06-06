@@ -347,10 +347,10 @@ async function handleGuess(ctx) {
   if (!game || game.status !== 'active') return false;
 
   const text = ctx.message?.text || '';
+  // يقبل: "تخمين: اسم" أو "اسم" مباشرة
   const m    = text.match(/^تخمين[:\s]+(.+)$/i);
-  if (!m) return false;
-
-  const guess   = m[1].trim();
+  const guess = m ? m[1].trim() : text.trim();
+  if (!guess || guess.length < 1) return false;
   const guesser = ctx.from;
   const isP1    = s(guesser.id) === s(game.p1.id);
   const isP2    = s(guesser.id) === s(game.p2.id);
