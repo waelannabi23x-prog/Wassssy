@@ -66,17 +66,20 @@ async function startInvite(ctx) {
   };
   _games.set(chatId, game);
 
+
+  const _botInfo = await ctx.telegram.getMe().catch(() => ({ username: '' }));
+  const _botLink = _botInfo.username ? `https://t.me/${_botInfo.username}` : '';
   const m = await ctx.telegram.sendMessage(chatId,
-    `🎮 *تحدي خمن الصورة\!*\n` +
-    `━━━━━━━━━━━━━━━\n` +
-    `👤 *${esc(uname(user))}* يتحدى الجميع\!\n\n` +
-    `📸 *طريقة اللعب:*\n` +
-    `1️⃣ اكتب *انا* للانضمام\n` +
+    `🎮 *تحدي خمن الصورة!*\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
+    `👤 ${mention(user)} يتحدى الجميع!\n\n` +
+    `📌 *كيف تلعب؟*\n` +
+    `1️⃣ اضغط زر *انضمام للعبة* أدناه\n` +
     `2️⃣ افتح البوت وأرسل صورة سرية\n` +
     `3️⃣ تحدّث مع منافسك بحرية\n` +
-    `4️⃣ أول من يخمن صورة خصمه يفوز\! 🏆\n\n` +
+    `4️⃣ أول من يخمن صورة خصمه يفوز 🏆\n\n` +
     `⏳ *60 ثانية* للانضمام`,
-    { parse_mode: 'MarkdownV2' }
+    { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '🎮 انضمام للعبة', url: _botLink + '?start=join_' + chatId }]] } }
   ).catch(() => null);
 
   if (!m) { _games.delete(chatId); return; }
@@ -162,14 +165,18 @@ async function handleJoin(ctx) {
   await cleanGroup(ctx.telegram, chatId, null);
 
   // رسالة المشاركين
+  const _bu2 = await ctx.telegram.getMe().catch(() => ({ username: '' }));
+  const _bl2 = _bu2.username ? `https://t.me/${_bu2.username}` : '';
   const m = await ctx.telegram.sendMessage(chatId,
-    `✅ *اكتملت المباراة!*\n` +
-    `┄┄┄┄┄┄┄┄┄┄\n` +
+    `🎯 *المباراة بدأت!*\n` +
+    `━━━━━━━━━━━━━━━━━━━━\n` +
     `🔴 ${mention(game.p1)}\n` +
     `🔵 ${mention(game.p2)}\n\n` +
-    `📲 *تحقق من رسائلك الخاصة مع البوت*\n` +
-    `⏳ عندكم *5 دقائق* لإرسال الصور`,
-    { parse_mode: 'Markdown' }
+    `⏳ عندكم *5 دقائق* لإرسال الصور السرية\n` +
+    `📲 افتح البوت وأرسل صورتك الآن!`,
+    { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [
+      [{ text: '📸 أرسل صورتك للبوت', url: _bl2 }]
+    ]}}
   ).catch(() => null);
 
   if (m) trackMsg(chatId, m.message_id);
