@@ -36,7 +36,6 @@ async function showGroupPanel(ctx) {
   }
 
   rows.push([
-    kbBtn('📜 تعديل القواعد', 'gp_setrules_' + chatId),
     kbBtn('📢 رسالة للكل',    'gp_broadcast_0'),
     kbBtn('🎓 رسالة لتخصص', 'gp_broadcast_sp'),
   ]);
@@ -76,7 +75,8 @@ async function showGroupDetail(ctx, chatId) {
 
   const rows = [
     // ── الترحيب ──
-    [kbBtn('✏️ رسالة الترحيب', 'gp_setwelcome_' + chatId),
+    [kbBtn('📜 تعديل القواعد', 'gp_setrules_' + chatId),
+     kbBtn('✏️ رسالة الترحيب', 'gp_setwelcome_' + chatId),
      kbBtn('🖼 صورة الترحيب',  'gp_setwphoto_'  + chatId)],
     // ── تبديل الإعدادات ──
     [kbBtn(g.welcome_enabled  ? '🔴 إيقاف الترحيب'  : '🟢 تفعيل الترحيب',  'gp_togglew_'      + chatId),
