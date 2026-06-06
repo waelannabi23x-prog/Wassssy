@@ -212,15 +212,29 @@ bot.use(async (ctx, next) => {
       arList = await _dbAll('SELECT * FROM auto_replies WHERE is_active=1').catch(()=>[]);
       _cSet(arKey, arList, 120000);
     }
-    // جمع كل الردود المطابقة وإرسالها معاً
-    const matchedReplies = arList.filter(ar => {
+    // Rotation — كل trigger له عداد خاص
+    if (!global._arCounters) global._arCounters = new Map();
+
+    // جمع كل الـ triggers الفريدة المطابقة
+    const triggersMatched = new Set();
+    for (const ar of arList) {
+      let matched = false;
       if (ar.match_type === 'exact') {
-        return txt.trim().toLowerCase() === ar.trigger.trim().toLowerCase();
+        matched = txt.trim().toLowerCase() === ar.trigger.trim().toLowerCase();
+      } else {
+        matched = txt.toLowerCase().includes(ar.trigger.toLowerCase());
       }
-      return txt.toLowerCase().includes(ar.trigger.toLowerCase());
-    });
-    for (const ar of matchedReplies) {
-      ctx.reply(ar.response, { reply_to_message_id: ctx.message.message_id }).catch(()=>{});
+      if (matched) triggersMatched.add(ar.trigger.toLowerCase());
+    }
+
+    // لكل trigger مطابق — اختر الرد التالي بالـ rotation
+    for (const trigger of triggersMatched) {
+      const responses = arList.filter(ar => ar.trigger.toLowerCase() === trigger);
+      if (!responses.length) continue;
+      const key = cid + '_' + trigger;
+      const idx = (global._arCounters.get(key) || 0) % responses.length;
+      global._arCounters.set(key, idx + 1);
+      ctx.reply(responses[idx].response, { reply_to_message_id: ctx.message.message_id }).catch(()=>{});
     }
   }
 
