@@ -1,6 +1,8 @@
 'use strict';
 const { handleSettingsCallback } = require('../handlers/group_commands');
-const groupPanel = require('../handlers/group_panel');
+const browse      = require('../handlers/browse');
+const groupPanel  = require('../handlers/group_panel');
+const groupSetup  = require('../handlers/group_setup');
 
 module.exports.registerCallbacks = function(bot, deps) {
   const {

@@ -206,7 +206,7 @@ bot.use(async (ctx, next) => {
 
   // 🤖 Auto-Reply — يشتغل للجميع حتى الأدمنز
   // تجاهل أوامر اللعبة
-  const _isGameMsg = /^(تخمين[:\s]|خمن$|انا$)/i.test(txt.trim());
+  const _isGameMsg = /^(تخمين[:\s]|خمن$|خمن |انا$)/i.test(txt.trim()) || txt.trim() === 'خمن';
   if (txt && txt.length > 0 && !_isGameMsg) {
     const arKey = 'auto_replies_all';
     let arList = _cGet(arKey);
@@ -363,6 +363,37 @@ async function launch() {
   // 📥 تسجيل القروب تلقائياً عند إضافة البوت
   // ══════════════════════════════════════════
   bot.on('my_chat_member', async ctx => {
+    // ⚡ لما يُضاف البوت لقروب — أرسل DM للأدمن الذي أضافه
+    try {
+      const upd    = ctx.update?.my_chat_member;
+      const newM   = upd?.new_chat_member;
+      const addedBy = upd?.from;
+      const chat   = upd?.chat;
+      if (newM?.user?.is_bot &&
+          (newM?.status === 'member' || newM?.status === 'administrator') &&
+          addedBy?.id &&
+          chat?.type !== 'private') {
+        const me = ctx.botInfo || await ctx.telegram.getMe().catch(() => ({}));
+        const un = me.username || '';
+        const chatId = chat.id;
+        const title  = chat.title || 'القروب';
+        setTimeout(async () => {
+          try {
+            await ctx.telegram.sendMessage(addedBy.id,
+              '🎉 شكراً لإضافتي في *' + title + '!*
+
+يمكنك إعداد القروب والتحكم فيه من هنا:',
+              {
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: [
+                  [{ text: '⚙️ إعداد القروب', url: 'https://t.me/' + un + '?start=setup_' + chatId }]
+                ]}
+              }
+            );
+          } catch(_) {}
+        }, 2000);
+      }
+    } catch(_) {}
     try {
       const update = ctx.myChatMember;
       const chat   = update?.chat;

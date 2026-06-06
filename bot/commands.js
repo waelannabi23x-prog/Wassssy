@@ -435,4 +435,33 @@ module.exports = function registerCommands(bot, deps) {
     return ctx.reply('فحص القنوات:' + lines.join(String.fromCharCode(10))).catch(()=>{});
   });
 
+  // ── أوامر الترحيب (للأدمن فقط) ──────────────────────────────
+  bot.command('setwelcome', async ctx => {
+    if (ctx.chat.type !== 'private' || !ctx.isOwner) return;
+    const text = ctx.message.text.replace('/setwelcome', '').trim();
+    if (!text) return ctx.reply('✏️ استخدام: /setwelcome نص الرسالة\nالمتغيرات: {name} {id}').catch(() => {});
+    const { setSetting } = require('../database/db');
+    await setSetting('start_welcome_msg', text);
+    await ctx.reply('✅ تم حفظ رسالة الترحيب!\n\nمعاينة:\n' + text, { parse_mode: 'Markdown' }).catch(() => {});
+  });
+
+  bot.command('setwelcomephoto', async ctx => {
+    if (ctx.chat.type !== 'private' || !ctx.isOwner) return;
+    const reply = ctx.message.reply_to_message;
+    const photo = reply?.photo;
+    if (!photo?.length) return ctx.reply('🖼️ ردّ على صورة واكتب /setwelcomephoto').catch(() => {});
+    const fileId = photo[photo.length - 1].file_id;
+    const { setSetting } = require('../database/db');
+    await setSetting('start_welcome_photo', fileId);
+    await ctx.reply('✅ تم حفظ صورة الترحيب!').catch(() => {});
+  });
+
+  bot.command('clearwelcomephoto', async ctx => {
+    if (ctx.chat.type !== 'private' || !ctx.isOwner) return;
+    const { setSetting } = require('../database/db');
+    await setSetting('start_welcome_photo', '');
+    await ctx.reply('✅ تم حذف صورة الترحيب').catch(() => {});
+  });
+
+
 };
