@@ -78,8 +78,8 @@ exports.listGroups = async (ctx) => {
     const uid = ctx.from?.id;
     if (!uid) return ctx.reply('❌ خطأ: لم يتم التعرف على المستخدم').catch(() => {});
 
-    const { all } = require('../database/db');
-    const groups = await all('SELECT chat_id, title FROM group_chats WHERE is_active=1 ORDER BY title').catch(() => []);
+
+    const groups = await db.all('SELECT chat_id, title FROM group_chats WHERE is_active=1 ORDER BY title').catch(() => []);
 
     if (!groups.length) {
       const BOT_UN = process.env.BOT_USERNAME || '';
