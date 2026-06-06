@@ -108,12 +108,26 @@ module.exports = function registerCommands(bot, deps) {
     } catch(e) { ctx.reply('Error: ' + e.message).catch(() => {}); }
   });
   bot.command('start', async ctx => {
+    // في المجموعة — أرسل زر للبوت الخاص بدل المنيو
+    if (ctx.chat.type !== 'private') {
+      const me = ctx.botInfo || await ctx.telegram.getMe().catch(() => ({}));
+      const un = me.username || '';
+      return ctx.reply('👋 للوصول للمحتوى الأكاديمي:', {
+        reply_markup: { inline_keyboard: [[{ text: '🎓 فتح EduMaster', url: 'https://t.me/' + un }]] }
+      }).catch(() => {});
+    }
     if (startHandler.clearAiMode) await startHandler.clearAiMode(ctx.uid);
     return startHandler(ctx);
   });
 
-  bot.command(['admin', 'owner', 'manage'], ctx => {
-    if (!ctx.isAdmin) return ctx.reply('🚫 ليس لديك صلاحية.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  bot.command(['admin', 'owner', 'manage'], async ctx => {
+    if (ctx.chat?.type !== 'private') {
+      const w = await ctx.reply('🔒 هذا الأمر للخاص فقط.').catch(() => null);
+      ctx.deleteMessage().catch(() => {});
+      if (w) setTimeout(() => ctx.deleteMessage(w.message_id).catch(() => {}), 5000);
+      return;
+    }
+    if (!ctx.isAdmin) return ctx.reply('🚫 ليس لديك صلاحية.').catch(() => {});
     return manage.mainMenu(ctx);
   });
 
