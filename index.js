@@ -212,16 +212,15 @@ bot.use(async (ctx, next) => {
       arList = await _dbAll('SELECT * FROM auto_replies WHERE is_active=1').catch(()=>[]);
       _cSet(arKey, arList, 120000);
     }
-    for (const ar of arList) {
-      let matched = false;
+    // جمع كل الردود المطابقة وإرسالها معاً
+    const matchedReplies = arList.filter(ar => {
       if (ar.match_type === 'exact') {
-        matched = txt.trim().toLowerCase() === ar.trigger.trim().toLowerCase();
-      } else {
-        matched = txt.toLowerCase().includes(ar.trigger.toLowerCase());
+        return txt.trim().toLowerCase() === ar.trigger.trim().toLowerCase();
       }
-      if (matched) {
-        ctx.reply(ar.response, { reply_to_message_id: ctx.message.message_id }).catch(()=>{});
-      }
+      return txt.toLowerCase().includes(ar.trigger.toLowerCase());
+    });
+    for (const ar of matchedReplies) {
+      ctx.reply(ar.response, { reply_to_message_id: ctx.message.message_id }).catch(()=>{});
     }
   }
 
