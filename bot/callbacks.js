@@ -255,6 +255,29 @@ module.exports.registerCallbacks = function(bot, deps) {
       }]);
       return ctx.editMessageReplyMarkup({ inline_keyboard: rows }).catch(() => {});
     }},
+    { p: 'grp_stats_', fn: async (ctx, d) => {
+      const chatId = d.replace('grp_stats_', '');
+      try {
+        const { all: dbAll2 } = require('../database/db');
+        const [msgs, members, warns] = await Promise.all([
+          dbAll2('SELECT COUNT(*) AS cnt FROM group_messages WHERE chat_id=$1', [chatId]).catch(() => [{ cnt: 0 }]),
+          dbAll2('SELECT COUNT(*) AS cnt FROM group_members WHERE chat_id=$1', [chatId]).catch(() => [{ cnt: 0 }]),
+          dbAll2('SELECT COUNT(*) AS cnt FROM group_warns WHERE chat_id=$1', [chatId]).catch(() => [{ cnt: 0 }]),
+        ]);
+        const text = '📊 *إحصائيات القروب*\n━━━━━━━━━━━━\n\n' +
+          '👤 الأعضاء المسجلون: *' + (members[0]?.cnt || 0) + '*\n' +
+          '⚠️ التحذيرات: *' + (warns[0]?.cnt || 0) + '*\n' +
+          '💬 الرسائل المحفوظة: *' + (msgs[0]?.cnt || 0) + '*';
+        return ctx.answerCbQuery().catch(()=>{}).then(() =>
+          ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '◀️ رجوع', callback_data: 'gp_view_' + chatId }]] } })
+          .catch(() => ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => {}))
+        );
+      } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
+    }},
+    { p: 'gp_close', fn: async (ctx, d) => {
+      ctx.answerCbQuery().catch(() => {});
+      return ctx.deleteMessage().catch(() => {});
+    }},
     { p: 'leave_grp_', fn: async (ctx, d) => {
       if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       const chatId = parseInt(d.substring(10));

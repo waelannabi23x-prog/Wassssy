@@ -105,9 +105,8 @@ async function showGroupDetail(ctx, chatId) {
     // ── إجراءات ──
     [kbBtn('📢 راسل هذا القروب', 'gp_msgone_'  + chatId),
      kbBtn('📊 إحصائيات',        'grp_stats_'  + chatId)],
-    [kbBtn('👥 الأعضاء',         'grp_main_'   + chatId),
-     kbBtn('🚪 مغادرة القروب',   'leave_grp_'  + chatId)],
-    [kbBtn('◀️ رجوع', 'gp_panel')],
+    [kbBtn('👥 الأعضاء', 'grp_main_' + chatId)],
+    [kbBtn('◀️ رجوع', 'gp_panel'), kbBtn('🗑 إغلاق', 'gp_close')],
   ];
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
