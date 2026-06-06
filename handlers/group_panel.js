@@ -206,6 +206,16 @@ async function handleCallback(ctx, data) {
 }
 
 async function handleText(ctx, text, state) {
+  if (state.type === 'gp_set_rules') {
+    if (text === '/cancel') {
+      await require('../utils/stateManager').delState(ctx.uid);
+      return ctx.reply('❌ تم الإلغاء').catch(() => {});
+    }
+    await run('UPDATE group_chats SET rules=$1 WHERE chat_id=$2', [text, state.chatId]).catch(() => {});
+    await require('../utils/stateManager').delState(ctx.uid);
+    await ctx.reply('✅ *تم حفظ القواعد بنجاح!*\n\nسيظهر للأعضاء عند كتابة /rules في القروب.', { parse_mode: 'Markdown' }).catch(() => {});
+    return showGroupDetail(ctx, state.chatId);
+  }
   if (state.type === 'gp_set_welcome') {
     // حفظ في الجدولين
     await run('UPDATE group_chats SET welcome_msg=$1 WHERE chat_id=$2', [text, state.chatId]).catch(() => {});
