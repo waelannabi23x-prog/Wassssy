@@ -502,20 +502,11 @@ module.exports = function registerCommands(bot, deps) {
     }
     const uid = ctx.from.id;
     const { all } = require('../database/db');
-    // جلب القروبات التي المستخدم أدمن فيها
-    const groups = await all(
-      'SELECT gc.* FROM group_chats gc JOIN admins a ON a.chat_id=gc.chat_id WHERE a.user_id=$1 AND gc.is_active=1 UNION SELECT gc.* FROM group_chats gc WHERE gc.is_active=1 AND $2::bigint = ANY(SELECT owner_id FROM settings LIMIT 1)',
-      [uid, uid]
-    ).catch(() => []);
-
-    // إذا مالك — يشوف كل القروبات
     const isOwner = uid === parseInt(process.env.OWNER_ID);
+    // المالك يشوف كل القروبات، غيره يشوف القروبات التي هو عضو فيها
     const myGroups = isOwner
       ? await all('SELECT * FROM group_chats WHERE is_active=1 ORDER BY title').catch(() => [])
-      : await all(
-          'SELECT gc.* FROM group_chats gc WHERE gc.chat_id IN (SELECT DISTINCT chat_id FROM group_members WHERE user_id=$1) AND gc.is_active=1 ORDER BY gc.title',
-          [uid]
-        ).catch(() => []);
+      : await all('SELECT gc.* FROM group_chats gc JOIN group_members gm ON gc.chat_id=gm.chat_id WHERE gm.user_id=$1 AND gc.is_active=1 GROUP BY gc.chat_id, gc.title, gc.specialty_id, gc.welcome_enabled, gc.goodbye_enabled, gc.notify_new_files, gc.anti_spam, gc.anti_link, gc.anti_flood, gc.rules, gc.is_active, gc.welcome_msg, gc.welcome_photo ORDER BY gc.title', [uid]).catch(() => []);
 
     if (!myGroups.length) {
       const BOT_UN = process.env.BOT_USERNAME || '';
