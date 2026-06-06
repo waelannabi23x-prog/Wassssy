@@ -88,6 +88,7 @@ module.exports.registerCallbacks = function(bot, deps) {
     }],
     ['noop',       () => {}],
     ['main_menu',  ctx => startHandler.showMainMenu(ctx)],
+    ['mygroups_refresh', ctx => tools.listGroups(ctx)],
     
     ['mg_open_app', async ctx => {
       const url = process.env.WEBHOOK_URL + '/app/app_index.html';

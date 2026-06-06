@@ -399,7 +399,22 @@ async function launch() {
       if (!chat || !['group','supergroup'].includes(chat.type)) return;
 
       if (['member','administrator'].includes(member?.status)) {
-        // البوت أُضيف للقروب
+        // تحقق إذا البوت ادمين
+        if (member?.status !== 'administrator') {
+          // مش ادمين — بعث رسالة لمن أضافه وخرج
+          const addedBy2 = ctx.update?.my_chat_member?.from;
+          if (addedBy2?.id) {
+            await ctx.telegram.sendMessage(addedBy2.id,
+              '⚠️ تم إضافتي في *' + (chat.title||'القروب') + '* لكن بدون صلاحيات ادمين!\n\n' +
+              '📌 لكي أعمل بشكل كامل، يرجى ترقيتي لـ *ادمين* ثم أضفني مجدداً.',
+              { parse_mode: 'Markdown' }
+            ).catch(() => {});
+          }
+          await ctx.telegram.leaveChat(chat.id).catch(() => {});
+          logger.info('[GroupReg] ⚠️ خرج البوت (مش ادمين) من: ' + (chat.title||chat.id));
+          return;
+        }
+        // البوت أُضيف للقروب كادمين
         await dbRun(
           `INSERT INTO group_chats(chat_id, title, specialty_id, welcome_enabled, goodbye_enabled, notify_new_files)
            VALUES($1,$2,0,1,0,1)
