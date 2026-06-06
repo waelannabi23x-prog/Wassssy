@@ -221,7 +221,6 @@ bot.use(async (ctx, next) => {
       }
       if (matched) {
         ctx.reply(ar.response, { reply_to_message_id: ctx.message.message_id }).catch(()=>{});
-        break;
       }
     }
   }
