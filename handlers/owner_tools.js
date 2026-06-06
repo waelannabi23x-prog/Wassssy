@@ -98,7 +98,7 @@ exports.listGroups = async (ctx) => {
   let text = '👥 *قروباتك (' + myGroups.length + ')*\n━━━━━━━━━━━━\n\nاختر قروب لإدارته:';
   const rows = [];
   myGroups.forEach(g => {
-    rows.push([btn('⚙️ ' + (g.title||g.chat_id).substring(0,25), 'gp_view_' + g.chat_id)]);
+    rows.push([btn('⚙️ ' + String(g.title||g.chat_id).substring(0,25), 'gp_view_' + g.chat_id)]);
   });
   rows.push([btn('🔄 تحديث', 'mygroups_refresh')]);
   ctx.reply(text, { parse_mode: 'Markdown', ...build(rows) });
