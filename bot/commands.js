@@ -497,36 +497,51 @@ module.exports = function registerCommands(bot, deps) {
     if (ctx.chat?.type !== 'private') {
       ctx.deleteMessage().catch(() => {});
       const w = await ctx.reply('🔒 هذا الأمر في الخاص فقط').catch(() => null);
-      if (w) setTimeout(() => ctx.deleteMessage(w.message_id).catch(() => {}), 4000);
+      if (w) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, w.message_id).catch(() => {}), 4000);
       return;
     }
-    const uid = ctx.from.id;
+    const uid = ctx.uid || ctx.from?.id;
     const { all } = require('../database/db');
+    const { build: kb, btn: b } = require('../utils/keyboard');
     const isOwner = uid === parseInt(process.env.OWNER_ID);
-    // المالك يشوف كل القروبات، غيره يشوف القروبات التي هو عضو فيها
-    const myGroups = isOwner
-      ? await all('SELECT * FROM group_chats WHERE is_active=1 ORDER BY title').catch(() => [])
-      : await all('SELECT gc.* FROM group_chats gc JOIN group_members gm ON gc.chat_id=gm.chat_id WHERE gm.user_id=$1 AND gc.is_active=1 GROUP BY gc.chat_id, gc.title, gc.specialty_id, gc.welcome_enabled, gc.goodbye_enabled, gc.notify_new_files, gc.anti_spam, gc.anti_link, gc.anti_flood, gc.rules, gc.is_active, gc.welcome_msg, gc.welcome_photo ORDER BY gc.title', [uid]).catch(() => []);
+    const BOT_UN = process.env.BOT_USERNAME || '';
 
-    if (!myGroups.length) {
-      const BOT_UN = process.env.BOT_USERNAME || '';
+    // جلب كل القروبات النشطة
+    const allGroups = await all('SELECT chat_id, title FROM group_chats WHERE is_active=1 ORDER BY title').catch(() => []);
+
+    if (!allGroups.length) {
       return ctx.reply(
-        '👥 *قروباتك*' + String.fromCharCode(10) + String.fromCharCode(10) +
-        'لا توجد قروبات مرتبطة بحسابك.' + String.fromCharCode(10) + String.fromCharCode(10) +
-        'أضف البوت لقروبك أولاً:',
+        '👥 *قروباتك*\n\nلا توجد قروبات مرتبطة بحسابك.\n\nأضف البوت لقروبك أولاً:',
         { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[
           { text: '➕ أضف البوت لقروب', url: 'https://t.me/' + BOT_UN + '?startgroup=true' }
-        ]]}} 
+        ]]}}
       ).catch(() => {});
     }
 
-    const { build: kb, btn: b } = require('../utils/keyboard');
-    let text = '👥 *قروباتك (' + myGroups.length + ')*' + String.fromCharCode(10) + '━━━━━━━━━━━━━━━━' + String.fromCharCode(10) + String.fromCharCode(10);
-    const rows = myGroups.map(g => {
-      text += '▪️ ' + (g.title || 'قروب') + String.fromCharCode(10);
-      return [b('⚙️ ' + String(g.title || g.chat_id).substring(0,25), 'gp_view_' + g.chat_id)];
-    });
-    const BOT_UN = process.env.BOT_USERNAME || '';
+    // فلتر عبر Telegram API
+    const myGroups = [];
+    if (isOwner) {
+      allGroups.forEach(g => myGroups.push(g));
+    } else {
+      for (const g of allGroups) {
+        try {
+          const m = await ctx.telegram.getChatMember(g.chat_id, uid);
+          if (['administrator','creator'].includes(m?.status)) myGroups.push(g);
+        } catch(_) {}
+      }
+    }
+
+    if (!myGroups.length) {
+      return ctx.reply(
+        '👥 *قروباتك*\n\nأنت لست ادمين في أي قروب يحتوي البوت حالياً.\n\nأضف البوت لقروبك:',
+        { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[
+          { text: '➕ أضف البوت لقروب', url: 'https://t.me/' + BOT_UN + '?startgroup=true' }
+        ]]}}
+      ).catch(() => {});
+    }
+
+    let text = '👥 *قروباتك (' + myGroups.length + ')*\n━━━━━━━━━━━━\n\nاختر قروب لإدارته:';
+    const rows = myGroups.map(g => [b('⚙️ ' + String(g.title || g.chat_id).substring(0,25), 'gp_view_' + g.chat_id)]);
     rows.push([{ text: '➕ أضف البوت لقروب جديد', url: 'https://t.me/' + BOT_UN + '?startgroup=true' }]);
     return ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } }).catch(() => {});
   });
