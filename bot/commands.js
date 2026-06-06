@@ -546,7 +546,6 @@ module.exports = function registerCommands(bot, deps) {
     return ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } }).catch(() => {});
   });
 
-};
   // ── /help ──
   bot.command('help', async ctx => {
     const text =
@@ -574,3 +573,4 @@ module.exports = function registerCommands(bot, deps) {
       '👨‍💻 Dev ↠ @lweees23';
     return ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => {});
   });
+};
