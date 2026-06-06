@@ -204,12 +204,6 @@ async function handleText(ctx, text, state) {
     await ctx.reply('✅ تم حفظ رسالة الترحيب!\n\n📝 المتغيرات:\n`{name}` الاسم | `{id}` المعرف\n`{spec}` التخصص | `{date}` التاريخ\n`{count}` عدد الأعضاء | `{group}` اسم القروب', { parse_mode: 'Markdown' }).catch(() => {});
     return showGroupDetail(ctx, state.chatId);
   }
-  if (state.type === 'gp_set_wphoto') {
-    // صورة ترحيب — يجب أن تكون صورة
-    await require('../utils/stateManager').delState(ctx.uid);
-    await ctx.reply('⚠️ أرسل صورة وليس نصاً').catch(() => {});
-    return;
-  }
   if (state.type === 'gp_broadcast_msg') {
     await require('../utils/stateManager').delState(ctx.uid);
     return _doBroadcast(ctx, state.spId, text, null, null);
@@ -334,8 +328,6 @@ async function _doBroadcast(ctx, spId, text, fileId, mediaType) {
   ).catch(() => {});
 }
 
-module.exports = { showMainMenu, showGroupPanel, handleCallback, handleText, handleMedia, migrateGroupPanel };
-
 // ══════════════════════════════════════════════════════════
 // القائمة الرئيسية للقروبات
 // ══════════════════════════════════════════════════════════
@@ -357,3 +349,5 @@ async function showMainMenu(ctx) {
     { parse_mode: 'Markdown', ...kbBuild(rows) }
   );
 }
+
+module.exports = { showMainMenu, showGroupPanel, handleCallback, handleText, handleMedia, migrateGroupPanel };
