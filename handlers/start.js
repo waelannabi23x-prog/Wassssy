@@ -28,12 +28,16 @@ async function startHandler(ctx) {
   const { getSetting } = require('../database/db');
   const welcomeText = await getSetting('start_welcome_text').catch(() => null);
   if (welcomeText && !ctx.startPayload) {
+    const _wt = welcomeText
+      .replace(/\{name\}/g, ctx.from?.first_name || "صديق")
+      .replace(/\{id\}/g, String(uid))
+      .replace(/\{username\}/g, ctx.from?.username ? "@" + ctx.from.username : ctx.from?.first_name || "صديق");
     const BOT_UN = process.env.BOT_USERNAME || '';
     const rows = [
       [btn('📚 تصفح المحتوى', 'browse')],
       [{ text: '➕ أضف البوت لمجموعتك', url: 'https://t.me/' + BOT_UN + '?startgroup=true' }]
     ];
-    await ctx.reply(welcomeText, {
+    await ctx.reply(_wt, {
       parse_mode: 'Markdown',
       disable_web_page_preview: false,
       reply_markup: { inline_keyboard: rows }
