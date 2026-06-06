@@ -212,7 +212,7 @@ module.exports.registerCallbacks = function(bot, deps) {
 
     // Group
     { p: 'grp_main_',   fn: (ctx, d) => { const chatId = d.replace('grp_main_',''); const { showAllMembers } = require('../handlers/group_admin'); return showAllMembers(ctx, chatId); } },
-    { p: 'grp_main',    fn: (ctx, d) => groupPanel.showMainMenu(ctx) },
+    { p: 'grp_main',    fn: (ctx, d) => { const uid = ctx.uid || ctx.from?.id; const isOwner = uid === parseInt(process.env.OWNER_ID); return isOwner ? groupPanel.showMainMenu(ctx) : groupPanel.showMyGroups(ctx); } },
     { p: 'gp_',         fn: (ctx, d) => groupPanel.handleCallback(ctx, d) },
     { p: 'grp_sp_',     fn: hGrpSp },
     { p: 'grp_dl_',     fn: hGrpDl },
