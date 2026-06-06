@@ -122,7 +122,7 @@ async function showBroadcastSpecPicker(ctx) {
 
 async function handleCallback(ctx, data) {
   const uid = ctx.uid;
-  if (data === 'gp_panel') return showGroupPanel(ctx);
+  if (data === 'gp_panel') { const uid = ctx.uid || ctx.from?.id; const isOwner = uid === parseInt(process.env.OWNER_ID); return isOwner ? showGroupPanel(ctx) : showMyGroups(ctx); }
 
   // ── تبديل anti-spam/link/flood ──
   const gpToggles = {
