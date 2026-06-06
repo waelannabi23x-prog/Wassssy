@@ -79,6 +79,11 @@ module.exports.registerMessages = function(bot, deps) {
       if (_gtxt) {
         const guessGame = require('../handlers/guess_game');
         if (/^خمن$/i.test(_gtxt)) { guessGame.startInvite && guessGame.startInvite(ctx).catch(e=>console.error('[Guess]',e.message)); return; }
+        if (/^قواعد$/.test(_gtxt)) {
+          ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id).catch(() => {});
+          const { showGroupRules } = require('../handlers/group_admin');
+          showGroupRules(ctx, ctx.chat.id).catch(() => {}); return;
+        }
         if (/^تخمين[:\s]+/i.test(_gtxt)) { guessGame.handleGuessMsg && guessGame.handleGuessMsg(ctx).catch(()=>{}); return; }
       }
       // في القروب نمرر للـ command handlers

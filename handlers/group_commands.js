@@ -304,7 +304,7 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   // 📜 /rules — قواعد القروب
   // ══════════════════════════════════════════
-  bot.command('rules', async ctx => {
+  bot.command(['rules', 'قواعد'], async ctx => {
     if (!isGroup(ctx)) return;
     // احذف أمر /rules
     ctx.deleteMessage().catch(() => {});
