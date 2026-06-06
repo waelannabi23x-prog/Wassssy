@@ -464,4 +464,80 @@ module.exports = function registerCommands(bot, deps) {
   });
 
 
+
+  // ── /setwelcome — تعيين رسالة ترحيب /start ──
+  bot.command('setwelcome', async ctx => {
+    if (!ctx.isOwner) return ctx.reply('🚫 للمالك فقط').catch(() => {});
+    if (ctx.chat?.type !== 'private') return ctx.reply('🔒 في الخاص فقط').catch(() => {});
+    const text = ctx.message.text.replace('/setwelcome', '').trim();
+    if (!text) return ctx.reply(
+      '📝 *استخدام:*' + String.fromCharCode(10) +
+      '/setwelcome [نص الرسالة]' + String.fromCharCode(10) + String.fromCharCode(10) +
+      '💡 يمكنك استخدام Markdown:' + String.fromCharCode(10) +
+      '*굵게* _مائل_ `كود`' + String.fromCharCode(10) +
+      '[رابط](https://t.me/xxx)' + String.fromCharCode(10) + String.fromCharCode(10) +
+      '🔹 لمسح الرسالة اكتب: /setwelcome off',
+      { parse_mode: 'Markdown' }
+    ).catch(() => {});
+    const { run } = require('../database/db');
+    if (text === 'off') {
+      await run("DELETE FROM settings WHERE key='start_welcome_text'").catch(() => {});
+      return ctx.reply('✅ تم حذف رسالة الترحيب — سيظهر المنيو العادي').catch(() => {});
+    }
+    await run(
+      "INSERT INTO settings(key,value) VALUES('start_welcome_text',$1) ON CONFLICT(key) DO UPDATE SET value=$1",
+      [text]
+    ).catch(() => {});
+    await ctx.reply('✅ تم حفظ رسالة الترحيب!' + String.fromCharCode(10) + String.fromCharCode(10) + '📋 معاينة:' + String.fromCharCode(10) + String.fromCharCode(10) + text, { parse_mode: 'Markdown' }).catch(() => {});
+  });
+
+
+  // ── /mygroup — إدارة القروب للأدمنية ──
+  bot.command('mygroup', async ctx => {
+    if (ctx.chat?.type !== 'private') {
+      ctx.deleteMessage().catch(() => {});
+      const w = await ctx.reply('🔒 هذا الأمر في الخاص فقط').catch(() => null);
+      if (w) setTimeout(() => ctx.deleteMessage(w.message_id).catch(() => {}), 4000);
+      return;
+    }
+    const uid = ctx.from.id;
+    const { all } = require('../database/db');
+    // جلب القروبات التي المستخدم أدمن فيها
+    const groups = await all(
+      'SELECT gc.* FROM group_chats gc JOIN admins a ON a.chat_id=gc.chat_id WHERE a.user_id=$1 AND gc.is_active=1 UNION SELECT gc.* FROM group_chats gc WHERE gc.is_active=1 AND $2::bigint = ANY(SELECT owner_id FROM settings LIMIT 1)',
+      [uid, uid]
+    ).catch(() => []);
+
+    // إذا مالك — يشوف كل القروبات
+    const isOwner = uid === parseInt(process.env.OWNER_ID);
+    const myGroups = isOwner
+      ? await all('SELECT * FROM group_chats WHERE is_active=1 ORDER BY title').catch(() => [])
+      : await all(
+          'SELECT gc.* FROM group_chats gc WHERE gc.chat_id IN (SELECT DISTINCT chat_id FROM group_members WHERE user_id=$1) AND gc.is_active=1 ORDER BY gc.title',
+          [uid]
+        ).catch(() => []);
+
+    if (!myGroups.length) {
+      const BOT_UN = process.env.BOT_USERNAME || '';
+      return ctx.reply(
+        '👥 *قروباتك*' + String.fromCharCode(10) + String.fromCharCode(10) +
+        'لا توجد قروبات مرتبطة بحسابك.' + String.fromCharCode(10) + String.fromCharCode(10) +
+        'أضف البوت لقروبك أولاً:',
+        { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[
+          { text: '➕ أضف البوت لقروب', url: 'https://t.me/' + BOT_UN + '?startgroup=true' }
+        ]]}} 
+      ).catch(() => {});
+    }
+
+    const { build: kb, btn: b } = require('../utils/keyboard');
+    let text = '👥 *قروباتك (' + myGroups.length + ')*' + String.fromCharCode(10) + '━━━━━━━━━━━━━━━━' + String.fromCharCode(10) + String.fromCharCode(10);
+    const rows = myGroups.map(g => {
+      text += '▪️ ' + (g.title || 'قروب') + String.fromCharCode(10);
+      return [b('⚙️ ' + (g.title || g.chat_id).substring(0,25), 'gp_view_' + g.chat_id)];
+    });
+    const BOT_UN = process.env.BOT_USERNAME || '';
+    rows.push([{ text: '➕ أضف البوت لقروب جديد', url: 'https://t.me/' + BOT_UN + '?startgroup=true' }]);
+    return ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } }).catch(() => {});
+  });
+
 };

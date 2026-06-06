@@ -61,6 +61,7 @@ async function mainMenu(ctx){
     const appVisible = global._appPublic || false;
     rows.push([btn('📱 فتح Mini App','mg_open_app'), btn(appVisible ? '👁 ظاهر للكل' : '🔒 مخفي عن المستخدمين', 'mg_toggle_app')]);
   }
+  rows.push([btn('⚙️ إعدادات البوت','mg_bot_settings')]);
   rows.push([btn('🏠 القائمة الرئيسية','main_menu')]);
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
@@ -349,6 +350,12 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
       case 'mg_rn_fl':await filesDb.rename(state.id,text);done('✅ تمت التسمية!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_'));break;
       case 'mg_desc_fl':await filesDb.updateDesc(state.id,text);done('✅ تم التحديث!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_'));break;
       case 'mg_admin_search':{clearState(uid);const [fr,ur]=await Promise.all([filesDb.search(text),usersDb.searchUsers(text)]);let resp='🔍 *بحث: "'+escMd(text)+'"*\n\n';if(fr.length){resp+='📄 *ملفات ('+fr.length+'):*\n';fr.slice(0,5).forEach(f=>{resp+='• '+escMd(f.title)+' ('+escMd(f.sub_name)+')\n';});}if(ur.length){resp+='\n👥 *مستخدمون ('+ur.length+'):*\n';ur.slice(0,5).forEach(u=>{resp+='• '+escMd(u.first_name||'ID:'+u.id)+(u.username?' @'+escMd(u.username):'')+'\n';});}if(!fr.length&&!ur.length) resp+='_لا نتائج._';ctx.reply(resp,{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
+      case 'mg_set_welcome':
+        clearState(uid);
+        if(text==='/cancel')return ctx.reply('❌ تم الإلغاء').catch(()=>{});
+        await require('../database/db').run("INSERT INTO settings(key,value) VALUES('start_welcome_text',$1) ON CONFLICT(key) DO UPDATE SET value=$1",[text]).catch(()=>{});
+        ctx.reply('✅ تم حفظ رسالة /start!',{parse_mode:'Markdown'}).catch(()=>{});
+        return handleCallback(ctx,'mg_bot_settings');
       case 'mg_broadcast':{clearState(uid);const ids=await usersDb.allIds();const total_bc=ids.length;const sm=await ctx.reply('📢 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total_bc,{parse_mode:'Markdown'});const bcRes=await concurrentBroadcast(ctx.telegram,ctx.chat.id,sm.message_id,ids,'📢 *إعلان*\n\n'+text,{parse_mode:'Markdown'});ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ *اكتمل!*\n`[██████████] 100%`\n✅ '+bcRes.sent+' | ❌ '+bcRes.failed,{...build([back('mg_menu')]),parse_mode:'Markdown'}).catch(err => { require('../utils/logger').debug("[silent]", err.message); });break;}
       case 'mg_msg_user_id':{setState(uid,{...state,type:'mg_msg_user_content',targetId:text.replace('@','')});ctx.reply('📝 ارسل الرسالة (نص، صورة، فيديو، sticker، voice):',{parse_mode:'Markdown'});break;}
       case 'mg_msg_user_content':{
@@ -579,6 +586,18 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
     }
     return;
   }
+  if(data==='mg_bot_settings'){
+    const wt=await require('../database/db').getSetting('start_welcome_text').catch(()=>null);
+    const preview=wt?wt.substring(0,150):'_غير مفعّل_';
+    const r2=[[btn('✏️ تعديل رسالة /start','mg_edit_welcome')]];
+    if(wt)r2.push([btn('🗑 حذف رسالة /start','mg_del_welcome')]);
+    r2.push(back('mg_menu'));
+    return eos(ctx,'⚙️ *إعدادات البوت*'+String.fromCharCode(10)+'━━━━━━━━━━━━━━━'+String.fromCharCode(10)+'📝 *رسالة /start:*'+String.fromCharCode(10)+preview,{parse_mode:'Markdown',...build(r2)});}
+
+  if(data==='mg_edit_welcome'){setState(uid,{type:'mg_set_welcome'});return ctx.reply('✏️ أرسل رسالة /start الجديدة:'+String.fromCharCode(10)+'_(أو /cancel)_',{parse_mode:'Markdown'}).catch(()=>{});}
+
+  if(data==='mg_del_welcome'){await require('../database/db').run("DELETE FROM settings WHERE key='start_welcome_text'").catch(()=>{});ctx.answerCbQuery('✅ تم الحذف').catch(()=>{});return handleCallback(ctx,'mg_bot_settings');}
+
   if(data==='mg_restore'){setState(uid,{type:'mg_awaiting_restore'});return eos(ctx,'♻️ *استعادة قاعدة البيانات*\n\n⚠️ سيتم استبدال البيانات!\n\nأرسل ملف `.db`:',{parse_mode:'Markdown',...build([back('mg_menu')])});}
   if(data==='mg_broadcast'){setState(uid,{type:'mg_broadcast'});return ctx.reply('📢 رسالة البث:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
   if(data==='mg_add_admin'){setState(uid,{type:'mg_add_admin_id'});return ctx.reply('👤 ID المستخدم:\n_(أو /cancel)_',{parse_mode:'Markdown'});}

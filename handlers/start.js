@@ -23,6 +23,23 @@ async function startHandler(ctx) {
       return ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(() => {});
     }
   }
+
+  // ── رسالة الترحيب المخصصة ──
+  const { getSetting } = require('../database/db');
+  const welcomeText = await getSetting('start_welcome_text').catch(() => null);
+  if (welcomeText && !ctx.startPayload) {
+    const BOT_UN = process.env.BOT_USERNAME || '';
+    const rows = [
+      [btn('📚 تصفح المحتوى', 'browse')],
+      [{ text: '➕ أضف البوت لمجموعتك', url: 'https://t.me/' + BOT_UN + '?startgroup=true' }]
+    ];
+    await ctx.reply(welcomeText, {
+      parse_mode: 'Markdown',
+      disable_web_page_preview: false,
+      reply_markup: { inline_keyboard: rows }
+    }).catch(() => {});
+    return;
+  }
   const rawText = ctx.message?.text || '';
   const payload = rawText.includes(' ') ? rawText.split(' ')[1] : ctx.startPayload || null;
 
