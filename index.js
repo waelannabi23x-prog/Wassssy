@@ -198,12 +198,36 @@ setInterval(() => { const cut=Date.now()-10000; for(const[k,v] of _spamProtect) 
 
 bot.use(async (ctx, next) => {
   if (ctx.chat?.type === 'private' || !ctx.message || !ctx.from) return next();
-  if (ctx.isAdmin || ctx.isOwner) return next();
 
   const uid = ctx.from.id;
   const cid = ctx.chat.id;
   const txt = ctx.message?.text || ctx.message?.caption || '';
   const now = Date.now();
+
+  // 🤖 Auto-Reply — يشتغل للجميع حتى الأدمنز
+  if (txt && txt.length > 0) {
+    const arKey = 'auto_replies_all';
+    let arList = _cGet(arKey);
+    if (!arList) {
+      arList = await _dbAll('SELECT * FROM auto_replies WHERE is_active=1').catch(()=>[]);
+      _cSet(arKey, arList, 120000);
+    }
+    for (const ar of arList) {
+      let matched = false;
+      if (ar.match_type === 'exact') {
+        matched = txt.trim().toLowerCase() === ar.trigger.trim().toLowerCase();
+      } else {
+        matched = txt.toLowerCase().includes(ar.trigger.toLowerCase());
+      }
+      if (matched) {
+        ctx.reply(ar.response, { reply_to_message_id: ctx.message.message_id }).catch(()=>{});
+        break;
+      }
+    }
+  }
+
+  // باقي الحماية للمستخدمين العاديين فقط
+  if (ctx.isAdmin || ctx.isOwner) return next();
 
   // جلب إعدادات القروب
   const sk = 'grp_s_' + cid;
@@ -223,30 +247,6 @@ bot.use(async (ctx, next) => {
       ctx.deleteMessage().catch(()=>{});
       if (sp.c === 6) require('./handlers/group_admin').warnMember(ctx,cid,uid,'فلود').catch(()=>{});
       return;
-    }
-  }
-
-  // 🤖 Auto-Reply
-  if (txt && txt.length > 0) {
-    const arKey = 'auto_replies_all';
-    let arList = _cGet(arKey);
-    if (!arList) {
-      arList = await _dbAll('SELECT * FROM auto_replies WHERE is_active=1').catch(()=>[]);
-      _cSet(arKey, arList, 120000); // كاش دقيقتين
-    }
-    for (const ar of arList) {
-      let matched = false;
-      if (ar.match_type === 'exact') {
-        matched = txt.trim().toLowerCase() === ar.trigger.trim().toLowerCase();
-      } else {
-        matched = txt.toLowerCase().includes(ar.trigger.toLowerCase());
-      }
-      if (matched) {
-        ctx.reply(ar.response, {
-          reply_to_message_id: ctx.message.message_id
-        }).catch(()=>{});
-        break; // رد واحد فقط
-      }
     }
   }
 
