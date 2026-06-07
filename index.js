@@ -504,11 +504,6 @@ async function launch() {
     try {
       const txt = (ctx.message?.text || '').trim();
       if (/^مليون$/i.test(txt)) {
-        try { require('./handlers/millionaire').register; } catch(_) {}
-        // يشغل اللعبة عبر hears مسجّل في register
-        return next();
-      }
-      if (/^مليون$/i.test(txt)) {
         try {
           const { startJoinPhase } = require('./handlers/millionaire');
           await startJoinPhase(ctx);

@@ -437,6 +437,12 @@ async function sendNextQuestion(telegram, chatId) {
     ...buildLifelineKeyboard(game),
   ];
 
+  // احذف رسالة السؤال القديمة
+  if (game.msgId) {
+    await telegram.deleteMessage(chatId, game.msgId).catch(() => {});
+    game.msgId = null;
+  }
+
   const msg = await telegram.sendMessage(chatId, txt, {
     parse_mode: 'Markdown',
     reply_markup: { inline_keyboard: keyboard },
