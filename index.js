@@ -508,6 +508,13 @@ async function launch() {
         // يشغل اللعبة عبر hears مسجّل في register
         return next();
       }
+      if (/^مليون$/i.test(txt)) {
+        try {
+          const { startJoinPhase } = require('./handlers/millionaire');
+          await startJoinPhase(ctx);
+        } catch(e) { require('./utils/logger').error('[Million]', e.message); }
+        return;
+      }
       if (/^انشاء حساب$|^فلوسي$|^فارسي|^rip /i.test(txt)) {
         const bank = require('./handlers/bank');
         if (/^انشاء حساب$/i.test(txt)) { await bank.createAccount(ctx); return; }

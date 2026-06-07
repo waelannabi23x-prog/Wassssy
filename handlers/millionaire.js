@@ -598,6 +598,15 @@ async function endGame(telegram, chatId, reason) {
   const winner = sorted[0];
   if (winner && winner.prize > 0) {
     txt += `\n🎊 *المبروك ${winner.name}!*\n🏆 جائزتك: ${fmtPrize(winner.prize)}`;
+    // ── إضافة الجائزة للبنك ──
+    try {
+      const bank = require('./bank');
+      await bank.addWinnings(winner.id, winner.name, winner.username, winner.prize, 'جائزة من سيربح المليون');
+      await telegram.sendMessage(winner.id,
+        '🏆 *مبروك! ربحت ' + fmtPrize(winner.prize) + ' في لعبة المليون!*\n💰 تم إضافة الجائزة لحسابك البنكي!\n\nاكتب *فلوسي* لعرض رصيدك.',
+        { parse_mode: 'Markdown' }
+      ).catch(() => {});
+    } catch(_) {}
   }
 
   await telegram.sendMessage(chatId, txt, { parse_mode: 'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
@@ -891,6 +900,11 @@ function register(bot) {
     return startJoinPhase(ctx);
   });
 
+  bot.hears(/^مليون$/i, async ctx => {
+    if (ctx.chat?.type === 'private') return ctx.reply('⚠️ هذه اللعبة للقروبات فقط!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    return startJoinPhase(ctx);
+  });
+
   bot.command('mstop', async ctx => {
     if (!ctx.isAdmin && !ctx.isOwner) return ctx.reply('🚫 للأدمن فقط.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     const game = getGame(ctx.chat.id);
@@ -963,4 +977,4 @@ function register(bot) {
   logger.info('✅ Million game registered');
 }
 
-module.exports = { register, initMillionaireSchema };
+module.exports = { register, initMillionaireSchema, startJoinPhase };
