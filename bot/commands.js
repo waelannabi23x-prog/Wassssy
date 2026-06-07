@@ -1,25 +1,6 @@
 'use strict';
 const { addChannel, removeChannel, getChannels } = require('../utils/channelGuard');
 
-
-  // ── أوامر البنك الجديدة ──
-  bot.command(['daily','يومي'], handleDaily);
-  bot.command(['flip','عملة'], handleFlip);
-  bot.command(['rob','سرقة'], handleRob);
-  bot.command(['leaderboard','متصدرين','lb'], handleLeaderboard);
-  bot.command(['bank','حسابي','بنكي'], ctx => require('../handlers/bank').showBalance(ctx));
-  bot.command(['adminpanel','لوحة','panel'], async ctx => {
-    if(!ctx.isOwner&&!ctx.isAdmin) return;
-    const {build}=require('../utils/keyboard');
-    const rows=[
-      [{text:'📁 المحتوى',callback_data:'manage'},{text:'👥 المستخدمون',callback_data:'manage_users_0'}],
-      [{text:'🏦 البنك',callback_data:'bank_admin_panel'},{text:'🎮 الألعاب',callback_data:'gp_million_panel'}],
-      [{text:'📢 بث',callback_data:'manage_broadcast'},{text:'⚙️ الإعدادات',callback_data:'manage_settings'}],
-      [{text:'📊 إحصائيات',callback_data:'manage_analytics'},{text:'🤖 أدوات',callback_data:'manage_owner_tools'}],
-    ];
-    return ctx.reply('🛡️ *لوحة الإدارة*\n━━━━━━━━━━━━━━━',{parse_mode:'Markdown',reply_markup:{inline_keyboard:rows}}).catch(()=>{});
-  });
-
 module.exports = function registerCommands(bot, deps) {
   const {
     startHandler, manage, userH, million, tools,
