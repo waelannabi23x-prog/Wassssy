@@ -396,6 +396,7 @@ async function beginGame(telegram, chatId) {
     delGame(chatId);
     return;
   }
+  // ✅ لاعب واحد مسموح — لا حاجة للانتظار
 
   game.status = 'playing';
   await run('UPDATE million_sessions SET status=$1 WHERE id=$2', ['playing', game.sessionId]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
@@ -461,7 +462,6 @@ async function sendNextQuestion(telegram, chatId) {
 
   // احذف رسالة السؤال القديمة
   if (game.msgId) {
-    await deleteGameMsgs(telegram, chatId, null);
     await telegram.deleteMessage(chatId, game.msgId).catch(() => {});
     game.msgId = null;
   }
@@ -568,7 +568,9 @@ async function resolveQuestion(telegram, chatId, timeout) {
     if (isSafe) txt += `\n🛡️ *نقطة أمان محققة!* اللاعبون يضمنون ${fmtPrize(prize)}`;
   }
 
-  await telegram.sendMessage(chatId, txt, { parse_mode: 'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  const resultMsg = await telegram.sendMessage(chatId, txt, { parse_mode: 'Markdown' }).catch(() => null);
+  // احذف رسالة النتيجة بعد 5 ثواني
+  if (resultMsg) setTimeout(() => telegram.deleteMessage(chatId, resultMsg.message_id).catch(() => {}), 5000);
 
   // Check if safe zone — eliminated players keep safe amount
   if (isSafe) {
@@ -631,6 +633,23 @@ async function endGame(telegram, chatId, reason) {
     try {
       const bank = require('./bank');
       await bank.addWinnings(winner.id, winner.name, winner.username, winner.prize, 'جائزة من سيربح المليون');
+      // reply على رسالة صاحب اللعبة (اللي كتب مليون)
+      try {
+        const replyOpts = game.hostMsgId ? { reply_to_message_id: game.hostMsgId } : {};
+        await telegram.sendMessage(chatId,
+          '🎊 *' + winner.name + '* ربح *' + fmtPrize(winner.prize) + '*! 🏆',
+          { parse_mode: 'Markdown', ...replyOpts }
+        );
+      } catch(_) {}
+      // reply للفائز مباشرة
+      try {
+        await telegram.sendMessage(winner.id,
+          '🏆 *مبروك! ربحت من سيربح المليون!*' + String.fromCharCode(10) +
+          '💰 جائزتك: *' + fmtPrize(winner.prize) + '*' + String.fromCharCode(10) +
+          '🏦 تم إضافة المبلغ لحسابك البنكي!',
+          { parse_mode: 'Markdown' }
+        );
+      } catch(_) {}
       await telegram.sendMessage(winner.id,
         '🏆 *مبروك! ربحت ' + fmtPrize(winner.prize) + ' في لعبة المليون!*\n💰 تم إضافة الجائزة لحسابك البنكي!\n\nاكتب *فلوسي* لعرض رصيدك.',
         { parse_mode: 'Markdown' }
