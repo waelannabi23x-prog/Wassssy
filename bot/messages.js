@@ -158,10 +158,13 @@ module.exports.registerMessages = function(bot, deps) {
     if (s?.type === 'mg_file') return manage.handleFileUpload(ctx);
   });
 
-  // ── رد تلقائي عشوائي في القروب ──
+  // ── رد تلقائي عشوائي في القروب (مرة واحدة فقط) ──
+  const _handledMsgs = new Set();
   bot.on('text', async (ctx, next) => {
     if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') return next();
     if (ctx.message?.text?.startsWith('/')) return next();
+    const _msgKey = ctx.chat?.id + '_' + ctx.message?.message_id;
+    if (_handledMsgs.has(_msgKey)) return; // منع double reply
     const uid = ctx.from?.id;
     const txt = (ctx.message?.text || '').trim();
     
@@ -187,6 +190,8 @@ module.exports.registerMessages = function(bot, deps) {
       
       // اختر رد عشوائي
       const pick = matched[Math.floor(Math.random() * matched.length)];
+      _handledMsgs.add(_msgKey); // علّم الرسالة كـ handled
+      setTimeout(() => _handledMsgs.delete(_msgKey), 30000); // تنظيف بعد 30 ثانية
       await ctx.reply(pick.response, { 
         reply_to_message_id: ctx.message?.message_id,
         parse_mode: 'Markdown'

@@ -223,7 +223,7 @@ bot.use(async (ctx, next) => {
 
   // 🤖 Auto-Reply — يشتغل للجميع حتى الأدمنز
   // تجاهل أوامر اللعبة
-  const _isGameMsg = /^(تخمين[:\s]|خمن$|خمن |انا$)/i.test(txt.trim()) || txt.trim() === 'خمن';
+  const _isGameMsg = /^(تخمين[:\s]|خمن$|خمن |انا$|مليون$)/i.test(txt.trim()) || txt.trim() === 'خمن' || txt.trim() === 'مليون';
   if (txt && txt.length > 0 && !_isGameMsg) {
     const arKey = 'auto_replies_all';
     let arList = _cGet(arKey);

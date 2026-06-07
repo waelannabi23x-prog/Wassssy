@@ -421,6 +421,22 @@ async function beginGame(telegram, chatId) {
   await sendNextQuestion(telegram, chatId);
 }
 
+// ── حذف رسائل القروب القديمة ──────────────────────────────
+const _grpMsgs = new Map(); // chatId → [msgIds]
+function trackGrpMsg(chatId, msgId) {
+  if (!msgId) return;
+  if (!_grpMsgs.has(chatId)) _grpMsgs.set(chatId, []);
+  _grpMsgs.get(chatId).push(msgId);
+}
+async function clearGrpMsgs(telegram, chatId, keepId) {
+  const ids = _grpMsgs.get(chatId) || [];
+  await Promise.allSettled(
+    ids.filter(id => id !== keepId)
+       .map(id => telegram.deleteMessage(chatId, id).catch(() => {}))
+  );
+  _grpMsgs.set(chatId, keepId ? [keepId] : []);
+}
+
 async function sendNextQuestion(telegram, chatId) {
   const game = getGame(chatId);
   if (!game || game.status !== 'playing') return;
@@ -496,7 +512,7 @@ async function handleAnswer(ctx, letter) {
   const uid    = ctx.from.id;
   const player = game.players.get(uid);
   if (!player) {
-    return ctx.answerCbQuery('⚠️ لست مسجلاً في هذه اللعبة.', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    return ctx.answerCbQuery('🚫 هذه ليست لعبتك!', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
   if (!player.alive) {
     return ctx.answerCbQuery('❌ لقد خرجت من اللعبة.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
@@ -513,6 +529,8 @@ async function handleAnswer(ctx, letter) {
   player.answerTime = elapsed;
 
   await ctx.answerCbQuery(`✅ سجلنا إجابتك: ${LETTERS['abcd'.indexOf(letter)]}`).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  // احفظ آخر message للاعب للـ reply
+  if (player) player.lastMsgId = ctx.callbackQuery?.message?.message_id;
 
   // If all alive players answered → resolve early
   const alive = [...game.players.values()].filter(p => p.alive);
@@ -1025,4 +1043,91 @@ function register(bot) {
   logger.info('✅ Million game registered');
 }
 
-module.exports = { register, initMillionaireSchema, startJoinPhase };
+
+async function handleMillionCallback(ctx, data) {
+  const chatId = ctx.chat?.id;
+  const uid    = String(ctx.from?.id);
+
+  // ── إجابة السؤال ma_LETTER_SESSION ──────────────────────────
+  if (data.startsWith('ma_')) {
+    const parts  = data.split('_');
+    const letter = parts[1];
+    const sid    = parseInt(parts[2]);
+    const game   = getGame(chatId);
+    if (!game || game.status !== 'playing') {
+      return ctx.answerCbQuery('⌛ لا يوجد لعبة نشطة').catch(() => {});
+    }
+    // فقط اللاعب المسجّل يجيب
+    if (!game.players.has(uid)) {
+      return ctx.answerCbQuery('⛔ لست مسجلاً في هذه الجولة').catch(() => {});
+    }
+    if (game.roundAnswers.has(uid)) {
+      return ctx.answerCbQuery('✅ تم تسجيل إجابتك').catch(() => {});
+    }
+    game.roundAnswers.set(uid, letter);
+    return ctx.answerCbQuery('📝 تم تسجيل إجابتك: ' + letter.toUpperCase()).catch(() => {});
+  }
+
+  // ── ml_forcestart ─────────────────────────────────────────────
+  if (data === 'ml_forcestart') {
+    ctx.answerCbQuery('🚀 جاري الإطلاق!').catch(() => {});
+    const game = getGame(chatId);
+    if (!game || game.status !== 'waiting') return;
+    if (game.joinTimer) { clearTimeout(game.joinTimer); game.joinTimer = null; }
+    return beginGame(ctx.telegram, chatId);
+  }
+
+  // ── ml_cancel ─────────────────────────────────────────────────
+  if (data === 'ml_cancel') {
+    ctx.answerCbQuery('🔴 تم الإلغاء').catch(() => {});
+    const game = getGame(chatId);
+    if (!game) return;
+    if (game.joinTimer)  clearTimeout(game.joinTimer);
+    if (game.timer)      clearTimeout(game.timer);
+    if (game.joinMsgId) ctx.telegram.deleteMessage(chatId, game.joinMsgId).catch(() => {});
+    clearGame(chatId);
+    return;
+  }
+
+  // ── ml_howto ──────────────────────────────────────────────────
+  if (data === 'ml_howto') {
+    ctx.answerCbQuery('').catch(() => {});
+    return ctx.reply(
+      '📖 *كيف تلعب من سيربح المليون؟*\n━━━━━━━━━━━━━━━━━━\n\n' +
+      '• اكتب *مليون* أو */million* لبدء اللعبة\n' +
+      '• اضغط *🚀 ابدأ* لتشغيل اللعبة فوراً\n' +
+      '• يظهر سؤال مع 4 خيارات — اختر قبل الوقت\n' +
+      '• لديك مساعدات قيّمة: 50/50، الجمهور، الصديق\n' +
+      '• 15 سؤال متصاعدة للوصول لـ 1,000,000 دج!\n\n' +
+      '🛡 *مناطق الأمان:* السؤال 5 — 10 — 15',
+      { parse_mode: 'Markdown' }
+    ).catch(() => {});
+  }
+
+  // ── ml_ranking ────────────────────────────────────────────────
+  if (data === 'ml_ranking') {
+    ctx.answerCbQuery('').catch(() => {});
+    return showLeaderboard(ctx).catch(() => {});
+  }
+
+  // ── ml_fifty / ml_audience / ml_call / ml_skip ───────────────
+  if (data.startsWith('ml_')) {
+    const lifelineKey = data.replace('ml_', '');
+    const game = getGame(chatId);
+    if (!game || !game.players.has(uid)) {
+      return ctx.answerCbQuery('⛔ لست في اللعبة').catch(() => {});
+    }
+    const player = game.players.get(uid);
+    if (player && player.lifelines && player.lifelines[lifelineKey] !== undefined) {
+      if (!player.lifelines[lifelineKey]) {
+        return ctx.answerCbQuery('❌ استخدمت هذه المساعدة مسبقاً').catch(() => {});
+      }
+      player.lifelines[lifelineKey] = false;
+      return ctx.answerCbQuery('✅ تم استخدام المساعدة').catch(() => {});
+    }
+    return ctx.answerCbQuery('').catch(() => {});
+  }
+}
+
+
+module.exports = { register, initMillionaireSchema, startJoinPhase, handleCallback: handleMillionCallback };

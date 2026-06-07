@@ -3,7 +3,8 @@ const { handleSettingsCallback } = require('../handlers/group_commands');
 const browse      = require('../handlers/browse');
 const groupPanel  = require('../handlers/group_panel');
 const groupSetup  = require('../handlers/group_setup');
-const gamesPanel  = require('../handlers/games_panel');
+const gamesPanel    = require('../handlers/games_panel');
+const millionGame  = require('../handlers/millionaire');
 
 module.exports.registerCallbacks = function(bot, deps) {
   const {
@@ -355,7 +356,14 @@ module.exports.registerCallbacks = function(bot, deps) {
           return;
         }
 
-        const _grpOk = data.startsWith('grp_') || data.startsWith('del_channel_')
+        // ── ألعاب المليون (في القروبات والخاص) ──────────────────
+        if (data.startsWith('ml_') || data.startsWith('ma_')) {
+          if (millionGame.handleCallback) {
+            return millionGame.handleCallback(ctx, data).catch(e => ctx.answerCbQuery('❌ ' + e.message).catch(() => {}));
+          }
+        }
+
+                const _grpOk = data.startsWith('grp_') || data.startsWith('del_channel_')
           || data.startsWith('gs_') || data.startsWith('grp_unban_')
           || data.startsWith('grp_unmute_') || data === 'check_subscription'
           || data === 'refresh_channels' || data.startsWith('mute_all_')

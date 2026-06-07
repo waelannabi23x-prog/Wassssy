@@ -55,6 +55,7 @@ async function mainMenu(ctx){
     rows.push([btn('🚩 البلاغات','mg_reports'),btn('📨 نظام الرسائل','mg_msgs')]);
     rows.push([btn('📢 القنوات والإعلانات','mg_channels_menu')]);
     rows.push([btn('🤖 الردود التلقائية','mg_auto_replies')]);
+    rows.push([btn('🎮 إعدادات الألعاب','mg_games_settings')]);
     rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp')]);
   }
   if(isOwner(ctx.uid)){
@@ -406,6 +407,16 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
       case 'mg_notify_msg':{clearState(uid);const nIds=await interactions.getActiveUsers(7);await safeAdd(broadcastQueue,'broadcast-all',{userIds:nIds,message:'🔔 *إشعار*\n\n'+text,parseMode:'Markdown',fromUid:uid});ctx.reply('📤 جاري الإرسال لـ *'+nIds.length+'* مستخدم — ستصلك النتيجة لما ينتهي',{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
       case 'mg_add_admin_id':{const tid=parseInt(text);if(isNaN(tid)){clearState(uid);return ctx.reply('❌ ID غير صحيح.');}await adminsDb.add(tid,uid);await interactions.addLog(uid,'add_admin','ID: '+tid);if(global.invalidateAdmin) global.invalidateAdmin(tid);const specs=await content.getSpecs();const spRows=specs.map(s=>[btn('🎓 '+s.name,'mg_admin_sp_'+tid+'_'+s.id)]);spRows.push([btn('كل التخصصات','mg_admin_sp_'+tid+'_0')]);clearState(uid);ctx.reply('اختر تخصص المشرف:',{...build(spRows)});try{ctx.telegram.sendMessage(tid,'🎉 تمت إضافتك مشرفاً',{parse_mode:'Markdown'});}catch(_){}break;}
       case 'mg_maint_msg':global.maintenanceModeMsg=text;clearState(uid);ctx.reply('✅ تم تحديث رسالة الصيانة',build([back('mg_menu')]));break;
+      case 'mg_gs_edit': {
+        const { run: dbRun2 } = require('../database/db');
+        await dbRun2(
+          'INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=$2',
+          [state.key, text]
+        ).catch(()=>{});
+        clearState(uid);
+        await ctx.reply('✅ تم الحفظ!').catch(()=>{});
+        return showGamesSettings(ctx);
+      }
       case 'mg_ar_trigger': {
         setState(uid, { type: 'mg_ar_response', trigger: text });
         return eos(ctx,
@@ -478,6 +489,20 @@ async function handleCallback(ctx,data){
   // ── القنوات والإعلانات ──
   if(data==='mg_channels_menu') return showChannelsMenu(ctx);
   if(data==='mg_auto_replies') return showAutoReplies(ctx);
+  if(data==='mg_games_settings') return showGamesSettings(ctx);
+  if(data.startsWith('mg_gs_')) {
+    const key = data.replace('mg_gs_','');
+    const val = await require('../database/db').get('SELECT value FROM settings WHERE key=$1',[key]).catch(()=>null);
+    const cur = val?.value || '';
+    setState(uid, { type: 'mg_gs_edit', key });
+    return eos(ctx,
+      '⚙️ *تعديل إعداد اللعبة*\n\n' +
+      '🔑 `' + key + '`\n' +
+      '📝 القيمة الحالية: `' + (cur||'غير محددة') + '`\n\n' +
+      'أرسل القيمة الجديدة:',
+      { parse_mode:'Markdown', ...build([[btn('❌ إلغاء','mg_games_settings')]]) }
+    );
+  }
   if(data==='mg_add_ar') {
     setState(uid, { type: 'mg_ar_trigger' });
     return eos(ctx,
@@ -739,6 +764,39 @@ async function showAutoReplies(ctx) {
   rows.push([btn('➕ إضافة رد تلقائي', 'mg_add_ar')]);
   rows.push(back('mg_menu'));
   return eos(ctx, text, { parse_mode: 'Markdown', ...build(rows) });
+}
+
+// ══════════════════════════════════════════
+// 🎮 إعدادات الألعاب
+// ══════════════════════════════════════════
+async function showGamesSettings(ctx) {
+  const { get: dbGet } = require('../database/db');
+  const keys = ['million_prize_currency','million_question_time','million_max_players','million_join_time'];
+  const labels = {
+    'million_prize_currency': '💰 عملة الجائزة',
+    'million_question_time':  '⏱ وقت السؤال (ثانية)',
+    'million_max_players':    '👥 أقصى لاعبين',
+    'million_join_time':      '⏳ وقت الانضمام (ثانية)',
+  };
+  const defaults = {
+    'million_prize_currency': 'دج',
+    'million_question_time':  '30',
+    'million_max_players':    '30',
+    'million_join_time':      '20',
+  };
+
+  let text = '🎮 *إعدادات الألعاب*\n━━━━━━━━━━━━━━━\n\n';
+  text += '🏆 *من سيربح المليون:*\n';
+  const rows = [];
+  for (const key of keys) {
+    const val = await dbGet('SELECT value FROM settings WHERE key=$1',[key]).catch(()=>null);
+    const v = val?.value || defaults[key];
+    text += '• ' + labels[key] + ': `' + v + '`\n';
+    rows.push([btn('✏️ ' + labels[key], 'mg_gs_' + key)]);
+  }
+  rows.push([btn('🗂 إدارة أسئلة المليون', 'mg_million_q')]);
+  rows.push(back('mg_menu'));
+  return eos(ctx, text, { parse_mode:'Markdown', ...build(rows) });
 }
 
 module.exports={mainMenu,handleCallback,handleText,handleFileUpload,handleBulkUpload,showUserProfile,showUsers,handleBundleFileUpload};
