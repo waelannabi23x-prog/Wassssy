@@ -1,4 +1,3 @@
-const { handleDaily, handleFlip, handleRob, handleLeaderboard } = require('../handlers/bank_games');
 'use strict';
 const { addChannel, removeChannel, getChannels } = require('../utils/channelGuard');
 
