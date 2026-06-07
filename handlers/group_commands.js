@@ -460,23 +460,14 @@ function setupGroupCommands(bot) {
     const isAdm = ['administrator','creator'].includes(member?.status);
     // join date من restricted info
     const joinDate = member?.status === 'restricted' ? '' : '';
-    let txt = "👤 *معلومات العضو*
-
-";
-    txt += "🔴 الاسم: *" + name + "*
-";
-    if (target.username) txt += "🔗 يوزر: @" + target.username + "
-";
-    txt += "🆔 الرقم التعريفي: " + target.id + "
-";
-    if (target.last_name) txt += "👨‍👩 اسم العائلة: " + target.last_name + "
-";
-    txt += "👀 الحالة: " + (statusMap[member?.status] || "غير معروف") + "
-";
-    txt += "❗ الإنذارات: " + (warns?.c || 0) + "/3
-";
-    txt += "⬇️ الانضمام: " + (member?.status === 'left' ? 'غير متاح' : 'متاح') + "
-";
+    let txt = "👤 *معلومات العضو*\n\n";
+    txt += "🔴 الاسم: *" + name + "*\n";
+    if (target.username) txt += "🔗 يوزر: @" + target.username + "\n";
+    txt += "🆔 الرقم التعريفي: " + target.id + "\n";
+    if (target.last_name) txt += "👨‍👩 اسم العائلة: " + target.last_name + "\n";
+    txt += "👀 الحالة: " + (statusMap[member?.status] || "غير معروف") + "\n";
+    txt += "❗ الإنذارات: " + (warns?.c || 0) + "/3\n";
+    txt += "⬇️ الانضمام: " + (member?.status === 'left' ? 'غير متاح' : 'متاح') + "\n";
     const kb = [];
     if (!isAdm) {
       kb.push([{ text: '❗ الإنذارات', callback_data: 'grp_warns_' + target.id }]);
