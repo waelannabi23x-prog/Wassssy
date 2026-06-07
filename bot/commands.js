@@ -246,8 +246,11 @@ module.exports = function registerCommands(bot, deps) {
     }
   });
 
-  bot.command('million', ctx => million.cmdMillion(ctx));
-  bot.command('mtop',    ctx => million.cmdTop(ctx));
+  bot.command('million', async ctx => {
+    if (ctx.chat?.type === 'private') return ctx.reply('⚠️ هذه اللعبة للقروبات فقط!').catch(() => {});
+    return millionaire.startJoinPhase(ctx);
+  });
+  bot.command('mtop', ctx => millionaire.showLeaderboard ? millionaire.showLeaderboard(ctx) : ctx.reply('قريباً').catch(() => {}));
 
   bot.command('users', async ctx => {
     if (!ctx.isOwner && !ctx.isAdmin) return;
