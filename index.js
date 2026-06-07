@@ -487,12 +487,14 @@ async function launch() {
     // ── كومندز البنك في القروب ──
     try {
       const txt = (ctx.message?.text || '').trim();
-      const bank = require('./handlers/bank');
-      if (/^انشاء حساب$/i.test(txt)) { await bank.createAccount(ctx); return; }
-      if (/^فلوسي$/i.test(txt)) { await bank.showBalance(ctx); return; }
-      if (/^فارسي/i.test(txt)) { await bank.transfer(ctx); return; }
-      if (/^rip /i.test(txt)) { await bank.loan(ctx); return; }
-    } catch(_) {}
+      if (/^انشاء حساب$|^فلوسي$|^فارسي|^rip /i.test(txt)) {
+        const bank = require('./handlers/bank');
+        if (/^انشاء حساب$/i.test(txt)) { await bank.createAccount(ctx); return; }
+        if (/^فلوسي$/i.test(txt)) { await bank.showBalance(ctx); return; }
+        if (/^فارسي/i.test(txt)) { await bank.transfer(ctx); return; }
+        if (/^rip /i.test(txt)) { await bank.loan(ctx); return; }
+      }
+    } catch(e) { require('./utils/logger').error('[Bank Group]', e.message); }
 
     return next();
   });
