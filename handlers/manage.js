@@ -799,5 +799,75 @@ async function showGamesSettings(ctx) {
   return eos(ctx, text, { parse_mode:'Markdown', ...build(rows) });
 }
 
+
+// ══════════════════════════════════════════
+// إدارة أسئلة المليون
+// ══════════════════════════════════════════
+async function showMillionQPanel(ctx) {
+  const { all: dbAll } = require('../database/db');
+  const rows  = await dbAll("SELECT difficulty, COUNT(*) as c FROM million_questions WHERE is_active=1 GROUP BY difficulty").catch(()=>[]);
+  const total = await dbAll("SELECT COUNT(*) as c FROM million_questions WHERE is_active=1").then(r=>r[0]?.c||0).catch(()=>0);
+  const diff  = { easy:'🟢 سهل', medium:'🟡 متوسط', hard:'🔴 صعب' };
+  let stats = '';
+  for (const r of rows) stats += `\n  ${diff[r.difficulty]||r.difficulty}: ${r.c}`;
+  const txt = `🎯 *إدارة أسئلة المليون*\n\n📊 إجمالي نشط: ${total}${stats}\n\n💡 اختر:`;
+  const kb = [
+    [{ text: '📋 قائمة الأسئلة', callback_data: 'mg_mq_list_1' }],
+    [{ text: '➕ إضافة سؤال',    callback_data: 'mg_mq_add'    },
+     { text: '🗑 حذف سؤال',      callback_data: 'mg_mq_del'    }],
+    [{ text: '◀️ رجوع',           callback_data: 'mg_settings'  }],
+  ];
+  await ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard: kb }}).catch(()=>
+    ctx.reply(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard: kb }})
+  );
+}
+
+async function showMillionQList(ctx, page) {
+  page = page || 1;
+  const { all: dbAll } = require('../database/db');
+  const PER = 8, offset = (page-1)*PER;
+  const rows = await dbAll(
+    "SELECT id,question,correct,difficulty,is_active FROM million_questions ORDER BY id DESC LIMIT $1 OFFSET $2",
+    [PER+1, offset]
+  ).catch(()=>[]);
+  const hasNext = rows.length > PER;
+  const items = rows.slice(0, PER);
+  if (!items.length) return ctx.answerCbQuery('لا توجد أسئلة.', { show_alert:true }).catch(()=>{});
+  const de = { easy:'🟢', medium:'🟡', hard:'🔴' };
+  let txt = `📋 *أسئلة المليون* — صفحة ${page}\n\n`;
+  for (const q of items) {
+    const st = q.is_active ? '✅' : '❌';
+    const qt = q.question.length > 45 ? q.question.slice(0,42)+'...' : q.question;
+    txt += `${st}${de[q.difficulty]||'⚪'} \[${q.id}\] ${qt}\n`;
+  }
+  const nav = [];
+  if (page > 1)  nav.push({ text:'◀️', callback_data:'mg_mq_list_'+(page-1) });
+  if (hasNext)   nav.push({ text:'▶️', callback_data:'mg_mq_list_'+(page+1) });
+  const kb = [];
+  if (nav.length) kb.push(nav);
+  kb.push([{ text:'◀️ رجوع', callback_data:'mg_million_q' }]);
+  await ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard: kb }}).catch(()=>
+    ctx.reply(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard: kb }})
+  );
+}
+
+async function startMillionQAdd(ctx) {
+  const { setState } = require('../utils/stateManager');
+  setState(ctx.from.id, { type:'mq_add_q', step:'question' });
+  await ctx.editMessageText(
+    '➕ *إضافة سؤال جديد*\n\n✏️ أرسل نص السؤال:',
+    { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[[{ text:'❌ إلغاء', callback_data:'mg_million_q' }]] }}
+  ).catch(()=> ctx.reply('✏️ أرسل نص السؤال:').catch(()=>{}));
+}
+
+async function startMillionQDel(ctx) {
+  const { setState } = require('../utils/stateManager');
+  setState(ctx.from.id, { type:'mq_del_q' });
+  await ctx.editMessageText(
+    '🗑 *حذف سؤال*\n\n🔢 أرسل رقم ID السؤال:\n_(شوف الأرقام من قائمة الأسئلة)_',
+    { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[[{ text:'❌ إلغاء', callback_data:'mg_million_q' }]] }}
+  ).catch(()=> ctx.reply('🔢 أرسل رقم السؤال:').catch(()=>{}));
+}
+
 module.exports={mainMenu,handleCallback,handleText,handleFileUpload,handleBulkUpload,showUserProfile,showUsers,handleBundleFileUpload};
 

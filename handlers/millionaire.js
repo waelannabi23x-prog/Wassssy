@@ -1141,4 +1141,18 @@ async function handleMillionCallback(ctx, data) {
 }
 
 
-module.exports = { register, initMillionaireSchema, startJoinPhase, handleCallback: handleMillionCallback };
+
+async function stopGame(ctx) {
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+  const { getGame, delGame } = require("../utils/botCache") || {};
+  const game = games ? games.get(chatId) : null;
+  if (!game) return ctx.reply("⚠️ لا توجد لعبة جارية.").catch(() => {});
+  if (game.timer)     clearTimeout(game.timer);
+  if (game.joinTimer) clearTimeout(game.joinTimer);
+  game.status = "ended";
+  games.delete(chatId);
+  ctx.reply("🛑 تم إيقاف اللعبة.").catch(() => {});
+}
+
+module.exports = { stopGame, register, initMillionaireSchema, startJoinPhase, handleCallback: handleMillionCallback };

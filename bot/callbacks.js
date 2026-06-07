@@ -357,7 +357,15 @@ module.exports.registerCallbacks = function(bot, deps) {
         }
 
         // ── ألعاب المليون (في القروبات والخاص) ──────────────────
-        if (data.startsWith('ml_') || data.startsWith('ma_')) {
+        if (data.startsWith('ml_') || data.startsWith('ma_') ||
+            data.startsWith('mlr_') || data.startsWith('mar_')) {
+          const handler = data.startsWith('mlr_') || data.startsWith('mar_')
+            ? (d) => millionaire.handleCallback(ctx, d)
+            : () => millionGame.handleCallback ? millionGame.handleCallback(ctx, data) : null;
+          return handler(data);
+        }
+
+        if (data.startsWith('ma_')) {
           if (millionGame.handleCallback) {
             return millionGame.handleCallback(ctx, data).catch(e => ctx.answerCbQuery('❌ ' + e.message).catch(() => {}));
           }

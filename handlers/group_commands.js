@@ -459,4 +459,37 @@ async function handleSettingsCallback(ctx, data) {
   return false;
 }
 
+  bot.command(["cmds", "اوامر", "help"], async ctx => {
+    if (!isGroup(ctx)) return;
+    delCmd(ctx);
+    const isAdm = await isTgAdmin(ctx);
+    let txt = "📋 *أوامر البوت في القروب*\n\n";
+    txt += "👥 *للجميع:*\n";
+    txt += "`/info` — معلومات عضو\n";
+    txt += "`/rules` — قواعد القروب\n";
+    txt += "`مليون` — لعبة من سيربح المليون\n";
+    txt += "`خمن` — لعبة التخمين\n";
+    if (isAdm) {
+      txt += "\n🛡️ *للمشرفين:*\n";
+      txt += "`/ban @user` — حظر\n";
+      txt += "`/unban @user` — رفع حظر\n";
+      txt += "`/kick @user` — طرد\n";
+      txt += "`/mute @user 10m` — إسكات\n";
+      txt += "`/unmute @user` — رفع إسكات\n";
+      txt += "`/warn @user` — تحذير\n";
+      txt += "`/warns @user` — عرض تحذيرات\n";
+      txt += "`/pin` — تثبيت رسالة\n";
+      txt += "`/unpin` — إلغاء تثبيت\n";
+      txt += "`/promote @user` — ترقية لمشرف\n";
+      txt += "`/demote @user` — سحب صلاحيات\n";
+      txt += "`/clean 20` — حذف N رسالة\n";
+      txt += "`/mstop` — إيقاف لعبة المليون\n";
+      txt += "`/tagall` — منشن الكل\n";
+      txt += "`/stats` — إحصائيات القروب\n";
+    }
+    const m = await ctx.reply(txt, { parse_mode: "Markdown" }).catch(() => null);
+    if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 30000);
+  });
+
+
 module.exports = { setupGroupCommands, handleSettingsCallback, showGroupSettings };
