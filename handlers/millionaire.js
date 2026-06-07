@@ -369,8 +369,14 @@ async function beginGame(telegram, chatId) {
   if (!game) return;
   if (game.joinTimer) { clearTimeout(game.joinTimer); game.joinTimer = null; }
 
+  // حذف رسالة الانضمام
+  if (game.joinMsgId) {
+    await telegram.deleteMessage(chatId, game.joinMsgId).catch(() => {});
+    game.joinMsgId = null;
+  }
+
   if (game.players.size === 0) {
-    await telegram.sendMessage(chatId, '😕 لم ينضم أحد للعبة. تم الإلغاء.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    await telegram.sendMessage(chatId, '😕 لم ينضم أحد للعبة. تم الإلغاء.').catch(() => {});
     delGame(chatId);
     return;
   }
