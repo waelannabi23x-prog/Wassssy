@@ -70,7 +70,7 @@ exports.showBalance = async (ctx) => {
       text += (isIn ? '📥' : '📤') + ' ' + fmt(tx.amount) + ' — ' + (tx.note || tx.type) + '\n';
     });
   }
-  return ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => {});
+  return ctx.reply(text, { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }).catch(() => {});
 };
 
 // ── تحويل ──
@@ -167,7 +167,7 @@ exports.showRip = async (ctx) => {
       text += sign + ' ' + fmt(t.amount) + ' — ' + (t.note || t.type) + String.fromCharCode(10);
     });
   }
-  return ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => {});
+  return ctx.reply(text, { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }).catch(() => {});
 };
 
 exports.getAccount = getAccount;
