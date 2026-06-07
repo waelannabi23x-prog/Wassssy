@@ -78,6 +78,13 @@ module.exports.registerMessages = function(bot, deps) {
       const _gtxt = ctx.message?.text?.trim();
       if (_gtxt) {
         const guessGame = require('../handlers/guess_game');
+        if (/^مليون$/i.test(_gtxt)) {
+          try {
+            const millionaire = require('../handlers/millionaire');
+            if (millionaire.startJoinPhase) await millionaire.startJoinPhase(ctx);
+          } catch(e) { require('../utils/logger').error('[Million]', e.message); }
+          return;
+        }
         if (/^خمن$/i.test(_gtxt)) { guessGame.startInvite && guessGame.startInvite(ctx).catch(e=>console.error('[Guess]',e.message)); return; }
         if (/^قواعد$/.test(_gtxt)) {
           ctx.telegram.deleteMessage(ctx.chat.id, ctx.message.message_id).catch(() => {});
@@ -149,6 +156,44 @@ module.exports.registerMessages = function(bot, deps) {
     }
 
     if (s?.type === 'mg_file') return manage.handleFileUpload(ctx);
+  });
+
+  // ── رد تلقائي عشوائي في القروب ──
+  bot.on('text', async (ctx, next) => {
+    if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') return next();
+    if (ctx.message?.text?.startsWith('/')) return next();
+    const uid = ctx.from?.id;
+    const txt = (ctx.message?.text || '').trim();
+    
+    try {
+      const { all } = require('../database/db');
+      const triggers = await all(
+        'SELECT * FROM auto_replies WHERE is_active=1',
+        []
+      ).catch(() => []);
+      
+      if (!triggers.length) return next();
+      
+      // ابحث عن trigger مطابق
+      const matched = triggers.filter(t => {
+        try {
+          return new RegExp(t.trigger, 'i').test(txt);
+        } catch(_) {
+          return txt.toLowerCase().includes(t.trigger.toLowerCase());
+        }
+      });
+      
+      if (!matched.length) return next();
+      
+      // اختر رد عشوائي
+      const pick = matched[Math.floor(Math.random() * matched.length)];
+      await ctx.reply(pick.response, { 
+        reply_to_message_id: ctx.message?.message_id,
+        parse_mode: 'Markdown'
+      }).catch(() => {});
+      return;
+    } catch(_) {}
+    return next();
   });
 
   // ── Photos / Videos / Audio / Voice ──
@@ -225,6 +270,9 @@ module.exports.registerMessages = function(bot, deps) {
       }
       if ((s?.type || '').startsWith('mg_') && ctx.isAdmin) return manage.handleText(ctx, s);
       if ((s?.type || '').startsWith('gp_')) return groupPanel.handleText(ctx, txt, s);
+      // ── ألعاب panel ──
+      const handled = await require('../handlers/games_panel').handleText(ctx).catch(() => false);
+      if (handled) return;
     } catch(e) { logger.error('[TextHandler]', e.message, { uid: ctx.from?.id }); }
   });
 

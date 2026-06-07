@@ -290,27 +290,43 @@ async function startJoinPhase(ctx) {
 
   setGame(chatId, game);
 
-  // Send join message
-  const txt =
-    `🎉 *من سيربح المليون — جولة جديدة!*\n\n` +
-    `اضغط زر الانضمام للمشاركة!\n` +
-    `⏱️ انتهاء التسجيل بعد *${JOIN_SECS}* ثانية\n\n` +
-    `💡 الجائزة الكبرى: *1,000,000 دج* 💰`;
+  // ── Auto-join: أضف المضيف مباشرة ──────────────────────────────
+  const _starter = ctx.from;
+  const _suid    = String(_starter.id);
+  game.players.set(_suid, {
+    name:      _starter.first_name || 'لاعب',
+    username:  _starter.username   || '',
+    alive:     true,
+    prize:     0,
+    lifelines: { fifty: true, audience: true, call: true, skip: true },
+    answers:   [],
+  });
 
-  const msg = await ctx.reply(txt, {
+  // ── رسالة البداية الاحترافية ─────────────────────────────────
+  const _joinTxt =
+    '🎰 *من سيربح المليون؟*\n' +
+    '━━━━━━━━━━━━━━━━━━━━\n\n' +
+    '👑 المضيف: *' + (_starter.first_name || 'لاعب') + '*\n' +
+    '👥 اللاعبون (1):\n' +
+    '1\. ' + (_starter.first_name || 'لاعب') + '\n\n' +
+    '💰 الجائزة الكبرى: *1,000,000 دج*\n\n' +
+    '⏱️ تبدأ اللعبة خلال *5* ثوانٍ\.\.\.';
+
+  const msg = await ctx.reply(_joinTxt, {
     parse_mode: 'Markdown',
     reply_markup: {
-      inline_keyboard: [[
-        { text: '✋ انضم للعبة', callback_data: 'ml_join' },
-        { text: '👥 اللاعبون (0)', callback_data: 'ml_players' },
-      ]],
+      inline_keyboard: [
+        [{ text: '🚀 ابدأ', callback_data: 'ml_forcestart' }],
+        [{ text: '📊 الترتيب', callback_data: 'ml_ranking' }, { text: '❓ كيف العب', callback_data: 'ml_howto' }],
+        [{ text: '🔴 إلغاء', callback_data: 'ml_cancel' }],
+      ],
     },
-  }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  }).catch(() => null);
 
-  if (msg) game.joinMsgId = msg.message_id;
+  if (msg) { game.joinMsgId = msg.message_id; trackGameMsg(chatId, msg.message_id); }
 
-  // Auto-start after JOIN_SECS
-  game.joinTimer = setTimeout(() => beginGame(ctx.telegram, chatId), JOIN_SECS * 1000);
+  // ── بدء تلقائي بعد 5 ثوانٍ ──────────────────────────────────
+  game.joinTimer = setTimeout(() => beginGame(ctx.telegram, chatId), 5000);
 }
 
 async function joinGame(ctx) {
@@ -445,6 +461,7 @@ async function sendNextQuestion(telegram, chatId) {
 
   // احذف رسالة السؤال القديمة
   if (game.msgId) {
+    await deleteGameMsgs(telegram, chatId, null);
     await telegram.deleteMessage(chatId, game.msgId).catch(() => {});
     game.msgId = null;
   }
