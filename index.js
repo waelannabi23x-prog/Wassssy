@@ -124,70 +124,43 @@ const rateLimit = (ctx, next) => {
 };
 
 // ── Middleware ──
-bot.use(async (ctx, next) => {
-  if (ctx.chat?.type !== 'private') {
-    if (ctx.callbackQuery) return next();
-    // ✅ لا نمسح أي رسالة من المستخدمين — البوت مش فلتر رسائل
-    // المسح يصير فقط عبر anti-spam أو أوامر الأدمن يدوياً
-    return next();
-  }
-  return next();
-});
 bot.use(rateLimit);
 
-// ── خمن وcallbacks اللعبة قبل auth ──
+// ── Middleware موحّد قبل auth ──
+bot.use(async (ctx, next) => {
+  const isGroup = ['group','supergroup'].includes(ctx.chat?.type);
+  const txt = (ctx.message?.text || '').trim();
 
-bot.use(async (ctx, next) => {
-  const txt = (ctx.message?.text || '').trim();
-  if (ctx.chat?.type !== 'private' && /^خمن$/i.test(txt)) {
-    return guessGame.startInvite(ctx).catch(()=>{});
+  // القروب فقط
+  if (isGroup && ctx.message) {
+    // ألعاب
+    if (/^خمن$/i.test(txt)) return guessGame.startInvite(ctx).catch(() => next());
+    if (/^تخمين[:\s:]+/i.test(txt)) {
+      const handled = await guessGame.handleGuessMsg(ctx).catch(() => false);
+      if (handled) return;
+    }
+    if (/^[أاآ]نا$/i.test(txt)) return guessGame.handleJoin(ctx).catch(() => next());
+    if (/^مليون$/i.test(txt)) {
+      try { await require('./handlers/millionaire').startJoinPhase(ctx); return; } catch(e) { logger.error('[Million]', e.message); }
+    }
+    // البنك
+    if (/^انشاء حساب$/i.test(txt)) return bank.createAccount(ctx).catch(() => next());
+    if (/^فلوسي$/i.test(txt)) return bank.showBalance(ctx).catch(() => next());
+    if (/^فارسي/i.test(txt)) return bank.transfer(ctx).catch(() => next());
+    if (/^rip /i.test(txt)) return bank.loan(ctx).catch(() => next());
   }
-  return next();
-});
 
-// ── تخمين: guess قبل auth ──
-bot.use(async (ctx, next) => {
-  const txt = (ctx.message?.text || '').trim();
-  if (ctx.chat?.type !== 'private' && /^تخمين[:\s:]+/i.test(txt)) {
-    const handled = await guessGame.handleGuessMsg(ctx).catch(() => false);
-    if (handled) return;
+  // PV لعبة خمن
+  if (!isGroup && ctx.chat?.type === 'private') {
+    const uid = String(ctx.from?.id || '');
+    if (guessGame.hasPvState(uid)) {
+      return guessGame.handlePvDirect(ctx).catch(e => {
+        logger.error('[GuessGame PV]', e.message);
+        return next();
+      });
+    }
   }
-  return next();
-});
 
-// ── انا: انضمام للعبة خمن قبل auth ──
-bot.use(async (ctx, next) => {
-  const txt = (ctx.message?.text || '').trim();
-  if (ctx.chat?.type !== 'private' && /^[أاآ]نا$/i.test(txt)) {
-    return guessGame.handleJoin(ctx).catch(e => { ctx.telegram.sendMessage(ctx.chat.id, "❌ join err: " + e.message).catch(()=>{}); return next(); });
-  }
-  return next();
-});
-// ── PV اللعبة قبل auth ──
-bot.use(async (ctx, next) => {
-  if (ctx.chat?.type !== 'private') return next();
-  const uid = String(ctx.from?.id || '');
-  if (guessGame.hasPvState(uid)) {
-    return guessGame.handlePvDirect(ctx).catch(e => {
-    require('./utils/logger').error('[GuessGame PV]', e.message);
-    return next();
-  });
-  }
-  return next();
-});
-// ── كومندز البنك في القروب (قبل auth) ──
-bot.use(async (ctx, next) => {
-  if (!ctx.message || !['group','supergroup'].includes(ctx.chat?.type)) return next();
-  const txt = (ctx.message?.text || '').trim();
-  if (/^انشاء حساب$|^فلوسي$|^فارسي|^rip /i.test(txt)) {
-    try {
-      const bank = require('./handlers/bank');
-      if (/^انشاء حساب$/i.test(txt)) return bank.createAccount(ctx);
-      if (/^فلوسي$/i.test(txt)) return bank.showBalance(ctx);
-      if (/^فارسي/i.test(txt)) return bank.transfer(ctx);
-      if (/^rip /i.test(txt)) return bank.loan(ctx);
-    } catch(e) { require('./utils/logger').error('[Bank]', e.message); }
-  }
   return next();
 });
 
