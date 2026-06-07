@@ -30,6 +30,17 @@ const PRIZES = [
 ];
 
 const SAFE_ZONES    = [4, 9, 14];  // indexes (0-based) = 5k, 32k, 1M
+
+async function _notify(telegram, chatId, text, opts = {}, deleteAfterMs = 0) {
+  try {
+    const m = await telegram.sendMessage(chatId, text, { parse_mode: "Markdown", ...opts });
+    if (deleteAfterMs > 0 && m) {
+      setTimeout(() => telegram.deleteMessage(chatId, m.message_id).catch(() => {}), deleteAfterMs);
+    }
+    return m;
+  } catch(_) { return null; }
+}
+
 const QUESTION_SECS = 30;          // seconds per question
 const JOIN_SECS     = 20;          // seconds to join before game starts
 const MAX_PLAYERS   = 30;
@@ -392,7 +403,7 @@ async function beginGame(telegram, chatId) {
   }
 
   if (game.players.size === 0) {
-    await telegram.sendMessage(chatId, '😕 لم ينضم أحد للعبة. تم الإلغاء.').catch(() => {});
+    await _notify(telegram, chatId, '😕 لم ينضم أحد للعبة. تم الإلغاء.', {}, 5000);
     delGame(chatId);
     return;
   }
@@ -498,7 +509,7 @@ async function sendNextQuestion(telegram, chatId) {
   setTimeout(async () => {
     const g2 = getGame(chatId);
     if (!g2 || g2.status !== 'playing' || g2.msgId !== msg?.message_id) return;
-    await telegram.sendMessage(chatId, '⚠️ *10 ثواني متبقية!*', { parse_mode: 'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    await _notify(telegram, chatId, '⚠️ *10 ثواني متبقية!*', {}, 4000); //(err => { require('../utils/logger').debug("[silent]", err.message); });
   }, (QUESTION_SECS - 10) * 1000);
 }
 
@@ -588,7 +599,7 @@ async function resolveQuestion(telegram, chatId, timeout) {
 
   const resultMsg = await telegram.sendMessage(chatId, txt, { parse_mode: 'Markdown' }).catch(() => null);
   // احذف رسالة النتيجة بعد 5 ثواني
-  if (resultMsg) setTimeout(() => telegram.deleteMessage(chatId, resultMsg.message_id).catch(() => {}), 5000);
+  if (resultMsg) setTimeout(() => telegram.deleteMessage(chatId, resultMsg.message_id).catch(() => {}), 7000);
 
   // Check if safe zone — eliminated players keep safe amount
   if (isSafe) {

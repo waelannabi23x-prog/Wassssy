@@ -158,50 +158,7 @@ module.exports.registerMessages = function(bot, deps) {
     if (s?.type === 'mg_file') return manage.handleFileUpload(ctx);
   });
 
-  // ── رد تلقائي عشوائي في القروب (مرة واحدة فقط) ──
-  const _handledMsgs = new Set();
-  bot.on('text', async (ctx, next) => {
-    if (ctx.chat?.type !== 'group' && ctx.chat?.type !== 'supergroup') return next();
-    if (ctx.message?.text?.startsWith('/')) return next();
-    const _msgKey = ctx.chat?.id + '_' + ctx.message?.message_id;
-    if (_handledMsgs.has(_msgKey)) return; // منع double reply
-    const uid = ctx.from?.id;
-    const txt = (ctx.message?.text || '').trim();
-    
-    try {
-      const { all } = require('../database/db');
-      const triggers = await all(
-        'SELECT * FROM auto_replies WHERE is_active=1',
-        []
-      ).catch(() => []);
-      
-      if (!triggers.length) return next();
-      
-      // ابحث عن trigger مطابق
-      const matched = triggers.filter(t => {
-        try {
-          return new RegExp(t.trigger, 'i').test(txt);
-        } catch(_) {
-          return txt.toLowerCase().includes(t.trigger.toLowerCase());
-        }
-      });
-      
-      if (!matched.length) return next();
-      
-      // اختر رد عشوائي
-      const pick = matched[Math.floor(Math.random() * matched.length)];
-      _handledMsgs.add(_msgKey); // علّم الرسالة كـ handled
-      setTimeout(() => _handledMsgs.delete(_msgKey), 30000); // تنظيف بعد 30 ثانية
-      await ctx.reply(pick.response, { 
-        reply_to_message_id: ctx.message?.message_id,
-        parse_mode: 'Markdown'
-      }).catch(() => {});
-      return;
-    } catch(_) {}
-    return next();
-  });
-
-  // ── Photos / Videos / Audio / Voice ──
+    // ── Photos / Videos / Audio / Voice ──
   bot.on(['photo', 'video', 'audio', 'voice'], async ctx => {
     if (ctx.chat?.type !== 'private') return;
     if (!ctx.isAdmin && !ctx.isOwner) return;
