@@ -228,35 +228,35 @@ bot.use(async (ctx, next) => {
     const arKey = 'auto_replies_all';
     let arList = _cGet(arKey);
     if (!arList) {
-      arList = await _dbAll('SELECT * FROM auto_replies WHERE is_active=1').catch(()=>[]);
+      arList = await _dbAll('SELECT * FROM auto_replies WHERE is_active=1').catch(() => []);
       _cSet(arKey, arList, 120000);
     }
-    // Rotation — رد واحد فقط على الجملة (أول trigger يطابق)
-    if (!global._arCounters) global._arCounters = new Map();
 
-    // ابحث عن أول trigger يطابق الجملة
-    const triggersFound = [];
+    // ابحث عن كل triggers تطابق
+    const matched = [];
     for (const ar of arList) {
-      const t = ar.trigger.toLowerCase();
-      let matched = ar.match_type === 'exact'
-        ? txt.trim().toLowerCase() === t
-        : txt.toLowerCase().includes(t);
-      if (matched && !triggersFound.includes(t)) triggersFound.push(t);
+      try {
+        let isMatch = false;
+        if (ar.match_type === 'regex') {
+          isMatch = new RegExp(ar.trigger, 'i').test(txt);
+        } else if (ar.match_type === 'exact') {
+          isMatch = txt.toLowerCase() === ar.trigger.toLowerCase();
+        } else {
+          isMatch = txt.toLowerCase().includes(ar.trigger.toLowerCase());
+        }
+        if (isMatch) matched.push(ar);
+      } catch(_) {
+        if (txt.toLowerCase().includes(ar.trigger.toLowerCase())) matched.push(ar);
+      }
     }
 
-    if (triggersFound.length > 0) {
-      // اختر trigger واحد بـ rotation بين الـ triggers المطابقة
-      const tKey = cid + '_triggers';
-      const tIdx = (global._arCounters.get(tKey) || 0) % triggersFound.length;
-      global._arCounters.set(tKey, tIdx + 1);
-      const chosenTrigger = triggersFound[tIdx];
-
-      // من الـ trigger المختار — rotation على الردود
-      const responses = arList.filter(ar => ar.trigger.toLowerCase() === chosenTrigger);
-      const rKey = cid + '_' + chosenTrigger;
-      const rIdx = (global._arCounters.get(rKey) || 0) % responses.length;
-      global._arCounters.set(rKey, rIdx + 1);
-      ctx.reply(responses[rIdx].response, { reply_to_message_id: ctx.message.message_id }).catch(()=>{});
+    if (matched.length > 0) {
+      // رد عشوائي حقيقي
+      const pick = matched[Math.floor(Math.random() * matched.length)];
+      ctx.reply(pick.response, {
+        reply_to_message_id: ctx.message.message_id,
+        parse_mode: 'Markdown'
+      }).catch(() => {});
     }
   }
 
@@ -503,6 +503,11 @@ async function launch() {
     // ── كومندز البنك في القروب ──
     try {
       const txt = (ctx.message?.text || '').trim();
+      if (/^مليون$/i.test(txt)) {
+        try { require('./handlers/millionaire').register; } catch(_) {}
+        // يشغل اللعبة عبر hears مسجّل في register
+        return next();
+      }
       if (/^انشاء حساب$|^فلوسي$|^فارسي|^rip /i.test(txt)) {
         const bank = require('./handlers/bank');
         if (/^انشاء حساب$/i.test(txt)) { await bank.createAccount(ctx); return; }
