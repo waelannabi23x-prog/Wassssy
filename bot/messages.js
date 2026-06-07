@@ -232,6 +232,10 @@ module.exports.registerMessages = function(bot, deps) {
       }
       if ((s?.type || '').startsWith('mg_') && ctx.isAdmin) return manage.handleText(ctx, s);
       if ((s?.type || '').startsWith('gp_')) return groupPanel.handleText(ctx, txt, s);
+      if (s?.type === 'million_add_q' || s?.type === 'million_del_q') {
+        const gamesPanel = require('../handlers/games_panel');
+        return gamesPanel.handleText(ctx, txt, s);
+      }
       // ── ألعاب panel ──
       const handled = await require('../handlers/games_panel').handleText(ctx).catch(() => false);
       if (handled) return;
