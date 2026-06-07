@@ -385,6 +385,118 @@ function setupGroupCommands(bot) {
     } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
   });
 
+  // ══ /pin ══
+  bot.command("pin", async ctx => {
+    if (!isGroup(ctx)) return;
+    if (!await isTgAdmin(ctx)) return ctx.reply("🚫 للمشرفين فقط").catch(() => {});
+    delCmd(ctx);
+    const r = ctx.message.reply_to_message;
+    if (!r) return ctx.reply("↩️ رد على الرسالة التي تريد تثبيتها").catch(() => {});
+    try {
+      await ctx.telegram.pinChatMessage(ctx.chat.id, r.message_id);
+      const m = await ctx.reply("📌 تم تثبيت الرسالة").catch(() => null);
+      if (m) setTimeout(() => ctx.deleteMessage(m.message_id).catch(() => {}), 5000);
+    } catch(e) { ctx.reply("❌ فشل: " + e.message).catch(() => {}); }
+  });
+
+  // ══ /unpin ══
+  bot.command("unpin", async ctx => {
+    if (!isGroup(ctx)) return;
+    if (!await isTgAdmin(ctx)) return ctx.reply("🚫 للمشرفين فقط").catch(() => {});
+    delCmd(ctx);
+    try {
+      const r = ctx.message.reply_to_message;
+      if (r) await ctx.telegram.unpinChatMessage(ctx.chat.id, r.message_id);
+      else   await ctx.telegram.unpinAllChatMessages(ctx.chat.id);
+      const m = await ctx.reply("✅ تم إلغاء التثبيت").catch(() => null);
+      if (m) setTimeout(() => ctx.deleteMessage(m.message_id).catch(() => {}), 5000);
+    } catch(e) { ctx.reply("❌ فشل: " + e.message).catch(() => {}); }
+  });
+
+  // ══ /promote ══
+  bot.command("promote", async ctx => {
+    if (!isGroup(ctx)) return;
+    if (!await isTgAdmin(ctx)) return ctx.reply("🚫 للمشرفين فقط").catch(() => {});
+    delCmd(ctx);
+    const target = await getTarget(ctx);
+    if (!target) return ctx.reply("⚠️ رد على رسالة العضو").catch(() => {});
+    try {
+      await ctx.telegram.promoteChatMember(ctx.chat.id, target.id, {
+        can_delete_messages: true, can_restrict_members: true,
+        can_pin_messages: true, can_manage_chat: true, can_invite_users: true,
+      });
+      const m = await ctx.reply("👑 *تم ترقية " + target.name + " لمشرف*", { parse_mode: "Markdown" }).catch(() => null);
+      if (m) setTimeout(() => ctx.deleteMessage(m.message_id).catch(() => {}), 8000);
+    } catch(e) { ctx.reply("❌ فشل: " + e.message).catch(() => {}); }
+  });
+
+  // ══ /demote ══
+  bot.command("demote", async ctx => {
+    if (!isGroup(ctx)) return;
+    if (!await isTgAdmin(ctx)) return ctx.reply("🚫 للمشرفين فقط").catch(() => {});
+    delCmd(ctx);
+    const target = await getTarget(ctx);
+    if (!target) return ctx.reply("⚠️ رد على رسالة المشرف").catch(() => {});
+    try {
+      await ctx.telegram.promoteChatMember(ctx.chat.id, target.id, {
+        can_delete_messages: false, can_restrict_members: false,
+        can_pin_messages: false, can_manage_chat: false,
+      });
+      const m = await ctx.reply("🔽 *تم سحب صلاحيات " + target.name + "*", { parse_mode: "Markdown" }).catch(() => null);
+      if (m) setTimeout(() => ctx.deleteMessage(m.message_id).catch(() => {}), 8000);
+    } catch(e) { ctx.reply("❌ فشل: " + e.message).catch(() => {}); }
+  });
+
+  // ══ /info ══
+  bot.command("info", async ctx => {
+    if (!isGroup(ctx)) return;
+    delCmd(ctx);
+    const target = ctx.message.reply_to_message?.from || ctx.from;
+    const { get: dbGet } = require("../database/db");
+    const member = await ctx.telegram.getChatMember(ctx.chat.id, target.id).catch(() => null);
+    const warns  = await dbGet("SELECT COUNT(*) as c FROM group_warnings WHERE chat_id=$1 AND user_id=$2", [ctx.chat.id, target.id]).catch(() => ({ c: 0 }));
+    const statusMap = { member:"عضو", administrator:"مشرف", creator:"مؤسس", restricted:"مقيّد", left:"غادر", kicked:"محظور" };
+    const name = [target.first_name, target.last_name].filter(Boolean).join(" ");
+    let txt = "👤 *معلومات العضو*\n\n";
+    txt += "📛 الاسم: " + name + "\n";
+    if (target.username) txt += "🔗 يوزر: @" + target.username + "\n";
+    txt += "🆔 ID: `" + target.id + "`\n";
+    txt += "📊 الحالة: " + (statusMap[member?.status] || "غير معروف") + "\n";
+    txt += "⚠️ التحذيرات: " + (warns?.c || 0) + "\n";
+    ctx.reply(txt, { parse_mode: "Markdown" }).catch(() => {});
+  });
+
+  // ══ /clean ══
+  bot.command("clean", async ctx => {
+    if (!isGroup(ctx)) return;
+    if (!await isTgAdmin(ctx)) return ctx.reply("🚫 للمشرفين فقط").catch(() => {});
+    delCmd(ctx);
+    const n = Math.min(parseInt(ctx.message.text.split(" ")[1]) || 10, 50);
+    let deleted = 0;
+    const startId = ctx.message.message_id;
+    for (let i = startId; i > startId - n - 1 && i > 0; i--) {
+      try { await ctx.telegram.deleteMessage(ctx.chat.id, i); deleted++; } catch(_) {}
+      await new Promise(r => setTimeout(r, 80));
+    }
+    const m = await ctx.reply("✅ تم حذف " + deleted + " رسالة").catch(() => null);
+    if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 4000);
+  });
+
+  // ══ /cmds ══
+  bot.command(["cmds", "اوامر"], async ctx => {
+    if (!isGroup(ctx)) return;
+    delCmd(ctx);
+    const isAdm = await isTgAdmin(ctx);
+    let txt = "📋 *أوامر البوت*\n\n👥 *للجميع:*\n`/info` معلومات عضو\n`/rules` القواعد\n`مليون` لعبة المليون\n`خمن` لعبة التخمين\n";
+    if (isAdm) {
+      txt += "\n🛡️ *للمشرفين:*\n`/ban` `/unban` `/kick`\n`/mute 10m` `/unmute`\n`/warn` `/warns` `/clearwarns`\n`/pin` `/unpin`\n`/promote` `/demote`\n`/info` `/clean 20`\n`/mstop`\n`/tagall` `/stats`\n";
+    }
+    const m = await ctx.reply(txt, { parse_mode: "Markdown" }).catch(() => null);
+    if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 30000);
+  });
+
+}
+
 // ══════════════════════════════════════════
 // ⚙️ لوحة إعدادات القروب الشاملة
 // ══════════════════════════════════════════
@@ -458,37 +570,4 @@ async function handleSettingsCallback(ctx, data) {
   return false;
 }
 
-  bot.command(["cmds", "اوامر", "help"], async ctx => {
-    if (!isGroup(ctx)) return;
-    delCmd(ctx);
-    const isAdm = await isTgAdmin(ctx);
-    let txt = "📋 *أوامر البوت في القروب*\n\n";
-    txt += "👥 *للجميع:*\n";
-    txt += "`/info` — معلومات عضو\n";
-    txt += "`/rules` — قواعد القروب\n";
-    txt += "`مليون` — لعبة من سيربح المليون\n";
-    txt += "`خمن` — لعبة التخمين\n";
-    if (isAdm) {
-      txt += "\n🛡️ *للمشرفين:*\n";
-      txt += "`/ban @user` — حظر\n";
-      txt += "`/unban @user` — رفع حظر\n";
-      txt += "`/kick @user` — طرد\n";
-      txt += "`/mute @user 10m` — إسكات\n";
-      txt += "`/unmute @user` — رفع إسكات\n";
-      txt += "`/warn @user` — تحذير\n";
-      txt += "`/warns @user` — عرض تحذيرات\n";
-      txt += "`/pin` — تثبيت رسالة\n";
-      txt += "`/unpin` — إلغاء تثبيت\n";
-      txt += "`/promote @user` — ترقية لمشرف\n";
-      txt += "`/demote @user` — سحب صلاحيات\n";
-      txt += "`/clean 20` — حذف N رسالة\n";
-      txt += "`/mstop` — إيقاف لعبة المليون\n";
-      txt += "`/tagall` — منشن الكل\n";
-      txt += "`/stats` — إحصائيات القروب\n";
-    }
-    const m = await ctx.reply(txt, { parse_mode: "Markdown" }).catch(() => null);
-    if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 30000);
-  });
-
-}
 module.exports = { setupGroupCommands, handleSettingsCallback, showGroupSettings };
