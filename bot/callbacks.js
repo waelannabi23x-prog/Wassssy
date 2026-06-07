@@ -281,7 +281,11 @@ module.exports.registerCallbacks = function(bot, deps) {
     }},
     { p: 'gp_close', fn: async (ctx, d) => {
       ctx.answerCbQuery().catch(() => {});
-      return ctx.deleteMessage().catch(() => {});
+      // نحاول نحذف — إذا فشل نحذف الأزرار فقط
+      ctx.deleteMessage().catch(() => {
+        ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
+      });
+      return;
     }},
     { p: 'leave_grp_', fn: async (ctx, d) => {
       if (!ctx.isOwner) return ctx.answerCbQuery('🚫 للمالك فقط', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
@@ -483,6 +487,22 @@ module.exports.registerCallbacks = function(bot, deps) {
           }).catch(() => {});
           await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '🔇 سحب الكلام', callback_data: 'grp_restrict_' + uid2 }]] }).catch(() => {});
           return ctx.answerCbQuery('🔊 تم إعطاء الكلام').catch(() => {});
+        }
+
+        if (data.startsWith('gp_leave_')) {
+          const leaveChatId = parseInt(data.replace('gp_leave_', ''));
+          const { run: dbRun2 } = require('../database/db');
+          try {
+            await ctx.telegram.leaveChat(leaveChatId);
+            await dbRun2('UPDATE group_chats SET is_active=0 WHERE chat_id=$1', [leaveChatId]).catch(() => {});
+            await ctx.editMessageText(
+              '✅ *تم الخروج من القروب بنجاح*',
+              { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '◀️ رجوع', callback_data: 'gp_mygroups' }]] }}
+            ).catch(() => ctx.reply('✅ تم الخروج').catch(() => {}));
+          } catch(e) {
+            ctx.answerCbQuery('❌ فشل الخروج: ' + e.message, { show_alert: true }).catch(() => {});
+          }
+          return;
         }
         const _grpOk = data.startsWith('grp_') || data.startsWith('del_channel_')
           || data.startsWith('gs_') || data.startsWith('grp_unban_')

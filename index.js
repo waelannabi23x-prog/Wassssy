@@ -388,13 +388,15 @@ async function launch() {
               // البوت مش ادمين — رسالة تنبيه وخروج
               await ctx.telegram.sendMessage(addedBy.id,
                 '⚠️ شكراً على الإضافة في *' + title + '*!\n\n' +
-                'لكن لاحظت أنك لم تمنحني صلاحيات *ادمين*، ولن أتمكن من العمل بشكل صحيح.\n\n' +
-                '📌 *كيف تصلح ذلك؟*\n' +
-                '1\. اذهب لإعدادات القروب\n' +
-                '2\. ادمنز ← أضف ادمن\n' +
-                '3\. اخترني وفعّل الصلاحيات\n\n' +
-                'سأخرج الآن وأعود عند إضافتي كادمين 👋',
-                { parse_mode: 'Markdown' }
+                '❌ لم تمنحني صلاحيات *ادمين* — لن أتمكن من العمل بشكل صحيح.\n\n' +
+                '👇 اضغط الزر لإضافتي كمشرف:',
+                {
+                  parse_mode: 'Markdown',
+                  reply_markup: { inline_keyboard: [
+                    [{ text: '👑 أضفني كـ مشرف 🛡️', url: 'https://t.me/' + un + '?startgroup=true&admin=delete_messages+restrict_members+pin_messages+invite_users+manage_chat' }],
+                    [{ text: '❓ كيف أضيفك؟', url: 'https://t.me/' + un + '?start=howto_admin' }]
+                  ]}
+                }
               ).catch(() => {});
               await ctx.telegram.leaveChat(chatId).catch(() => {});
             }
@@ -414,10 +416,17 @@ async function launch() {
           // مش ادمين — بعث رسالة لمن أضافه وخرج
           const addedBy2 = ctx.update?.my_chat_member?.from;
           if (addedBy2?.id) {
+            const _me2 = ctx.botInfo || await ctx.telegram.getMe().catch(() => ({}));
+            const _un2 = _me2.username || '';
             await ctx.telegram.sendMessage(addedBy2.id,
               '⚠️ تم إضافتي في *' + (chat.title||'القروب') + '* لكن بدون صلاحيات ادمين!\n\n' +
-              '📌 لكي أعمل بشكل كامل، يرجى ترقيتي لـ *ادمين* ثم أضفني مجدداً.',
-              { parse_mode: 'Markdown' }
+              '👇 اضغط الزر لإضافتي كمشرف:',
+              {
+                parse_mode: 'Markdown',
+                reply_markup: { inline_keyboard: [
+                  [{ text: '👑 أضفني كـ مشرف 🛡️', url: 'https://t.me/' + _un2 + '?startgroup=true&admin=delete_messages+restrict_members+pin_messages+invite_users+manage_chat' }]
+                ]}
+              }
             ).catch(() => {});
           }
           await ctx.telegram.leaveChat(chat.id).catch(() => {});
