@@ -45,9 +45,9 @@ exports.createAccount = async (ctx) => {
 // ── عرض الرصيد ──
 exports.showBalance = async (ctx) => {
   const uid = ctx.uid || ctx.from?.id;
-  const replyTo = ctx.message?.reply_to_message;
-  const targetId = replyTo ? replyTo.from?.id : uid;
-  const isSelf = targetId === uid;
+  // فلوسي = دائماً رصيد المستخدم نفسه
+  const targetId = uid;
+  const isSelf = true;
   const acc = await getAccount(targetId);
   if (!acc) {
     return ctx.reply(
