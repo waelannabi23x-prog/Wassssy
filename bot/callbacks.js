@@ -393,22 +393,36 @@ module.exports.registerCallbacks = function(bot, deps) {
           return ctx.answerCbQuery('❗ الإنذارات: ' + (w?.c||0) + '/3', { show_alert: true }).catch(() => {});
         }
         if (data.startsWith('grp_perms_')) {
-          const uid2 = parseInt(data.replace('grp_perms_', ''));
-          const member = await ctx.telegram.getChatMember(ctx.chat.id, uid2).catch(() => null);
-          const p = member?.can_send_messages !== false;
-          const txt = '🎛 *أذونات العضو*\n\n' +
-            (p ? '✅' : '❌') + ' الرسائل النصية\n' +
-            (member?.can_send_media_messages !== false ? '✅' : '❌') + ' الوسائط\n' +
-            (member?.can_send_polls !== false ? '✅' : '❌') + ' الاستطلاعات\n' +
-            (member?.can_add_web_page_previews !== false ? '✅' : '❌') + ' معاينة الروابط\n' +
-            (member?.can_invite_users !== false ? '✅' : '❌') + ' دعوة أعضاء\n' +
-            (member?.can_pin_messages ? '✅' : '❌') + ' تثبيت الرسائل\n';
-          const kb = [[
-            { text: p ? '🔇 سحب الكلام' : '🔊 إعطاء الكلام',
-              callback_data: (p ? 'grp_restrict_' : 'grp_unrestrict_') + uid2 }
-          ]];
-          await ctx.reply(txt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: kb } }).catch(() => {});
-          return ctx.answerCbQuery('').catch(() => {});
+          const parts   = data.replace('grp_perms_', '').split('_');
+          const uid2    = parseInt(parts[0]);
+          const chatId2 = parts[1] ? parseInt(parts[1]) : ctx.chat.id;
+          const adminId = ctx.from.id;
+          const member  = await ctx.telegram.getChatMember(chatId2, uid2).catch(() => null);
+          const p = member?.status === 'restricted' ? member : null;
+          const can = (key) => p ? (p[key] !== false) : true;
+          const tog = (label, key, val) => [{
+            text: (can(key) ? '✅ ' : '❌ ') + label,
+            callback_data: 'grp_ptog_' + key + '_' + uid2 + '_' + chatId2
+          }];
+          const kb = [
+            tog('الرسائل النصية',      'can_send_messages',          true),
+            tog('الوسائط (صور/فيديو)', 'can_send_media_messages',    true),
+            tog('الاستطلاعات',         'can_send_polls',             true),
+            tog('معاينة الروابط',      'can_add_web_page_previews',  true),
+            tog('دعوة أعضاء',          'can_invite_users',           true),
+            tog('تثبيت الرسائل',       'can_pin_messages',           false),
+            [{ text: '💾 حفظ', callback_data: 'grp_psave_' + uid2 + '_' + chatId2 }],
+          ];
+          const txt = '🎛 *أذونات العضو*\n🆔 ' + uid2 + '\n\n_اضغط لتفعيل/تعطيل كل إذن ثم اضغط حفظ_';
+          try {
+            await ctx.telegram.sendMessage(adminId, txt, {
+              parse_mode: 'Markdown',
+              reply_markup: { inline_keyboard: kb }
+            });
+            return ctx.answerCbQuery('📨 تم الإرسال للخاص', { show_alert: false }).catch(() => {});
+          } catch(_) {
+            return ctx.answerCbQuery('⚠️ افتح الخاص مع البوت أولاً', { show_alert: true }).catch(() => {});
+          }
         }
         if (data.startsWith('grp_restrict_')) {
           const uid2 = parseInt(data.replace('grp_restrict_', ''));
@@ -422,6 +436,50 @@ module.exports.registerCallbacks = function(bot, deps) {
           const uid2 = parseInt(data.replace('grp_unrestrict_', ''));
           await ctx.telegram.restrictChatMember(ctx.chat.id, uid2, {
             permissions: { can_send_messages: true, can_send_media_messages: true, can_send_polls: true, can_add_web_page_previews: true }
+          }).catch(() => {});
+          await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '🔇 سحب الكلام', callback_data: 'grp_restrict_' + uid2 }]] }).catch(() => {});
+          return ctx.answerCbQuery('🔊 تم إعطاء الكلام').catch(() => {});
+        }
+
+        // ── أزرار warn/info ──
+        if (data.startsWith('grp_warns_show_')) {
+          const uid2 = parseInt(data.replace('grp_warns_show_', ''));
+          const { all: dbAll } = require('../database/db');
+          const rows = await dbAll('SELECT reason, created_at FROM group_warns WHERE chat_id=$1 AND user_id=$2 ORDER BY created_at DESC LIMIT 5', [ctx.chat.id, uid2]).catch(() => []);
+          const cnt = rows.length;
+          let txt = '❗ *الإنذارات: ' + cnt + '/3*\n\n';
+          for (const r of rows) {
+            const d = new Date(r.created_at).toLocaleDateString('ar');
+            txt += '• ' + r.reason + ' — ' + d + '\n';
+          }
+          if (!cnt) txt = '✅ لا توجد إنذارات';
+          return ctx.answerCbQuery('').catch(()=>{}) || ctx.reply(txt, { parse_mode: 'Markdown' }).catch(() => {});
+        }
+        if (data.startsWith('grp_mute_60_')) {
+          const uid2 = parseInt(data.replace('grp_mute_60_', ''));
+          const { muteMember } = require('../handlers/group_admin');
+          await muteMember(ctx, ctx.chat.id, uid2, 60).catch(() => {});
+          await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '🔊 رفع الكتم', callback_data: 'grp_unmute_' + uid2 }]] }).catch(() => {});
+          return ctx.answerCbQuery('🔇 تم الكتم ساعة').catch(() => {});
+        }
+        if (data.startsWith('grp_ban_now_')) {
+          const uid2 = parseInt(data.replace('grp_ban_now_', ''));
+          await ctx.telegram.banChatMember(ctx.chat.id, uid2).catch(() => {});
+          await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '🔓 رفع الحظر', callback_data: 'grp_unban_' + uid2 }]] }).catch(() => {});
+          return ctx.answerCbQuery('🚫 تم الحظر').catch(() => {});
+        }
+        if (data.startsWith('grp_restrict_')) {
+          const uid2 = parseInt(data.replace('grp_restrict_', ''));
+          await ctx.telegram.restrictChatMember(ctx.chat.id, uid2, {
+            permissions: { can_send_messages: false, can_send_media_messages: false, can_send_polls: false }
+          }).catch(() => {});
+          await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '🔊 إعطاء الكلام', callback_data: 'grp_unrestrict_' + uid2 }]] }).catch(() => {});
+          return ctx.answerCbQuery('🔇 تم سحب الكلام').catch(() => {});
+        }
+        if (data.startsWith('grp_unrestrict_')) {
+          const uid2 = parseInt(data.replace('grp_unrestrict_', ''));
+          await ctx.telegram.restrictChatMember(ctx.chat.id, uid2, {
+            permissions: { can_send_messages: true, can_send_media_messages: true, can_send_polls: true, can_add_web_page_previews: true, can_invite_users: true }
           }).catch(() => {});
           await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '🔇 سحب الكلام', callback_data: 'grp_restrict_' + uid2 }]] }).catch(() => {});
           return ctx.answerCbQuery('🔊 تم إعطاء الكلام').catch(() => {});

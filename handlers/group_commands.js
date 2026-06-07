@@ -285,16 +285,7 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   // ⚙️ /settings — لوحة إعدادات القروب
   // ══════════════════════════════════════════
-  bot.command('settings', async ctx => {
-    if (!isGroup(ctx)) return;
-    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
-    delCmd(ctx);
-    return showGroupSettings(bot, ctx, ctx.chat.id);
-  });
 
-  // ══════════════════════════════════════════
-  // 📊 /stats — إحصائيات القروب
-  // ══════════════════════════════════════════
   bot.command('stats', async ctx => {
     if (!isGroup(ctx)) return;
     const { showGroupStats } = require('./group_admin');
@@ -482,9 +473,13 @@ function setupGroupCommands(bot) {
         { text: '🔇 كتم 🪃',   callback_data: 'grp_mute_1h_' + target.id },
         { text: '🚫 حظر 🏹',   callback_data: 'grp_ban_' + target.id },
       ]);
-      kb.push([{ text: '🎛 أذونات 📡', callback_data: 'grp_perms_' + target.id }]);
+      kb.push([{ text: '🎛 أذونات 📡', callback_data: 'grp_perms_' + target.id + '_' + ctx.chat.id }]);
     }
-    ctx.reply(txt, { parse_mode: "Markdown", reply_markup: kb.length ? { inline_keyboard: kb } : undefined }).catch(() => {});
+    ctx.reply(txt, {
+      parse_mode: "Markdown",
+      reply_to_message_id: ctx.message?.reply_to_message?.message_id,
+      reply_markup: kb.length ? { inline_keyboard: kb } : undefined
+    }).catch(() => {});
   });
 
   // ══ /clean ══

@@ -68,45 +68,9 @@ module.exports = function registerCommands(bot, deps) {
   });
 
 
-  bot.command('ban', async ctx => {
-    if (!ctx.isOwner) return;
-    if (ctx.chat?.type !== 'private') return;
-    const parts = (ctx.message.text || '').split(/\s+/);
-    const targetId = parseInt(parts[1]);
-    if (!targetId) return ctx.reply('Usage: /ban ID').catch(() => {});
-    try {
-      await usersDb.ban(targetId);
-      cacheClear('ban_' + targetId);
-      return ctx.reply('Banned: ' + targetId).catch(() => {});
-    } catch(e) { ctx.reply('Error: ' + e.message).catch(() => {}); }
-  });
 
-  bot.command('unban', async ctx => {
-    if (!ctx.isOwner) return;
-    if (ctx.chat?.type !== 'private') return;
-    const parts = (ctx.message.text || '').split(/\s+/);
-    const targetId = parseInt(parts[1]);
-    if (!targetId) return ctx.reply('Usage: /unban ID').catch(() => {});
-    try {
-      await usersDb.unban(targetId);
-      cacheClear('ban_' + targetId);
-      return ctx.reply('Unbanned: ' + targetId).catch(() => {});
-    } catch(e) { ctx.reply('Error: ' + e.message).catch(() => {}); }
-  });
 
-  bot.command('bans', async ctx => {
-    if (!ctx.isOwner) return;
-    if (ctx.chat?.type !== 'private') return;
-    try {
-      const list = await dbAll('SELECT id, first_name, username FROM users WHERE is_banned=1 LIMIT 50');
-      if (!list.length) return ctx.reply('No banned users').catch(() => {});
-      let text = 'Banned (' + list.length + '):\n';
-      list.forEach((u, i) => {
-        text += (i+1) + '. ' + (u.first_name||'user') + (u.username?' @'+u.username:'') + ' ID:' + u.id + '\n';
-      });
-      ctx.reply(text).catch(() => {});
-    } catch(e) { ctx.reply('Error: ' + e.message).catch(() => {}); }
-  });
+
   bot.command('start', async ctx => {
     // في المجموعة — أرسل زر للبوت الخاص بدل المنيو
     if (ctx.chat.type !== 'private') {
@@ -266,16 +230,7 @@ module.exports = function registerCommands(bot, deps) {
     return manage.mainMenu(ctx);
   });
 
-  bot.command('top', async ctx => {
-    try {
-      const rows = await dbAll('SELECT u.first_name, p.total_points FROM user_points p JOIN users u ON u.id=p.user_id ORDER BY p.total_points DESC LIMIT 10');
-      if (!rows.length) return ctx.reply('لا توجد نقاط بعد.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-      const txt = rows.map((r, i) => `${i+1}. ${r.first_name} — ${r.total_points} نقطة`).join('\n');
-      return ctx.reply('🏆 *المتصدرون:*\n\n' + txt, { parse_mode: 'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    } catch(e) { logger.error('[top]', e.message); }
-  });
 
-  // ── Group Admin Commands ──
   bot.command('all', async ctx => {
     if (ctx.chat.type !== 'supergroup' && ctx.chat.type !== 'group') return;
     try { return await showAllMembers(ctx, ctx.chat.id); }
@@ -467,33 +422,7 @@ module.exports = function registerCommands(bot, deps) {
 
 
   // ── /setwelcome — تعيين رسالة ترحيب /start ──
-  bot.command('setwelcome', async ctx => {
-    if (!ctx.isOwner) return ctx.reply('🚫 للمالك فقط').catch(() => {});
-    if (ctx.chat?.type !== 'private') return ctx.reply('🔒 في الخاص فقط').catch(() => {});
-    const text = ctx.message.text.replace('/setwelcome', '').trim();
-    if (!text) return ctx.reply(
-      '📝 *استخدام:*' + String.fromCharCode(10) +
-      '/setwelcome [نص الرسالة]' + String.fromCharCode(10) + String.fromCharCode(10) +
-      '💡 يمكنك استخدام Markdown:' + String.fromCharCode(10) +
-      '*굵게* _مائل_ `كود`' + String.fromCharCode(10) +
-      '[رابط](https://t.me/xxx)' + String.fromCharCode(10) + String.fromCharCode(10) +
-      '🔹 لمسح الرسالة اكتب: /setwelcome off',
-      { parse_mode: 'Markdown' }
-    ).catch(() => {});
-    const { run } = require('../database/db');
-    if (text === 'off') {
-      await run("DELETE FROM settings WHERE key='start_welcome_text'").catch(() => {});
-      return ctx.reply('✅ تم حذف رسالة الترحيب — سيظهر المنيو العادي').catch(() => {});
-    }
-    await run(
-      "INSERT INTO settings(key,value) VALUES('start_welcome_text',$1) ON CONFLICT(key) DO UPDATE SET value=$1",
-      [text]
-    ).catch(() => {});
-    await ctx.reply('✅ تم حفظ رسالة الترحيب!' + String.fromCharCode(10) + String.fromCharCode(10) + '📋 معاينة:' + String.fromCharCode(10) + String.fromCharCode(10) + text, { parse_mode: 'Markdown' }).catch(() => {});
-  });
 
-
-  // ── /mygroup — إدارة القروب للأدمنية ──
   bot.command('mygroup', async ctx => {
     if (ctx.chat?.type !== 'private') {
       ctx.deleteMessage().catch(() => {});

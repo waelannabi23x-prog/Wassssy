@@ -402,7 +402,16 @@ async function muteAll(ctx, chatId) {
       `✅ نجح: *${ok}* عضو\n` +
       `❌ فشل: *${fail}*\n` +
       `⏱ المدة: ساعة واحدة`,
-      { parse_mode: 'Markdown' }
+      {
+        parse_mode: 'Markdown',
+        reply_to_message_id: ctx.message?.reply_to_message?.message_id,
+        reply_markup: { inline_keyboard: [
+          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + targetUserId },
+           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + targetUserId }],
+          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + targetUserId },
+           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + targetUserId }],
+        ]}
+      }
     ).catch(() => null);
 
     if (sent) setTimeout(() => ctx.deleteMessage(sent.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 8000);
@@ -453,7 +462,16 @@ async function unmuteAll(ctx, chatId) {
       `━━━━━━━━━━━━━━━━━━\n` +
       `✅ نجح: *${ok}* عضو\n` +
       `❌ فشل: *${fail}*`,
-      { parse_mode: 'Markdown' }
+      {
+        parse_mode: 'Markdown',
+        reply_to_message_id: ctx.message?.reply_to_message?.message_id,
+        reply_markup: { inline_keyboard: [
+          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + targetUserId },
+           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + targetUserId }],
+          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + targetUserId },
+           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + targetUserId }],
+        ]}
+      }
     ).catch(() => null);
 
     if (sent) setTimeout(() => ctx.deleteMessage(sent.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 8000);
@@ -656,7 +674,16 @@ async function banMember(ctx, chatId, targetUserId, reason, deleteMessages) {
       `━━━━━━━━━━━━━━━━━━\n` +
       `👤 [العضو](tg://user?id=${targetUserId})\n` +
       `📝 السبب: ${reason || 'غير محدد'}`,
-      { parse_mode: 'Markdown' }
+      {
+        parse_mode: 'Markdown',
+        reply_to_message_id: ctx.message?.reply_to_message?.message_id,
+        reply_markup: { inline_keyboard: [
+          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + targetUserId },
+           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + targetUserId }],
+          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + targetUserId },
+           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + targetUserId }],
+        ]}
+      }
     ).catch(() => null);
 
     if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 10000);
@@ -702,7 +729,16 @@ async function muteMember(ctx, chatId, targetUserId, durationMinutes) {
       `🔇 *تم إسكات العضو*\n` +
       `👤 [العضو](tg://user?id=${targetUserId})\n` +
       `⏱ المدة: ${durText}`,
-      { parse_mode: 'Markdown' }
+      {
+        parse_mode: 'Markdown',
+        reply_to_message_id: ctx.message?.reply_to_message?.message_id,
+        reply_markup: { inline_keyboard: [
+          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + targetUserId },
+           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + targetUserId }],
+          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + targetUserId },
+           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + targetUserId }],
+        ]}
+      }
     ).catch(() => null);
     if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 8000);
   } catch (e) {
@@ -727,7 +763,16 @@ async function unmuteMember(ctx, chatId, targetUserId) {
 
     const msg = await ctx.reply(
       `🔊 *تم تفعيل العضو*\n👤 [العضو](tg://user?id=${targetUserId})`,
-      { parse_mode: 'Markdown' }
+      {
+        parse_mode: 'Markdown',
+        reply_to_message_id: ctx.message?.reply_to_message?.message_id,
+        reply_markup: { inline_keyboard: [
+          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + targetUserId },
+           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + targetUserId }],
+          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + targetUserId },
+           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + targetUserId }],
+        ]}
+      }
     ).catch(() => null);
     if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 8000);
   } catch (e) {
