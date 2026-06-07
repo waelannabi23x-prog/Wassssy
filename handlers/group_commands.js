@@ -454,16 +454,39 @@ function setupGroupCommands(bot) {
     const target = ctx.message.reply_to_message?.from || ctx.from;
     const { get: dbGet } = require("../database/db");
     const member = await ctx.telegram.getChatMember(ctx.chat.id, target.id).catch(() => null);
-    const warns  = await dbGet("SELECT COUNT(*) as c FROM group_warnings WHERE chat_id=$1 AND user_id=$2", [ctx.chat.id, target.id]).catch(() => ({ c: 0 }));
-    const statusMap = { member:"عضو", administrator:"مشرف", creator:"مؤسس", restricted:"مقيّد", left:"غادر", kicked:"محظور" };
+    const warns  = await dbGet("SELECT COUNT(*) as c FROM group_warns WHERE chat_id=$1 AND user_id=$2", [ctx.chat.id, target.id]).catch(() => ({ c: 0 }));
+    const statusMap = { member:"عضو 👤", administrator:"مشرف 🛡️", creator:"مؤسس 👑", restricted:"مقيّد 🔒", left:"غادر 🚪", kicked:"محظور 🚫" };
     const name = [target.first_name, target.last_name].filter(Boolean).join(" ");
-    let txt = "👤 *معلومات العضو*\n\n";
-    txt += "📛 الاسم: " + name + "\n";
-    if (target.username) txt += "🔗 يوزر: @" + target.username + "\n";
-    txt += "🆔 ID: `" + target.id + "`\n";
-    txt += "📊 الحالة: " + (statusMap[member?.status] || "غير معروف") + "\n";
-    txt += "⚠️ التحذيرات: " + (warns?.c || 0) + "\n";
-    ctx.reply(txt, { parse_mode: "Markdown" }).catch(() => {});
+    const isAdm = ['administrator','creator'].includes(member?.status);
+    // join date من restricted info
+    const joinDate = member?.status === 'restricted' ? '' : '';
+    let txt = "👤 *معلومات العضو*
+
+";
+    txt += "🔴 الاسم: *" + name + "*
+";
+    if (target.username) txt += "🔗 يوزر: @" + target.username + "
+";
+    txt += "🆔 الرقم التعريفي: " + target.id + "
+";
+    if (target.last_name) txt += "👨‍👩 اسم العائلة: " + target.last_name + "
+";
+    txt += "👀 الحالة: " + (statusMap[member?.status] || "غير معروف") + "
+";
+    txt += "❗ الإنذارات: " + (warns?.c || 0) + "/3
+";
+    txt += "⬇️ الانضمام: " + (member?.status === 'left' ? 'غير متاح' : 'متاح') + "
+";
+    const kb = [];
+    if (!isAdm) {
+      kb.push([{ text: '❗ الإنذارات', callback_data: 'grp_warns_' + target.id }]);
+      kb.push([
+        { text: '🔇 كتم 🪃',   callback_data: 'grp_mute_1h_' + target.id },
+        { text: '🚫 حظر 🏹',   callback_data: 'grp_ban_' + target.id },
+      ]);
+      kb.push([{ text: '🎛 أذونات 📡', callback_data: 'grp_perms_' + target.id }]);
+    }
+    ctx.reply(txt, { parse_mode: "Markdown", reply_markup: kb.length ? { inline_keyboard: kb } : undefined }).catch(() => {});
   });
 
   // ══ /clean ══

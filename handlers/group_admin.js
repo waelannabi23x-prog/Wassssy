@@ -582,6 +582,14 @@ async function warnMember(ctx, chatId, targetUserId, reason) {
       actionText = `\n⚠️ *تحذير أخير!* — تحذير آخر = حظر فوري`;
     }
 
+    const _warnKb = count < MAX_WARNS ? [
+      [{ text: '❗ الإنذارات', callback_data: 'grp_warns_' + targetUserId },
+       { text: '🔇 كتم 🪃',   callback_data: 'grp_mute_1h_' + targetUserId }],
+      [{ text: '🚫 حظر 🏹',   callback_data: 'grp_ban_' + targetUserId },
+       { text: '🎛 أذونات 📡', callback_data: 'grp_perms_' + targetUserId }],
+    ] : [
+      [{ text: '🔓 رفع الحظر', callback_data: 'grp_unban_' + targetUserId }],
+    ];
     const msg = await ctx.reply(
       `⚠️ *تحذير رسمي*\n` +
       `━━━━━━━━━━━━━━━━━━\n` +
@@ -589,10 +597,10 @@ async function warnMember(ctx, chatId, targetUserId, reason) {
       `📝 السبب: ${(reason || 'مخالفة القواعد')}\n` +
       `🔢 التحذير رقم: *${count}/${MAX_WARNS}*` +
       actionText,
-      { parse_mode: 'Markdown' }
+      { parse_mode: 'Markdown', reply_markup: { inline_keyboard: _warnKb } }
     ).catch(() => null);
 
-    if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 15000);
+    if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 30000);
   } catch (e) {
     console.error('[Warn]', e.message);
   }

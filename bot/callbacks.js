@@ -371,7 +371,61 @@ module.exports.registerCallbacks = function(bot, deps) {
           }
         }
 
-                const _grpOk = data.startsWith('grp_') || data.startsWith('del_channel_')
+        
+        // ── أزرار info/warn السريعة ──
+        if (data.startsWith('grp_mute_1h_')) {
+          const uid2 = parseInt(data.replace('grp_mute_1h_', ''));
+          const { muteMember } = require('../handlers/group_admin');
+          await muteMember(ctx, ctx.chat.id, uid2, 60);
+          return ctx.answerCbQuery('🔇 تم الإسكات ساعة').catch(() => {});
+        }
+        if (data.startsWith('grp_ban_')) {
+          const uid2 = parseInt(data.replace('grp_ban_', ''));
+          await ctx.telegram.banChatMember(ctx.chat.id, uid2).catch(() => {});
+          await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '🔓 رفع الحظر', callback_data: 'grp_unban_' + uid2 }]] }).catch(() => {});
+          return ctx.answerCbQuery('🚫 تم الحظر').catch(() => {});
+        }
+        if (data.startsWith('grp_warns_')) {
+          const uid2 = parseInt(data.replace('grp_warns_', ''));
+          const { get: dbGet } = require('../database/db');
+          const w = await dbGet('SELECT COUNT(*) as c FROM group_warns WHERE chat_id=$1 AND user_id=$2', [ctx.chat.id, uid2]).catch(() => ({ c:0 }));
+          return ctx.answerCbQuery('❗ الإنذارات: ' + (w?.c||0) + '/3', { show_alert: true }).catch(() => {});
+        }
+        if (data.startsWith('grp_perms_')) {
+          const uid2 = parseInt(data.replace('grp_perms_', ''));
+          const member = await ctx.telegram.getChatMember(ctx.chat.id, uid2).catch(() => null);
+          const p = member?.can_send_messages !== false;
+          const txt = '🎛 *أذونات العضو*\n\n' +
+            (p ? '✅' : '❌') + ' الرسائل النصية\n' +
+            (member?.can_send_media_messages !== false ? '✅' : '❌') + ' الوسائط\n' +
+            (member?.can_send_polls !== false ? '✅' : '❌') + ' الاستطلاعات\n' +
+            (member?.can_add_web_page_previews !== false ? '✅' : '❌') + ' معاينة الروابط\n' +
+            (member?.can_invite_users !== false ? '✅' : '❌') + ' دعوة أعضاء\n' +
+            (member?.can_pin_messages ? '✅' : '❌') + ' تثبيت الرسائل\n';
+          const kb = [[
+            { text: p ? '🔇 سحب الكلام' : '🔊 إعطاء الكلام',
+              callback_data: (p ? 'grp_restrict_' : 'grp_unrestrict_') + uid2 }
+          ]];
+          await ctx.reply(txt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: kb } }).catch(() => {});
+          return ctx.answerCbQuery('').catch(() => {});
+        }
+        if (data.startsWith('grp_restrict_')) {
+          const uid2 = parseInt(data.replace('grp_restrict_', ''));
+          await ctx.telegram.restrictChatMember(ctx.chat.id, uid2, {
+            permissions: { can_send_messages: false, can_send_media_messages: false, can_send_polls: false }
+          }).catch(() => {});
+          await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '🔊 إعطاء الكلام', callback_data: 'grp_unrestrict_' + uid2 }]] }).catch(() => {});
+          return ctx.answerCbQuery('🔇 تم سحب الكلام').catch(() => {});
+        }
+        if (data.startsWith('grp_unrestrict_')) {
+          const uid2 = parseInt(data.replace('grp_unrestrict_', ''));
+          await ctx.telegram.restrictChatMember(ctx.chat.id, uid2, {
+            permissions: { can_send_messages: true, can_send_media_messages: true, can_send_polls: true, can_add_web_page_previews: true }
+          }).catch(() => {});
+          await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '🔇 سحب الكلام', callback_data: 'grp_restrict_' + uid2 }]] }).catch(() => {});
+          return ctx.answerCbQuery('🔊 تم إعطاء الكلام').catch(() => {});
+        }
+        const _grpOk = data.startsWith('grp_') || data.startsWith('del_channel_')
           || data.startsWith('gs_') || data.startsWith('grp_unban_')
           || data.startsWith('grp_unmute_') || data === 'check_subscription'
           || data === 'refresh_channels' || data.startsWith('mute_all_')
@@ -381,7 +435,10 @@ module.exports.registerCallbacks = function(bot, deps) {
           || data.startsWith('ml_') || data.startsWith('gp_')
           || data.startsWith('grp_register_') || data.startsWith('grp_reg_btn_')
           || data === 'mb_panel' || data.startsWith('gp_million') || data.startsWith('gp_guess')
-          || data.startsWith('mlr_') || data.startsWith('mar_');
+          || data.startsWith('mlr_') || data.startsWith('mar_')
+          || data.startsWith('grp_mute_1h_') || data.startsWith('grp_ban_')
+          || data.startsWith('grp_warns_') || data.startsWith('grp_perms_')
+          || data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_');
         if (!_grpOk)
           return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }
