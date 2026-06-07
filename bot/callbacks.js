@@ -230,8 +230,8 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'bdl_',        fn: (ctx, d) => { const p = d.split('_'); return browse.sendBundle(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }},
     { p: 'fl_',         fn: (ctx, d) => { const p = d.split('_'); return browse.sendFile(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }},
     { p: 'ml_',         fn: (ctx)    => million.handleCallback(bot, ctx) },
-    { p: 'mlr_',        fn: (ctx, d) => millionaire.handleCallback(ctx, d) },
-    { p: 'mar_',        fn: (ctx, d) => millionaire.handleCallback(ctx, d) },
+    { p: 'mlr_',        fn: (ctx, d) => millionGame.handleCallback(ctx, d) },
+    { p: 'mar_',        fn: (ctx, d) => millionGame.handleCallback(ctx, d) },
     { p: 'share_',      fn: (ctx)    => { const { handleShare } = require('../handlers/share_summary'); return handleShare(ctx); } },
     { p: 'ct_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showFiles(ctx, p[1], p[2], p[3], p[4], p[5]); }},
     { p: 'sb_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showCategories(ctx, p[1], p[2], p[3], p[4]); }},
@@ -360,7 +360,7 @@ module.exports.registerCallbacks = function(bot, deps) {
         if (data.startsWith('ml_') || data.startsWith('ma_') ||
             data.startsWith('mlr_') || data.startsWith('mar_')) {
           const handler = data.startsWith('mlr_') || data.startsWith('mar_')
-            ? (d) => millionaire.handleCallback(ctx, d)
+            ? (d) => millionGame.handleCallback(ctx, d)
             : () => millionGame.handleCallback ? millionGame.handleCallback(ctx, data) : null;
           return handler(data);
         }
