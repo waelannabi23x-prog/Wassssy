@@ -429,6 +429,7 @@ async function beginGame(telegram, chatId) {
 
   // Register players in DB
   for (const p of game.players.values()) {
+    if (!p.id) continue; // تجاهل لاعب بدون ID
     await run(
       `INSERT INTO million_players(session_id,user_id,first_name,username)
        VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
