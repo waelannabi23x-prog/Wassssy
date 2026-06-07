@@ -354,8 +354,24 @@ function setupGroupCommands(bot) {
   bot.command(["العاب", "games"], async ctx => {
     if (!isGroup(ctx)) return;
     delCmd(ctx);
-    const msg = await ctx.reply("🎮 الالعاب:\n🎰 مليون — اكتب مليون\n📸 خمن — اكتب خمن\n💳 فلوسي | انشاء حساب | فارسي | rip", { parse_mode: "Markdown" }).catch(() => null);
-    if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(() => {}), 60000);
+    const { get: dbG } = require('../database/db');
+    const qc = await dbG('SELECT COUNT(*) AS c FROM million_questions WHERE is_active=1').catch(() => ({ c: 0 }));
+    const qs = qc?.c || 0;
+    const text =
+      '🎮 *ألعاب القروب*\n━━━━━━━━━━━━━━━━━━━━\n\n' +
+      '🏆 *من سيربح المليون* — ' + qs + ' سؤال — اكتب *مليون*\n' +
+      '📸 *خمن الصورة* — اكتب *خمن*\n' +
+      '🎲 *قلب العملة* — /flip [مبلغ]\n' +
+      '🦹 *السرقة* — رد + /rob\n' +
+      '🎁 *مكافأة يومية* — /daily\n' +
+      '🏅 *المتصدرون* — /leaderboard';
+    const rows = [
+      [{ text: '🏆 مليون', callback_data: 'games_start_million' }, { text: '📸 خمن', callback_data: 'games_start_guess' }],
+      [{ text: '🎲 /flip', callback_data: 'games_start_flip' }, { text: '🏦 حسابي', callback_data: 'games_bank' }],
+      [{ text: '🎁 /daily', callback_data: 'games_daily' }, { text: '🏅 متصدرون', callback_data: 'games_leaderboard' }],
+    ];
+    const msg = await ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } }).catch(() => null);
+    if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(() => {}), 120000);
   });
 
   // ══════════════════════════════════════════
@@ -374,7 +390,16 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   // Callbacks من القروب (ban/unban/mute من الأزرار)
   // ══════════════════════════════════════════
-  bot.action(/^grp_unban_(\d+)$/, async ctx => {
+
+  // ══════════════════════════════════════════
+  // 💰 أوامر البنك في القروب
+  // ══════════════════════════════════════════
+  bot.command(['daily','يومي'], async ctx => { if(!isGroup(ctx)) return; const {handleDaily}=require('./bank_games'); return handleDaily(ctx).catch(()=>{}); });
+  bot.command(['flip','عملة'], async ctx => { if(!isGroup(ctx)) return; const {handleFlip}=require('./bank_games'); return handleFlip(ctx).catch(()=>{}); });
+  bot.command(['rob','سرقة'], async ctx => { if(!isGroup(ctx)) return; const {handleRob}=require('./bank_games'); return handleRob(ctx).catch(()=>{}); });
+  bot.command(['leaderboard','متصدرين','lb'], async ctx => { if(!isGroup(ctx)) return; const {handleLeaderboard}=require('./bank_games'); return handleLeaderboard(ctx).catch(()=>{}); });
+
+    bot.action(/^grp_unban_(\d+)$/, async ctx => {
     if (!await isTgAdmin(ctx)) return ctx.answerCbQuery('🚫').catch(() => {});
     const userId = parseInt(ctx.match[1]);
     try {
@@ -393,34 +418,6 @@ function setupGroupCommands(bot) {
       ctx.answerCbQuery('✅ رُفع الإسكات').catch(() => {});
       ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
     } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
-  });
-
-  // ══ /pin ══
-  bot.command("pin", async ctx => {
-    if (!isGroup(ctx)) return;
-    if (!await isTgAdmin(ctx)) return ctx.reply("🚫 للمشرفين فقط").catch(() => {});
-    delCmd(ctx);
-    const r = ctx.message.reply_to_message;
-    if (!r) return ctx.reply("↩️ رد على الرسالة التي تريد تثبيتها").catch(() => {});
-    try {
-      await ctx.telegram.pinChatMessage(ctx.chat.id, r.message_id);
-      const m = await ctx.reply("📌 تم تثبيت الرسالة").catch(() => null);
-      if (m) setTimeout(() => ctx.deleteMessage(m.message_id).catch(() => {}), 5000);
-    } catch(e) { ctx.reply("❌ فشل: " + e.message).catch(() => {}); }
-  });
-
-  // ══ /unpin ══
-  bot.command("unpin", async ctx => {
-    if (!isGroup(ctx)) return;
-    if (!await isTgAdmin(ctx)) return ctx.reply("🚫 للمشرفين فقط").catch(() => {});
-    delCmd(ctx);
-    try {
-      const r = ctx.message.reply_to_message;
-      if (r) await ctx.telegram.unpinChatMessage(ctx.chat.id, r.message_id);
-      else   await ctx.telegram.unpinAllChatMessages(ctx.chat.id);
-      const m = await ctx.reply("✅ تم إلغاء التثبيت").catch(() => null);
-      if (m) setTimeout(() => ctx.deleteMessage(m.message_id).catch(() => {}), 5000);
-    } catch(e) { ctx.reply("❌ فشل: " + e.message).catch(() => {}); }
   });
 
   // ══ /promote ══
@@ -513,7 +510,7 @@ function setupGroupCommands(bot) {
     const isAdm = await isTgAdmin(ctx);
     let txt = "📋 *أوامر البوت*\n\n👥 *للجميع:*\n`/info` معلومات عضو\n`/rules` القواعد\n`مليون` لعبة المليون\n`خمن` لعبة التخمين\n";
     if (isAdm) {
-      txt += "\n🛡️ *للمشرفين:*\n`/ban` `/unban` `/kick`\n`/mute 10m` `/unmute`\n`/warn` `/warns` `/clearwarns`\n`/pin` `/unpin`\n`/promote` `/demote`\n`/info` `/clean 20`\n`/mstop`\n`/tagall` `/stats`\n";
+      txt += "\n🛡️ *للمشرفين:*\n`/ban` `/unban` `/kick`\n`/mute 10m` `/unmute`\n`/warn` `/warns` `/unwarn`\n`/pin` `/unpin`\n`/promote` `/demote`\n`/info` `/clean 20`\n`/mstop` `/mstats`\n`/tagall` `/stats`\n";
     }
     const m = await ctx.reply(txt, { parse_mode: "Markdown" }).catch(() => null);
     if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 30000);

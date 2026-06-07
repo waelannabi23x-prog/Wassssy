@@ -678,6 +678,12 @@ async function endGame(telegram, chatId, reason) {
     try {
       const bank = require('./bank');
       await bank.addWinnings(winner.id, winner.name, winner.username, winner.prize, 'جائزة من سيربح المليون');
+      try {
+        const {awardPoints}=require('../database/points');
+        const xg=Math.min(Math.max(1,Math.floor(winner.prize/10000)),50);
+        for(let _i=0;_i<xg;_i++) await awardPoints(winner.id,'rating').catch(()=>{});
+        logger.info('[Million] +'+xg+' XP => '+winner.id);
+      } catch(_) {}
       // reply على رسالة صاحب اللعبة (اللي كتب مليون)
       try {
         const replyOpts = game.hostMsgId ? { reply_to_message_id: game.hostMsgId } : {};

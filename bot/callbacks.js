@@ -1,3 +1,4 @@
+const { handleBankGamesCallback } = require('../handlers/bank_games');
 'use strict';
 const { handleSettingsCallback } = require('../handlers/group_commands');
 const browse      = require('../handlers/browse');
