@@ -42,26 +42,46 @@ async function concurrentBroadcast(bot,chatId,msgId,ids,txt,opt={}){if(!bot)retu
 }
 async function mainMenu(ctx){
   const [specs0,files0]=await Promise.all([content.getSpecs(),filesDb.totalFiles()]);
-  const text='🛠 *لوحة الإدارة*\n\n📚 التخصصات: *'+specs0.length+'*\n📁 الملفات: *'+files0+'*\n🔧 الصيانة: *'+(global.maintenanceMode?'🔴 مفعّل':'🟢 متوقف')+'*';
-  const rows=[[btn('📂 المحتوى','mg_content')],[btn('📊 الإحصائيات','mg_analytics'),btn('📜 السجلات','mg_logs')]];
+  const text=
+    '🛠 *لوحة الإدارة*\n' +
+    '━━━━━━━━━━━━━━━━━━━━\n\n' +
+    '📚 التخصصات: *'+specs0.length+'*\n' +
+    '📁 الملفات: *'+files0+'*\n' +
+    '🔧 الصيانة: *'+(global.maintenanceMode?'🔴 مفعّل':'🟢 متوقف')+'*';
+
+  const rows = [];
+
+  // ── المحتوى والإحصائيات ──
+  rows.push([btn('📂 المحتوى','mg_content'), btn('📊 الإحصائيات','mg_analytics')]);
+  rows.push([btn('📜 السجلات','mg_logs'), btn('🗑 المحذوفات','mg_trash')]);
+
   if(isOwner(ctx.uid)){
-    rows.push([btn('📢 بث','mg_broadcast'),btn('👥 المستخدمون','mg_users')]);
-    rows.push([btn('👑 الإداريون','mg_admins')]);
+    // ── المستخدمون ──
+    rows.push([btn('👥 المستخدمون','mg_users'), btn('👑 الإداريون','mg_admins')]);
+
+    // ── القروبات ──
     rows.push([btn('👥 القروبات','grp_main')]);
-    rows.push([btn('💾 نسخ احتياطي','mg_backup'),btn(global.maintenanceMode?'🟢 إيقاف الصيانة':'🔴 وضع الصيانة','mg_maint')]);
-    rows.push([btn('♻️ استعادة','mg_restore'),btn('🗑 سلة المحذوفات','mg_trash')]);
-    rows.push([btn('🔔 إشعار للمستخدمين','mg_notify')]);
+
+    // ── البث والإشعارات ──
+    rows.push([btn('📢 بث للكل','mg_broadcast'), btn('🔔 إشعار','mg_notify')]);
+    rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp'), btn('📨 الرسائل','mg_msgs')]);
+
+    // ── الألعاب والبنك ──
+    rows.push([btn('🎮 الألعاب','mb_panel'), btn('🏦 البنك','mg_bank_panel')]);
+
+    // ── الردود والقنوات ──
+    rows.push([btn('🤖 الردود التلقائية','mg_auto_replies'), btn('📢 القنوات','mg_channels_menu')]);
+
+    // ── النظام ──
+    rows.push([btn('💾 نسخ احتياطي','mg_backup'), btn('♻️ استعادة','mg_restore')]);
+    rows.push([btn(global.maintenanceMode?'🟢 إيقاف الصيانة':'🔴 الصيانة','mg_maint'), btn('🚩 البلاغات','mg_reports')]);
+
     if(process.env.CHANNEL_ID) rows.push([btn('📢 نشر في القناة','mg_post_channel')]);
-    rows.push([btn('🚩 البلاغات','mg_reports'),btn('📨 نظام الرسائل','mg_msgs')]);
-    rows.push([btn('📢 القنوات والإعلانات','mg_channels_menu')]);
-    rows.push([btn('🤖 الردود التلقائية','mg_auto_replies')]);
-    rows.push([btn('🎮 إعدادات الألعاب','mg_games_settings')]);
-    rows.push([btn('🎓 إشعار لتخصص','mg_notify_sp')]);
-  }
-  if(isOwner(ctx.uid)){
+
     const appVisible = global._appPublic || false;
-    rows.push([btn('📱 فتح Mini App','mg_open_app'), btn(appVisible ? '👁 ظاهر للكل' : '🔒 مخفي عن المستخدمين', 'mg_toggle_app')]);
+    rows.push([btn('📱 Mini App','mg_open_app'), btn(appVisible?'👁 ظاهر':'🔒 مخفي','mg_toggle_app')]);
   }
+
   rows.push([btn('⚙️ إعدادات البوت','mg_bot_settings')]);
   rows.push([btn('🏠 القائمة الرئيسية','main_menu')]);
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
@@ -568,6 +588,45 @@ async function handleCallback(ctx,data){
   if(data==='mg_admins') return showAdmins(ctx);
   if(data==='mg_trash') return showTrash(ctx);
   if(data==='mg_search_prompt'){setState(uid,{type:'mg_admin_search'});return ctx.reply('🔍 بحث:\nأدخل اسم ملف أو مستخدم:');}
+  if(data==='mg_bank_panel'){
+    try {
+      const { all } = require('../database/db');
+      const [accounts, txCount] = await Promise.all([
+        all('SELECT COUNT(*) as cnt FROM bank_accounts').catch(()=>[{cnt:0}]),
+        all('SELECT COUNT(*) as cnt FROM bank_transactions').catch(()=>[{cnt:0}]),
+      ]);
+      const text =
+        '🏦 *لوحة البنك*\n' +
+        '━━━━━━━━━━━━━━━━━━━━\n\n' +
+        '👤 الحسابات: *' + (accounts[0]?.cnt||0) + '*\n' +
+        '💸 المعاملات: *' + (txCount[0]?.cnt||0) + '*\n\n' +
+        '⚙️ اختر ما تريد:';
+      const rows = [
+        [btn('👤 أغنى المستخدمين','mg_bank_top')],
+        [btn('💸 آخر المعاملات','mg_bank_txs')],
+        [btn('➕ إضافة رصيد','mg_bank_add')],
+        [back('mg_menu')[0]],
+      ];
+      return eos(ctx, text, {parse_mode:'Markdown', ...build(rows)});
+    } catch(e) { return ctx.answerCbQuery('❌ ' + e.message, {show_alert:true}).catch(()=>{}); }
+  }
+
+  if(data==='mg_bank_top'){
+    const { all } = require('../database/db');
+    const top = await all('SELECT first_name, balance FROM bank_accounts ORDER BY balance DESC LIMIT 10').catch(()=>[]);
+    let text = '🏆 *أغنى المستخدمين*\n━━━━━━━━━━━━━━━━━━━━\n\n';
+    top.forEach((u,i) => { text += (i+1) + '. ' + (u.first_name||'مجهول') + ' — ' + Number(u.balance).toLocaleString('en') + ' $\n'; });
+    return eos(ctx, text||'لا يوجد', {parse_mode:'Markdown', ...build([back('mg_bank_panel')])});
+  }
+
+  if(data==='mg_bank_txs'){
+    const { all } = require('../database/db');
+    const txs = await all('SELECT * FROM bank_transactions ORDER BY created_at DESC LIMIT 10').catch(()=>[]);
+    let text = '💸 *آخر المعاملات*\n━━━━━━━━━━━━━━━━━━━━\n\n';
+    txs.forEach(tx => { text += (tx.type==='win'?'🏆':'💸') + ' ' + Number(tx.amount).toLocaleString('en') + ' $ — ' + (tx.note||tx.type) + '\n'; });
+    return eos(ctx, text||'لا يوجد', {parse_mode:'Markdown', ...build([back('mg_bank_panel')])});
+  }
+
   if(data==='mg_notify'){setState(uid,{type:'mg_msg_user_id'});return ctx.reply('ID: ارسل ID المستخدم',{parse_mode:'Markdown',...build([back('mg_menu')])});}
   if(data.startsWith('mg_ng_sp_')){const spId=data.replace('mg_ng_sp_','');setState(uid,{type:'mg_notify_groups_msg',spId});return ctx.reply('📝 رسالة الإشعار لـ '+(spId==='0'?'كل القروبات':'التخصص')+':\n_(أو /cancel)_',{parse_mode:'Markdown'});}
   if(data.startsWith('mg_notify_sp_')&&!data.startsWith('mg_notify_sp_msg')){const spId=data.replace('mg_notify_sp_','');setState(uid,{type:'mg_notify_sp_msg',spId});return ctx.reply('📝 رسالة الإشعار:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
