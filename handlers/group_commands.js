@@ -349,6 +349,16 @@ function setupGroupCommands(bot) {
   });
 
   // ══════════════════════════════════════════
+  // 🎮 كومند الألعاب
+  // ══════════════════════════════════════════
+  bot.command(["العاب", "games"], async ctx => {
+    if (!isGroup(ctx)) return;
+    delCmd(ctx);
+    const msg = await ctx.reply("🎮 الالعاب:\n🎰 مليون — اكتب مليون\n📸 خمن — اكتب خمن\n💳 فلوسي | انشاء حساب | فارسي | rip", { parse_mode: "Markdown" }).catch(() => null);
+    if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(() => {}), 60000);
+  });
+
+  // ══════════════════════════════════════════
   // 🎮 Million Battle
   // ══════════════════════════════════════════
   bot.command('million', async ctx => {
