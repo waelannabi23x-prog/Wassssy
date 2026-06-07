@@ -384,7 +384,6 @@ function setupGroupCommands(bot) {
       ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
     } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
   });
-}
 
 // ══════════════════════════════════════════
 // ⚙️ لوحة إعدادات القروب الشاملة
@@ -491,5 +490,5 @@ async function handleSettingsCallback(ctx, data) {
     if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 30000);
   });
 
-
+}
 module.exports = { setupGroupCommands, handleSettingsCallback, showGroupSettings };
