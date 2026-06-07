@@ -18,6 +18,21 @@
  */
 
 const { run, all, get, runSilent } = require('../database/db');
+
+// ── تتبع رسائل اللعبة للحذف ──
+const _gameMsgs = new Map();
+function trackGameMsg(chatId, msgId) {
+  if (!msgId) return;
+  const cid = String(chatId);
+  if (!_gameMsgs.has(cid)) _gameMsgs.set(cid, []);
+  _gameMsgs.get(cid).push(msgId);
+}
+async function deleteGameMsgs(telegram, chatId, keepId) {
+  const cid = String(chatId);
+  const ids = (_gameMsgs.get(cid) || []).filter(id => id !== keepId);
+  await Promise.allSettled(ids.map(id => telegram.deleteMessage(chatId, id).catch(() => {})));
+  _gameMsgs.delete(cid);
+}
 const logger = require('../utils/logger');
 
 /* ═══════════════════════════════════════════════════════════════
@@ -1060,7 +1075,7 @@ async function handleMillionCallback(ctx, data) {
   const uid    = String(ctx.from?.id);
 
   // ── إجابة السؤال ma_LETTER_SESSION ──────────────────────────
-  if (data.startsWith('ma_')) {
+  if (data.startsWith('mar_')) {
     const parts  = data.split('_');
     const letter = parts[1];
     const sid    = parseInt(parts[2]);
@@ -1080,7 +1095,7 @@ async function handleMillionCallback(ctx, data) {
   }
 
   // ── ml_forcestart ─────────────────────────────────────────────
-  if (data === 'ml_forcestart') {
+  if (data === 'mlr_forcestart') {
     ctx.answerCbQuery('🚀 جاري الإطلاق!').catch(() => {});
     const game = getGame(chatId);
     if (!game || game.status !== 'waiting') return;
@@ -1089,7 +1104,7 @@ async function handleMillionCallback(ctx, data) {
   }
 
   // ── ml_cancel ─────────────────────────────────────────────────
-  if (data === 'ml_cancel') {
+  if (data === 'mlr_cancel') {
     ctx.answerCbQuery('🔴 تم الإلغاء').catch(() => {});
     const game = getGame(chatId);
     if (!game) return;
@@ -1101,7 +1116,7 @@ async function handleMillionCallback(ctx, data) {
   }
 
   // ── ml_howto ──────────────────────────────────────────────────
-  if (data === 'ml_howto') {
+  if (data === 'mlr_howto') {
     ctx.answerCbQuery('').catch(() => {});
     return ctx.reply(
       '📖 *كيف تلعب من سيربح المليون؟*\n━━━━━━━━━━━━━━━━━━\n\n' +
@@ -1116,13 +1131,13 @@ async function handleMillionCallback(ctx, data) {
   }
 
   // ── ml_ranking ────────────────────────────────────────────────
-  if (data === 'ml_ranking') {
+  if (data === 'mlr_ranking') {
     ctx.answerCbQuery('').catch(() => {});
     return showLeaderboard(ctx).catch(() => {});
   }
 
   // ── ml_fifty / ml_audience / ml_call / ml_skip ───────────────
-  if (data.startsWith('ml_')) {
+  if (data.startsWith('mlr_')) {
     const lifelineKey = data.replace('ml_', '');
     const game = getGame(chatId);
     if (!game || !game.players.has(uid)) {
