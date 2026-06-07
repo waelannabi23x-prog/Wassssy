@@ -27,7 +27,7 @@ exports.createAccount = async (ctx) => {
   if (existing) {
     return ctx.reply(
       '🏦 *حسابك البنكي موجود!*\n\n💰 رصيدك: *' + fmt(existing.balance) + '*\n\nاكتب *فلوسي* لعرض تفاصيل حسابك.',
-      { parse_mode: 'Markdown' }
+      { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }
     ).catch(() => {});
   }
   await run('INSERT INTO bank_accounts(user_id, first_name, username, balance) VALUES($1,$2,$3,0)',
@@ -38,7 +38,7 @@ exports.createAccount = async (ctx) => {
     '🆔 رقم الحساب: ' + uid + '\n' +
     '💰 الرصيد الابتدائي: *0 $*\n\n' +
     '💡 ابدأ بالعب لكسب المال!',
-    { parse_mode: 'Markdown' }
+    { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }
   ).catch(() => {});
 };
 
@@ -52,7 +52,7 @@ exports.showBalance = async (ctx) => {
   if (!acc) {
     return ctx.reply(
       isSelf ? '❌ ليس لديك حساب!\n\nاكتب *انشاء حساب* لفتح حساب.' : '❌ هذا المستخدم ليس لديه حساب.',
-      { parse_mode: 'Markdown' }
+      { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }
     ).catch(() => {});
   }
   const txs = await all(
@@ -79,7 +79,7 @@ exports.transfer = async (ctx) => {
   const replyTo = ctx.message?.reply_to_message;
   const text = ctx.message?.text || '';
   if (!replyTo) {
-    return ctx.reply('📌 *كيف تحول؟*\n\nرد على رسالة المستخدم واكتب:\nفارسي 500', { parse_mode: 'Markdown' }).catch(() => {});
+    return ctx.reply('📌 *كيف تحول؟*\n\nرد على رسالة المستخدم واكتب:\nفارسي 500', { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }).catch(() => {});
   }
   const toId = replyTo.from?.id;
   if (toId === uid) return ctx.reply('❌ لا تستطيع التحويل لنفسك!').catch(() => {});
@@ -88,8 +88,8 @@ exports.transfer = async (ctx) => {
     return ctx.reply('❌ أدخل مبلغاً صحيحاً (الحد الأدنى ' + fmt(MIN_TRANSFER) + ')').catch(() => {});
   }
   const fromAcc = await getAccount(uid);
-  if (!fromAcc) return ctx.reply('❌ ليس لديك حساب! اكتب *انشاء حساب*', { parse_mode: 'Markdown' }).catch(() => {});
-  if (fromAcc.balance < amount) return ctx.reply('❌ رصيدك غير كافٍ! رصيدك: *' + fmt(fromAcc.balance) + '*', { parse_mode: 'Markdown' }).catch(() => {});
+  if (!fromAcc) return ctx.reply('❌ ليس لديك حساب! اكتب *انشاء حساب*', { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }).catch(() => {});
+  if (fromAcc.balance < amount) return ctx.reply('❌ رصيدك غير كافٍ! رصيدك: *' + fmt(fromAcc.balance) + '*', { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }).catch(() => {});
   const toAcc = await ensureAccount(toId, replyTo.from?.first_name, replyTo.from?.username);
   await run('UPDATE bank_accounts SET balance = balance - $1 WHERE user_id=$2', [amount, uid]);
   await run('UPDATE bank_accounts SET balance = balance + $1 WHERE user_id=$2', [amount, toId]);
@@ -101,7 +101,7 @@ exports.transfer = async (ctx) => {
   ).catch(() => {});
   return ctx.reply(
     '✅ *تم التحويل!*\n\n💸 أرسلت *' + fmt(amount) + '* لـ ' + (replyTo.from?.first_name || 'المستخدم') + '\n💳 رصيدك المتبقي: *' + fmt(Number(fromAcc.balance) - amount) + '*',
-    { parse_mode: 'Markdown' }
+    { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }
   ).catch(() => {});
 };
 
@@ -111,18 +111,18 @@ exports.loan = async (ctx) => {
   const replyTo = ctx.message?.reply_to_message;
   const text = ctx.message?.text || '';
   if (!replyTo) {
-    return ctx.reply('📌 *كيف تقرض؟*\n\nرد على رسالة المستخدم واكتب:\nrip 500\n\n⚠️ يجب أن يكون رصيدك فوق ' + fmt(MIN_LOAN_BALANCE), { parse_mode: 'Markdown' }).catch(() => {});
+    return ctx.reply('📌 *كيف تقرض؟*\n\nرد على رسالة المستخدم واكتب:\nrip 500\n\n⚠️ يجب أن يكون رصيدك فوق ' + fmt(MIN_LOAN_BALANCE), { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }).catch(() => {});
   }
   const toId = replyTo.from?.id;
   if (toId === uid) return ctx.reply('❌ لا تستطيع إقراض نفسك!').catch(() => {});
   const amount = parseFloat(text.replace(/rip/gi, '').trim());
   if (isNaN(amount) || amount <= 0) {
-    return ctx.reply('❌ أدخل مبلغاً صحيحاً\nمثال: rip 500', { parse_mode: 'Markdown' }).catch(() => {});
+    return ctx.reply('❌ أدخل مبلغاً صحيحاً\nمثال: rip 500', { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }).catch(() => {});
   }
   const fromAcc = await getAccount(uid);
-  if (!fromAcc) return ctx.reply('❌ ليس لديك حساب! اكتب *انشاء حساب*', { parse_mode: 'Markdown' }).catch(() => {});
-  if (fromAcc.balance < MIN_LOAN_BALANCE) return ctx.reply('❌ يجب أن يكون رصيدك فوق *' + fmt(MIN_LOAN_BALANCE) + '* للإقراض!', { parse_mode: 'Markdown' }).catch(() => {});
-  if (amount > fromAcc.balance) return ctx.reply('❌ لا تستطيع إقراض أكثر من رصيدك *' + fmt(fromAcc.balance) + '*', { parse_mode: 'Markdown' }).catch(() => {});
+  if (!fromAcc) return ctx.reply('❌ ليس لديك حساب! اكتب *انشاء حساب*', { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }).catch(() => {});
+  if (fromAcc.balance < MIN_LOAN_BALANCE) return ctx.reply('❌ يجب أن يكون رصيدك فوق *' + fmt(MIN_LOAN_BALANCE) + '* للإقراض!', { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }).catch(() => {});
+  if (amount > fromAcc.balance) return ctx.reply('❌ لا تستطيع إقراض أكثر من رصيدك *' + fmt(fromAcc.balance) + '*', { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }).catch(() => {});
   const toAcc = await ensureAccount(toId, replyTo.from?.first_name, replyTo.from?.username);
   await run('UPDATE bank_accounts SET balance = balance - $1 WHERE user_id=$2', [amount, uid]);
   await run('UPDATE bank_accounts SET balance = balance + $1 WHERE user_id=$2', [amount, toId]);
@@ -135,7 +135,7 @@ exports.loan = async (ctx) => {
   ).catch(() => {});
   return ctx.reply(
     '✅ *تم القرض!*\n\n🤝 أقرضت *' + fmt(amount) + '* لـ ' + (replyTo.from?.first_name || 'المستخدم') + '\n💳 رصيدك المتبقي: *' + fmt(Number(fromAcc.balance) - amount) + '*',
-    { parse_mode: 'Markdown' }
+    { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }
   ).catch(() => {});
 };
 
@@ -153,7 +153,7 @@ exports.addWinnings = async (userId, firstName, username, amount, note) => {
 exports.showRip = async (ctx) => {
   const uid = ctx.from.id;
   const acc = await getAccount(uid);
-  if (!acc) return ctx.reply('❌ ما عندك حساب بنكي! اكتب *انشاء حساب*', { parse_mode: 'Markdown' }).catch(() => {});
+  if (!acc) return ctx.reply('❌ ما عندك حساب بنكي! اكتب *انشاء حساب*', { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }).catch(() => {});
   const { all } = require('../database/db');
   const txs = await all('SELECT * FROM bank_transactions WHERE to_id=$1 OR from_id=$1 ORDER BY created_at DESC LIMIT 10', [uid]).catch(() => []);
   let text = '🏦 *حسابك البنكي*' + String.fromCharCode(10);
