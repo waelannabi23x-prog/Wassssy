@@ -144,7 +144,7 @@ function safeZoneText(level) {
 function lifelineButtons(lifelines) {
   const btns = [];
   for (const [k, v] of Object.entries(LIFELINES)) {
-    if (lifelines[k]) btns.push({ text: v.emoji + ' ' + v.name, callback_data: 'ml_' + k });
+    if (lifelines[k]) btns.push({ text: v.emoji + ' ' + v.name, callback_data: 'mlr_' + k });
   }
   return btns;
 }
@@ -226,7 +226,7 @@ function buildAnswerKeyboard(game, q, hiddenOptions) {
     for (let j = i; j < i + 2 && j < opts.length; j++) {
       const o = opts[j];
       if (!hidden.includes(o.l)) {
-        row.push({ text: o.txt.substring(0, 40), callback_data: `ma_${o.l}_${game.sessionId}` });
+        row.push({ text: o.txt.substring(0, 40), callback_data: `mar_${o.l}_${game.sessionId}` });
       }
     }
     if (row.length) rows.push(row);
@@ -316,9 +316,9 @@ async function startJoinPhase(ctx) {
     parse_mode: 'Markdown',
     reply_markup: {
       inline_keyboard: [
-        [{ text: '🚀 ابدأ', callback_data: 'ml_forcestart' }],
-        [{ text: '📊 الترتيب', callback_data: 'ml_ranking' }, { text: '❓ كيف العب', callback_data: 'ml_howto' }],
-        [{ text: '🔴 إلغاء', callback_data: 'ml_cancel' }],
+        [{ text: '🚀 ابدأ', callback_data: 'mlr_forcestart' }],
+        [{ text: '📊 الترتيب', callback_data: 'mlr_ranking' }, { text: '❓ كيف العب', callback_data: 'mlr_howto' }],
+        [{ text: '🔴 إلغاء', callback_data: 'mlr_cancel' }],
       ],
     },
   }).catch(() => null);
@@ -372,8 +372,8 @@ async function joinGame(ctx) {
       parse_mode: 'Markdown',
       reply_markup: {
         inline_keyboard: [[
-          { text: `✋ انضم (${count})`, callback_data: 'ml_join' },
-          { text: '▶️ ابدأ الآن', callback_data: 'ml_forcestart' },
+          { text: `✋ انضم (${count})`, callback_data: 'mlr_join' },
+          { text: '▶️ ابدأ الآن', callback_data: 'mlr_forcestart' },
         ]],
       },
     }
@@ -954,8 +954,8 @@ function register(bot) {
   bot.on('callback_query', async (ctx, next) => {
     const d = ctx.callbackQuery?.data || '';
 
-    if (d === 'ml_join')        return joinGame(ctx);
-    if (d === 'ml_forcestart') {
+    if (d === 'mlr_join')        return joinGame(ctx);
+    if (d === 'mlr_forcestart') {
       if (!ctx.isAdmin && !ctx.isOwner) return ctx.answerCbQuery('🚫 للأدمن فقط.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       const game = getGame(ctx.chat.id);
       if (!game || game.status !== 'waiting') return ctx.answerCbQuery('⚠️').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
@@ -963,7 +963,7 @@ function register(bot) {
       await ctx.answerCbQuery('▶️ بدأت اللعبة!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       return beginGame(ctx.telegram, ctx.chat.id);
     }
-    if (d === 'ml_players') {
+    if (d === 'mlr_players') {
       const game = getGame(ctx.chat.id);
       if (!game) return ctx.answerCbQuery('⚠️').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       const list = [...game.players.values()].map(p => `👤 ${p.name}`).join('\n') || 'لا أحد';
@@ -971,13 +971,13 @@ function register(bot) {
     }
 
     // Lifelines
-    if (d.startsWith('ml_')) {
+    if (d.startsWith('mlr_')) {
       const type = d.substring(3);
       if (['fifty','audience','call','skip'].includes(type)) return useLifeline(ctx, type);
     }
 
     // Answer
-    if (d.startsWith('ma_')) {
+    if (d.startsWith('mar_')) {
       const parts  = d.split('_');
       const letter = parts[1];
       const sid    = parseInt(parts[2]);

@@ -229,6 +229,8 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'bdl_',        fn: (ctx, d) => { const p = d.split('_'); return browse.sendBundle(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }},
     { p: 'fl_',         fn: (ctx, d) => { const p = d.split('_'); return browse.sendFile(ctx, p[1], p[2], p[3], p[4], p[5], p[6]); }},
     { p: 'ml_',         fn: (ctx)    => million.handleCallback(bot, ctx) },
+    { p: 'mlr_',        fn: (ctx, d) => millionaire.handleCallback(ctx, d) },
+    { p: 'mar_',        fn: (ctx, d) => millionaire.handleCallback(ctx, d) },
     { p: 'share_',      fn: (ctx)    => { const { handleShare } = require('../handlers/share_summary'); return handleShare(ctx); } },
     { p: 'ct_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showFiles(ctx, p[1], p[2], p[3], p[4], p[5]); }},
     { p: 'sb_',         fn: (ctx, d) => { const p = d.split('_'); return browse.showCategories(ctx, p[1], p[2], p[3], p[4]); }},
@@ -362,7 +364,8 @@ module.exports.registerCallbacks = function(bot, deps) {
           || data.startsWith('grp_stats_') || data === 'rules_ok'
           || data.startsWith('ml_') || data.startsWith('gp_')
           || data.startsWith('grp_register_') || data.startsWith('grp_reg_btn_')
-          || data === 'mb_panel' || data.startsWith('gp_million') || data.startsWith('gp_guess');
+          || data === 'mb_panel' || data.startsWith('gp_million') || data.startsWith('gp_guess')
+          || data.startsWith('mlr_') || data.startsWith('mar_');
         if (!_grpOk)
           return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }
