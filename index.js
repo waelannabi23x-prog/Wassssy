@@ -385,19 +385,24 @@ async function launch() {
                 }
               );
             } else {
-              // البوت مش ادمين — رسالة تنبيه وخروج
-              await ctx.telegram.sendMessage(addedBy.id,
-                '⚠️ شكراً على الإضافة في *' + title + '*!\n\n' +
-                '❌ لم تمنحني صلاحيات *ادمين* — لن أتمكن من العمل بشكل صحيح.\n\n' +
-                '👇 اضغط الزر لإضافتي كمشرف:',
-                {
-                  parse_mode: 'Markdown',
-                  reply_markup: { inline_keyboard: [
-                    [{ text: '👑 أضفني كـ مشرف 🛡️', url: 'https://t.me/' + un + '?startgroup=true&admin=delete_messages+restrict_members+pin_messages+invite_users+manage_chat' }],
-                    [{ text: '❓ كيف أضيفك؟', url: 'https://t.me/' + un + '?start=howto_admin' }]
-                  ]}
-                }
+              // البوت مش ادمين — رسالة في القروب + DM + خروج
+              const _noAdminKb = { inline_keyboard: [
+                [{ text: '👑 أضفني كـ مشرف 🛡️', url: 'https://t.me/' + un + '?startgroup=true&admin=delete_messages+restrict_members+pin_messages+invite_users+manage_chat' }]
+              ]};
+              // نبعث في القروب أولاً
+              await ctx.telegram.sendMessage(chatId,
+                '👋 مرحباً! أنا *' + (un || 'البوت') + '*\n\n' +
+                '❌ تم إضافتي بدون صلاحيات ادمين — لن أتمكن من العمل.\n\n' +
+                '👇 اضغط لإعادة إضافتي كمشرف:',
+                { parse_mode: 'Markdown', reply_markup: _noAdminKb }
               ).catch(() => {});
+              // نحاول نبعث في الخاص أيضاً
+              await ctx.telegram.sendMessage(addedBy.id,
+                '⚠️ أضفتني في *' + title + '* بدون صلاحيات ادمين!\n\n' +
+                '👇 اضغط لإعادة إضافتي كمشرف:',
+                { parse_mode: 'Markdown', reply_markup: _noAdminKb }
+              ).catch(() => {});
+              await new Promise(r => setTimeout(r, 1500));
               await ctx.telegram.leaveChat(chatId).catch(() => {});
             }
           } catch(_) {}
