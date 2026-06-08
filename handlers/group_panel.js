@@ -394,20 +394,7 @@ async function showMyGroups(ctx) {
   const isOwner = uid === parseInt(process.env.OWNER_ID);
 
   const allGroups = await all('SELECT chat_id, title FROM group_chats WHERE is_active=1 ORDER BY title').catch(() => []);
-  // تحقق حقيقي إذا البوت لازال في القروب وحدّث is_active
-  const { run: dbRun } = require('../database/db');
-  for (const g of allGroups) {
-    try {
-      const botM = await ctx.telegram.getChatMember(g.chat_id, ctx.botInfo?.id || (await ctx.telegram.getMe()).id);
-      if (['left','kicked'].includes(botM?.status)) {
-        await dbRun('UPDATE group_chats SET is_active=0 WHERE chat_id=$1', [g.chat_id]).catch(() => {});
-        g._inactive = true;
-      }
-    } catch(_) { g._inactive = true; }
-  }
-  const activeGroups_filtered = allGroups.filter(g => !g._inactive);
-  allGroups.length = 0;
-  activeGroups_filtered.forEach(g => allGroups.push(g));
+
   const BOT_UN = process.env.BOT_USERNAME || '';
 
   const myGroups = [];

@@ -445,7 +445,17 @@ module.exports.registerCallbacks = function(bot, deps) {
           return ctx.answerCbQuery('🔊 تم إعطاء الكلام').catch(() => {});
         }
 
-        // ── أزرار warn/info ──
+        // ── أزرار warn/info — للأدمن فقط ──
+        if (data.startsWith('grp_warns_show_') || data.startsWith('grp_mute_60_') ||
+            data.startsWith('grp_ban_now_') || data.startsWith('grp_perms_') ||
+            data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_') ||
+            data.startsWith('grp_ptog_') || data.startsWith('grp_psave_')) {
+          const isAdmOrOwner = ctx.isAdmin || ctx.isOwner ||
+            ['administrator','creator'].includes(
+              (await ctx.telegram.getChatMember(ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id, ctx.from.id).catch(() => null))?.status
+            );
+          if (!isAdmOrOwner) return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(() => {});
+        }
         if (data.startsWith('grp_warns_show_')) {
           const uid2 = parseInt(data.replace('grp_warns_show_', ''));
           const { all: dbAll } = require('../database/db');
