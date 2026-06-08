@@ -2,7 +2,13 @@
 const { addChannel, removeChannel, getChannels } = require('../utils/channelGuard');
 
 
-  // /cleangroups — مسح القروبات اللي البوت مش فيها
+
+  // ── أوامر جديدة ──
+  bot.command(['daily','يومي'], ctx => require('../handlers/bank_games').handleDaily(ctx).catch(()=>{}));
+  bot.command(['flip','عملة'],  ctx => require('../handlers/bank_games').handleFlip(ctx).catch(()=>{}));
+  bot.command(['rob','سرقة'],   ctx => require('../handlers/bank_games').handleRob(ctx).catch(()=>{}));
+  bot.command(['leaderboard','متصدرين','lb'], ctx => require('../handlers/bank_games').handleLeaderboard(ctx).catch(()=>{}));
+  bot.command(['bank','حسابي','بنكي'], ctx => require('../handlers/bank').showBalance(ctx).catch(()=>{}));
   bot.command('cleangroups', async ctx => {
     if (!ctx.isOwner) return;
     const { all: dbAll, run: dbRun } = require('../database/db');
@@ -10,18 +16,22 @@ const { addChannel, removeChannel, getChannels } = require('../utils/channelGuar
     const msg = await ctx.reply('🔍 يفحص ' + groups.length + ' قروب...').catch(() => null);
     let removed = 0;
     for (const g of groups) {
-      try {
-        await ctx.telegram.getChat(g.chat_id);
-      } catch(e) {
-        // البوت مش في القروب
-        await dbRun('UPDATE group_chats SET is_active=0 WHERE chat_id=$1', [g.chat_id]).catch(() => {});
-        removed++;
-      }
-      await new Promise(r => setTimeout(r, 200));
+      try { await ctx.telegram.getChat(g.chat_id); }
+      catch(e) { await dbRun('UPDATE group_chats SET is_active=0 WHERE chat_id=$1',[g.chat_id]).catch(()=>{}); removed++; }
+      await new Promise(r=>setTimeout(r,200));
     }
-    const txt = '✅ *اكتمل!*\n\n🗑 مُسح: *' + removed + '* قروب\n✅ نشط: *' + (groups.length - removed) + '* قروب';
-    if (msg) ctx.telegram.editMessageText(ctx.chat.id, msg.message_id, null, txt, { parse_mode: 'Markdown' }).catch(() => {});
-    else ctx.reply(txt, { parse_mode: 'Markdown' }).catch(() => {});
+    const txt = '✅ مُسح: *'+removed+'* | نشط: *'+(groups.length-removed)+'*';
+    if(msg) ctx.telegram.editMessageText(ctx.chat.id,msg.message_id,null,txt,{parse_mode:'Markdown'}).catch(()=>{});
+    else ctx.reply(txt,{parse_mode:'Markdown'}).catch(()=>{});
+  });
+  bot.command(['adminpanel','لوحة'], async ctx => {
+    if(!ctx.isOwner&&!ctx.isAdmin) return;
+    const rows=[
+      [{text:'📁 المحتوى',callback_data:'manage'},{text:'👥 المستخدمون',callback_data:'manage_users_0'}],
+      [{text:'🏦 البنك',callback_data:'bank_admin_panel'},{text:'🎮 الألعاب',callback_data:'gp_million_panel'}],
+      [{text:'📊 إحصائيات',callback_data:'manage_analytics'},{text:'⚙️ الإعدادات',callback_data:'manage_settings'}],
+    ];
+    return ctx.reply('🛡️ *لوحة الإدارة*\n━━━━━━━━━━━━━━━',{parse_mode:'Markdown',reply_markup:{inline_keyboard:rows}}).catch(()=>{});
   });
 
 module.exports = function registerCommands(bot, deps) {
