@@ -204,11 +204,15 @@ async function showUsers(ctx, page=0, filter='all') {
   ];
 
   // أزرار المستخدمين 2 × N
-  const userBtns = list.map(u => {
-    const icon = u.is_banned ? '🚫' : '👤';
-    const label = (icon + ' ' + (u.first_name || 'مجهول')).substring(0, 20);
-    return btn(label, 'mg_up_' + u.user_id);
-  });
+  const userBtns = list
+    .filter(u => u.user_id || u.id)
+    .map(u => {
+      const uid3 = String(u.user_id || u.id);
+      const icon = u.is_banned ? '🚫' : '👤';
+      const rawName = (u.first_name || 'مجهول').replace(/[^\w\s؀-ۿ]/g, '').trim() || 'مجهول';
+      const label = (icon + ' ' + rawName).substring(0, 20);
+      return btn(label, 'mg_up_' + uid3);
+    });
   const userRows = [];
   for (let i = 0; i < userBtns.length; i += 2)
     userRows.push(userBtns.slice(i, i + 2));
@@ -615,7 +619,7 @@ async function handleCallback(ctx,data){
   // ── بروفايل مستخدم من الأزرار الجديدة ──
   if (data.startsWith('mg_up_') && !data.startsWith('mg_upg_')) {
     const uid2 = data.replace('mg_up_', '');
-    if (!uid2 || isNaN(Number(uid2))) return ctx.answerCbQuery('❌').catch(() => {});
+    if (!uid2) return ctx.answerCbQuery('❌').catch(() => {});
     return showUserProfile(ctx, uid2);
   }
   // ── تنقل صفحات المستخدمين ──
