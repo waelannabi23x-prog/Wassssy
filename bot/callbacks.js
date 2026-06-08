@@ -280,10 +280,9 @@ module.exports.registerCallbacks = function(bot, deps) {
       } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
     }},
     { p: 'gp_close', fn: async (ctx, d) => {
-      ctx.answerCbQuery().catch(() => {});
-      // نحاول نحذف — إذا فشل نحذف الأزرار فقط
-      ctx.deleteMessage().catch(() => {
-        ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
+      await ctx.answerCbQuery().catch(() => {});
+      await ctx.deleteMessage().catch(async () => {
+        await ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
       });
       return;
     }},
