@@ -85,8 +85,8 @@ async function showMillionQuestions(ctx, page) {
 
   let text = '📋 *قائمة الأسئلة* (' + (page * limit + 1) + '-' + Math.min((page + 1) * limit, total.cnt) + ' من ' + total.cnt + ')\n━━━━━━━━━━━━━━━━━━━━\n\n';
   questions.forEach((q, i) => {
-    text += (offset + i + 1) + '. ' + q.question.substring(0, 40) + '\n';
-    text += '   ✅ ' + q.correct_answer + ' | ⭐'.repeat(q.difficulty || 1) + '\n\n';
+    text += (offset + i + 1) + '. [' + q.id + '] ' + (q.text || '').substring(0, 40) + '\n';
+    text += '   ✅ ' + (q.correct || '?') + ' | ' + (q.difficulty || 'medium') + '\n\n';
   });
 
   const rows = [];
@@ -157,8 +157,8 @@ async function handleText(ctx) {
     const correct = answerMap[answerLine] || answerLine;
 
     await run(
-      'INSERT INTO million_questions(question, option_a, option_b, option_c, option_d, correct_answer, difficulty, is_active) VALUES($1,$2,$3,$4,$5,$6,1,1)',
-      [question, optA, optB, optC, optD, correct]
+      'INSERT INTO million_questions(text, option_a, option_b, option_c, option_d, correct, difficulty, is_active) VALUES($1,$2,$3,$4,$5,$6,$7,1)',
+      [question, optA, optB, optC, optD, correct, 'medium']
     ).catch(() => {});
     await delState(uid);
     await ctx.reply('✅ *تم إضافة السؤال!*\n\n❓ ' + question + '\n✅ الإجابة: ' + correct, { parse_mode: 'Markdown' }).catch(() => {});
@@ -177,9 +177,9 @@ async function handleText(ctx) {
       await ctx.reply('❌ لم يتم العثور على سؤال برقم ' + id).catch(() => {});
       return true;
     }
-    await run('UPDATE million_questions SET is_active=0 WHERE id=$1', [id]).catch(() => {});
+    await run('UPDATE million_questions SET is_active=0::smallint WHERE id=$1', [id]).catch(() => {});
     await delState(uid);
-    await ctx.reply('✅ تم حذف السؤال: ' + q.question.substring(0, 50)).catch(() => {});
+    await ctx.reply('✅ تم حذف السؤال: ' + (q.text || '').substring(0, 50)).catch(() => {});
     return true;
   }
 

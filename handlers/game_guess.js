@@ -436,12 +436,13 @@ async function handleGuessAttempt(bot, ctx) {
     return true;
   }
 
-  const guess  = match[1].trim().toLowerCase();
-  const target = userId === game.creator_id ? game.opponent_answer : game.creator_answer;
+  const _normalize = s => (s || '').normalize('NFC').trim().toLowerCase().replace(/\s+/g, ' ');
+  const guess  = _normalize(match[1]);
+  const target = _normalize(userId === game.creator_id ? game.opponent_answer : game.creator_answer);
 
   addMsgToDelete(gameId, ctx.message.message_id);
 
-  if (guess === target.toLowerCase()) {
+  if (guess === target || target.includes(guess) && guess.length >= 3) {
     // فاز!
     await endGame(bot, gameId, userId);
   } else {

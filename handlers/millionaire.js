@@ -1117,104 +1117,17 @@ function register(bot) {
 }
 
 
-async function handleMillionCallback(ctx, data) {
-  const chatId = ctx.chat?.id;
-  const uid    = String(ctx.from?.id);
-
-  // ── إجابة السؤال ma_LETTER_SESSION ──────────────────────────
-  if (data.startsWith('mar_')) {
-    const parts  = data.split('_');
-    const letter = parts[1];
-    const sid    = parseInt(parts[2]);
-    const game   = getGame(chatId);
-    if (!game || game.status !== 'playing') {
-      return ctx.answerCbQuery('⌛ لا يوجد لعبة نشطة').catch(() => {});
-    }
-    // فقط اللاعب المسجّل يجيب
-    if (!game.players.has(uid)) {
-      return ctx.answerCbQuery('⛔ لست مسجلاً في هذه الجولة').catch(() => {});
-    }
-    if (game.roundAnswers.has(uid)) {
-      return ctx.answerCbQuery('✅ تم تسجيل إجابتك').catch(() => {});
-    }
-    game.roundAnswers.set(uid, letter);
-    return ctx.answerCbQuery('📝 تم تسجيل إجابتك: ' + letter.toUpperCase()).catch(() => {});
-  }
-
-  // ── ml_forcestart ─────────────────────────────────────────────
-  if (data === 'mlr_forcestart') {
-    ctx.answerCbQuery('🚀 جاري الإطلاق!').catch(() => {});
-    const game = getGame(chatId);
-    if (!game || game.status !== 'waiting') return;
-    if (game.joinTimer) { clearTimeout(game.joinTimer); game.joinTimer = null; }
-    return beginGame(ctx.telegram, chatId);
-  }
-
-  // ── ml_cancel ─────────────────────────────────────────────────
-  if (data === 'mlr_cancel') {
-    ctx.answerCbQuery('🔴 تم الإلغاء').catch(() => {});
-    const game = getGame(chatId);
-    if (!game) return;
-    if (game.joinTimer)  clearTimeout(game.joinTimer);
-    if (game.timer)      clearTimeout(game.timer);
-    if (game.joinMsgId) ctx.telegram.deleteMessage(chatId, game.joinMsgId).catch(() => {});
-    clearGame(chatId);
-    return;
-  }
-
-  // ── ml_howto ──────────────────────────────────────────────────
-  if (data === 'mlr_howto') {
-    ctx.answerCbQuery('').catch(() => {});
-    return ctx.reply(
-      '📖 *كيف تلعب من سيربح المليون؟*\n━━━━━━━━━━━━━━━━━━\n\n' +
-      '• اكتب *مليون* أو */million* لبدء اللعبة\n' +
-      '• اضغط *🚀 ابدأ* لتشغيل اللعبة فوراً\n' +
-      '• يظهر سؤال مع 4 خيارات — اختر قبل الوقت\n' +
-      '• لديك مساعدات قيّمة: 50/50، الجمهور، الصديق\n' +
-      '• 15 سؤال متصاعدة للوصول لـ 1,000,000 دج!\n\n' +
-      '🛡 *مناطق الأمان:* السؤال 5 — 10 — 15',
-      { parse_mode: 'Markdown' }
-    ).catch(() => {});
-  }
-
-  // ── ml_ranking ────────────────────────────────────────────────
-  if (data === 'mlr_ranking') {
-    ctx.answerCbQuery('').catch(() => {});
-    return showLeaderboard(ctx).catch(() => {});
-  }
-
-  // ── ml_fifty / ml_audience / ml_call / ml_skip ───────────────
-  if (data.startsWith('mlr_')) {
-    const lifelineKey = data.replace('ml_', '');
-    const game = getGame(chatId);
-    if (!game || !game.players.has(uid)) {
-      return ctx.answerCbQuery('⛔ لست في اللعبة').catch(() => {});
-    }
-    const player = game.players.get(uid);
-    if (player && player.lifelines && player.lifelines[lifelineKey] !== undefined) {
-      if (!player.lifelines[lifelineKey]) {
-        return ctx.answerCbQuery('❌ استخدمت هذه المساعدة مسبقاً').catch(() => {});
-      }
-      player.lifelines[lifelineKey] = false;
-      return ctx.answerCbQuery('✅ تم استخدام المساعدة').catch(() => {});
-    }
-    return ctx.answerCbQuery('').catch(() => {});
-  }
-}
+// handleMillionCallback removed — register() handles all callbacks internally
 
 
 
 async function stopGame(ctx) {
   const chatId = ctx.chat?.id;
   if (!chatId) return;
-  const { getGame, delGame } = require("../utils/botCache") || {};
-  const game = games ? games.get(chatId) : null;
-  if (!game) return ctx.reply("⚠️ لا توجد لعبة جارية.").catch(() => {});
-  if (game.timer)     clearTimeout(game.timer);
-  if (game.joinTimer) clearTimeout(game.joinTimer);
-  game.status = "ended";
-  games.delete(chatId);
-  ctx.reply("🛑 تم إيقاف اللعبة.").catch(() => {});
+  const game = getGame(chatId);
+  if (!game) return ctx.reply('⚠️ لا توجد لعبة جارية.').catch(() => {});
+  await endGame(ctx.telegram, chatId, 'stopped');
+  ctx.reply('🛑 تم إيقاف اللعبة.').catch(() => {});
 }
 
-module.exports = { stopGame, register, initMillionaireSchema, startJoinPhase, handleCallback: handleMillionCallback };
+module.exports = { stopGame, register, initMillionaireSchema, startJoinPhase };

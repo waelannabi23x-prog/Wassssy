@@ -95,8 +95,9 @@ exports.transfer = async (ctx) => {
   await run('UPDATE bank_accounts SET balance = balance + $1 WHERE user_id=$2', [amount, toId]);
   await run('INSERT INTO bank_transactions(from_id, to_id, amount, type, note) VALUES($1,$2,$3,$4,$5)',
     [uid, toId, amount, 'transfer', 'تحويل من ' + (ctx.from?.first_name || uid)]);
+  const toAccNew = await getAccount(toId);
   ctx.telegram.sendMessage(toId,
-    '💸 *استلمت تحويلاً!*\n\n👤 من: *' + (ctx.from?.first_name || 'مجهول') + '*\n💰 المبلغ: *' + fmt(amount) + '*\n💳 رصيدك الجديد: *' + fmt(Number(toAcc.balance) + amount) + '*',
+    '💸 *استلمت تحويلاً!*\n\n👤 من: *' + (ctx.from?.first_name || 'مجهول') + '*\n💰 المبلغ: *' + fmt(amount) + '*\n💳 رصيدك الجديد: *' + fmt(toAccNew ? toAccNew.balance : Number(toAcc.balance) + amount) + '*',
     { parse_mode: 'Markdown' }
   ).catch(() => {});
   return ctx.reply(
@@ -129,8 +130,9 @@ exports.loan = async (ctx) => {
   await run('INSERT INTO bank_transactions(from_id, to_id, amount, type, note) VALUES($1,$2,$3,$4,$5)',
     [uid, toId, amount, 'loan', 'قرض من ' + (ctx.from?.first_name || uid)]);
   await run('INSERT INTO bank_loans(user_id, amount, due_at) VALUES($1,$2, NOW() + INTERVAL \'7 days\')', [toId, amount]);
+  const toAccLoanNew = await getAccount(toId);
   ctx.telegram.sendMessage(toId,
-    '🤝 *حصلت على قرض!*\n\n👤 من: *' + (ctx.from?.first_name || 'مجهول') + '*\n💰 المبلغ: *' + fmt(amount) + '*\n💳 رصيدك الجديد: *' + fmt(Number(toAcc.balance) + amount) + '*\n\n⚠️ يجب السداد خلال 7 أيام!',
+    '🤝 *حصلت على قرض!*\n\n👤 من: *' + (ctx.from?.first_name || 'مجهول') + '*\n💰 المبلغ: *' + fmt(amount) + '*\n💳 رصيدك الجديد: *' + fmt(toAccLoanNew ? toAccLoanNew.balance : Number(toAcc.balance) + amount) + '*\n\n⚠️ يجب السداد خلال 7 أيام!',
     { parse_mode: 'Markdown' }
   ).catch(() => {});
   return ctx.reply(

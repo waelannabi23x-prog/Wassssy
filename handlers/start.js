@@ -14,19 +14,19 @@ async function startHandler(ctx) {
   const uid  = ctx.uid;
   const name = ctx.from?.first_name || 'طالب';
 
-  // ── تحقق من الاشتراك ──
-  if (!ctx.isOwner && !ctx.isAdmin && ctx.chat?.type === 'private') {
-    const guard = require('../utils/channelGuard');
-    const res = await guard.checkAllChannels({ telegram: ctx.telegram }, uid);
-    if (!res.ok) {
-      const { text, buttons } = guard.buildSubscribeMessage(res.missing, name);
-      return ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(() => {});
-    }
-  }
-
-  // ── رسالة الترحيب المخصصة ──
+  // ── تحقق من الاشتراك + رسالة الترحيب بالتوازي ──
   const { getSetting } = require('../database/db');
-  const welcomeText = await getSetting('start_welcome_text').catch(() => null);
+  const guard = require('../utils/channelGuard');
+  const [_guardRes, welcomeText] = await Promise.all([
+    (!ctx.isOwner && !ctx.isAdmin && ctx.chat?.type === 'private')
+      ? guard.checkAllChannels({ telegram: ctx.telegram }, uid)
+      : Promise.resolve({ ok: true }),
+    getSetting('start_welcome_text').catch(() => null),
+  ]);
+  if (!_guardRes.ok) {
+    const { text, buttons } = guard.buildSubscribeMessage(_guardRes.missing, name);
+    return ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(() => {});
+  }
   if (welcomeText && !ctx.startPayload) {
     const _wt = welcomeText
       .replace(/\{name\}/g, ctx.from?.first_name || "صديق")
