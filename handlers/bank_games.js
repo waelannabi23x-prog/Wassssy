@@ -86,6 +86,38 @@ async function handleLeaderboard(ctx) {
 }
 
 async function handleBankGamesCallback(ctx,data) {
+  if(data==='games_how_million'){
+    ctx.answerCbQuery().catch(()=>{});
+    return ctx.reply(
+      '🏆 *طريقة لعب — من سيربح المليون*\n━━━━━━━━━━━━━━━\n\n' +
+      '1️⃣ اكتب *مليون* في القروب لبدء جلسة\n' +
+      '2️⃣ اكتب *أنا* للانضمام (يتسع لـ 30 لاعب)\n' +
+      '3️⃣ تبدأ اللعبة بعد 20 ثانية تلقائياً\n' +
+      '4️⃣ أجب على الأسئلة باختيار أ/ب/ج/د\n' +
+      '5️⃣ لديك 30 ثانية لكل سؤال\n' +
+      '6️⃣ الفائز يأخذ الجائزة في حسابه البنكي💰\n\n' +
+      '🛟 *المساعدات:*\n' +
+      '5️⃣0️⃣ مساعدة 50/50\n' +
+      '👥 مساعدة الجمهور\n' +
+      '📞 مساعدة صديق\n' +
+      '⏭️ تخطي السؤال',
+      { parse_mode:'Markdown', reply_to_message_id: ctx.callbackQuery?.message?.message_id }
+    ).catch(()=>{});
+  }
+  if(data==='games_how_guess'){
+    ctx.answerCbQuery().catch(()=>{});
+    return ctx.reply(
+      '📸 *طريقة لعب — خمن الصورة*\n━━━━━━━━━━━━━━━\n\n' +
+      '1️⃣ اكتب *خمن* في القروب لبدء تحدي\n' +
+      '2️⃣ اكتب *أنا* للانضمام (لاعبان فقط)\n' +
+      '3️⃣ كل لاعب يرسل صورة سرية للبوت في الخاص\n' +
+      '4️⃣ البوت يعرض الصورتين في القروب\n' +
+      '5️⃣ من يخمن صورة منافسه أولاً يفوز\n' +
+      '6️⃣ الفائز يربح *500 $* في حسابه البنكي💰',
+      { parse_mode:'Markdown', reply_to_message_id: ctx.callbackQuery?.message?.message_id }
+    ).catch(()=>{});
+  }
+
   if(data==='games_leaderboard'){ ctx.answerCbQuery().catch(()=>{}); return handleLeaderboard(ctx); }
   if(data==='games_bank'){ ctx.answerCbQuery().catch(()=>{}); return require('./bank').showBalance(ctx); }
   if(data==='games_daily'){ ctx.answerCbQuery().catch(()=>{}); return handleDaily(ctx); }
