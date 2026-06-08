@@ -31,4 +31,29 @@ async function stress(ctx, text) {
   return ctx.reply('🧬 *نتائج: *' + cnt + '*\n⏱️ الرسائل: *' + (eT - sT) + 'ms*\n💾 الرام: *+' + (eM - sM).toFixed(2) + ' MB*', { parse_mode: 'Markdown' });
 }
 
+
+// ── مزامنة القروبات ─────────────────────────────────────
+async function syncGroups(ctx) {
+  const { all, run } = require('../database/db');
+  const groups = await all('SELECT chat_id, title FROM group_chats WHERE is_active=1').catch(() => []);
+  if (!groups.length) return ctx.reply('لا توجد قروبات نشطة.').catch(() => {});
+  await ctx.reply('🔄 جاري التحقق من ' + groups.length + ' قروب...').catch(() => {});
+  let ok = 0, bad = 0;
+  const me = await ctx.telegram.getMe().catch(() => ({}));
+  for (const g of groups) {
+    try {
+      const m = await ctx.telegram.getChatMember(g.chat_id, me.id);
+      if (['kicked','left'].includes(m.status)) {
+        await run('UPDATE group_chats SET is_active=0 WHERE chat_id=$1', [g.chat_id]).catch(() => {});
+        bad++;
+      } else { ok++; }
+    } catch(_) {
+      await run('UPDATE group_chats SET is_active=0 WHERE chat_id=$1', [g.chat_id]).catch(() => {});
+      bad++;
+    }
+    await new Promise(r => setTimeout(r, 300));
+  }
+  ctx.reply('✅ مزامنة كاملة\n\n🟢 نشط: ' + ok + '\n🔴 تم تعطيل: ' + bad).catch(() => {});
+}
+
 module.exports = { spy, stress };
