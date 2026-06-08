@@ -1,6 +1,29 @@
 'use strict';
 const { addChannel, removeChannel, getChannels } = require('../utils/channelGuard');
 
+
+  // /cleangroups — مسح القروبات اللي البوت مش فيها
+  bot.command('cleangroups', async ctx => {
+    if (!ctx.isOwner) return;
+    const { all: dbAll, run: dbRun } = require('../database/db');
+    const groups = await dbAll('SELECT chat_id, title FROM group_chats WHERE is_active=1').catch(() => []);
+    const msg = await ctx.reply('🔍 يفحص ' + groups.length + ' قروب...').catch(() => null);
+    let removed = 0;
+    for (const g of groups) {
+      try {
+        await ctx.telegram.getChat(g.chat_id);
+      } catch(e) {
+        // البوت مش في القروب
+        await dbRun('UPDATE group_chats SET is_active=0 WHERE chat_id=$1', [g.chat_id]).catch(() => {});
+        removed++;
+      }
+      await new Promise(r => setTimeout(r, 200));
+    }
+    const txt = '✅ *اكتمل!*\n\n🗑 مُسح: *' + removed + '* قروب\n✅ نشط: *' + (groups.length - removed) + '* قروب';
+    if (msg) ctx.telegram.editMessageText(ctx.chat.id, msg.message_id, null, txt, { parse_mode: 'Markdown' }).catch(() => {});
+    else ctx.reply(txt, { parse_mode: 'Markdown' }).catch(() => {});
+  });
+
 module.exports = function registerCommands(bot, deps) {
   const {
     startHandler, manage, userH, million, tools,
