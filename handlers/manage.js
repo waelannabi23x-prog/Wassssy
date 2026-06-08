@@ -176,10 +176,17 @@ async function showUsers(ctx, page=0, filter='all') {
   else if (filter === 'new')  whereClause = "WHERE joined_at >= NOW() - INTERVAL '1 day'";
   else                        whereClause = "WHERE last_active >= NOW() - INTERVAL '7 days'";
 
-  const [list, totalRow] = await Promise.all([
-    all(`SELECT * FROM users ${whereClause} ORDER BY last_active DESC LIMIT $1 OFFSET $2`, [limit, offset]),
-    all(`SELECT COUNT(*) as c FROM users ${whereClause}`).then(r => parseInt(r[0]?.c || 0)),
-  ]);
+  const cacheKey = 'users_' + filter + '_' + page;
+  let list, totalRow;
+  const cached = cacheGet(cacheKey);
+  if (cached) { list = cached.list; totalRow = cached.total; }
+  else {
+    [list, totalRow] = await Promise.all([
+      all(`SELECT * FROM users ${whereClause} ORDER BY last_active DESC LIMIT $1 OFFSET $2`, [limit, offset]),
+      all(`SELECT COUNT(*) as c FROM users ${whereClause}`).then(r => parseInt(r[0]?.c || 0)),
+    ]);
+    cacheSet(cacheKey, { list, total: totalRow }, 30000);
+  }
 
   const totalPages = Math.ceil(totalRow / limit) || 1;
   const filterLabel = { all: '🟢 النشطون 7 أيام', banned: '🚫 المحظورون', new: '🆕 جدد اليوم' }[filter];

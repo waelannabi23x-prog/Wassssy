@@ -296,7 +296,7 @@ module.exports.registerCallbacks = function(bot, deps) {
         return ctx.editMessageText('✅ خرجت من القروب ' + chatId).catch(() => ctx.reply('✅ تم الخروج.').catch(err => { require('../utils/logger').debug("[silent]", err.message); }));
       } catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
     }},
-    { p: 'mg_',         fn: async (ctx, d) => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); return manage.handleCallback(ctx, d); }},
+    { p: 'mg_',         fn: async (ctx, d) => { if (!ctx.isAdmin && !ctx.isOwner) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); return manage.handleCallback(ctx, d); }},
   ];
 
   function _getPrefixHandler(data) {
