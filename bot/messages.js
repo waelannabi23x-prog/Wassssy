@@ -168,7 +168,7 @@ module.exports.registerMessages = function(bot, deps) {
     if (s?.type === 'mg_file')         return manage.handleFileUpload(ctx);
 
     // ── رد تلقائي بوسائط (صورة/فيديو/ستيكر/صوت) ──
-    if (s?.type === 'mg_ar_response') {
+    if (s?.type === 'mg_ar_response' && ctx.chat?.type === 'private') {
       const { setState } = require('../utils/stateManager');
       const { run: dbR } = require('../database/db');
       const { cacheDelete } = require('../utils/cache');
@@ -325,7 +325,7 @@ module.exports.registerMessages = function(bot, deps) {
     if (ctx.chat?.type !== 'private') return;
     const s = require('../utils/stateManager').getState(ctx.uid);
     // إذا كان في وضع إضافة رد تلقائي — احفظ الستيكر
-    if (s?.type === 'mg_ar_response') {
+    if (s?.type === 'mg_ar_response' && ctx.chat?.type === 'private') {
       const { setState } = require('../utils/stateManager');
       const { run: dbR } = require('../database/db');
       const file_id = ctx.message.sticker?.file_id;

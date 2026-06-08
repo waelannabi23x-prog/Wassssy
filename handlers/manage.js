@@ -475,6 +475,23 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
         ).catch(()=>{});
       }
 
+            case 'mg_ar_search': {
+        const results = await all(
+          "SELECT * FROM auto_replies WHERE is_active=1 AND (trigger ILIKE $1 OR response ILIKE $1) LIMIT 10",
+          ['%' + text + '%']
+        ).catch(() => []);
+        clearState(uid);
+        if (!results.length) {
+          return eos(ctx, '🔍 لم يُعثر على نتائج لـ: *' + escMd(text) + '*', {
+            parse_mode:'Markdown', ...build([[btn('◀️ رجوع','mg_auto_replies')]])
+          });
+        }
+        const tIcon = { exact:'🎯', regex:'⚙️', contains:'🔍' };
+        const rows = results.map(r => [btn((tIcon[r.match_type]||'🔍')+' '+r.trigger.substring(0,25), 'mg_ar_view_'+r.id)]);
+        rows.push([btn('◀️ رجوع','mg_auto_replies')]);
+        return eos(ctx, '🔍 *' + results.length + ' نتيجة*', { parse_mode:'Markdown', ...build(rows) });
+      }
+
             case 'mg_ar_trigger': {
         setState(uid, { type: 'mg_ar_response', trigger: text });
         return eos(ctx,
@@ -493,9 +510,10 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
       case 'mg_ar_response': {
         const trigger = state.trigger;
         const matchType = state.matchType || 'contains';
+        // نص عادي فقط — الوسائط تُعالج في handleMedia/sticker handlers
         await dbRun(
-          'INSERT INTO auto_replies(trigger,response,match_type,created_by) VALUES($1,$2,$3,$4)',
-          [trigger, text, matchType, uid]
+          'INSERT INTO auto_replies(trigger,response,match_type,resp_type,file_id,created_by) VALUES($1,$2,$3,$4,$5,$6)',
+          [trigger, text, matchType, 'text', null, uid]
         ).catch(()=>{});
         cacheClear('auto_replies_all');
         clearState(uid);
