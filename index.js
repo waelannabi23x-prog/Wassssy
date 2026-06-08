@@ -197,7 +197,11 @@ bot.use(async (ctx, next) => {
   // 🤖 Auto-Reply — يشتغل للجميع حتى الأدمنز
   // تجاهل أوامر اللعبة
   const _isGameMsg = /^(تخمين[:\s]|خمن$|خمن |انا$|مليون$)/i.test(txt.trim()) || txt.trim() === 'خمن' || txt.trim() === 'مليون';
-  if (txt && txt.length > 0 && !_isGameMsg) {
+  // تجاهل إذا الأدمن في وضع إضافة رد تلقائي
+  const _uid4ar = ctx.from?.id;
+  const _state4ar = _uid4ar ? require('./utils/stateManager').getState(_uid4ar) : null;
+  const _inArMode = _state4ar?.type?.startsWith('mg_ar') || _state4ar?.type?.startsWith('mg_awaiting');
+  if (txt && txt.length > 0 && !_isGameMsg && !_inArMode) {
     const arKey = 'auto_replies_all';
     let arList = _cGet(arKey);
     if (!arList) {
