@@ -333,6 +333,65 @@ module.exports.registerCallbacks = function(bot, deps) {
       // أجب فوراً مرة وحدة فقط
       ctx.answerCbQuery('').catch(() => {});
 
+
+      // ── toggle أذونات (يشتغل من الخاص) ──
+      if (data.startsWith('grp_ptog_')) {
+        const parts2 = data.replace('grp_ptog_', '').split('_');
+        const permKey = parts2[0];
+        const uid3    = parseInt(parts2[1]);
+        const cid3    = parseInt(parts2[2]);
+        const curKb   = ctx.callbackQuery?.message?.reply_markup?.inline_keyboard || [];
+        const labels  = {
+          can_send_messages:'الرسائل النصية',
+          can_send_media_messages:'الوسائط (صور/فيديو)',
+          can_send_polls:'الاستطلاعات',
+          can_add_web_page_previews:'معاينة الروابط',
+          can_invite_users:'دعوة أعضاء',
+          can_pin_messages:'تثبيت الرسائل',
+        };
+        // نقلب حالة الزر في الـ keyboard
+        const newKb = curKb.map(row => row.map(btn => {
+          if (btn.callback_data === data) {
+            const isOn = btn.text.startsWith('✅');
+            return { ...btn, text: (isOn ? '❌ ' : '✅ ') + (labels[permKey] || permKey) };
+          }
+          return btn;
+        }));
+        await ctx.editMessageReplyMarkup({ inline_keyboard: newKb }).catch(() => {});
+        return ctx.answerCbQuery('').catch(() => {});
+      }
+
+      if (data.startsWith('grp_psave_')) {
+        const parts3  = data.replace('grp_psave_', '').split('_');
+        const uid3    = parseInt(parts3[0]);
+        const cid3    = parseInt(parts3[1]);
+        const curKb2  = ctx.callbackQuery?.message?.reply_markup?.inline_keyboard || [];
+        const keyMap  = {
+          'الرسائل النصية':'can_send_messages',
+          'الوسائط (صور/فيديو)':'can_send_media_messages',
+          'الاستطلاعات':'can_send_polls',
+          'معاينة الروابط':'can_add_web_page_previews',
+          'دعوة أعضاء':'can_invite_users',
+          'تثبيت الرسائل':'can_pin_messages',
+        };
+        const permsToSave = {};
+        for (const row of curKb2) {
+          for (const btn of row) {
+            const isOn = btn.text.startsWith('✅');
+            for (const [label, key] of Object.entries(keyMap)) {
+              if (btn.text.includes(label)) permsToSave[key] = isOn;
+            }
+          }
+        }
+        try {
+          await ctx.telegram.restrictChatMember(cid3, uid3, { permissions: permsToSave });
+          await ctx.editMessageText('✅ *تم حفظ الأذونات بنجاح!*', { parse_mode: 'Markdown' }).catch(() => {});
+          return ctx.answerCbQuery('✅ تم الحفظ').catch(() => {});
+        } catch(e) {
+          return ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {});
+        }
+      }
+
       if (ctx.chat?.type !== 'private') {
         if (data.startsWith('grp_main_')) {
           const chatId = data.replace('grp_main_', '');
