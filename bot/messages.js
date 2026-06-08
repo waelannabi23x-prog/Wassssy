@@ -259,7 +259,8 @@ module.exports.registerMessages = function(bot, deps) {
         } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
         return browse.showComments(ctx, s.fid, s.spId, s.yrId, s.smId, s.sbId, s.catId);
       }
-      if ((s?.type || '').startsWith('mg_') && ctx.isAdmin) return manage.handleText(ctx, s);
+      if (s?.type === 'admin_contact') return manage.handleText(ctx, s);
+      if ((s?.type || '').startsWith('mg_') && (ctx.isAdmin || ctx.isOwner)) return manage.handleText(ctx, s);
       if ((s?.type || '').startsWith('gp_')) return groupPanel.handleText(ctx, txt, s);
       if (s?.type === 'million_add_q' || s?.type === 'million_del_q') {
         const gamesPanel = require('../handlers/games_panel');
