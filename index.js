@@ -226,10 +226,16 @@ bot.use(async (ctx, next) => {
     if (matched.length > 0) {
       // رد عشوائي حقيقي
       const pick = matched[Math.floor(Math.random() * matched.length)];
-      ctx.reply(pick.response, {
-        reply_to_message_id: ctx.message.message_id,
-        parse_mode: 'Markdown'
-      }).catch(() => {});
+      const _rtype = pick.resp_type || 'text';
+        const _fid   = pick.file_id;
+        const _opts  = { reply_to_message_id: ctx.message.message_id };
+        if      (_rtype==='sticker'   && _fid) ctx.telegram.sendSticker(ctx.chat.id,_fid,_opts).catch(()=>{});
+        else if (_rtype==='photo'     && _fid) ctx.telegram.sendPhoto(ctx.chat.id,_fid,{..._opts,caption:pick.response||undefined,parse_mode:'Markdown'}).catch(()=>{});
+        else if (_rtype==='video'     && _fid) ctx.telegram.sendVideo(ctx.chat.id,_fid,{..._opts,caption:pick.response||undefined,parse_mode:'Markdown'}).catch(()=>{});
+        else if (_rtype==='voice'     && _fid) ctx.telegram.sendVoice(ctx.chat.id,_fid,{..._opts,caption:pick.response||undefined}).catch(()=>{});
+        else if (_rtype==='animation' && _fid) ctx.telegram.sendAnimation(ctx.chat.id,_fid,{..._opts,caption:pick.response||undefined,parse_mode:'Markdown'}).catch(()=>{});
+        else if (_rtype==='document'  && _fid) ctx.telegram.sendDocument(ctx.chat.id,_fid,{..._opts,caption:pick.response||undefined,parse_mode:'Markdown'}).catch(()=>{});
+        else ctx.reply(pick.response,{reply_to_message_id:ctx.message.message_id,parse_mode:'Markdown'}).catch(()=>{});
     }
   }
 

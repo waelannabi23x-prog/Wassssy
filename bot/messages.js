@@ -166,7 +166,36 @@ module.exports.registerMessages = function(bot, deps) {
     if (s?.type === 'mg_bulk_files')   return manage.handleBulkUpload(ctx);
     if (s?.type === 'mg_bundle_files') return manage.handleBundleFileUpload(ctx);
     if (s?.type === 'mg_file')         return manage.handleFileUpload(ctx);
-    if (s?.type === 'mg_tpl_content')  return manage.handleText(ctx, s);
+
+    // ── رد تلقائي بوسائط (صورة/فيديو/ستيكر/صوت) ──
+    if (s?.type === 'mg_ar_response') {
+      const { setState } = require('../utils/stateManager');
+      const { run: dbR } = require('../database/db');
+      const { cacheDelete } = require('../utils/cache');
+      const msg = ctx.message;
+      let resp_type = 'text', file_id = null;
+      if (msg.sticker)   { resp_type='sticker';  file_id=msg.sticker.file_id; }
+      else if (msg.photo)     { resp_type='photo';    file_id=msg.photo[msg.photo.length-1].file_id; }
+      else if (msg.video)     { resp_type='video';    file_id=msg.video.file_id; }
+      else if (msg.voice)     { resp_type='voice';    file_id=msg.voice.file_id; }
+      else if (msg.animation) { resp_type='animation';file_id=msg.animation.file_id; }
+      else if (msg.document)  { resp_type='document'; file_id=msg.document.file_id; }
+      if (file_id) {
+        await dbR(
+          'INSERT INTO auto_replies(trigger,response,match_type,resp_type,file_id,created_by) VALUES($1,$2,$3,$4,$5,$6)',
+          [s.trigger, msg.caption||'', s.match_type||'contains', resp_type, file_id, ctx.uid]
+        ).catch(()=>
+          dbR('INSERT INTO auto_replies(trigger,response,match_type,created_by) VALUES($1,$2,$3,$4)',
+            [s.trigger, file_id, s.match_type||'contains', ctx.uid])
+        );
+        try { require('../utils/cache').cacheClear('auto_replies_all'); } catch(_) {}
+        setState(ctx.uid, null);
+        return ctx.reply('✅ رد تلقائي بـ ' + resp_type + ' أضيف!', { ...require('../utils/keyboard').build([[require('../utils/keyboard').btn('◀️ رجوع','mg_auto_replies')]]) }).catch(()=>{});
+      }
+      return; // نص عادي — يكمل للمعالج الأصلي في manage.handleText
+    }
+
+        if (s?.type === 'mg_tpl_content')  return manage.handleText(ctx, s);
     if (s?.type === 'mg_notify_groups_msg') return manage.handleText(ctx, s);
     if (s?.type?.startsWith('gp_') || s?.type?.startsWith('mg_awaiting')) return groupPanel.handleMedia(ctx, s);
   });

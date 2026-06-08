@@ -437,7 +437,45 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
         await ctx.reply('✅ تم الحفظ!').catch(()=>{});
         return showGamesSettings(ctx);
       }
-      case 'mg_ar_trigger': {
+
+      case 'mg_bank_add_id': {
+        const targetId = parseInt(text);
+        if(!targetId || isNaN(targetId)) {
+          return ctx.reply('❌ ID غير صحيح، أرسل رقم ID فقط').catch(()=>{});
+        }
+        const { get: dbG } = require('../database/db');
+        const acc = await dbG('SELECT * FROM bank_accounts WHERE user_id=$1',[targetId]).catch(()=>null);
+        if(!acc) {
+          return ctx.reply('❌ هذا المستخدم ليس لديه حساب بنكي').catch(()=>{});
+        }
+        setState(uid, { type:'mg_bank_add_amount', targetId, targetName: acc.first_name||String(targetId) });
+        return ctx.reply(
+          '🏦 المستخدم: *' + (acc.first_name||targetId) + '*\n💰 رصيده الحالي: *' + Number(acc.balance).toLocaleString('en') + ' $*\n\nأرسل المبلغ المراد إضافته:',
+          { parse_mode:'Markdown', ...build([[btn('❌ إلغاء','mg_bank_panel')]]) }
+        ).catch(()=>{});
+      }
+      case 'mg_bank_add_amount': {
+        const amount = parseInt(text);
+        if(!amount || isNaN(amount) || amount === 0) {
+          return ctx.reply('❌ أرسل رقم صحيح (يمكن أن يكون سالباً للخصم)').catch(()=>{});
+        }
+        const { run: dbR, get: dbG } = require('../database/db');
+        await dbR('UPDATE bank_accounts SET balance=balance+$1 WHERE user_id=$2',[amount, state.targetId]);
+        await dbR("INSERT INTO bank_transactions(from_id,to_id,amount,type,note) VALUES(0,$1,$2,'admin','إضافة يدوية من الأدمن')",[state.targetId, Math.abs(amount)]);
+        const newAcc = await dbG('SELECT balance FROM bank_accounts WHERE user_id=$1',[state.targetId]).catch(()=>null);
+        setState(uid, null);
+        // إشعار المستخدم
+        ctx.telegram.sendMessage(state.targetId,
+          (amount>0?'💰 *تم إضافة ':'💸 *تم خصم ') + Math.abs(amount).toLocaleString('en') + ' $ ' + (amount>0?'لحسابك':'من حسابك') + ' من الإدارة*\n🏦 رصيدك الجديد: *' + Number(newAcc?.balance||0).toLocaleString('en') + ' $*',
+          { parse_mode:'Markdown' }
+        ).catch(()=>{});
+        return ctx.reply(
+          '✅ *تم!*\n👤 ' + (state.targetName||state.targetId) + '\n' + (amount>0?'➕ أضيف: ':'➖ خُصم: ') + '*' + Math.abs(amount).toLocaleString('en') + ' $*\n💰 الرصيد الجديد: *' + Number(newAcc?.balance||0).toLocaleString('en') + ' $*',
+          { parse_mode:'Markdown', ...build([[btn('◀️ رجوع','mg_bank_panel')]]) }
+        ).catch(()=>{});
+      }
+
+            case 'mg_ar_trigger': {
         setState(uid, { type: 'mg_ar_response', trigger: text });
         return eos(ctx,
           '🤖 *إضافة رد تلقائي*\n\n' +
@@ -447,6 +485,10 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
             [btn('❌ إلغاء','mg_auto_replies')]
           ]) }
         );
+      }
+      case 'mg_ar_response_media': {
+        // رد بمحتوى (تمت معالجته في handleMedia)
+        break;
       }
       case 'mg_ar_response': {
         const trigger = state.trigger;
@@ -611,7 +653,17 @@ async function handleCallback(ctx,data){
     } catch(e) { return ctx.answerCbQuery('❌ ' + e.message, {show_alert:true}).catch(()=>{}); }
   }
 
-  if(data==='mg_bank_top'){
+
+  if(data==='mg_bank_add') {
+    setState(uid, { type: 'mg_bank_add_id' });
+    return eos(ctx,
+      '🏦 *إضافة رصيد يدوي*\n\n' +
+      'أرسل ID المستخدم:',
+      { parse_mode:'Markdown', ...build([[btn('❌ إلغاء','mg_bank_panel')]]) }
+    );
+  }
+
+    if(data==='mg_bank_top'){
     const { all } = require('../database/db');
     const top = await all('SELECT first_name, balance FROM bank_accounts ORDER BY balance DESC LIMIT 10').catch(()=>[]);
     let text = '🏆 *أغنى المستخدمين*\n━━━━━━━━━━━━━━━━━━━━\n\n';
