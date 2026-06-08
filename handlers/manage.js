@@ -855,26 +855,82 @@ async function showAdsMenu(ctx) {
 // 🤖 الردود التلقائية
 // ══════════════════════════════════════════
 
-async function showAutoReplies(ctx) {
-  const list = await all('SELECT * FROM auto_replies WHERE is_active=1 ORDER BY id DESC LIMIT 20').catch(() => []);
-  let text = '🤖 *الردود التلقائية*\n━━━━━━━━━━━━━━━\n\n';
-  if (!list.length) {
-    text += '_لا توجد ردود مضافة_\n\n';
-  } else {
-    list.forEach((r, i) => {
-      const icon = r.match_type === 'exact' ? '🎯' : '🔍';
-      text += (i+1) + '. ' + icon + ' `' + escMd(r.trigger.substring(0,20)) + '`\n';
-      text += '   ↩️ ' + escMd(r.response.substring(0,30)) + '\n\n';
-    });
-  }
-  text += '📌 *أنواع المطابقة:*\n🔍 يحتوي على | 🎯 مطابقة تامة';
+async function showAutoReplies(ctx, page) {
+  page = parseInt(page) || 0;
+  const PAGE = 5;
+  const total = await require('../database/db').get('SELECT COUNT(*) as c FROM auto_replies WHERE is_active=1').catch(()=>({c:0}));
+  const totalCount = parseInt(total?.c) || 0;
+  const list = await all(
+    'SELECT * FROM auto_replies WHERE is_active=1 ORDER BY id DESC LIMIT $1 OFFSET $2',
+    [PAGE, page * PAGE]
+  ).catch(() => []);
 
-  const rows = list.map(r => [
-    btn('🗑 ' + r.trigger.substring(0,20), 'mg_del_ar_' + r.id)
-  ]);
-  rows.push([btn('➕ إضافة رد تلقائي', 'mg_add_ar')]);
+  const typeIcon = { exact:'🎯', regex:'⚙️', contains:'🔍' };
+
+  const text =
+    '🤖 *الردود التلقائية*\n━━━━━━━━━━━━━━━\n\n' +
+    '📊 المجموع: *' + totalCount + '* رد' +
+    (totalCount === 0 ? '\n\n_لا توجد ردود مضافة_' : '');
+
+  const rows = [];
+
+  // زر لكل رد — يعرض التفاصيل عند الضغط
+  list.forEach(r => {
+    const icon = typeIcon[r.match_type] || '🔍';
+    rows.push([btn(icon + ' ' + r.trigger.substring(0,25), 'mg_ar_view_' + r.id)]);
+  });
+
+  // تنقل صفحات
+  const navRow = [];
+  if (page > 0) navRow.push(btn('◀️', 'mg_ar_page_' + (page-1)));
+  if ((page+1)*PAGE < totalCount) navRow.push(btn('▶️', 'mg_ar_page_' + (page+1)));
+  if (navRow.length) rows.push(navRow);
+
+  rows.push([btn('➕ إضافة رد', 'mg_add_ar'), btn('🔍 بحث', 'mg_ar_search')]);
   rows.push(back('mg_menu'));
   return eos(ctx, text, { parse_mode: 'Markdown', ...build(rows) });
+}
+
+async function showAutoReplyDetail(ctx, id) {
+  const r = await require('../database/db').get('SELECT * FROM auto_replies WHERE id=$1',[id]).catch(()=>null);
+  if (!r) return ctx.answerCbQuery('❌ غير موجود').catch(()=>{});
+  const typeMap = { exact:'🎯 مطابقة تامة', regex:'⚙️ Regex', contains:'🔍 يحتوي على' };
+  const respType = r.resp_type || 'text';
+  const typeIcon2 = { text:'📝', photo:'🖼', video:'🎥', sticker:'🎭', voice:'🎤', animation:'🎞', document:'📄' };
+
+  let text =
+    '🤖 *تفاصيل الرد التلقائي*\n━━━━━━━━━━━━━━━\n\n' +
+    '🔑 *الكلمة:* `' + escMd(r.trigger) + '`\n' +
+    '📋 *النوع:* ' + (typeMap[r.match_type]||'🔍 يحتوي على') + '\n' +
+    '📤 *الرد:* ' + (typeIcon2[respType]||'📝') + ' ' + respType + '\n';
+
+  if (respType === 'text') {
+    text += '\n💬 *المحتوى:*\n' + escMd((r.response||'').substring(0,200));
+  }
+
+  const rows = [
+    [btn('🗑 حذف', 'mg_del_ar_' + r.id), btn('◀️ رجوع', 'mg_auto_replies')],
+  ];
+
+  // إرسال الوسائط مباشرة إذا كان رد بصورة/فيديو/ستيكر
+  if (respType !== 'text' && r.file_id) {
+    try {
+      const opts = { caption: text, parse_mode:'Markdown', reply_markup:{ inline_keyboard: rows } };
+      if (respType==='photo')     await ctx.telegram.sendPhoto(ctx.chat.id, r.file_id, opts).catch(()=>{});
+      else if (respType==='video') await ctx.telegram.sendVideo(ctx.chat.id, r.file_id, opts).catch(()=>{});
+      else if (respType==='sticker') {
+        await ctx.telegram.sendSticker(ctx.chat.id, r.file_id).catch(()=>{});
+        await ctx.reply(text, {parse_mode:'Markdown', ...build(rows)}).catch(()=>{});
+      }
+      else if (respType==='voice') await ctx.telegram.sendVoice(ctx.chat.id, r.file_id, opts).catch(()=>{});
+      else if (respType==='animation') await ctx.telegram.sendAnimation(ctx.chat.id, r.file_id, opts).catch(()=>{});
+      else if (respType==='document') await ctx.telegram.sendDocument(ctx.chat.id, r.file_id, opts).catch(()=>{});
+      ctx.answerCbQuery().catch(()=>{});
+      return;
+    } catch(_) {}
+  }
+
+  return eos(ctx, text, { parse_mode:'Markdown', ...build(rows) });
 }
 
 // ══════════════════════════════════════════
@@ -980,5 +1036,5 @@ async function startMillionQDel(ctx) {
   ).catch(()=> ctx.reply('🔢 أرسل رقم السؤال:').catch(()=>{}));
 }
 
-module.exports={mainMenu,handleCallback,handleText,handleFileUpload,handleBulkUpload,showUserProfile,showUsers,handleBundleFileUpload};
+module.exports={showAutoReplyDetail,mainMenu,handleCallback,handleText,handleFileUpload,handleBulkUpload,showUserProfile,showUsers,handleBundleFileUpload};
 
