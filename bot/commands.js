@@ -1,12 +1,7 @@
 'use strict';
 const { addChannel, removeChannel, getChannels } = require('../utils/channelGuard');
 
-module.exports = function registerCommands(bot, {
-  startHandler, manage, userH, million, tools, browse, bank,
-  contentDb, usersDb, bundlesDb, dbAll, cacheClear,
-  logger, OWNER_ID, kbBtn, kbBuild, eos, resetChat,
-  millionaire, tagAll, muteAll, unmuteAll, showAllMembers,
-}) {
+module.exports = function registerCommands(bot, { startHandler, manage, userH, million, tools, browse, bank, contentDb, usersDb, bundlesDb, dbAll, cacheClear, logger, OWNER_ID, kbBtn, kbBuild, eos, resetChat, millionaire, tagAll, muteAll, unmuteAll, showAllMembers }) {
 
   bot.command('top', async ctx => {
     if (ctx.chat?.type !== 'private') return;
