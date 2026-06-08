@@ -56,35 +56,4 @@ async function syncGroups(ctx) {
   ctx.reply('✅ مزامنة كاملة\n\n🟢 نشط: ' + ok + '\n🔴 تم تعطيل: ' + bad).catch(() => {});
 }
 
-
-bot.command('syncgroups', async ctx => {
-  if (!ctx.isOwner) return;
-  const { all, run } = require('../database/db');
-  const groups = await all('SELECT chat_id, title FROM group_chats WHERE is_active=1').catch(() => []);
-  if (!groups.length) return ctx.reply('لا توجد قروبات نشطة.').catch(() => {});
-  const m = await ctx.reply('🔄 جاري التحقق من ' + groups.length + ' قروب...').catch(() => {});
-  let ok = 0, bad = 0, notAdmin = 0;
-  const me = await ctx.telegram.getMe().catch(() => ({}));
-  for (const g of groups) {
-    try {
-      const member = await ctx.telegram.getChatMember(g.chat_id, me.id);
-      if (['kicked','left'].includes(member.status)) {
-        await run('UPDATE group_chats SET is_active=0 WHERE chat_id=$1', [g.chat_id]).catch(() => {});
-        bad++;
-      } else if (member.status !== 'administrator') {
-        await ctx.telegram.leaveChat(g.chat_id).catch(() => {});
-        await run('UPDATE group_chats SET is_active=0 WHERE chat_id=$1', [g.chat_id]).catch(() => {});
-        notAdmin++;
-      } else {
-        ok++;
-      }
-    } catch(_) {
-      await run('UPDATE group_chats SET is_active=0 WHERE chat_id=$1', [g.chat_id]).catch(() => {});
-      bad++;
-    }
-    await new Promise(r => setTimeout(r, 400));
-  }
-  ctx.reply('✅ مزامنة كاملة\n\n🟢 نشط: ' + ok + '\n🚪 غير موجود: ' + bad + '\n⚠️ مش ادمين (خرج): ' + notAdmin).catch(() => {});
-});
-
 module.exports = { spy, stress };

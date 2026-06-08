@@ -370,13 +370,13 @@ async function _doBroadcast(ctx, spId, text, fileId, mediaType) {
 // القائمة الرئيسية للقروبات
 // ══════════════════════════════════════════════════════════
 async function showMainMenu(ctx) {
-  const groups  = await all('SELECT COUNT(*) AS cnt FROM group_chats').then(r => r[0]?.cnt || 0).catch(() => 0);
+  const groups  = await all('SELECT COUNT(*) AS cnt FROM group_chats WHERE is_active=1').then(r => r[0]?.cnt || 0).catch(() => 0);
   const channels = await all('SELECT COUNT(*) AS cnt FROM group_chats WHERE specialty_id IS NOT NULL').then(r => r[0]?.cnt || 0).catch(() => 0);
 
   const rows = [
     [kbBtn('👥 إدارة القروبات',         'gp_panel')],
-    [kbBtn('📣 إشعار القروبات',          'mg_notify_groups')],
-    [kbBtn('🎮 ألعاب القروب',            'mb_panel')],
+
+
     [kbBtn('◀️ رجوع',                   'mg_menu')],
   ];
 
