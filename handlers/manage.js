@@ -162,87 +162,101 @@ async function showAnalytics(ctx){
 async function showLogs(ctx){const _lk='admin_logs';const _lc=cacheGet(_lk);const logs=_lc||await interactions.getLogs(20);if(!_lc) cacheSet(_lk,logs,60000);let text='📜 *آخر السجلات*\n\n';if(logs.length) logs.forEach(l=>{text+='• '+(escMd(l.first_name)||'ID:'+l.user_id)+': '+l.action+(l.details?' — '+l.details:'')+'\n';});else text+='_لا توجد سجلات._';return eos(ctx,text,{parse_mode:'Markdown',...build([back('mg_menu')])});}
 
 async function showUsers(ctx, page=0, filter='all') {
-  const PAGE_SIZE = 15;
-  const _uk = 'admin_users_' + page + '_' + filter;
-  const _uc = cacheGet(_uk);
-  let list, total;
+  const uid = ctx.uid || ctx.from?.id;
+  const perms = ctx.isOwner ? ['full'] : await require('../database/admins').getPerms(uid).catch(() => []);
+  if (!perms.includes('full') && !perms.includes('view_users'))
+    return ctx.answerCbQuery('ليس لديك صلاحية', { show_alert: true }).catch(() => {});
 
-  if (_uc) { list = _uc.list; total = _uc.total; }
-  else {
-    const whereClause = filter === 'banned'
-      ? "WHERE is_banned=1"
-      : filter === 'new'
-      ? "WHERE joined_at > NOW() - INTERVAL '24 hours'"
-      : "WHERE last_active > NOW() - INTERVAL '7 days'";
+  page = parseInt(page) || 0;
+  const limit = 10;
+  const offset = page * limit;
 
-    [list, total] = await Promise.all([
-      require('../database/db').all(
-        `SELECT id, first_name, last_name, username, is_banned, last_active, joined_at
-         FROM users ${whereClause}
-         ORDER BY last_active DESC NULLS LAST
-         LIMIT $1 OFFSET $2`,
-        [PAGE_SIZE, page * PAGE_SIZE]
-      ),
-      require('../database/db').get(
-        `SELECT COUNT(*) as c FROM users ${whereClause}`
-      ).then(r => parseInt(r?.c || 0))
-    ]);
-    cacheSet(_uk, { list, total }, 30000);
-  }
+  let whereClause = '';
+  if (filter === 'banned') whereClause = 'WHERE is_banned=1';
+  else if (filter === 'new')  whereClause = "WHERE joined_at >= NOW() - INTERVAL '1 day'";
+  else                        whereClause = "WHERE last_active >= NOW() - INTERVAL '7 days'";
 
-  const pages = Math.ceil(total / PAGE_SIZE) || 1;
-  const filterLabel = { all: '🟢 النشطون 7 أيام', banned: '🚫 المحظورون', new: '🆕 جدد اليوم' }[filter];
-
-  let text = '👥 *المستخدمون — ' + filterLabel + '*\n';
-  text += '📊 الإجمالي: *' + total + '* | صفحة *' + (page+1) + '/' + pages + '*\n';
-  text += '━━━━━━━━━━━━━━━\n\n';
-
-  if (!list.length) {
-    text += '_لا يوجد مستخدمون_';
-  } else {
-    list.forEach((u, i) => {
-      const num = page * PAGE_SIZE + i + 1;
-      const name = escMd((u.first_name || 'مجهول').substring(0, 15));
-      const uname = u.username ? ' @' + escMd(u.username.substring(0, 12)) : '';
-      const status = u.is_banned ? ' 🚫' : '';
-      const days = u.last_active
-        ? Math.floor((Date.now() - new Date(u.last_active)) / 86400000)
-        : '?';
-      const daysText = days === 0 ? 'اليوم' : days + 'ي';
-      text += num + '. ' + name + uname + status + ' `' + u.id + '` _(' + daysText + ')_\n';
-    });
-  }
-
-  // ── أزرار فلتر ──
-  const filterRow = [
-    btn(filter==='all'   ? '✅ النشطون' : '🟢 النشطون',  'mg_uf.all'),
-    btn(filter==='banned'? '✅ محظورون' : '🚫 محظورون',  'mg_uf.banned'),
-    btn(filter==='new'   ? '✅ جدد'     : '🆕 جدد',      'mg_uf.new'),
-  ];
-
-  // ── أزرار المستخدمين — زر واحد فقط لكل مستخدم ──
-  const userRows = list.map(u => [
-    btn(
-      (u.is_banned ? '🚫 ' : '👤 ') + (u.first_name || 'ID:' + u.id).substring(0, 20),
-      'mg_profile_' + u.id
-    )
+  const [list, totalRow] = await Promise.all([
+    all(`SELECT * FROM users ${whereClause} ORDER BY last_active DESC LIMIT $1 OFFSET $2`, [limit, offset]),
+    all(`SELECT COUNT(*) as c FROM users ${whereClause}`).then(r => parseInt(r[0]?.c || 0)),
   ]);
 
-  // ── Navigation ──
-  const nav = [];
-  if (page > 0)                      nav.push(btn('⬅️ السابق', 'mg_up.' + (page-1) + '.' + filter));
-  if ((page+1) * PAGE_SIZE < total)  nav.push(btn('التالي ➡️', 'mg_up.' + (page+1) + '.' + filter));
+  const totalPages = Math.ceil(totalRow / limit) || 1;
+  const filterLabel = { all: '🟢 النشطون 7 أيام', banned: '🚫 المحظورون', new: '🆕 جدد اليوم' }[filter];
+
+  const text =
+    '👥 *المستخدمون — ' + filterLabel + '*\n' +
+    '━━━━━━━━━━━━━━━━━━━━\n' +
+    'الإجمالي: *' + totalRow + '* | صفحة ' + (page + 1) + '/' + totalPages;
+
+  // فلاتر
+  const filterRow = [
+    btn(filter === 'all'    ? '✅ النشطون'  : '🟢 النشطون',   'mg_uf.all'),
+    btn(filter === 'banned' ? '✅ محظورون'  : '🚫 محظورون',  'mg_uf.banned'),
+    btn(filter === 'new'    ? '✅ جدد'      : '🆕 جدد',       'mg_uf.new'),
+  ];
+
+  // أزرار المستخدمين 2 × N
+  const userBtns = list.map(u => {
+    const icon = u.is_banned ? '🚫' : '👤';
+    const label = (icon + ' ' + (u.first_name || 'مجهول')).substring(0, 20);
+    return btn(label, 'mg_up_' + u.user_id);
+  });
+  const userRows = [];
+  for (let i = 0; i < userBtns.length; i += 2)
+    userRows.push(userBtns.slice(i, i + 2));
+
+  // تنقل صفحات
+  const navRow = [];
+  if (page > 0)              navRow.push(btn('◀️', 'mg_upg.' + filter + '.' + (page - 1)));
+  if ((page + 1) < totalPages) navRow.push(btn('▶️', 'mg_upg.' + filter + '.' + (page + 1)));
 
   const rows = [filterRow, ...userRows];
-  if (nav.length) rows.push(nav);
-  rows.push(back('mg_menu'));
+  if (navRow.length) rows.push(navRow);
+  rows.push([back('mg_main')[0]]);
 
   return eos(ctx, text, { parse_mode: 'Markdown', ...build(rows) });
 }
 
-async function showUserProfile(ctx,userId){const [user,dlCount,favCount,spRow,lastFile]=await Promise.all([usersDb.getById(userId),interactions.getUserDownloadCount(userId),require('../database/db').get('SELECT COUNT(*) as c FROM favorites WHERE user_id=$1',[userId]).then(r=>r?.c||0),usersDb.getSpecialty(userId),interactions.getLastFile(userId)]);if(!user) return ctx.reply('❌ المستخدم غير موجود.');const spId=spRow?.specialty_id;const sp=spId&&spId!=0?await content.getSpec(spId):null;const text='👤 *بروفايل المستخدم*\n\n🆔 ID: `'+userId+'`\n👋 الاسم: '+escMd(user.first_name||'؟')+' '+(user.last_name?escMd(user.last_name):'')+'\n'+(user.username?'📛 @'+escMd(user.username)+'\n':'')+'📅 انضم: '+(user.joined_at?new Date(user.joined_at).toLocaleDateString('en-GB'):'؟')+'\n🕐 آخر نشاط: '+(user.last_active?new Date(user.last_active).toLocaleDateString('en-GB'):'؟')+'\n🎓 التخصص: *'+escMd(sp?sp.name:'غير محدد')+'*\n🚫 محظور: '+(user.is_banned?'نعم':'لا')+'\n\n📊 *النشاط:*\n⬇️ التحميلات: *'+dlCount+'*\n⭐ المفضلة: *'+favCount+'*'+(lastFile?'\n📄 آخر ملف: *'+escMd(lastFile.title)+'*':'');const rows=[[btn(user.is_banned?'✅ إلغاء الحظر':'🚫 حظر',(user.is_banned?'mg_unban_':'mg_ban_')+userId)],[back('mg_users')[0]]];return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});}
-const { ALL_PERMS: PERMS_MAP } = require('../database/admins');
-const ALL_PERMS = Object.keys(PERMS_MAP);
+
+async function showUserProfile(ctx, userId) {
+  const [user, dlCount, favCount, spRow, lastFile] = await Promise.all([
+    usersDb.getById(userId),
+    interactions.getUserDownloadCount(userId),
+    require('../database/db').get('SELECT COUNT(*) as c FROM favorites WHERE user_id=$1', [userId]).then(r => r?.c || 0),
+    usersDb.getSpecialty(userId),
+    interactions.getLastFile(userId),
+  ]);
+  if (!user) return ctx.reply('❌ المستخدم غير موجود.').catch(() => {});
+
+  const spId = spRow?.specialty_id;
+  const sp   = spId && spId != 0 ? await content.getSpec(spId) : null;
+
+  const text =
+    '👤 *بروفايل المستخدم*\n\n' +
+    '🆔 ID: `' + userId + '`\n' +
+    '👋 الاسم: ' + escMd(user.first_name || '؟') + ' ' + (user.last_name ? escMd(user.last_name) : '') + '\n' +
+    (user.username ? '📛 @' + escMd(user.username) + '\n' : '') +
+    '📅 انضم: ' + (user.joined_at ? new Date(user.joined_at).toLocaleDateString('en-GB') : '؟') + '\n' +
+    '🕐 آخر نشاط: ' + (user.last_active ? new Date(user.last_active).toLocaleDateString('en-GB') : '؟') + '\n' +
+    '🎓 التخصص: *' + escMd(sp ? sp.name : 'غير محدد') + '*\n' +
+    '🚫 محظور: ' + (user.is_banned ? 'نعم ⛔' : 'لا ✅') + '\n\n' +
+    '📊 *النشاط:*\n' +
+    '⬇️ التحميلات: *' + dlCount + '*\n' +
+    '⭐ المفضلة: *' + favCount + '*' +
+    (lastFile ? '\n📄 آخر ملف: *' + escMd(lastFile.title) + '*' : '');
+
+  const rows = [
+    [
+      btn(user.is_banned ? '✅ إلغاء الحظر' : '🚫 حظر', (user.is_banned ? 'mg_unban_' : 'mg_ban_') + userId),
+      btn('💬 تواصل', 'mg_contact_' + userId),
+    ],
+    [back('mg_users')[0]],
+  ];
+  return eos(ctx, text, { parse_mode: 'Markdown', ...build(rows) });
+}
+
+
 const PERM_LABELS={upload:'📤 رفع',delete:'🗑 حذف',add_content:'➕ إضافة محتوى',view_users:'👥 مشاهدة المستخدمين',full:'👑 كل الصلاحيات'};
 
 async function showEditPerms(ctx, adminId) {
@@ -560,6 +574,31 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
       default:break;
     }
   }catch(e){clearState(uid);ctx.reply(e.message==='exists'?'❌ موجود!':'❌ '+e.message);}
+  // ── تواصل مع مستخدم ──
+  if (state && state.type === 'admin_contact') {
+    const targetId = state.targetId;
+    const msg = ctx.message;
+    try {
+      if (msg.photo) {
+        const fid = msg.photo[msg.photo.length - 1].file_id;
+        await ctx.telegram.sendPhoto(targetId, fid, { caption: msg.caption || '' });
+      } else if (msg.video) {
+        await ctx.telegram.sendVideo(targetId, msg.video.file_id, { caption: msg.caption || '' });
+      } else if (msg.sticker) {
+        await ctx.telegram.sendSticker(targetId, msg.sticker.file_id);
+      } else if (msg.document) {
+        await ctx.telegram.sendDocument(targetId, msg.document.file_id, { caption: msg.caption || '' });
+      } else if (text) {
+        await ctx.telegram.sendMessage(targetId, text);
+      }
+      await clearState(uid);
+      await ctx.reply('✅ تم الإرسال!', build([[btn('◀️ رجوع للبروفايل', 'mg_up_' + targetId)]]));
+    } catch(_) {
+      await ctx.reply('❌ فشل الإرسال — المستخدم ربما حظر البوت.');
+    }
+    return true;
+  }
+
 }
 async function handleCallback(ctx,data){
   const uid=ctx.uid;
@@ -775,6 +814,29 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
   if(data.startsWith('mg_ep_')) return showEditPerms(ctx,data.replace('mg_ep_',''));
   if(data.startsWith('mg_tp_')){const p=data.replace('mg_tp_','').split('_');const adminId=p[0];const perm=p.slice(1).join('_');const list=await adminsDb.getAll();const admin=list.find(a=>a.user_id==adminId);let perms=(admin.permissions||'').split(',').map(x=>x.trim()).filter(Boolean);if(perms.includes(perm)) perms=perms.filter(x=>x!==perm);else{if(perm==='full') perms=['full'];else{perms=perms.filter(x=>x!=='full');perms.push(perm);}}await adminsDb.updatePerms(adminId,perms.join(','));return showEditPerms(ctx,adminId);}
   if(data.startsWith('mg_profile_')) return showUserProfile(ctx,data.replace('mg_profile_',''));
+  // ── بروفايل مستخدم من الأزرار الجديدة ──
+  if (data.startsWith('mg_up_')) {
+    const uid2 = parseInt(data.replace('mg_up_', ''));
+    return showUserProfile(ctx, uid2);
+  }
+  // ── تنقل صفحات المستخدمين ──
+  if (data.startsWith('mg_upg.')) {
+    const parts = data.split('.');
+    return showUsers(ctx, parseInt(parts[2]) || 0, parts[1] || 'all');
+  }
+  // ── تواصل مع مستخدم ──
+  if (data.startsWith('mg_contact_')) {
+    const cuid = data.replace('mg_contact_', '');
+    const { setState } = require('../utils/stateManager');
+    await setState(ctx.uid || ctx.from?.id, { type: 'admin_contact', targetId: cuid });
+    return eos(ctx,
+      '💬 *تواصل مع المستخدم*\n\n' +
+      'أرسل أي شيء — نص، صورة، فيديو، أو ستيكر\n' +
+      'وسيصله عبر البوت مباشرة.',
+      { parse_mode: 'Markdown', ...build([[btn('❌ إلغاء', 'mg_up_' + cuid)]]) }
+    );
+  }
+
   if(data.startsWith('mg_ban_')){const bid=parseInt(data.replace('mg_ban_',''));await usersDb.ban(bid);cacheClearPrefix('admin_users_');cacheClear('ban_'+bid);await interactions.addLog(uid,'ban',String(bid));return showUsers(ctx);}
   if(data.startsWith('mg_unban_')){const ubid=parseInt(data.replace('mg_unban_',''));await usersDb.unban(ubid);cacheClearPrefix('admin_users_');cacheClear('ban_'+ubid);return showUsers(ctx);}
   if(data.startsWith('mg_uf.')) {
@@ -1070,4 +1132,3 @@ async function startMillionQDel(ctx) {
 }
 
 module.exports={showAutoReplyDetail,mainMenu,handleCallback,handleText,handleFileUpload,handleBulkUpload,showUserProfile,showUsers,handleBundleFileUpload};
-
