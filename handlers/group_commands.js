@@ -342,9 +342,8 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   // 🎮 كومند الألعاب
   // ══════════════════════════════════════════
-  bot.command(["العاب", "games"], async ctx => {
+  bot.command(["العاب", "games", "العبوا"], async ctx => {
     if (!isGroup(ctx)) return;
-    delCmd(ctx);
     const { get: dbG } = require('../database/db');
     const qc = await dbG('SELECT COUNT(*) AS c FROM million_questions WHERE is_active=1').catch(() => ({ c: 0 }));
     const qs = qc?.c || 0;
