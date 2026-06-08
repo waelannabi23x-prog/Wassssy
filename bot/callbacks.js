@@ -4,24 +4,8 @@ const { handleSettingsCallback } = require('../handlers/group_commands');
 const browse      = require('../handlers/browse');
 const groupPanel  = require('../handlers/group_panel');
 const groupSetup  = require('../handlers/group_setup');
-const gamesPanel    = require('../handlers/games_panel');
-const millionGame  = require('../handlers/millionaire');
-
-
-  // ── Games Callbacks ──
-  bot.action(/^games_/, async ctx => {
-    // فقط من أرسل الأمر الأصلي
-    const senderId = ctx.callbackQuery?.message?.reply_to_message?.from?.id || ctx.from?.id;
-    if (ctx.from?.id !== senderId) {
-      return ctx.answerCbQuery('⚠️ هذه الأزرار خاصة بمن طلبها!', { show_alert: true }).catch(() => {});
-    }
-    const data = ctx.callbackQuery?.data || '';
-    try {
-      await handleBankGamesCallback(ctx, data);
-    } catch(e) {
-      ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {});
-    }
-  });
+const gamesPanel  = require('../handlers/games_panel');
+const millionGame = require('../handlers/millionaire');
 
 module.exports.registerCallbacks = function(bot, deps) {
   const {
