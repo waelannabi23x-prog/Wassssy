@@ -844,7 +844,19 @@ async function handleAddQuestion(ctx) {
 
   _addState.set(uid, { step: 'text', data: {} });
   return ctx.reply(
-    '➕ *إضافة سؤال جديد*\n\n📝 أرسل نص السؤال:',
+    '➕ *إضافة سؤال جديد*\n━━━━━━━━━━━━━━━\n\n' +
+    '📋 *الصيغة المطلوبة (كل شيء في رسالة وحدة):*\n\n' +
+    '```\n' +
+    'السؤال: ما هي عاصمة فرنسا؟\n' +
+    'أ: باريس\n' +
+    'ب: لندن\n' +
+    'ج: برلين\n' +
+    'د: روما\n' +
+    'الجواب: أ\n' +
+    'الصعوبة: سهل\n' +
+    '```\n\n' +
+    '📌 الصعوبة: *سهل* / *متوسط* / *صعب*\n' +
+    '📌 الجواب: *أ* أو *ب* أو *ج* أو *د*',
     { parse_mode: 'Markdown' }
   ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 }
@@ -857,13 +869,41 @@ async function handleAddText(ctx) {
   const txt = ctx.message.text.trim();
 
   if (st.step === 'text') {
+    // تحقق إذا الرسالة تحتوي على الصيغة الكاملة
+    const lines = txt.split('\n').map(l => l.trim()).filter(Boolean);
+    const sLine = lines.find(l => l.startsWith('السؤال:'));
+    const aLine = lines.find(l => l.startsWith('أ:') || l.startsWith('ا:'));
+    const bLine = lines.find(l => l.startsWith('ب:'));
+    const cLine = lines.find(l => l.startsWith('ج:'));
+    const dLine = lines.find(l => l.startsWith('د:'));
+    const ansLine = lines.find(l => l.startsWith('الجواب:'));
+    const diffLine = lines.find(l => l.startsWith('الصعوبة:'));
+
+    if (sLine && aLine && bLine && cLine && dLine && ansLine) {
+      // صيغة كاملة — احفظ مباشرة
+      const question = sLine.replace('السؤال:', '').trim();
+      const opts = [
+        aLine.replace(/^[اأ]:/, '').trim(),
+        bLine.replace('ب:', '').trim(),
+        cLine.replace('ج:', '').trim(),
+        dLine.replace('د:', '').trim(),
+      ];
+      const ansMap = { 'أ':'a', 'ا':'a', 'ب':'b', 'ج':'c', 'د':'d', 'a':'a', 'b':'b', 'c':'c', 'd':'d' };
+      const correct = ansMap[ansLine.replace('الجواب:', '').trim()] || 'a';
+      const diffMap = { 'سهل':'easy', 'متوسط':'medium', 'صعب':'hard', 'easy':'easy', 'medium':'medium', 'hard':'hard' };
+      const difficulty = diffMap[diffLine?.replace('الصعوبة:', '').trim() || 'متوسط'] || 'medium';
+
+      await saveQuestion(ctx, uid, { text: question, opts, correct, difficulty, category: 'عام' });
+      _addState.delete(uid);
+      return true;
+    }
+
+    // صيغة قديمة — خطوة خطوة
     st.data.text = txt;
     st.step = 'options';
     await ctx.reply(
-      '✅ السؤال:\n' + txt + '\n\n' +
-      '📝 الآن أرسل الخيارات الأربعة (كل خيار في سطر):\n' +
-      'مثال:\n' +
-      'باريس\nلندن\nبرلين\nروما'
+      '✅ السؤال: ' + txt + '\n\n' +
+      '📝 أرسل الخيارات الأربعة (كل خيار في سطر):'
     ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     return true;
   }
