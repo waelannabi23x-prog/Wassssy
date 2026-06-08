@@ -585,4 +585,29 @@ async function handleSettingsCallback(ctx, data) {
   return false;
 }
 
-module.exports = { setupGroupCommands, handleSettingsCallback, showGroupSettings };
+
+async function showGamesMenu(ctx) {
+  const { get: dbG } = require('../database/db');
+  const qc = await dbG('SELECT COUNT(*) AS c FROM million_questions WHERE is_active=1').catch(() => ({ c: 0 }));
+  const qs = qc?.c || 0;
+  const text =
+    '🎮 *ألعاب القروب*\n━━━━━━━━━━━━━━━━━━━━\n\n' +
+    '🏆 *من سيربح المليون* — ' + qs + ' سؤال — اكتب *مليون*\n' +
+    '📸 *خمن الصورة* — اكتب *خمن*\n' +
+    '🎲 *قلب العملة* — /flip [مبلغ]\n' +
+    '🦹 *السرقة* — رد + /rob\n' +
+    '🎁 *مكافأة يومية* — /daily\n' +
+    '🏅 *المتصدرون* — /leaderboard';
+  const rows = [
+    [{ text: '🏆 مليون', callback_data: 'games_start_million' }, { text: '📸 خمن', callback_data: 'games_start_guess' }],
+    [{ text: '🎲 قلب عملة', callback_data: 'games_start_flip' }, { text: '🏦 حسابي البنكي', callback_data: 'games_bank' }],
+    [{ text: '🎁 مكافأة يومية', callback_data: 'games_daily' }, { text: '🏅 متصدرون', callback_data: 'games_leaderboard' }],
+  ];
+  return ctx.reply(text, {
+    parse_mode: 'Markdown',
+    reply_to_message_id: ctx.message?.message_id,
+    reply_markup: { inline_keyboard: rows }
+  }).catch(() => null);
+}
+
+module.exports = { setupGroupCommands, showGamesMenu, handleSettingsCallback, showGroupSettings };
