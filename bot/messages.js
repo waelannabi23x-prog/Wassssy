@@ -265,9 +265,11 @@ module.exports.registerMessages = function(bot, deps) {
         const gamesPanel = require('../handlers/games_panel');
         return gamesPanel.handleText(ctx, txt, s);
       }
-      // ── ألعاب panel ──
-      const handled = await require('../handlers/games_panel').handleText(ctx).catch(() => false);
-      if (handled) return;
+      // ── ألعاب panel — فقط لما في state مناسب ──
+      if (s?.type?.startsWith('gp_million') || s?.type?.startsWith('gp_guess')) {
+        const handled = await require('../handlers/games_panel').handleText(ctx).catch(() => false);
+        if (handled) return;
+      }
     } catch(e) { logger.error('[TextHandler]', e.message, { uid: ctx.from?.id }); }
   });
 
