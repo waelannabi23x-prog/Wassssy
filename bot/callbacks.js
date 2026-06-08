@@ -639,7 +639,8 @@ module.exports.registerCallbacks = function(bot, deps) {
           || data.startsWith('mlr_') || data.startsWith('mar_')
           || data.startsWith('grp_mute_1h_') || data.startsWith('grp_ban_')
           || data.startsWith('grp_warns_') || data.startsWith('grp_perms_')
-          || data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_');
+          || data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_')
+          || data.startsWith('games_');
         if (!_grpOk)
           return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }
