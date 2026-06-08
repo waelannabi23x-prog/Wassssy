@@ -615,6 +615,12 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
 async function handleCallback(ctx,data){
   const uid=ctx.uid;
   try{
+  if(data==='mg_menu')         return mainMenu(ctx);
+  if(data==='mg_sec_users')    return showSectionUsers(ctx);
+  if(data==='mg_sec_content')  return showSectionContent(ctx);
+  if(data==='mg_sec_notify')   return showSectionNotify(ctx);
+  if(data==='mg_sec_admin')    return showSectionAdmin(ctx);
+  if(data==='mg_sec_settings') return showSectionSettings(ctx);
   if(data==='mg_content') return showContent(ctx);
   // ── بروفايل مستخدم من الأزرار الجديدة ──
   if (data.startsWith('mg_up_') && !data.startsWith('mg_upg_')) {
