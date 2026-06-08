@@ -15,7 +15,7 @@ async function migrateGroupPanel() {
 }
 
 async function showGroupPanel(ctx) {
-  const groups = await all('SELECT * FROM group_chats ORDER BY title').catch(() => []);
+  const groups = await all('SELECT * FROM group_chats WHERE is_active=1 ORDER BY title').catch(() => []);
   const total = groups.length;
 
   let text = '📋 *لوحة إدارة القروبات*\n';
@@ -39,7 +39,6 @@ async function showGroupPanel(ctx) {
     kbBtn('📢 رسالة للكل',    'gp_broadcast_0'),
     kbBtn('🎓 رسالة لتخصص', 'gp_broadcast_sp'),
   ]);
-  rows.push([kbBtn('🎮 ألعاب القروب', 'mb_panel')]);
   rows.push([kbBtn('◀️ رجوع', 'mg_menu')]);
 
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
