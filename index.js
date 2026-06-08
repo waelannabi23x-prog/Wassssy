@@ -418,22 +418,29 @@ async function launch() {
       if (['member','administrator'].includes(member?.status)) {
         // تحقق إذا البوت ادمين
         if (member?.status !== 'administrator') {
-          // مش ادمين — بعث رسالة لمن أضافه وخرج
+          // مش ادمين — بعث رسالة في القروب + DM + خروج
           const addedBy2 = ctx.update?.my_chat_member?.from;
+          const _me2 = ctx.botInfo || await ctx.telegram.getMe().catch(() => ({}));
+          const _un2 = _me2.username || '';
+          const _kb2 = { inline_keyboard: [[
+            { text: '👑 أضفني كـ مشرف 🛡️', url: 'https://t.me/' + _un2 + '?startgroup=true&admin=delete_messages+restrict_members+pin_messages+invite_users+manage_chat' }
+          ]]};
+          // رسالة في القروب أولاً
+          await ctx.telegram.sendMessage(chat.id,
+            '👋 مرحباً! أنا *' + (_un2 || 'البوت') + '*\n\n' +
+            '❌ تمت إضافتي بدون صلاحيات ادمين.\n' +
+            '👇 أضفني كمشرف لأعمل بشكل صحيح:',
+            { parse_mode: 'Markdown', reply_markup: _kb2 }
+          ).catch(() => {});
+          // رسالة في الخاص
           if (addedBy2?.id) {
-            const _me2 = ctx.botInfo || await ctx.telegram.getMe().catch(() => ({}));
-            const _un2 = _me2.username || '';
             await ctx.telegram.sendMessage(addedBy2.id,
-              '⚠️ تم إضافتي في *' + (chat.title||'القروب') + '* لكن بدون صلاحيات ادمين!\n\n' +
-              '👇 اضغط الزر لإضافتي كمشرف:',
-              {
-                parse_mode: 'Markdown',
-                reply_markup: { inline_keyboard: [
-                  [{ text: '👑 أضفني كـ مشرف 🛡️', url: 'https://t.me/' + _un2 + '?startgroup=true&admin=delete_messages+restrict_members+pin_messages+invite_users+manage_chat' }]
-                ]}
-              }
+              '⚠️ أضفتني في *' + (chat.title||'القروب') + '* بدون صلاحيات ادمين!\n\n' +
+              '👇 اضغط لإضافتي كمشرف:',
+              { parse_mode: 'Markdown', reply_markup: _kb2 }
             ).catch(() => {});
           }
+          await new Promise(r => setTimeout(r, 2000));
           await ctx.telegram.leaveChat(chat.id).catch(() => {});
           logger.info('[GroupReg] ⚠️ خرج البوت (مش ادمين) من: ' + (chat.title||chat.id));
           return;
