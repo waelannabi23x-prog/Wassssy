@@ -357,8 +357,8 @@ function setupGroupCommands(bot) {
       '🏅 *المتصدرون* — /leaderboard';
     const rows = [
       [{ text: '🏆 مليون', callback_data: 'games_start_million' }, { text: '📸 خمن', callback_data: 'games_start_guess' }],
-      [{ text: '🎲 /flip', callback_data: 'games_start_flip' }, { text: '🏦 حسابي', callback_data: 'games_bank' }],
-      [{ text: '🎁 /daily', callback_data: 'games_daily' }, { text: '🏅 متصدرون', callback_data: 'games_leaderboard' }],
+      [{ text: '🎲 قلب عملة', callback_data: 'games_start_flip' }, { text: '🏦 حسابي البنكي', callback_data: 'games_bank' }],
+      [{ text: '🎁 مكافأة يومية', callback_data: 'games_daily' }, { text: '🏅 متصدرون', callback_data: 'games_leaderboard' }],
     ];
     const msg = await ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } }).catch(() => null);
     if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(() => {}), 120000);

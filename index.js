@@ -135,6 +135,9 @@ bot.use(async (ctx, next) => {
   if (isGroup && ctx.message) {
     // ألعاب
     if (/^خمن$/i.test(txt)) return guessGame.startInvite(ctx).catch(() => next());
+    if (/^(العاب|الالعاب)$/i.test(txt)) {
+      try { await require('./handlers/group_commands').showGamesMenu(ctx); return; } catch(_) {}
+    }
     if (/^تخمين[:\s:]+/i.test(txt)) {
       const handled = await guessGame.handleGuessMsg(ctx).catch(() => false);
       if (handled) return;

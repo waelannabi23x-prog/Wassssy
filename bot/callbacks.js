@@ -671,7 +671,14 @@ module.exports.registerCallbacks = function(bot, deps) {
         filesDb.getFiles(parseInt(parts[parts.length-1])).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }
 
-      if (exactR.has(data)) return exactR.get(data)(ctx, data);
+      // ── ألعاب القروب ──
+      if (data.startsWith('games_')) {
+        try { await handleBankGamesCallback(ctx, data); }
+        catch(e) { ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
+        return;
+      }
+
+            if (exactR.has(data)) return exactR.get(data)(ctx, data);
       const _h = _getPrefixHandler(data);
       if (_h) return _h(ctx, data);
 
