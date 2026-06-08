@@ -323,11 +323,28 @@ module.exports.registerMessages = function(bot, deps) {
   });
   bot.on('sticker', async ctx => {
     if (ctx.chat?.type !== 'private') return;
-    const sticker = ctx.message.sticker;
     const s = require('../utils/stateManager').getState(ctx.uid);
+    // إذا كان في وضع إضافة رد تلقائي — احفظ الستيكر
+    if (s?.type === 'mg_ar_response') {
+      const { setState } = require('../utils/stateManager');
+      const { run: dbR } = require('../database/db');
+      const file_id = ctx.message.sticker?.file_id;
+      if (file_id) {
+        await dbR(
+          'INSERT INTO auto_replies(trigger,response,match_type,resp_type,file_id,created_by) VALUES($1,$2,$3,$4,$5,$6)',
+          [s.trigger, '', s.match_type||'contains', 'sticker', file_id, ctx.uid]
+        ).catch(() =>
+          dbR('INSERT INTO auto_replies(trigger,response,match_type,created_by) VALUES($1,$2,$3,$4)',
+            [s.trigger, file_id, s.match_type||'contains', ctx.uid])
+        );
+        require('../utils/cache').cacheClear('auto_replies_all');
+        setState(ctx.uid, null);
+        return ctx.reply('✅ رد تلقائي بستيكر أضيف!', {
+          reply_markup: { inline_keyboard: [[{ text: '◀️ رجوع', callback_data: 'mg_auto_replies' }]] }
+        }).catch(() => {});
+      }
+    }
     if (s?.type?.startsWith('gp_') || s?.type?.startsWith('mg_awaiting')) return groupPanel.handleMedia(ctx, s);
-    // رد بنفس الـ sticker
-    // لا ترد تلقائياً
   });
 
   bot.on('inline_query', async ctx => {
