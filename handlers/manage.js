@@ -227,6 +227,7 @@ async function showUsers(ctx, page=0, filter='all') {
 
 
 async function showUserProfile(ctx, userId) {
+  userId = String(userId);
   const [user, dlCount, favCount, spRow, lastFile] = await Promise.all([
     usersDb.getById(userId),
     interactions.getUserDownloadCount(userId),
@@ -823,7 +824,8 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
   if(data.startsWith('mg_profile_')) return showUserProfile(ctx,data.replace('mg_profile_',''));
   // ── بروفايل مستخدم من الأزرار الجديدة ──
   if (data.startsWith('mg_up_') && !data.startsWith('mg_upg_')) {
-    const uid2 = parseInt(data.replace('mg_up_', ''));
+    const uid2 = data.replace('mg_up_', '');
+    if (!uid2 || isNaN(Number(uid2))) return ctx.answerCbQuery('❌').catch(() => {});
     return showUserProfile(ctx, uid2);
   }
   // ── تنقل صفحات المستخدمين ──
