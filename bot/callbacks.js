@@ -531,17 +531,69 @@ module.exports.registerCallbacks = function(bot, deps) {
           if (!isAdmOrOwner) return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(() => {});
         }
         if (data.startsWith('grp_warns_show_')) {
-          const uid2 = parseInt(data.replace('grp_warns_show_', ''));
-          const { all: dbAll } = require('../database/db');
-          const rows = await dbAll('SELECT reason, created_at FROM group_warns WHERE chat_id=$1 AND user_id=$2 ORDER BY created_at DESC LIMIT 5', [ctx.chat.id, uid2]).catch(() => []);
+          const parts_w = data.replace('grp_warns_show_', '').split('_');
+          const uid2  = parseInt(parts_w[0]);
+          const cid_w = parts_w[1] ? parseInt(parts_w[1]) : ctx.chat?.id;
+          const { all: dbAll, run: dbRun } = require('../database/db');
+          const rows = await dbAll('SELECT id, reason, created_at FROM group_warns WHERE chat_id=$1 AND user_id=$2 ORDER BY created_at DESC LIMIT 5', [cid_w, uid2]).catch(() => []);
           const cnt = rows.length;
-          let txt = '❗ *الإنذارات: ' + cnt + '/3*\n\n';
+          let txt = '❗ *إنذارات العضو: ' + cnt + '/3*\n\n';
           for (const r of rows) {
             const d = new Date(r.created_at).toLocaleDateString('ar');
             txt += '• ' + r.reason + ' — ' + d + '\n';
           }
-          if (!cnt) txt = '✅ لا توجد إنذارات';
-          return ctx.answerCbQuery('').catch(()=>{}) || ctx.reply(txt, { parse_mode: 'Markdown' }).catch(() => {});
+          if (!cnt) txt = '✅ لا توجد إنذارات بعد';
+          const wKb = [[
+            { text: '➕ إنذار', callback_data: 'grp_wadd_' + uid2 + '_' + cid_w },
+            { text: '➖ حذف إنذار', callback_data: 'grp_wdel_' + uid2 + '_' + cid_w },
+          ]];
+          await ctx.answerCbQuery('').catch(() => {});
+          return ctx.reply(txt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: wKb } }).catch(() => {});
+        }
+
+        if (data.startsWith('grp_wadd_')) {
+          const parts_wa = data.replace('grp_wadd_', '').split('_');
+          const uid2 = parseInt(parts_wa[0]);
+          const cid_w = parseInt(parts_wa[1]);
+          const { run: dbRun, get: dbGet } = require('../database/db');
+          await dbRun(
+            'INSERT INTO group_warns(chat_id,user_id,warned_by,reason,created_at) VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)',
+            [cid_w, uid2, ctx.from.id, 'إنذار يدوي']
+          ).catch(() => {});
+          const cnt = await dbGet('SELECT COUNT(*) as c FROM group_warns WHERE chat_id=$1 AND user_id=$2', [cid_w, uid2]).then(r=>r?.c||0).catch(()=>0);
+          // تحقق إذا وصل 3
+          if (parseInt(cnt) >= 3) {
+            await ctx.telegram.banChatMember(cid_w, uid2).catch(() => {});
+            await dbRun('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [cid_w, uid2]).catch(() => {});
+            return ctx.editMessageText('🚫 *تم الحظر تلقائياً بعد 3 إنذارات!*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '🔓 رفع الحظر', callback_data: 'grp_unban_' + uid2 }]] }}).catch(() => {});
+          }
+          await ctx.editMessageText(
+            '❗ *إنذارات العضو: ' + cnt + '/3*\n\n✅ تم إضافة إنذار',
+            { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[
+              { text: '➕ إنذار', callback_data: 'grp_wadd_' + uid2 + '_' + cid_w },
+              { text: '➖ حذف إنذار', callback_data: 'grp_wdel_' + uid2 + '_' + cid_w },
+            ]]}}
+          ).catch(() => {});
+          return ctx.answerCbQuery('✅ تم إضافة إنذار — ' + cnt + '/3').catch(() => {});
+        }
+
+        if (data.startsWith('grp_wdel_')) {
+          const parts_wd = data.replace('grp_wdel_', '').split('_');
+          const uid2 = parseInt(parts_wd[0]);
+          const cid_w = parseInt(parts_wd[1]);
+          const { run: dbRun, get: dbGet, all: dbAll2 } = require('../database/db');
+          // نحذف آخر إنذار
+          const last = await dbAll2('SELECT id FROM group_warns WHERE chat_id=$1 AND user_id=$2 ORDER BY created_at DESC LIMIT 1', [cid_w, uid2]).then(r=>r[0]).catch(()=>null);
+          if (last) await dbRun('DELETE FROM group_warns WHERE id=$1', [last.id]).catch(() => {});
+          const cnt = await dbGet('SELECT COUNT(*) as c FROM group_warns WHERE chat_id=$1 AND user_id=$2', [cid_w, uid2]).then(r=>r?.c||0).catch(()=>0);
+          await ctx.editMessageText(
+            '❗ *إنذارات العضو: ' + cnt + '/3*\n\n✅ تم حذف إنذار',
+            { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[
+              { text: '➕ إنذار', callback_data: 'grp_wadd_' + uid2 + '_' + cid_w },
+              { text: '➖ حذف إنذار', callback_data: 'grp_wdel_' + uid2 + '_' + cid_w },
+            ]]}}
+          ).catch(() => {});
+          return ctx.answerCbQuery('✅ تم حذف إنذار — ' + cnt + '/3').catch(() => {});
         }
         if (data.startsWith('grp_mute_60_')) {
           const uid2 = parseInt(data.replace('grp_mute_60_', ''));
