@@ -215,8 +215,8 @@ async function showUsers(ctx, page=0, filter='all') {
 
   // تنقل صفحات
   const navRow = [];
-  if (page > 0)              navRow.push(btn('◀️', 'mg_upg.' + filter + '.' + (page - 1)));
-  if ((page + 1) < totalPages) navRow.push(btn('▶️', 'mg_upg.' + filter + '.' + (page + 1)));
+  if (page > 0)              navRow.push(btn('◀️', 'mg_upg_' + filter + '_' + (page - 1)));
+  if ((page + 1) < totalPages) navRow.push(btn('▶️', 'mg_upg_' + filter + '_' + (page + 1)));
 
   const rows = [filterRow, ...userRows];
   if (navRow.length) rows.push(navRow);
@@ -822,14 +822,16 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
   if(data.startsWith('mg_tp_')){const p=data.replace('mg_tp_','').split('_');const adminId=p[0];const perm=p.slice(1).join('_');const list=await adminsDb.getAll();const admin=list.find(a=>a.user_id==adminId);let perms=(admin.permissions||'').split(',').map(x=>x.trim()).filter(Boolean);if(perms.includes(perm)) perms=perms.filter(x=>x!==perm);else{if(perm==='full') perms=['full'];else{perms=perms.filter(x=>x!=='full');perms.push(perm);}}await adminsDb.updatePerms(adminId,perms.join(','));return showEditPerms(ctx,adminId);}
   if(data.startsWith('mg_profile_')) return showUserProfile(ctx,data.replace('mg_profile_',''));
   // ── بروفايل مستخدم من الأزرار الجديدة ──
-  if (data.startsWith('mg_up_')) {
+  if (data.startsWith('mg_up_') && !data.startsWith('mg_upg_')) {
     const uid2 = parseInt(data.replace('mg_up_', ''));
     return showUserProfile(ctx, uid2);
   }
   // ── تنقل صفحات المستخدمين ──
-  if (data.startsWith('mg_upg.')) {
-    const parts = data.split('.');
-    return showUsers(ctx, parseInt(parts[2]) || 0, parts[1] || 'all');
+  if (data.startsWith('mg_upg_')) {
+    const parts = data.replace('mg_upg_', '').split('_');
+    const pg = parseInt(parts[parts.length - 1]) || 0;
+    const flt = parts.slice(0, -1).join('_') || 'all';
+    return showUsers(ctx, pg, flt);
   }
   // ── تواصل مع مستخدم ──
   if (data.startsWith('mg_contact_')) {
