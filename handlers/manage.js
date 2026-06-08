@@ -565,6 +565,21 @@ async function handleCallback(ctx,data){
       { parse_mode:'Markdown', ...build([[btn('❌ إلغاء','mg_games_settings')]]) }
     );
   }
+  if(data.startsWith('mg_ar_page_')) {
+    const pg = parseInt(data.replace('mg_ar_page_','')) || 0;
+    return showAutoReplies(ctx, pg);
+  }
+  if(data.startsWith('mg_ar_view_')) {
+    const arId = parseInt(data.replace('mg_ar_view_',''));
+    return showAutoReplyDetail(ctx, arId);
+  }
+  if(data==='mg_ar_search') {
+    setState(uid, { type: 'mg_ar_search' });
+    return eos(ctx,
+      '🔍 *بحث في الردود التلقائية*\n\nأرسل الكلمة للبحث:',
+      { parse_mode:'Markdown', ...build([[btn('❌ إلغاء','mg_auto_replies')]]) }
+    );
+  }
   if(data==='mg_add_ar') {
     setState(uid, { type: 'mg_ar_trigger' });
     return eos(ctx,
