@@ -612,6 +612,19 @@ async function handleCallback(ctx,data){
   const uid=ctx.uid;
   try{
   if(data==='mg_content') return showContent(ctx);
+  // ── بروفايل مستخدم من الأزرار الجديدة ──
+  if (data.startsWith('mg_up_') && !data.startsWith('mg_upg_')) {
+    const uid2 = data.replace('mg_up_', '');
+    if (!uid2 || isNaN(Number(uid2))) return ctx.answerCbQuery('❌').catch(() => {});
+    return showUserProfile(ctx, uid2);
+  }
+  // ── تنقل صفحات المستخدمين ──
+  if (data.startsWith('mg_upg_')) {
+    const parts = data.replace('mg_upg_', '').split('_');
+    const pg = parseInt(parts[parts.length - 1]) || 0;
+    const flt = parts.slice(0, -1).join('_') || 'all';
+    return showUsers(ctx, pg, flt);
+  }
 
   // ── القنوات والإعلانات ──
   if(data==='mg_channels_menu') return showChannelsMenu(ctx);
@@ -820,21 +833,9 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
   if(data.startsWith('mg_admin_sp_')){const p=data.replace('mg_admin_sp_','').split('_');await adminsDb.setSpecialty(p[0],p[1]);return eos(ctx,'✅ تم تحديد التخصص',{...build([back('mg_admins')])});}
   if(data.startsWith('mg_da_')){const rid=parseInt(data.replace('mg_da_',''));await adminsDb.remove(rid);if(global.invalidateAdmin)global.invalidateAdmin(rid);return showAdmins(ctx);}
   if(data.startsWith('mg_ep_')) return showEditPerms(ctx,data.replace('mg_ep_',''));
-  if(data.startsWith('mg_tp_')){const p=data.replace('mg_tp_','').split('_');const adminId=p[0];const perm=p.slice(1).join('_');const list=await adminsDb.getAll();const admin=list.find(a=>a.user_id==adminId);let perms=(admin.permissions||'').split(',').map(x=>x.trim()).filter(Boolean);if(perms.includes(perm)) perms=perms.filter(x=>x!==perm);else{if(perm==='full') perms=['full'];else{perms=perms.filter(x=>x!=='full');perms.push(perm);}}await adminsDb.updatePerms(adminId,perms.join(','));return showEditPerms(ctx,adminId);}
+  if(data.startsWith('mg_tp_')){const p=data.replace('mg_tp_','').split('_');const adminId=p[0];const perm=p.slice(1).join('_');const list=await adminsDb.getAll();const admin=list.find(a=>a.user_id==adminId);if(!admin) return ctx.answerCbQuery('❌').catch(()=>{});let perms=(admin.permissions||'').split(',').map(x=>x.trim()).filter(Boolean);if(perms.includes(perm)) perms=perms.filter(x=>x!==perm);else{if(perm==='full') perms=['full'];else{perms=perms.filter(x=>x!=='full');perms.push(perm);}}await adminsDb.updatePerms(adminId,perms.join(','));return showEditPerms(ctx,adminId);}
   if(data.startsWith('mg_profile_')) return showUserProfile(ctx,data.replace('mg_profile_',''));
-  // ── بروفايل مستخدم من الأزرار الجديدة ──
-  if (data.startsWith('mg_up_') && !data.startsWith('mg_upg_')) {
-    const uid2 = data.replace('mg_up_', '');
-    if (!uid2 || isNaN(Number(uid2))) return ctx.answerCbQuery('❌').catch(() => {});
-    return showUserProfile(ctx, uid2);
-  }
-  // ── تنقل صفحات المستخدمين ──
-  if (data.startsWith('mg_upg_')) {
-    const parts = data.replace('mg_upg_', '').split('_');
-    const pg = parseInt(parts[parts.length - 1]) || 0;
-    const flt = parts.slice(0, -1).join('_') || 'all';
-    return showUsers(ctx, pg, flt);
-  }
+
   // ── تواصل مع مستخدم ──
   if (data.startsWith('mg_contact_')) {
     const cuid = data.replace('mg_contact_', '');
