@@ -15,7 +15,23 @@ async function migrateGroupPanel() {
 }
 
 async function showGroupPanel(ctx) {
-  const groups = await all('SELECT * FROM group_chats WHERE is_active=1 ORDER BY title').catch(() => []);
+  // تنظيف سريع — نتحقق من أول 20 قروب فقط لتجنب البطء
+  const allG = await all('SELECT chat_id, title FROM group_chats WHERE is_active=1 ORDER BY title').catch(() => []);
+  const botId = ctx.botInfo?.id || (await ctx.telegram.getMe().catch(() => ({}))).id;
+  const { run: dbRun2 } = require('../database/db');
+  for (const g of allG.slice(0, 20)) {
+    try {
+      const bm = await ctx.telegram.getChatMember(g.chat_id, botId).catch(() => null);
+      if (!bm || ['left','kicked'].includes(bm.status)) {
+        await dbRun2('UPDATE group_chats SET is_active=0 WHERE chat_id=$1', [g.chat_id]).catch(() => {});
+        g._remove = true;
+      }
+    } catch(_) {
+      await dbRun2('UPDATE group_chats SET is_active=0 WHERE chat_id=$1', [g.chat_id]).catch(() => {});
+      g._remove = true;
+    }
+  }
+  const groups = allG.filter(g => !g._remove);
   const total = groups.length;
 
   let text = '📋 *لوحة إدارة القروبات*\n';
