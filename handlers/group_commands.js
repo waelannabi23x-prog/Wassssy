@@ -952,7 +952,7 @@ function setupGroupCommands(bot) {
     }
     const kb = results.slice(0, 8).map(f => ([{
       text: (f.title || f.name || 'ملف').substring(0, 40),
-      callback_data: 'grp_sendfile_' + f.id + '_' + ctx.from.id
+      callback_data: 'gsf-' + f.id + '-' + ctx.from.id
     }]));
     kb.push([{ text: '❌ إلغاء', callback_data: 'grp_search_close' }]);
     ctx.reply(
