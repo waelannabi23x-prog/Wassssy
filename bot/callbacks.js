@@ -450,6 +450,90 @@ module.exports.registerCallbacks = function(bot, deps) {
         ).catch(() => {});
         return ctx.answerCbQuery("").catch(() => {});
       }
+
+      // ── slot callbacks ──
+      if (data.startsWith('slot_play_')) {
+        const uid2 = parseInt(data.replace('slot_play_', ''));
+        if (ctx.from.id !== uid2) return ctx.answerCbQuery('🚫 هذه ليست لعبتك!', { show_alert: true }).catch(() => {});
+        const { get: dbGet, run: dbRun } = require('../database/db');
+        const BET = 50;
+        const acc = await dbGet('SELECT balance FROM bank_accounts WHERE user_id=$1', [uid2]).catch(() => null);
+        if (!acc || parseFloat(acc.balance) < BET) return ctx.answerCbQuery('❌ رصيدك غير كافٍ! (' + BET + ' دج)', { show_alert: true }).catch(() => {});
+        await dbRun('UPDATE bank_accounts SET balance=balance-$1 WHERE user_id=$2', [BET, uid2]).catch(() => {});
+        const symbols = ['🍎','🍊','🍋','🍒','🍇','⭐','💎','7️⃣'];
+        const r1 = symbols[Math.floor(Math.random()*symbols.length)];
+        const r2 = symbols[Math.floor(Math.random()*symbols.length)];
+        const r3 = symbols[Math.floor(Math.random()*symbols.length)];
+        let win = 0, resultTxt = '';
+        if (r1===r2&&r2===r3) {
+          if (r1==='💎'){win=BET*10;resultTxt='💎 *جاكبوت!! ×10*';}
+          else if (r1==='7️⃣'){win=BET*7;resultTxt='7️⃣ *سبعة ×7*';}
+          else if (r1==='⭐'){win=BET*5;resultTxt='⭐ *نجوم ×5*';}
+          else {win=BET*3;resultTxt='🎉 *ثلاثة متشابهة ×3*';}
+        } else if (r1===r2||r2===r3||r1===r3) { win=Math.floor(BET*1.5); resultTxt='✅ *اثنان متشابهان ×1.5*'; }
+        else { resultTxt='❌ *خسرت!*'; }
+        if (win>0) await dbRun('UPDATE bank_accounts SET balance=balance+$1 WHERE user_id=$2',[win,uid2]).catch(()=>{});
+        const newBal = await dbGet('SELECT balance FROM bank_accounts WHERE user_id=$1',[uid2]).then(r=>r?.balance||0).catch(()=>0);
+        await ctx.editMessageText(
+          '🎰 *ماكينة القمار*\n\n[ '+r1+' | '+r2+' | '+r3+' ]\n\n'+resultTxt+'\n'+(win>0?'💰 ربحت: *'+win+' دج*':'💸 خسرت: *'+BET+' دج*')+'\n👛 رصيدك: *'+parseFloat(newBal).toFixed(0)+' دج*',
+          { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[[
+            {text:'🎰 العب مجدداً', callback_data:'slot_play_'+uid2},
+            {text:'💰 رصيدي', callback_data:'slot_bal_'+uid2},
+          ]]}}
+        ).catch(()=>{});
+        return ctx.answerCbQuery('').catch(()=>{});
+      }
+
+      if (data.startsWith('slot_bal_')) {
+        const uid2 = parseInt(data.replace('slot_bal_', ''));
+        const { get: dbGet } = require('../database/db');
+        const acc = await dbGet('SELECT balance FROM bank_accounts WHERE user_id=$1',[uid2]).catch(()=>null);
+        return ctx.answerCbQuery('💰 رصيدك: '+(acc?parseFloat(acc.balance).toFixed(0):0)+' دج', { show_alert:true }).catch(()=>{});
+      }
+
+      // ── shop callbacks ──
+      if (data.startsWith('shop_buy_')) {
+        const parts = data.replace('shop_buy_','').split('_');
+        const itemId = parseInt(parts[0]);
+        const uid2   = parseInt(parts[1]);
+        if (ctx.from.id !== uid2) return ctx.answerCbQuery('🚫 هذه ليست قائمتك!', { show_alert:true }).catch(()=>{});
+        const { get: dbGet, run: dbRun } = require('../database/db');
+        const items = [
+          { id:1, name:'🛡️ درع الحماية',  price:500  },
+          { id:2, name:'⭐ نجمة VIP',      price:1000 },
+          { id:3, name:'🎯 تذكرة مليون',   price:300  },
+          { id:4, name:'🎰 رمز سلوت ×2',   price:200  },
+          { id:5, name:'📦 صندوق مفاجأة',  price:150  },
+        ];
+        const item = items.find(i=>i.id===itemId);
+        if (!item) return ctx.answerCbQuery('❌ منتج غير موجود', {show_alert:true}).catch(()=>{});
+        const acc = await dbGet('SELECT balance FROM bank_accounts WHERE user_id=$1',[uid2]).catch(()=>null);
+        if (!acc || parseFloat(acc.balance) < item.price)
+          return ctx.answerCbQuery('❌ رصيدك غير كافٍ! تحتاج '+item.price+' دج', {show_alert:true}).catch(()=>{});
+        await dbRun('UPDATE bank_accounts SET balance=balance-$1 WHERE user_id=$2',[item.price, uid2]).catch(()=>{});
+        // تنفيذ المنتج
+        if (itemId === 5) {
+          const bonus = Math.floor(Math.random()*1900)+100;
+          await dbRun('UPDATE bank_accounts SET balance=balance+$1 WHERE user_id=$2',[bonus,uid2]).catch(()=>{});
+          return ctx.answerCbQuery('📦 فتحت الصندوق وربحت '+bonus+' دج! 🎉', {show_alert:true}).catch(()=>{});
+        }
+        await ctx.answerCbQuery('✅ اشتريت '+item.name+'!', {show_alert:true}).catch(()=>{});
+        const newBal = await dbGet('SELECT balance FROM bank_accounts WHERE user_id=$1',[uid2]).then(r=>r?.balance||0).catch(()=>0);
+        await ctx.editMessageText(
+          '✅ *تمت عملية الشراء!*\n\n'+item.name+'\n💰 المبلغ: '+item.price+' دج\n👛 رصيدك الآن: '+parseFloat(newBal).toFixed(0)+' دج',
+          { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[[{text:'🏪 العودة للمتجر', callback_data:'shop_back_'+uid2}]]}}
+        ).catch(()=>{});
+        return;
+      }
+
+      if (data === 'shop_close') {
+        await ctx.deleteMessage().catch(()=>{});
+        return ctx.answerCbQuery('').catch(()=>{});
+      }
+
+      if (data.startsWith('shop_back_')) {
+        return ctx.answerCbQuery('🏪 اكتب /متجر لفتح المتجر مجدداً').catch(()=>{});
+      }
       if (ctx.chat?.type !== 'private') {
         if (data.startsWith('grp_main_')) {
           const chatId = data.replace('grp_main_', '');

@@ -621,6 +621,102 @@ function setupGroupCommands(bot) {
     ).catch(() => {});
   });
 
+
+  // ══════════════════════════════════════════
+  // 🎰 /slot — ماكينة القمار
+  // ══════════════════════════════════════════
+  bot.command(["slot", "سلوت", "قمار"], async ctx => {
+    if (!isGroup(ctx)) return;
+    delCmd(ctx);
+    const { get: dbGet, run: dbRun } = require("../database/db");
+    const uid = ctx.from.id;
+    const name = ctx.from.first_name || "لاعب";
+    const BET = 50;
+
+    const acc = await dbGet("SELECT balance FROM bank_accounts WHERE user_id=$1", [uid]).catch(() => null);
+    if (!acc) return ctx.reply("❌ ليس لديك حساب بنكي! اكتب *انشاء حساب*", { parse_mode: "Markdown" }).catch(() => {});
+    if (parseFloat(acc.balance) < BET) return ctx.reply("❌ رصيدك غير كافٍ! تحتاج *" + BET + " دج* للعب.", { parse_mode: "Markdown" }).catch(() => {});
+
+    // خصم الرهان
+    await dbRun("UPDATE bank_accounts SET balance=balance-$1 WHERE user_id=$2", [BET, uid]).catch(() => {});
+
+    const symbols = ["🍎", "🍊", "🍋", "🍒", "🍇", "⭐", "💎", "7️⃣"];
+    const r1 = symbols[Math.floor(Math.random() * symbols.length)];
+    const r2 = symbols[Math.floor(Math.random() * symbols.length)];
+    const r3 = symbols[Math.floor(Math.random() * symbols.length)];
+
+    const spinning = await ctx.reply("🎰 *جاري الدوران...*\n\n[ 🔄 | 🔄 | 🔄 ]", { parse_mode: "Markdown" }).catch(() => null);
+
+    let win = 0;
+    let resultTxt = "";
+    if (r1 === r2 && r2 === r3) {
+      if (r1 === "💎") { win = BET * 10; resultTxt = "💎 *جاكبوت!! ×10*"; }
+      else if (r1 === "7️⃣") { win = BET * 7; resultTxt = "7️⃣ *سبعة ×7*"; }
+      else if (r1 === "⭐") { win = BET * 5; resultTxt = "⭐ *نجوم ×5*"; }
+      else { win = BET * 3; resultTxt = "🎉 *ثلاثة متشابهة ×3*"; }
+    } else if (r1 === r2 || r2 === r3 || r1 === r3) {
+      win = Math.floor(BET * 1.5);
+      resultTxt = "✅ *اثنان متشابهان ×1.5*";
+    } else {
+      resultTxt = "❌ *خسرت!*";
+    }
+
+    if (win > 0) {
+      await dbRun("UPDATE bank_accounts SET balance=balance+$1 WHERE user_id=$2", [win, uid]).catch(() => {});
+    }
+
+    const newBal = await dbGet("SELECT balance FROM bank_accounts WHERE user_id=$1", [uid]).then(r => r?.balance || 0).catch(() => 0);
+
+    setTimeout(async () => {
+      if (spinning) {
+        await ctx.telegram.editMessageText(ctx.chat.id, spinning.message_id, null,
+          "🎰 *ماكينة القمار*\n\n" +
+          "[ " + r1 + " | " + r2 + " | " + r3 + " ]\n\n" +
+          resultTxt + "\n" +
+          (win > 0 ? "💰 ربحت: *" + win + " دج*" : "💸 خسرت: *" + BET + " دج*") + "\n" +
+          "👛 رصيدك: *" + parseFloat(newBal).toFixed(0) + " دج*",
+          { parse_mode: "Markdown", reply_markup: { inline_keyboard: [[
+            { text: "🎰 العب مجدداً", callback_data: "slot_play_" + uid },
+            { text: "💰 رصيدي", callback_data: "slot_bal_" + uid },
+          ]]}}
+        ).catch(() => {});
+      }
+    }, 2000);
+  });
+
+  // ══════════════════════════════════════════
+  // 🏪 /market — متجر البوت
+  // ══════════════════════════════════════════
+  bot.command(["market", "متجر", "shop"], async ctx => {
+    if (!isGroup(ctx)) return;
+    delCmd(ctx);
+    const { get: dbGet } = require("../database/db");
+    const uid = ctx.from.id;
+    const acc = await dbGet("SELECT balance FROM bank_accounts WHERE user_id=$1", [uid]).catch(() => null);
+    const bal = acc ? parseFloat(acc.balance).toFixed(0) : 0;
+
+    const items = [
+      { id: 1, name: "🛡️ درع الحماية",    desc: "حمايتك من السبام يوم كامل", price: 500,   emoji: "🛡️" },
+      { id: 2, name: "⭐ نجمة VIP",        desc: "لقب VIP في القروب أسبوع",   price: 1000,  emoji: "⭐" },
+      { id: 3, name: "🎯 تذكرة مليون",     desc: "دخول مجاني للعبة المليون",  price: 300,   emoji: "🎯" },
+      { id: 4, name: "🎰 رمز سلوت ×2",     desc: "ضاعف أرباح السلوت مرة",     price: 200,   emoji: "🎰" },
+      { id: 5, name: "📦 صندوق مفاجأة",    desc: "ربح عشوائي 100-2000 دج",   price: 150,   emoji: "📦" },
+    ];
+
+    let txt = "🏪 *متجر البوت*\n";
+    txt += "━━━━━━━━━━━━━━━━━━\n";
+    txt += "👛 رصيدك: *" + bal + " دج*\n\n";
+    for (const item of items) {
+      txt += item.emoji + " *" + item.name + "* — " + item.price + " دج\n";
+      txt += "   _" + item.desc + "_\n\n";
+    }
+
+    const kb = items.map(item => [{ text: item.emoji + " " + item.name + " (" + item.price + " دج)", callback_data: "shop_buy_" + item.id + "_" + uid }]);
+    kb.push([{ text: "❌ إغلاق", callback_data: "shop_close" }]);
+
+    ctx.reply(txt, { parse_mode: "Markdown", reply_markup: { inline_keyboard: kb } }).catch(() => {});
+  });
+
 }
 
 // ══════════════════════════════════════════
