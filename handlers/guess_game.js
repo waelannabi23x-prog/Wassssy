@@ -54,7 +54,7 @@ async function startInvite(ctx) {
     return;
   }
 
-  ctx.telegram.deleteMessage(chatId, ctx.message.message_id).catch(() => {});
+  // نبقي رسالة خمن لأن الرد سيكون عليها
 
   const gameId = Date.now();
   const game = {
