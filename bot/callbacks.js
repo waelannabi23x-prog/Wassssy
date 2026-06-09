@@ -786,6 +786,31 @@ module.exports.registerCallbacks = function(bot, deps) {
         }
 
 
+
+      // ── إرسال ملف للقروب من نتائج البحث ──
+      if (data.startsWith('grp_sendfile_')) {
+        const parts = data.replace('grp_sendfile_', '').split('_');
+        const fileId  = parts[0];
+        const reqUid  = parseInt(parts[1]);
+        if (ctx.from.id !== reqUid) return ctx.answerCbQuery('🚫 فقط من طلب البحث يقدر يختار', { show_alert: true }).catch(() => {});
+        const { get: dbGet } = require('../database/db');
+        const file = await dbGet('SELECT * FROM files WHERE id=$1 AND is_deleted=0', [fileId]).catch(() => null);
+        if (!file) return ctx.answerCbQuery('❌ الملف غير موجود', { show_alert: true }).catch(() => {});
+        try {
+          // نبعث الملف للقروب
+          const caption = '📁 *' + (file.title || file.name || 'ملف') + '*';
+          if (file.file_id) {
+            await ctx.telegram.sendDocument(ctx.chat.id, file.file_id, { caption, parse_mode: 'Markdown' });
+          } else {
+            await ctx.reply(caption + '\n🔗 ' + (file.url || ''), { parse_mode: 'Markdown' });
+          }
+          // نحذف رسالة النتائج
+          await ctx.deleteMessage().catch(() => {});
+          return ctx.answerCbQuery('✅ تم إرسال الملف').catch(() => {});
+        } catch(e) {
+          return ctx.answerCbQuery('❌ فشل الإرسال: ' + e.message, { show_alert: true }).catch(() => {});
+        }
+      }
         const _grpOk = data.startsWith('grp_') || data.startsWith('del_channel_')
           || data.startsWith('gs_') || data.startsWith('grp_unban_')
           || data.startsWith('grp_unmute_') || data === 'check_subscription'
