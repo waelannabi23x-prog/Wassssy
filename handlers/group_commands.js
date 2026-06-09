@@ -717,6 +717,81 @@ function setupGroupCommands(bot) {
     ctx.reply(txt, { parse_mode: "Markdown", reply_markup: { inline_keyboard: kb } }).catch(() => {});
   });
 
+
+  // ══════════════════════════════════════════
+  // 💑 /couples — زوج اليوم
+  // ══════════════════════════════════════════
+  bot.command(["couples", "زوج", "زواج"], async ctx => {
+    if (!isGroup(ctx)) return;
+    delCmd(ctx);
+    const { all: dbAll } = require("../database/db");
+    const members = await dbAll(
+      "SELECT user_id, first_name FROM group_members WHERE chat_id=$1 AND first_name != ''",
+      [ctx.chat.id]
+    ).catch(() => []);
+    if (members.length < 2) return ctx.reply("❌ لا يوجد أعضاء كافيون!").catch(() => {});
+    // نستخدم التاريخ seed لنفس النتيجة طول اليوم
+    const today = new Date().toISOString().split('T')[0];
+    const seed = (ctx.chat.id + today).split('').reduce((a,c) => a + c.charCodeAt(0), 0);
+    const idx1 = seed % members.length;
+    const idx2 = (seed * 7 + 3) % members.length === idx1
+      ? (seed * 7 + 4) % members.length
+      : (seed * 7 + 3) % members.length;
+    const p1 = members[idx1];
+    const p2 = members[idx2 >= members.length ? 0 : idx2];
+    const hearts = ["💕","💖","💗","💝","💓","💞","🥰","😍"];
+    const heart = hearts[seed % hearts.length];
+    const txt =
+      heart + " *زوج اليوم في " + (ctx.chat.title||"القروب") + "*
+" +
+      "━━━━━━━━━━━━━━━━━━
+
+" +
+      "👫 [" + p1.first_name + "](tg://user?id=" + p1.user_id + ")
+" +
+      heart + " *×* " + heart + "
+" +
+      "👫 [" + p2.first_name + "](tg://user?id=" + p2.user_id + ")
+
+" +
+      "_يتجدد كل يوم_ 🗓";
+    ctx.reply(txt, { parse_mode: "Markdown" }).catch(() => {});
+  });
+
+
+  // ══════════════════════════════════════════
+  // 📋 /setlog — تعيين قناة السجل
+  // ══════════════════════════════════════════
+  bot.command(["setlog", "سجل"], async ctx => {
+    if (!isGroup(ctx)) return;
+    if (!await isTgAdmin(ctx)) return ctx.reply("🚫 للمشرفين فقط").catch(() => {});
+    delCmd(ctx);
+    const args = ctx.message.text.split(" ").slice(1);
+    if (!args.length) {
+      const { get: dbGet } = require("../database/db");
+      const g = await dbGet("SELECT log_channel FROM group_chats WHERE chat_id=$1", [ctx.chat.id]).catch(() => null);
+      return ctx.reply(
+        "📋 *قناة السجل*\n\n" +
+        "الحالية: " + (g?.log_channel ? "*" + g.log_channel + "*" : "_غير محددة_") + "\n\n" +
+        "لتعيين قناة:\n`/setlog @username_channel`\n\nلإلغاء:\n`/setlog off`",
+        { parse_mode: "Markdown" }
+      ).catch(() => {});
+    }
+    const { run: dbRun } = require("../database/db");
+    if (args[0] === "off") {
+      await dbRun("UPDATE group_chats SET log_channel=NULL WHERE chat_id=$1", [ctx.chat.id]).catch(() => {});
+      return ctx.reply("✅ تم إلغاء قناة السجل").catch(() => {});
+    }
+    const channel = args[0];
+    try {
+      await ctx.telegram.sendMessage(channel, "✅ *تم ربط هذه القناة كسجل لـ " + (ctx.chat.title||"القروب") + "*", { parse_mode: "Markdown" });
+      await dbRun("UPDATE group_chats SET log_channel=$1 WHERE chat_id=$2", [channel, ctx.chat.id]).catch(() => {});
+      ctx.reply("✅ تم تعيين " + channel + " كقناة سجل!", { parse_mode: "Markdown" }).catch(() => {});
+    } catch(e) {
+      ctx.reply("❌ فشل — تأكد أن البوت ادمين في القناة\n" + e.message).catch(() => {});
+    }
+  });
+
 }
 
 // ══════════════════════════════════════════
