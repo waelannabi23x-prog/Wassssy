@@ -59,18 +59,31 @@ exports.showBalance = async (ctx) => {
     'SELECT * FROM bank_transactions WHERE to_id=$1 OR from_id=$1 ORDER BY created_at DESC LIMIT 5',
     [targetId]
   ).catch(() => []);
-  let text = '🏦 *حساب ' + (isSelf ? 'بنكك' : acc.first_name || 'المستخدم') + '*\n';
+  const name = acc.first_name || ctx.from?.first_name || 'مستخدم';
+  let text = '🏦 *حساب بنكك*\n';
   text += '━━━━━━━━━━━━━━━━━━━━\n\n';
-  text += '🆔 رقم الحساب: ' + targetId + '\n';
+  text += '🆔 رقم الحساب: `' + targetId + '`\n';
   text += '💰 الرصيد: *' + fmt(acc.balance) + '*\n\n';
   if (txs.length) {
     text += '📋 *آخر المعاملات:*\n';
     txs.forEach(tx => {
       const isIn = tx.to_id == targetId && tx.from_id != targetId;
-      text += (isIn ? '📥' : '📤') + ' ' + fmt(tx.amount) + ' — ' + (tx.note || tx.type) + '\n';
+      const arrow = isIn ? '📥' : '📤';
+      const note = tx.note || tx.type || 'معاملة';
+      text += arrow + ' *' + fmt(tx.amount) + '* — ' + note + '\n';
     });
   }
-  return ctx.reply(text, { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }).catch(() => {});
+  const kb = [[
+    { text: '💸 تحويل', callback_data: 'bank_transfer_help' },
+    { text: '📊 إحصائياتي', callback_data: 'bank_stats_' + targetId },
+  ],[
+    { text: '🏆 أثرى المستخدمين', callback_data: 'bank_top' },
+  ]];
+  return ctx.reply(text, {
+    parse_mode: 'Markdown',
+    reply_to_message_id: ctx.message?.message_id,
+    reply_markup: { inline_keyboard: kb }
+  }).catch(() => {});
 };
 
 // ── تحويل ──

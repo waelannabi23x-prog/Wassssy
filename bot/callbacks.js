@@ -534,6 +534,39 @@ module.exports.registerCallbacks = function(bot, deps) {
       if (data.startsWith('shop_back_')) {
         return ctx.answerCbQuery('🏪 اكتب /متجر لفتح المتجر مجدداً').catch(()=>{});
       }
+
+      // ── bank callbacks ──
+      if (data === 'bank_transfer_help') {
+        return ctx.answerCbQuery('💸 رد على رسالة شخص واكتب: فارسي 500', { show_alert: true }).catch(() => {});
+      }
+      if (data.startsWith('bank_stats_')) {
+        const uid2 = parseInt(data.replace('bank_stats_', ''));
+        const { all: dbAll } = require('../database/db');
+        const stats = await dbAll(
+          'SELECT type, SUM(amount) as total, COUNT(*) as cnt FROM bank_transactions WHERE to_id=$1 OR from_id=$1 GROUP BY type',
+          [uid2]
+        ).catch(() => []);
+        let txt = '📊 *إحصائياتك البنكية*\n━━━━━━━━━━━━━━━━━━\n\n';
+        for (const s of stats) {
+          txt += '• ' + (s.type||'معاملة') + ': ' + s.cnt + ' مرة (' + s.total + ' دج)\n';
+        }
+        if (!stats.length) txt += '_لا توجد معاملات بعد_';
+        await ctx.reply(txt, { parse_mode: 'Markdown' }).catch(() => {});
+        return ctx.answerCbQuery('').catch(() => {});
+      }
+      if (data === 'bank_top') {
+        const { all: dbAll } = require('../database/db');
+        const top = await dbAll(
+          'SELECT user_id, first_name, balance FROM bank_accounts ORDER BY balance DESC LIMIT 10'
+        ).catch(() => []);
+        let txt = '🏆 *أثرى المستخدمين*\n━━━━━━━━━━━━━━━━━━\n\n';
+        const medals = ['🥇','🥈','🥉'];
+        top.forEach((u,i) => {
+          txt += (medals[i]||i+1+'.') + ' ' + (u.first_name||'مجهول') + ' — *' + parseFloat(u.balance).toLocaleString() + ' دج*\n';
+        });
+        await ctx.reply(txt, { parse_mode: 'Markdown' }).catch(() => {});
+        return ctx.answerCbQuery('').catch(() => {});
+      }
       if (ctx.chat?.type !== 'private') {
         if (data.startsWith('grp_main_')) {
           const chatId = data.replace('grp_main_', '');
