@@ -1,129 +1,62 @@
 'use strict';
-const { addChannel, removeChannel, getChannels 
-  // ══════════════════════════════════════════
-  // 👑 أوامر المالك (Owner Only)
-  // ══════════════════════════════════════════
-  const _isOwner = (ctx) => ctx.from?.id === parseInt(process.env.OWNER_ID);
+const { addChannel, removeChannel, getChannels } = require('../utils/channelGuard');
 
-  // /broadcast — بث رسالة لكل المستخدمين
-  bot.command(["broadcast", "بث"], async ctx => {
-    if (!_isOwner(ctx)) return;
-    const txt = ctx.message.text.split(" ").slice(1).join(" ");
-    if (!txt) return ctx.reply("⚠️ اكتب الرسالة بعد الأمر:\n/broadcast نص الرسالة").catch(() => {});
-    const { all: dbAll } = require("../database/db");
-    const users = await dbAll("SELECT DISTINCT user_id FROM users WHERE user_id IS NOT NULL").catch(() => []);
-    let sent = 0, failed = 0;
-    const msg = await ctx.reply("📢 جاري البث لـ " + users.length + " مستخدم...").catch(() => null);
-    for (const u of users) {
-      try {
-        await ctx.telegram.sendMessage(u.user_id, "📢 *رسالة من الإدارة:*\n\n" + txt, { parse_mode: "Markdown" });
-        sent++;
-      } catch(_) { failed++; }
-      if (sent % 20 === 0) await new Promise(r => setTimeout(r, 1000));
+
+  // ── AFK ──
+  bot.command(['afk','غائب'], handleAfk);
+
+  // ── Notes ──
+  bot.command(['note','ملاحظة'], saveNote);
+  bot.command(['notes','ملاحظات'], listNotes);
+  bot.command(['delnote','حذف_ملاحظة'], delNote);
+  bot.hears(/^#(\w+)$/i, async ctx => {
+    if (!['group','supergroup'].includes(ctx.chat?.type)) return;
+    return getNote(ctx, ctx.match[1]);
+  });
+
+  // ── Blacklist ──
+  bot.command(['blacklist','قائمة_سوداء'], addBlacklist);
+  bot.command(['unblacklist','حذف_محظور'], delBlacklist);
+  bot.command(['blacklists','المحظورات'], listBlacklist);
+
+  // ── Locks ──
+  bot.command('lock',   ctx => handleLock(ctx, false));
+  bot.command('unlock', ctx => handleLock(ctx, true));
+
+  // ── البنك ──
+  bot.command(['daily','يومي'],    handleDaily);
+  bot.command(['flip','عملة'],     handleFlip);
+  bot.command(['rob','سرقة'],      handleRob);
+  bot.command(['leaderboard','متصدرين','lb'], handleLeaderboard);
+  bot.command(['bank','حسابي','بنكي'], ctx => require('../handlers/bank').showBalance(ctx).catch(()=>{}));
+
+  // ── cleangroups ──
+  bot.command('cleangroups', async ctx => {
+    if (!ctx.isOwner) return;
+    const { all: dbA, run: dbR } = require('../database/db');
+    const groups = await dbA('SELECT chat_id, title FROM group_chats WHERE is_active=1').catch(() => []);
+    const msg = await ctx.reply('🔍 يفحص ' + groups.length + ' قروب...').catch(() => null);
+    let removed = 0;
+    for (const g of groups) {
+      try { await ctx.telegram.getChat(g.chat_id); }
+      catch(e) { await dbR('UPDATE group_chats SET is_active=0 WHERE chat_id=$1',[g.chat_id]).catch(()=>{}); removed++; }
+      await new Promise(r => setTimeout(r, 300));
     }
-    if (msg) ctx.telegram.editMessageText(ctx.chat.id, msg.message_id, null,
-      "✅ *انتهى البث*\n\n📤 أُرسل: " + sent + "\n❌ فشل: " + failed,
-      { parse_mode: "Markdown" }
-    ).catch(() => {});
+    const txt = '✅ نشط: *'+(groups.length-removed)+'* | 🗑 مُسح: *'+removed+'*';
+    if (msg) ctx.telegram.editMessageText(ctx.chat.id, msg.message_id, null, txt, {parse_mode:'Markdown'}).catch(()=>{});
+    else ctx.reply(txt, {parse_mode:'Markdown'}).catch(()=>{});
   });
 
-  // /addbalance — إضافة رصيد لمستخدم
-  bot.command(["addbalance", "زيدرصيد"], async ctx => {
-    if (!_isOwner(ctx)) return;
-    const args = ctx.message.text.split(" ").slice(1);
-    if (args.length < 2) return ctx.reply("⚠️ الاستخدام:\n/addbalance USER_ID المبلغ").catch(() => {});
-    const uid2 = parseInt(args[0]);
-    const amount = parseFloat(args[1]);
-    if (!uid2 || !amount) return ctx.reply("❌ ID أو مبلغ خاطئ").catch(() => {});
-    const { run: dbRun, get: dbGet } = require("../database/db");
-    await dbRun("INSERT INTO bank_accounts(user_id,balance) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET balance=bank_accounts.balance+$2", [uid2, amount]).catch(() => {});
-    const acc = await dbGet("SELECT balance FROM bank_accounts WHERE user_id=$1", [uid2]).catch(() => null);
-    ctx.reply("✅ تمت الإضافة\n🆔 " + uid2 + "\n💰 +" + amount + " دج\n💳 الرصيد: " + (acc?.balance||amount)).catch(() => {});
+  // ── adminpanel ──
+  bot.command(['adminpanel','لوحة'], async ctx => {
+    if (!ctx.isOwner && !ctx.isAdmin) return;
+    const rows = [
+      [{text:'📁 المحتوى',callback_data:'manage'},{text:'👥 المستخدمون',callback_data:'manage_users_0'}],
+      [{text:'🏦 البنك',callback_data:'mg_bank_panel'},{text:'🎮 الألعاب',callback_data:'gp_million_panel'}],
+      [{text:'📊 إحصائيات',callback_data:'manage_analytics'},{text:'⚙️ الإعدادات',callback_data:'manage_settings'}],
+    ];
+    return ctx.reply('🛡️ *لوحة الإدارة*\n━━━━━━━━━━━━━━━',{parse_mode:'Markdown',reply_markup:{inline_keyboard:rows}}).catch(()=>{});
   });
-
-  // /removebalance — خصم رصيد
-  bot.command(["removebalance", "خصرصيد"], async ctx => {
-    if (!_isOwner(ctx)) return;
-    const args = ctx.message.text.split(" ").slice(1);
-    if (args.length < 2) return ctx.reply("⚠️ /removebalance USER_ID المبلغ").catch(() => {});
-    const uid2 = parseInt(args[0]);
-    const amount = parseFloat(args[1]);
-    const { run: dbRun } = require("../database/db");
-    await dbRun("UPDATE bank_accounts SET balance=GREATEST(0,balance-$1) WHERE user_id=$2", [amount, uid2]).catch(() => {});
-    ctx.reply("✅ تم الخصم\n🆔 " + uid2 + "\n💸 -" + amount + " دج").catch(() => {});
-  });
-
-  // /ban_user — حظر مستخدم من البوت كليًا
-  bot.command(["banuser", "حظرمستخدم"], async ctx => {
-    if (!_isOwner(ctx)) return;
-    const args = ctx.message.text.split(" ").slice(1);
-    const uid2 = parseInt(args[0]);
-    if (!uid2) return ctx.reply("⚠️ /banuser USER_ID").catch(() => {});
-    const { run: dbRun } = require("../database/db");
-    await dbRun("INSERT INTO banned_users(user_id,reason) VALUES($1,$2) ON CONFLICT(user_id) DO UPDATE SET reason=$2", [uid2, args.slice(1).join(" ")||"بدون سبب"]).catch(() => {});
-    ctx.reply("✅ تم حظر المستخدم " + uid2 + " من البوت").catch(() => {});
-  });
-
-  // /unban_user — رفع حظر مستخدم
-  bot.command(["unbanuser", "رفعحظرمستخدم"], async ctx => {
-    if (!_isOwner(ctx)) return;
-    const args = ctx.message.text.split(" ").slice(1);
-    const uid2 = parseInt(args[0]);
-    if (!uid2) return ctx.reply("⚠️ /unbanuser USER_ID").catch(() => {});
-    const { run: dbRun } = require("../database/db");
-    await dbRun("DELETE FROM banned_users WHERE user_id=$1", [uid2]).catch(() => {});
-    ctx.reply("✅ رُفع الحظر عن " + uid2).catch(() => {});
-  });
-
-  // /stats_global — إحصائيات عامة
-  bot.command(["gstats", "احصائيات"], async ctx => {
-    if (!_isOwner(ctx)) return;
-    const { get: dbGet } = require("../database/db");
-    const [users, groups, files, txs] = await Promise.all([
-      dbGet("SELECT COUNT(*) as c FROM users").catch(()=>({c:0})),
-      dbGet("SELECT COUNT(*) as c FROM group_chats WHERE is_active=1").catch(()=>({c:0})),
-      dbGet("SELECT COUNT(*) as c FROM files WHERE is_deleted=0").catch(()=>({c:0})),
-      dbGet("SELECT COUNT(*) as c FROM bank_transactions").catch(()=>({c:0})),
-    ]);
-    ctx.reply(
-      "📊 *إحصائيات البوت*\n━━━━━━━━━━━━━━━━━━\n\n" +
-      "👥 المستخدمون: *" + users.c + "*\n" +
-      "🏘 القروبات النشطة: *" + groups.c + "*\n" +
-      "📁 الملفات: *" + files.c + "*\n" +
-      "💸 المعاملات البنكية: *" + txs.c + "*\n",
-      { parse_mode: "Markdown" }
-    ).catch(() => {});
-  });
-
-  // /maintenance — وضع الصيانة
-  bot.command(["maintenance", "صيانة"], async ctx => {
-    if (!_isOwner(ctx)) return;
-    global.maintenanceMode = !global.maintenanceMode;
-    ctx.reply(global.maintenanceMode ? "🔧 *وضع الصيانة: مُفعَّل*\n\nالبوت لن يستجيب للمستخدمين العاديين." : "✅ *وضع الصيانة: مُعطَّل*\n\nالبوت يعمل بشكل طبيعي.", { parse_mode: "Markdown" }).catch(() => {});
-  });
-
-  // /ownerhelp — قائمة أوامر المالك
-  bot.command(["ownerhelp", "مساعدةمالك"], async ctx => {
-    if (!_isOwner(ctx)) return;
-    ctx.reply(
-      "👑 *أوامر المالك*\n━━━━━━━━━━━━━━━━━━\n\n" +
-      "💰 *البنك:*\n" +
-      "`/addbalance ID المبلغ` — إضافة رصيد\n" +
-      "`/removebalance ID المبلغ` — خصم رصيد\n\n" +
-      "🚫 *الحظر:*\n" +
-      "`/banuser ID` — حظر من البوت\n" +
-      "`/unbanuser ID` — رفع الحظر\n\n" +
-      "📢 *البث:*\n" +
-      "`/broadcast رسالة` — بث لكل المستخدمين\n\n" +
-      "📊 *الإحصائيات:*\n" +
-      "`/gstats` — إحصائيات عامة\n\n" +
-      "⚙️ *النظام:*\n" +
-      "`/maintenance` — تفعيل/تعطيل الصيانة\n",
-      { parse_mode: "Markdown" }
-    ).catch(() => {});
-  });
-
-} = require('../utils/channelGuard');
 
 module.exports = function registerCommands(bot, { startHandler, manage, userH, million, tools, browse, bank, contentDb, usersDb, bundlesDb, dbAll, cacheClear, logger, OWNER_ID, kbBtn, kbBuild, eos, resetChat, millionaire, tagAll, muteAll, unmuteAll, showAllMembers }) {
 
