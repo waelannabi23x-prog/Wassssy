@@ -407,6 +407,49 @@ module.exports.registerCallbacks = function(bot, deps) {
           return;
         }
 
+
+      // ── صح أو جرأة ──
+      if (data.startsWith('tnd_truth_') || data.startsWith('tnd_dare_')) {
+        const isT = data.startsWith('tnd_truth_');
+        const uid2 = parseInt(data.replace(isT ? 'tnd_truth_' : 'tnd_dare_', ''));
+        const truths = [
+          "ما هو أكبر كذبة قلتها في حياتك؟",
+          "من هو الشخص الذي تحبه سراً في هذا القروب؟",
+          "ما هو أحرج موقف مررت به؟",
+          "ما هو الشيء الذي تخجل من الاعتراف به؟",
+          "هل سبق أن تجسست على شخص ما؟",
+          "ما هو أغبى شيء فعلته في حياتك؟",
+          "ما هو سرك الذي لم تخبر به أحداً؟",
+          "ما هو الشيء الذي تفعله سراً ولا تريد أحداً أن يعرف؟",
+          "ما هو أسوأ قرار اتخذته في حياتك؟",
+          "من هو الشخص الذي تعتذر منه لو قدرت؟",
+        ];
+        const dares = [
+          "أرسل آخر صورة في هاتفك! 📸",
+          "اكتب رسالة محرجة لآخر شخص تحدثت معه!",
+          "غير اسمك في القروب لشيء مضحك لمدة ساعة!",
+          "أرسل صوت تقلد فيه شخصاً مشهوراً! 🎤",
+          "اكتب 10 أشياء تحبها في نفسك!",
+          "قلد أسلوب كتابة شخص في القروب لرسالة كاملة!",
+          "اعترف بشيء محرج حدث معك هذا الأسبوع!",
+          "اكتب رأيك الحقيقي في آخر شخص تكلم في القروب!",
+          "تحدى شخصاً آخر في القروب على شيء!",
+          "أرسل ميم يعبر عن مزاجك الآن!",
+        ];
+        const list = isT ? truths : dares;
+        const q = list[Math.floor(Math.random() * list.length)];
+        const emoji = isT ? "🤔" : "😈";
+        const label = isT ? "سؤال صح" : "تحدي جرأة";
+        const kb = [[
+          { text: isT ? "🎭 جرأة بدل" : "🤔 صح بدل", callback_data: (isT ? "tnd_dare_" : "tnd_truth_") + uid2 },
+          { text: "🔄 " + (isT ? "سؤال آخر" : "تحدي آخر"), callback_data: data },
+        ]];
+        await ctx.editMessageText(
+          emoji + " *" + label + ":*\n\n" + q,
+          { parse_mode: "Markdown", reply_markup: { inline_keyboard: kb } }
+        ).catch(() => {});
+        return ctx.answerCbQuery("").catch(() => {});
+      }
       if (ctx.chat?.type !== 'private') {
         if (data.startsWith('grp_main_')) {
           const chatId = data.replace('grp_main_', '');

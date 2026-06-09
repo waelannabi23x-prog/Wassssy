@@ -551,6 +551,76 @@ function setupGroupCommands(bot) {
     ctx.telegram.deleteMessage(ctx.chat.id, replyTo.message_id).catch(() => {});
   });
 
+
+  // ══════════════════════════════════════════
+  // 🎭 /truth و /dare — صح أو جرأة
+  // ══════════════════════════════════════════
+  const _truths = [
+    "ما هو أكبر كذبة قلتها في حياتك؟",
+    "من هو الشخص الذي تحبه سراً في هذا القروب؟",
+    "ما هو أحرج موقف مررت به؟",
+    "ما هو الشيء الذي تخجل من الاعتراف به؟",
+    "هل سبق أن تجسست على شخص ما؟",
+    "ما هو أغبى شيء فعلته في حياتك؟",
+    "من هو الشخص الذي تتمنى لو لم تقابله؟",
+    "ما هو سرك الذي لم تخبر به أحداً؟",
+    "هل سبق أن كذبت على أحد قريب منك؟ وماذا قلت؟",
+    "ما هو الشيء الذي تفعله سراً ولا تريد أحداً أن يعرف؟",
+    "من هو أكثر شخص تغار منه؟",
+    "ما هو أسوأ قرار اتخذته في حياتك؟",
+    "هل سبق أن بكيت بسبب فيلم أو مسلسل؟ أي واحد؟",
+    "ما هو الشيء الذي تتمنى تغييره في نفسك؟",
+    "من هو الشخص الذي تعتذر منه لو قدرت؟",
+  ];
+
+  const _dares = [
+    "أرسل آخر صورة في هاتفك! 📸",
+    "اكتب رسالة محرجة لآخر شخص تحدثت معه!",
+    "غير اسمك في القروب لشيء مضحك لمدة ساعة!",
+    "أرسل صوت تقلد فيه شخصاً مشهوراً! 🎤",
+    "اكتب 10 أشياء تحبها في نفسك!",
+    "أرسل أغرب إيموجي تعرفه وفسره!",
+    "اكتب قصيدة قصيرة عن شخص في القروب!",
+    "قلد أسلوب كتابة شخص في القروب لرسالة كاملة!",
+    "اعترف بشيء محرج حدث معك هذا الأسبوع!",
+    "أرسل ميم يعبر عن مزاجك الآن!",
+    "اكتب رسالة بالكامل بدون حروف العلة!",
+    "غني مقطع من أغنية تحبها (نص الكلمات)!",
+    "أرسل أول شيء تجده في بحث Google الآن!",
+    "اكتب رأيك الحقيقي في آخر شخص تكلم في القروب!",
+    "تحدى شخصاً آخر في القروب على شيء!",
+  ];
+
+  bot.command(["truth", "صح", "حقيقة"], async ctx => {
+    if (!isGroup(ctx)) return;
+    const target = ctx.message.reply_to_message?.from || ctx.from;
+    const name = target.first_name || "أنت";
+    const q = _truths[Math.floor(Math.random() * _truths.length)];
+    const kb = [[
+      { text: "🎭 جرأة بدل", callback_data: "tnd_dare_" + target.id },
+      { text: "🔄 سؤال آخر",  callback_data: "tnd_truth_" + target.id },
+    ]];
+    ctx.reply(
+      "🤔 *سؤال صح لـ " + name + ":*\n\n" + q,
+      { parse_mode: "Markdown", reply_markup: { inline_keyboard: kb } }
+    ).catch(() => {});
+  });
+
+  bot.command(["dare", "جرأة"], async ctx => {
+    if (!isGroup(ctx)) return;
+    const target = ctx.message.reply_to_message?.from || ctx.from;
+    const name = target.first_name || "أنت";
+    const d = _dares[Math.floor(Math.random() * _dares.length)];
+    const kb = [[
+      { text: "🤔 صح بدل",   callback_data: "tnd_truth_" + target.id },
+      { text: "🔄 تحدي آخر", callback_data: "tnd_dare_"  + target.id },
+    ]];
+    ctx.reply(
+      "😈 *تحدي جرأة لـ " + name + ":*\n\n" + d,
+      { parse_mode: "Markdown", reply_markup: { inline_keyboard: kb } }
+    ).catch(() => {});
+  });
+
 }
 
 // ══════════════════════════════════════════
