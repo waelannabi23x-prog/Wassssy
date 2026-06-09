@@ -15,9 +15,12 @@ async function showGamesPanel(ctx) {
     '📸 *خمن الصورة* — تحدي بين لاعبين\n\n' +
     '⚙️ اختر لعبة لإدارتها:';
 
+  const slotStats = await get('SELECT COUNT(*) as games, SUM(CASE WHEN amount>0 THEN 1 ELSE 0 END) as wins FROM bank_transactions WHERE type=$1', ['slot_win']).catch(()=>({games:0,wins:0}));
   const rows = [
     [kbBtn('🎰 إدارة لعبة المليون', 'gp_million_panel')],
-    [kbBtn('📸 إدارة لعبة خمن', 'gp_guess_panel')],
+    [kbBtn('📸 إدارة لعبة خمن',     'gp_guess_panel')],
+    [kbBtn('🎰 إعدادات السلوت',      'gp_slot_panel')],
+    [kbBtn('🏪 إدارة المتجر',        'gp_shop_panel')],
     [kbBtn('◀️ رجوع', 'gp_panel')],
   ];
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
@@ -103,7 +106,23 @@ async function showMillionQuestions(ctx, page) {
 // handleCallback
 // ══════════════════════════════════════════
 async function handleCallback(ctx, data) {
-  if (data === 'mb_panel') return showGamesPanel(ctx);
+  if (data === 'mb_panel')         return showGamesPanel(ctx);
+  if (data === 'gp_slot_panel')   return showSlotPanel(ctx);
+  if (data === 'gp_shop_panel')   return showShopPanel(ctx);
+  if (data === 'gp_slot_top') {
+    const { all: dbAll } = require('../database/db');
+    const top = await dbAll(
+      "SELECT user_id, first_name, SUM(amount) as total FROM bank_transactions WHERE description LIKE '%سلوت%' AND amount>0 GROUP BY user_id, first_name ORDER BY total DESC LIMIT 10"
+    ).catch(() => []);
+    let txt = '🏆 *أفضل لاعبي السلوت*\n━━━━━━━━━━━━━━━━━━━━\n\n';
+    if (!top.length) txt += '_لا توجد بيانات بعد_';
+    const medals = ['🥇','🥈','🥉'];
+    top.forEach((p,i) => { txt += (medals[i]||i+1+'.') + ' ' + (p.first_name||'مجهول') + ' — *' + p.total + ' دج*\n'; });
+    return eos(ctx, txt, { parse_mode:'Markdown', ...kbBuild([[kbBtn('◀️ رجوع','gp_slot_panel')]]) });
+  }
+  if (data === 'gp_slot_bet') {
+    return eos(ctx, '💰 *تغيير الرهان*\n\nأرسل المبلغ الجديد (الحد الأدنى 10 دج):', { parse_mode:'Markdown', ...kbBuild([[kbBtn('❌ إلغاء','gp_slot_panel')]]) });
+  }
   if (data === 'gp_million_panel') return showMillionPanel(ctx);
   if (data === 'gp_guess_panel') return showGuessPanel(ctx);
   if (data.startsWith('gp_million_list_')) return showMillionQuestions(ctx, data.replace('gp_million_list_', ''));
@@ -184,6 +203,74 @@ async function handleText(ctx) {
   }
 
   return false;
+}
+
+
+// ══════════════════════════════════════════
+// لوحة إعدادات السلوت
+// ══════════════════════════════════════════
+async function showSlotPanel(ctx) {
+  const { get: dbGet } = require('../database/db');
+  // إحصائيات السلوت
+  const stats = await dbGet(
+    "SELECT COUNT(*) as total, SUM(CASE WHEN description LIKE '%ربح%' THEN 1 ELSE 0 END) as wins FROM bank_transactions WHERE description LIKE '%سلوت%'"
+  ).catch(() => ({ total: 0, wins: 0 }));
+
+  const text =
+    '🎰 *إعدادات السلوت*\n' +
+    '━━━━━━━━━━━━━━━━━━━━\n\n' +
+    '📊 *الإحصائيات:*\n' +
+    '🎮 إجمالي الجولات: *' + (stats?.total || 0) + '*\n' +
+    '🏆 الفائزون: *' + (stats?.wins || 0) + '*\n\n' +
+    '⚙️ *الإعدادات الحالية:*\n' +
+    '💰 الرهان: *50 دج*\n' +
+    '💎 جاكبوت: *×10*\n' +
+    '7️⃣ سبعة: *×7*\n' +
+    '⭐ نجوم: *×5*\n' +
+    '🎉 ثلاثة: *×3*\n' +
+    '✅ اثنان: *×1.5*\n';
+
+  const rows = [
+    [kbBtn('💰 تغيير الرهان',     'gp_slot_bet')],
+    [kbBtn('🏆 أفضل اللاعبين',    'gp_slot_top')],
+    [kbBtn('🔄 إعادة ضبط',        'gp_slot_reset')],
+    [kbBtn('◀️ رجوع', 'mb_panel')],
+  ];
+  return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
+}
+
+// ══════════════════════════════════════════
+// لوحة إدارة المتجر
+// ══════════════════════════════════════════
+async function showShopPanel(ctx) {
+  const { all: dbAll } = require('../database/db');
+  const purchases = await dbAll(
+    "SELECT COUNT(*) as cnt FROM bank_transactions WHERE description LIKE '%متجر%' OR description LIKE '%اشترى%'"
+  ).catch(() => []);
+  const total = purchases[0]?.cnt || 0;
+
+  const items = [
+    { id:1, name:'🛡️ درع الحماية',  price:500  },
+    { id:2, name:'⭐ نجمة VIP',      price:1000 },
+    { id:3, name:'🎯 تذكرة مليون',   price:300  },
+    { id:4, name:'🎰 رمز سلوت ×2',   price:200  },
+    { id:5, name:'📦 صندوق مفاجأة',  price:150  },
+  ];
+
+  let text = '🏪 *إدارة المتجر*\n━━━━━━━━━━━━━━━━━━━━\n\n';
+  text += '📊 إجمالي المشتريات: *' + total + '*\n\n';
+  text += '🛒 *المنتجات الحالية:*\n';
+  for (const item of items) {
+    text += item.name + ' — ' + item.price + ' دج\n';
+  }
+
+  const rows = [
+    [kbBtn('➕ إضافة منتج',      'gp_shop_add')],
+    [kbBtn('✏️ تعديل سعر',       'gp_shop_edit')],
+    [kbBtn('📊 إحصائيات المبيعات','gp_shop_stats')],
+    [kbBtn('◀️ رجوع', 'mb_panel')],
+  ];
+  return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
 
 module.exports = { showGamesPanel, showMillionPanel, showGuessPanel, handleCallback, handleText };
