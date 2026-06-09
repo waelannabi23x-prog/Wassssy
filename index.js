@@ -440,8 +440,7 @@ async function launch() {
                 '👇 اضغط لإعادة إضافتي كمشرف:',
                 { parse_mode: 'Markdown', reply_markup: _noAdminKb }
               ).catch(() => {});
-              await new Promise(r => setTimeout(r, 1500));
-              await ctx.telegram.leaveChat(chatId).catch(() => {});
+              // البوت يبقى في القروب
             }
           } catch(_) {}
         }, 2000);
