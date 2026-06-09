@@ -510,6 +510,47 @@ function setupGroupCommands(bot) {
     if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 30000);
   });
 
+
+  // ══════════════════════════════════════════
+  // 🗑 /purge — حذف رسائل بالجملة
+  // ══════════════════════════════════════════
+  bot.command(["purge", "مسح"], async ctx => {
+    if (!isGroup(ctx)) return;
+    if (!await isTgAdmin(ctx)) return ctx.reply("🚫 للمشرفين فقط").catch(() => {});
+    delCmd(ctx);
+    const replyTo = ctx.message.reply_to_message;
+    if (!replyTo) return ctx.reply("↩️ رد على أول رسالة تريد حذفها").catch(() => {});
+    const fromId  = replyTo.message_id;
+    const toId    = ctx.message.message_id - 1;
+    if (toId < fromId) return ctx.reply("⚠️ ما في رسائل للحذف").catch(() => {});
+    const total = toId - fromId + 1;
+    if (total > 100) return ctx.reply("⚠️ الحد الأقصى 100 رسالة").catch(() => {});
+    const m = await ctx.reply("🗑 جاري حذف " + total + " رسالة...").catch(() => null);
+    let deleted = 0;
+    for (let i = fromId; i <= toId; i++) {
+      try {
+        await ctx.telegram.deleteMessage(ctx.chat.id, i);
+        deleted++;
+      } catch(_) {}
+      if (deleted % 10 === 0) await new Promise(r => setTimeout(r, 200));
+    }
+    if (m) await ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {});
+    const done = await ctx.reply("✅ تم حذف " + deleted + " رسالة").catch(() => null);
+    if (done) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, done.message_id).catch(() => {}), 4000);
+  });
+
+  // ══════════════════════════════════════════
+  // 🗑 /del — حذف رسالة واحدة (رد عليها)
+  // ══════════════════════════════════════════
+  bot.command(["del", "حذف"], async ctx => {
+    if (!isGroup(ctx)) return;
+    if (!await isTgAdmin(ctx)) return ctx.reply("🚫 للمشرفين فقط").catch(() => {});
+    const replyTo = ctx.message.reply_to_message;
+    delCmd(ctx);
+    if (!replyTo) return;
+    ctx.telegram.deleteMessage(ctx.chat.id, replyTo.message_id).catch(() => {});
+  });
+
 }
 
 // ══════════════════════════════════════════
