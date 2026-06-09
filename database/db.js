@@ -247,7 +247,36 @@ async function initSchema() {
   )`); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_auto_replies_active ON auto_replies(is_active)'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
-  // ── Seed أسئلة المليون إذا DB فارغة ──
+
+  // ── جداول الميزات الجديدة ──
+  try { await pg.query(`CREATE TABLE IF NOT EXISTS afk_users(
+    user_id BIGINT PRIMARY KEY, reason TEXT DEFAULT '',
+    since TIMESTAMPTZ DEFAULT NOW(), is_afk SMALLINT DEFAULT 1
+  )`); } catch(_) {}
+  try { await pg.query(`CREATE TABLE IF NOT EXISTS couple_of_day(
+    id SERIAL PRIMARY KEY, chat_id BIGINT, date TEXT,
+    user1_id BIGINT, user2_id BIGINT, name1 TEXT, name2 TEXT,
+    UNIQUE(chat_id, date)
+  )`); } catch(_) {}
+  try { await pg.query(`CREATE TABLE IF NOT EXISTS notes(
+    id SERIAL PRIMARY KEY, chat_id BIGINT, name TEXT,
+    content TEXT, file_id TEXT, note_type TEXT DEFAULT 'text',
+    created_by BIGINT, UNIQUE(chat_id, name)
+  )`); } catch(_) {}
+  try { await pg.query(`CREATE TABLE IF NOT EXISTS blacklist_words(
+    id SERIAL PRIMARY KEY, chat_id BIGINT, word TEXT,
+    action TEXT DEFAULT 'delete', added_by BIGINT,
+    UNIQUE(chat_id, word)
+  )`); } catch(_) {}
+  try { await pg.query(`CREATE TABLE IF NOT EXISTS group_locks(
+    chat_id BIGINT PRIMARY KEY,
+    lock_sticker SMALLINT DEFAULT 0, lock_gif SMALLINT DEFAULT 0,
+    lock_link SMALLINT DEFAULT 0, lock_forward SMALLINT DEFAULT 0,
+    lock_photo SMALLINT DEFAULT 0, lock_video SMALLINT DEFAULT 0,
+    lock_voice SMALLINT DEFAULT 0, lock_poll SMALLINT DEFAULT 0
+  )`); } catch(_) {}
+
+    // ── Seed أسئلة المليون إذا DB فارغة ──
   try {
     const qCount = await pg.query('SELECT COUNT(*) as c FROM million_questions WHERE is_active=1');
     if (parseInt(qCount.rows[0].c) < 5) {

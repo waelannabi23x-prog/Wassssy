@@ -188,15 +188,114 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   // ⚠️ /warn — تحذير عضو
   // ══════════════════════════════════════════
-  bot.command('warn', async ctx => {
+
+  // ══════════════════════════════════════════
+  // 👤 /info — معلومات مستخدم
+  // ══════════════════════════════════════════
+  bot.command('info', async ctx => {
+    if (!isGroup(ctx)) return;
+    const target = ctx.message?.reply_to_message?.from || ctx.from;
+    const uid = target?.id;
+    if (!uid) return;
+
+    const { get: dbG, all: dbA } = require('../database/db');
+
+    const [userRow, warns, bankAcc, xpRow] = await Promise.all([
+      dbG('SELECT * FROM users WHERE id=$1', [uid]).catch(()=>null),
+      dbA('SELECT id FROM group_warns WHERE chat_id=$1 AND user_id=$2', [ctx.chat.id, uid]).catch(()=>[]),
+      dbG('SELECT balance FROM bank_accounts WHERE user_id=$1', [uid]).catch(()=>null),
+      dbG('SELECT xp, level FROM user_xp WHERE user_id=$1', [uid]).catch(()=>null),
+    ]);
+
+    // تحقق من صلاحيات في القروب
+    let chatMember;
+    try { chatMember = await ctx.telegram.getChatMember(ctx.chat.id, uid); } catch(_) {}
+    const roleMap = {
+      creator: '👑 صاحب القروب',
+      administrator: '⚡ مشرف',
+      member: '👤 عضو',
+      restricted: '🔇 مقيد',
+      left: '🚶 غادر',
+      kicked: '🚫 محظور',
+    };
+    const role = roleMap[chatMember?.status] || '👤 عضو';
+
+    let text = '👤 *معلومات المستخدم*\n━━━━━━━━━━━━━━━\n\n';
+    text += '🆔 ID: `' + uid + '`\n';
+    text += '📛 الاسم: [' + (target.first_name||'؟') + '](tg://user?id=' + uid + ')\n';
+    if (target.username) text += '🔗 يوزر: @' + target.username + '\n';
+    text += '🎭 الدور: ' + role + '\n';
+    if (target.is_bot) text += '🤖 بوت\n';
+    text += '\n📊 *الإحصائيات:*\n';
+    text += '⚠️ التحذيرات: *' + warns.length + '/3*\n';
+    if (bankAcc) text += '💰 الرصيد: *' + Number(bankAcc.balance||0).toLocaleString('en') + ' $*\n';
+    if (xpRow) text += '✨ XP: *' + (xpRow.xp||0) + '* | المستوى: *' + (xpRow.level||1) + '*\n';
+    if (userRow?.joined_at) text += '📅 انضم للبوت: *' + new Date(userRow.joined_at).toLocaleDateString('ar') + '*\n';
+
+    const rows = [];
+    if (warns.length && (ctx.isAdmin || ctx.isOwner)) {
+      rows.push([{ text: '🗑 مسح التحذيرات', callback_data: 'grp_clearwarn_' + uid }]);
+    }
+    if (ctx.isAdmin || ctx.isOwner) {
+      rows.push([
+        { text: '🚫 حظر', callback_data: 'grp_ban_' + uid },
+        { text: '🔇 كتم', callback_data: 'grp_mute_1h_' + uid },
+      ]);
+    }
+
+    return ctx.reply(text, {
+      parse_mode: 'Markdown',
+      reply_to_message_id: ctx.message?.message_id,
+      reply_markup: rows.length ? { inline_keyboard: rows } : undefined
+    }).catch(()=>{});
+  });
+
+
+    bot.command('warn', async ctx => {
     if (!isGroup(ctx)) return;
     if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
     delCmd(ctx);
     const target = await getTarget(ctx);
-    if (!target) return ctx.reply('⚠️ رد على رسالة المستخدم', { parse_mode: 'Markdown' }).catch(() => {});
-    const args = ctx.message.text.split(' ').slice(2);
-    const reason = args.join(' ') || 'مخالفة القواعد';
-    await warnMember(ctx, ctx.chat.id, target.id, reason);
+    if (!target) return ctx.reply('⚠️ رد على رسالة المستخدم أو اكتب /warn @username [سبب]', { reply_to_message_id: ctx.message?.message_id }).catch(() => {});
+    const args = ctx.message.text.split(' ').slice(target.fromReply ? 1 : 2);
+    const reason = args.join(' ').trim() || 'مخالفة القواعد';
+
+    // إضافة التحذير
+    await run(
+      'INSERT INTO group_warns(chat_id,user_id,reason,warned_by) VALUES($1,$2,$3,$4)',
+      [ctx.chat.id, target.id, reason, ctx.from?.id]
+    ).catch(()=>{});
+
+    const warns = await all(
+      'SELECT id FROM group_warns WHERE chat_id=$1 AND user_id=$2',
+      [ctx.chat.id, target.id]
+    ).catch(()=>[]);
+    const count = warns.length;
+    const MAX = 3;
+
+    const warnText =
+      '⚠️ *تحذير!*\n━━━━━━━━━━━━━━━\n\n' +
+      '👤 المستخدم: [' + target.name + '](tg://user?id=' + target.id + ')\n' +
+      '📝 السبب: ' + reason + '\n' +
+      '🔢 التحذيرات: *' + count + '/' + MAX + '*\n\n' +
+      (count >= MAX ? '🚫 *تم الحظر تلقائياً بعد ' + MAX + ' تحذيرات!*' : '_تحذير ' + count + ' من ' + MAX + '_');
+
+    const rows = [[
+      { text: '🗑 مسح التحذيرات', callback_data: 'grp_clearwarn_' + target.id },
+      { text: '🚫 حظر', callback_data: 'grp_ban_' + target.id },
+    ]];
+
+    await ctx.reply(warnText, {
+      parse_mode: 'Markdown',
+      reply_to_message_id: ctx.message?.reply_to_message?.message_id || ctx.message?.message_id,
+      reply_markup: { inline_keyboard: rows }
+    }).catch(() => {});
+
+    // حظر تلقائي بعد MAX تحذيرات
+    if (count >= MAX) {
+      await ctx.telegram.banChatMember(ctx.chat.id, target.id).catch(() => {});
+      await run('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [ctx.chat.id, target.id]).catch(() => {});
+    }
   });
 
   // ══════════════════════════════════════════
@@ -223,14 +322,27 @@ function setupGroupCommands(bot) {
     const target = await getTarget(ctx);
     if (!target) return ctx.reply('⚠️ رد على رسالة المستخدم').catch(() => {});
     const warns = await all(
-      'SELECT reason, created_at FROM group_warns WHERE chat_id=$1 AND user_id=$2 ORDER BY created_at DESC',
+      'SELECT reason, warned_by, created_at FROM group_warns WHERE chat_id=$1 AND user_id=$2 ORDER BY created_at DESC',
       [ctx.chat.id, target.id]
     ).catch(() => []);
-    let text = `⚠️ *تحذيرات ${target.name}*: ${warns.length}/3\n\n`;
-    warns.forEach((w, i) => { text += `${i+1}. ${w.reason}\n`; });
-    if (!warns.length) text += '_لا توجد تحذيرات_';
-    const msg = await ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => {});
-    if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 20000);
+    let text = '📋 *سجل تحذيرات* [' + target.name + '](tg://user?id=' + target.id + ')\n';
+    text += '━━━━━━━━━━━━━━━\n\n';
+    text += '🔢 المجموع: *' + warns.length + '/3*\n\n';
+    if (warns.length) {
+      warns.forEach((w, i) => {
+        const date = new Date(w.created_at).toLocaleDateString('ar');
+        text += (i+1) + '. ' + (w.reason||'مخالفة') + ' — _' + date + '_\n';
+      });
+    } else {
+      text += '✅ _لا توجد تحذيرات_';
+    }
+    const rows = warns.length ? [[
+      { text: '🗑 مسح الكل', callback_data: 'grp_clearwarn_' + target.id },
+    ]] : [];
+    return ctx.reply(text, {
+      parse_mode: 'Markdown',
+      reply_markup: rows.length ? { inline_keyboard: rows } : undefined
+    }).catch(() => {});
   });
 
   // ══════════════════════════════════════════
@@ -718,45 +830,6 @@ function setupGroupCommands(bot) {
   });
 
 
-  // ══════════════════════════════════════════
-  // 💑 /couples — زوج اليوم
-  // ══════════════════════════════════════════
-  bot.command(["couples", "زوج", "زواج"], async ctx => {
-    if (!isGroup(ctx)) return;
-    delCmd(ctx);
-    const { all: dbAll } = require("../database/db");
-    const members = await dbAll(
-      "SELECT user_id, first_name FROM group_members WHERE chat_id=$1 AND first_name != ''",
-      [ctx.chat.id]
-    ).catch(() => []);
-    if (members.length < 2) return ctx.reply("❌ لا يوجد أعضاء كافيون!").catch(() => {});
-    // نستخدم التاريخ seed لنفس النتيجة طول اليوم
-    const today = new Date().toISOString().split('T')[0];
-    const seed = (ctx.chat.id + today).split('').reduce((a,c) => a + c.charCodeAt(0), 0);
-    const idx1 = seed % members.length;
-    const idx2 = (seed * 7 + 3) % members.length === idx1
-      ? (seed * 7 + 4) % members.length
-      : (seed * 7 + 3) % members.length;
-    const p1 = members[idx1];
-    const p2 = members[idx2 >= members.length ? 0 : idx2];
-    const hearts = ["💕","💖","💗","💝","💓","💞","🥰","😍"];
-    const heart = hearts[seed % hearts.length];
-    const txt =
-      heart + " *زوج اليوم في " + (ctx.chat.title||"القروب") + "*
-" +
-      "━━━━━━━━━━━━━━━━━━
-
-" +
-      "👫 [" + p1.first_name + "](tg://user?id=" + p1.user_id + ")
-" +
-      heart + " *×* " + heart + "
-" +
-      "👫 [" + p2.first_name + "](tg://user?id=" + p2.user_id + ")
-
-" +
-      "_يتجدد كل يوم_ 🗓";
-    ctx.reply(txt, { parse_mode: "Markdown" }).catch(() => {});
-  });
 
 
   // ══════════════════════════════════════════
@@ -901,5 +974,72 @@ async function showGamesMenu(ctx) {
     reply_markup: { inline_keyboard: rows }
   }).catch(() => null);
 }
+
+  bot.command(['couples', 'زوج', 'زواج'], async ctx => {
+    if (!isGroup(ctx)) return;
+    delCmd(ctx);
+    const { all: dbAll } = require('../database/db');
+    const members = await dbAll(
+      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 AND first_name IS NOT NULL AND first_name != \'\'',
+      [ctx.chat.id]
+    ).catch(() => []);
+    if (members.length < 2) return ctx.reply('❌ لا يوجد أعضاء كافيون!').catch(() => {});
+    const today = new Date().toISOString().split('T')[0];
+    const seed = (String(ctx.chat.id) + today).split('').reduce((a,c) => a + c.charCodeAt(0), 0);
+    const idx1 = seed % members.length;
+    let idx2 = (seed * 7 + 3) % members.length;
+    if (idx2 === idx1) idx2 = (idx2 + 1) % members.length;
+    const p1 = members[idx1];
+    const p2 = members[idx2];
+    const hearts = ['\u{1F495}','\u{1F496}','\u{1F497}','\u{1F49D}','\u{1F493}','\u{1F49E}','\u{1F970}','\u{1F60D}'];
+    const heart = hearts[seed % hearts.length];
+    const chatTitle = ctx.chat.title || 'القروب';
+    const txt = heart + ' *زوج اليوم في ' + chatTitle + '*\n'
+      + '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n'
+      + '\u{1F46B} [' + p1.first_name + '](tg://user?id=' + p1.user_id + ')\n'
+      + heart + ' *\u00D7* ' + heart + '\n'
+      + '\u{1F46B} [' + p2.first_name + '](tg://user?id=' + p2.user_id + ')\n\n'
+      + '_يتجدد كل يوم_ \u{1F5D3}';
+    ctx.reply(txt, { parse_mode: 'Markdown' }).catch(() => {});
+  });
+
+
+  // 💑 Couple of the Day
+  bot.command(['couple','زوج'], async ctx => {
+    if (!isGroup(ctx)) return;
+    const cid = ctx.chat?.id;
+    const today = new Date().toISOString().split('T')[0];
+    const ck = 'couple_' + cid + '_' + today;
+    let saved = require('../utils/cache').cacheGet ? null : null;
+    const existing = await require('../database/db').get(
+      'SELECT * FROM couple_of_day WHERE chat_id=$1 AND date=$2', [cid, today]
+    ).catch(()=>null);
+    if (existing) {
+      const hearts = ['💕','💖','💗','💝','💓'];
+      const h = hearts[Math.floor(Math.random()*hearts.length)];
+      return ctx.reply(
+        h + ' *زوج اليوم*\n━━━━━━━━━━━━━━━\n\n' +
+        '[' + existing.name1 + '](tg://user?id=' + existing.user1_id + ') ' + h + ' [' + existing.name2 + '](tg://user?id=' + existing.user2_id + ')\n\n_يتجدد غداً!_ 🌅',
+        { parse_mode:'Markdown', reply_to_message_id: ctx.message?.message_id }
+      ).catch(()=>{});
+    }
+    const members = await require('../database/db').all(
+      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 AND is_bot=0 ORDER BY RANDOM() LIMIT 20', [cid]
+    ).catch(()=>[]);
+    if (!members || members.length < 2) return ctx.reply('❌ ما في أعضاء كافيين!', { reply_to_message_id: ctx.message?.message_id }).catch(()=>{});
+    const u1 = members[0], u2 = members[1];
+    await require('../database/db').run(
+      'INSERT INTO couple_of_day(chat_id,date,user1_id,user2_id,name1,name2) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING',
+      [cid, today, u1.user_id, u2.user_id, u1.first_name||'؟', u2.first_name||'؟']
+    ).catch(()=>{});
+    const hearts = ['💕','💖','💗','💝','💓'];
+    const h = hearts[Math.floor(Math.random()*hearts.length)];
+    return ctx.reply(
+      h + ' *زوج اليوم*\n━━━━━━━━━━━━━━━\n\n' +
+      '[' + (u1.first_name||'؟') + '](tg://user?id=' + u1.user_id + ') ' + h + ' [' + (u2.first_name||'؟') + '](tg://user?id=' + u2.user_id + ')\n\n_يتجدد غداً!_ 🌅',
+      { parse_mode:'Markdown', reply_to_message_id: ctx.message?.message_id }
+    ).catch(()=>{});
+  });
+
 
 module.exports = { setupGroupCommands, showGamesMenu, handleSettingsCallback, showGroupSettings };
