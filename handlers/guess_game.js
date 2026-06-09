@@ -143,12 +143,11 @@ async function handleJoin(ctx) {
         `🎮 *انضممت للتحدي\!*\n\n` +
         `📸 أرسل صورتك السرية الآن\n` +
         `ثم اكتب اسمها`,
-        { parse_mode: 'MarkdownV2', reply_markup: { inline_keyboard: [[{ text: '📸 أرسل صورتك هنا', url: _bl }]] } }
+        { parse_mode: 'MarkdownV2', reply_markup: { inline_keyboard: [[{ text: '📸 أرسل صورتك للبوت', url: _bl }]] } }
       ).catch(() => {
-        // إذا ما فتح المستخدم البوت — أرسل في القروب
         ctx.telegram.sendMessage(ctx.chat.id,
-          `📌 ${mention(user)} أرسل صورتك السرية للبوت!`,
-          { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '🤖 فتح البوت', url: _bl }]] } }
+          `📌 ${mention(user)} افتح البوت وأرسل صورتك السرية!`,
+          { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '📸 أرسل صورتك للبوت', url: _bl }]] } }
         ).catch(() => {});
       });
     }
