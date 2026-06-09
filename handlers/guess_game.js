@@ -69,17 +69,17 @@ async function startInvite(ctx) {
 
   const _botInfo = await ctx.telegram.getMe().catch(() => ({ username: '' }));
   const _botLink = _botInfo.username ? `https://t.me/${_botInfo.username}` : '';
+  const _startMsgId = ctx.message?.message_id;
   const m = await ctx.telegram.sendMessage(chatId,
     `🎮 *تحدي خمن الصورة!*\n` +
     `━━━━━━━━━━━━━━━━━━━━\n` +
     `👤 ${mention(user)} يتحدى الجميع!\n\n` +
     `📌 *كيف تلعب؟*\n` +
-    `1️⃣ اضغط زر *انضمام للعبة* أدناه\n` +
+    `1️⃣ اكتب *انا* للانضمام\n` +
     `2️⃣ افتح البوت وأرسل صورة سرية\n` +
-    `3️⃣ تحدّث مع منافسك بحرية\n` +
-    `4️⃣ أول من يخمن صورة خصمه يفوز 🏆\n\n` +
+    `3️⃣ أول من يخمن صورة خصمه يفوز 🏆\n\n` +
     `⏳ *60 ثانية* للانضمام`,
-    { parse_mode: 'Markdown' }
+    { parse_mode: 'Markdown', reply_to_message_id: _startMsgId }
   ).catch(() => null);
 
   if (!m) { _games.delete(chatId); return; }
