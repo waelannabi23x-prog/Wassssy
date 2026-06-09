@@ -941,9 +941,12 @@ function setupGroupCommands(bot) {
     const query = ctx.match[1]?.trim();
     if (!query || query.length < 2) return;
     const { smartSearch } = require('./group');
+    // رسالة loading فورية
+    const loadMsg = await ctx.reply('🔍 *جاري البحث...*', { parse_mode: 'Markdown', reply_to_message_id: ctx.message.message_id }).catch(() => null);
     const results = await smartSearch(query, 8).catch(() => []);
+    if (loadMsg) ctx.telegram.deleteMessage(ctx.chat.id, loadMsg.message_id).catch(() => {});
     if (!results.length) {
-      const m = await ctx.reply('🔍 ما وجدنا نتائج لـ *' + query + '*', { parse_mode: 'Markdown', reply_to_message_id: ctx.message.message_id }).catch(() => null);
+      const m = await ctx.reply('❌ ما وجدنا نتائج لـ *' + query + '*', { parse_mode: 'Markdown', reply_to_message_id: ctx.message.message_id }).catch(() => null);
       if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 5000);
       return;
     }
@@ -951,7 +954,7 @@ function setupGroupCommands(bot) {
       text: (f.title || f.name || 'ملف').substring(0, 40),
       callback_data: 'grp_sendfile_' + f.id + '_' + ctx.from.id
     }]));
-    kb.push([{ text: '❌ إغلاق', callback_data: 'gp_close' }]);
+    kb.push([{ text: '❌ إلغاء', callback_data: 'grp_search_close' }]);
     ctx.reply(
       '🔍 *نتائج البحث عن:* ' + query + '\n' +
       '━━━━━━━━━━━━━━━━━━\n' +

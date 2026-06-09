@@ -567,6 +567,11 @@ module.exports.registerCallbacks = function(bot, deps) {
         await ctx.reply(txt, { parse_mode: 'Markdown' }).catch(() => {});
         return ctx.answerCbQuery('').catch(() => {});
       }
+      if (data === 'grp_search_close') {
+        await ctx.deleteMessage().catch(() => {});
+        return ctx.answerCbQuery('').catch(() => {});
+      }
+
       if (ctx.chat?.type !== 'private') {
         if (data.startsWith('grp_main_')) {
           const chatId = data.replace('grp_main_', '');
