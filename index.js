@@ -197,7 +197,32 @@ bot.use(async (ctx, next) => {
   const txt = ctx.message?.text || ctx.message?.caption || '';
   const now = Date.now();
 
-  // 🤖 Auto-Reply — يشتغل للجميع حتى الأدمنز
+
+  // ── تحقق من صلاحيات البوت في القروب ──
+  bot.use(async (ctx, next) => {
+    if (!['group','supergroup'].includes(ctx.chat?.type)) return next();
+    if (!ctx.message?.text?.startsWith('/')) return next();
+    // تحقق هل البوت أدمن
+    try {
+      const me = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);
+      if (me.status === 'administrator' || me.status === 'creator') return next();
+      // البوت مش أدمن — أرسل رسالة مع زر
+      const botUn = ctx.botInfo?.username || '';
+      await ctx.reply(
+        '⚠️ أنا لست مشرفاً في هذا القروب!\n\n' +
+        'لكي تعمل الأوامر بشكل صحيح، يرجى إضافتي كمشرف 👇',
+        {
+          reply_to_message_id: ctx.message?.message_id,
+          reply_markup: { inline_keyboard: [[
+            { text: '➕ أضفني كمشرف', url: 'https://t.me/' + botUn + '?startgroup=admin' }
+          ]]}
+        }
+      ).catch(()=>{});
+      return; // لا تنفذ الأمر
+    } catch(_) { return next(); }
+  });
+
+    // 🤖 Auto-Reply — يشتغل للجميع حتى الأدمنز
   // تجاهل أوامر اللعبة
   const _isGameMsg = /^(تخمين[:\s]|خمن$|خمن |انا$|مليون$)/i.test(txt.trim()) || txt.trim() === 'خمن' || txt.trim() === 'مليون';
   // تجاهل إذا الأدمن في وضع إضافة رد تلقائي
