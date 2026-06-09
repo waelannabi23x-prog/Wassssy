@@ -188,15 +188,18 @@ async function getRandomQuestion(usedIds, difficulty) {
   const diff = difficulty || 'medium';
   const exclude = usedIds.length ? `AND id NOT IN (${usedIds.join(',')})` : '';
   // Try exact difficulty first, then fallback
+  // difficulty قد يكون text أو integer في DB
+  const diffMap = { 'easy': 1, 'medium': 2, 'hard': 3 };
+  const diffInt = diffMap[diff] || 2;
   let q = await get(
-    `SELECT * FROM million_questions WHERE is_active=1 AND difficulty=$1 ${exclude}
-     ORDER BY used_count ASC, RANDOM() LIMIT 1`, [diff]
-  );
+    `SELECT * FROM million_questions WHERE is_active=1 AND (difficulty=$1 OR difficulty=$2::text) ${exclude}
+     ORDER BY used_count ASC, RANDOM() LIMIT 1`, [diffInt, diff]
+  ).catch(() => null);
   if (!q) {
     q = await get(
       `SELECT * FROM million_questions WHERE is_active=1 ${exclude}
        ORDER BY used_count ASC, RANDOM() LIMIT 1`, []
-    );
+    ).catch(() => null);
   }
   return q;
 }
@@ -1130,4 +1133,20 @@ async function stopGame(ctx) {
   ctx.reply('🛑 تم إيقاف اللعبة.').catch(() => {});
 }
 
-module.exports = { stopGame, register, initMillionaireSchema, startJoinPhase };
+
+async function handleCallback(ctx, d) {
+  try {
+    if (!d) d = ctx.callbackQuery?.data;
+    if (d === 'mlr_join')        return joinGame(ctx);
+    if (d === 'mlr_forcestart')  return forceStart(ctx);
+    if (d === 'mlr_cancel')      return cancelGame(ctx);
+    if (d === 'mlr_ranking')     return showRanking(ctx);
+    if (d === 'mlr_howto')       return ctx.answerCbQuery('اكتب مليون في القروب لبدء اللعبة!', { show_alert: true }).catch(() => {});
+    if (d.startsWith('mar_'))    return handleAnswer(ctx, d);
+    if (d.startsWith('mlr_'))    return handleLifeline(ctx, d);
+  } catch(e) {
+    ctx.answerCbQuery('❌ ' + e.message).catch(() => {});
+  }
+}
+
+module.exports = { stopGame, register, initMillionaireSchema, startJoinPhase, handleCallback };
