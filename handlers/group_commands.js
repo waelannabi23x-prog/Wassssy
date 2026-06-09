@@ -865,6 +865,73 @@ function setupGroupCommands(bot) {
     }
   });
 
+  bot.command(['couples', 'زوج', 'زواج'], async ctx => {
+    if (!isGroup(ctx)) return;
+    delCmd(ctx);
+    const { all: dbAll } = require('../database/db');
+    const members = await dbAll(
+      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 AND first_name IS NOT NULL AND first_name != \'\'',
+      [ctx.chat.id]
+    ).catch(() => []);
+    if (members.length < 2) return ctx.reply('❌ لا يوجد أعضاء كافيون!').catch(() => {});
+    const today = new Date().toISOString().split('T')[0];
+    const seed = (String(ctx.chat.id) + today).split('').reduce((a,c) => a + c.charCodeAt(0), 0);
+    const idx1 = seed % members.length;
+    let idx2 = (seed * 7 + 3) % members.length;
+    if (idx2 === idx1) idx2 = (idx2 + 1) % members.length;
+    const p1 = members[idx1];
+    const p2 = members[idx2];
+    const hearts = ['\u{1F495}','\u{1F496}','\u{1F497}','\u{1F49D}','\u{1F493}','\u{1F49E}','\u{1F970}','\u{1F60D}'];
+    const heart = hearts[seed % hearts.length];
+    const chatTitle = ctx.chat.title || 'القروب';
+    const txt = heart + ' *زوج اليوم في ' + chatTitle + '*\n'
+      + '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n'
+      + '\u{1F46B} [' + p1.first_name + '](tg://user?id=' + p1.user_id + ')\n'
+      + heart + ' *\u00D7* ' + heart + '\n'
+      + '\u{1F46B} [' + p2.first_name + '](tg://user?id=' + p2.user_id + ')\n\n'
+      + '_يتجدد كل يوم_ \u{1F5D3}';
+    ctx.reply(txt, { parse_mode: 'Markdown' }).catch(() => {});
+  });
+
+
+  // 💑 Couple of the Day
+  bot.command(['couple','زوج'], async ctx => {
+    if (!isGroup(ctx)) return;
+    const cid = ctx.chat?.id;
+    const today = new Date().toISOString().split('T')[0];
+    const ck = 'couple_' + cid + '_' + today;
+    let saved = require('../utils/cache').cacheGet ? null : null;
+    const existing = await require('../database/db').get(
+      'SELECT * FROM couple_of_day WHERE chat_id=$1 AND date=$2', [cid, today]
+    ).catch(()=>null);
+    if (existing) {
+      const hearts = ['💕','💖','💗','💝','💓'];
+      const h = hearts[Math.floor(Math.random()*hearts.length)];
+      return ctx.reply(
+        h + ' *زوج اليوم*\n━━━━━━━━━━━━━━━\n\n' +
+        '[' + existing.name1 + '](tg://user?id=' + existing.user1_id + ') ' + h + ' [' + existing.name2 + '](tg://user?id=' + existing.user2_id + ')\n\n_يتجدد غداً!_ 🌅',
+        { parse_mode:'Markdown', reply_to_message_id: ctx.message?.message_id }
+      ).catch(()=>{});
+    }
+    const members = await require('../database/db').all(
+      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 AND is_bot=0 ORDER BY RANDOM() LIMIT 20', [cid]
+    ).catch(()=>[]);
+    if (!members || members.length < 2) return ctx.reply('❌ ما في أعضاء كافيين!', { reply_to_message_id: ctx.message?.message_id }).catch(()=>{});
+    const u1 = members[0], u2 = members[1];
+    await require('../database/db').run(
+      'INSERT INTO couple_of_day(chat_id,date,user1_id,user2_id,name1,name2) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING',
+      [cid, today, u1.user_id, u2.user_id, u1.first_name||'؟', u2.first_name||'؟']
+    ).catch(()=>{});
+    const hearts = ['💕','💖','💗','💝','💓'];
+    const h = hearts[Math.floor(Math.random()*hearts.length)];
+    return ctx.reply(
+      h + ' *زوج اليوم*\n━━━━━━━━━━━━━━━\n\n' +
+      '[' + (u1.first_name||'؟') + '](tg://user?id=' + u1.user_id + ') ' + h + ' [' + (u2.first_name||'؟') + '](tg://user?id=' + u2.user_id + ')\n\n_يتجدد غداً!_ 🌅',
+      { parse_mode:'Markdown', reply_to_message_id: ctx.message?.message_id }
+    ).catch(()=>{});
+  });
+
+
 }
 
 // ══════════════════════════════════════════
@@ -974,72 +1041,5 @@ async function showGamesMenu(ctx) {
     reply_markup: { inline_keyboard: rows }
   }).catch(() => null);
 }
-
-  bot.command(['couples', 'زوج', 'زواج'], async ctx => {
-    if (!isGroup(ctx)) return;
-    delCmd(ctx);
-    const { all: dbAll } = require('../database/db');
-    const members = await dbAll(
-      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 AND first_name IS NOT NULL AND first_name != \'\'',
-      [ctx.chat.id]
-    ).catch(() => []);
-    if (members.length < 2) return ctx.reply('❌ لا يوجد أعضاء كافيون!').catch(() => {});
-    const today = new Date().toISOString().split('T')[0];
-    const seed = (String(ctx.chat.id) + today).split('').reduce((a,c) => a + c.charCodeAt(0), 0);
-    const idx1 = seed % members.length;
-    let idx2 = (seed * 7 + 3) % members.length;
-    if (idx2 === idx1) idx2 = (idx2 + 1) % members.length;
-    const p1 = members[idx1];
-    const p2 = members[idx2];
-    const hearts = ['\u{1F495}','\u{1F496}','\u{1F497}','\u{1F49D}','\u{1F493}','\u{1F49E}','\u{1F970}','\u{1F60D}'];
-    const heart = hearts[seed % hearts.length];
-    const chatTitle = ctx.chat.title || 'القروب';
-    const txt = heart + ' *زوج اليوم في ' + chatTitle + '*\n'
-      + '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n'
-      + '\u{1F46B} [' + p1.first_name + '](tg://user?id=' + p1.user_id + ')\n'
-      + heart + ' *\u00D7* ' + heart + '\n'
-      + '\u{1F46B} [' + p2.first_name + '](tg://user?id=' + p2.user_id + ')\n\n'
-      + '_يتجدد كل يوم_ \u{1F5D3}';
-    ctx.reply(txt, { parse_mode: 'Markdown' }).catch(() => {});
-  });
-
-
-  // 💑 Couple of the Day
-  bot.command(['couple','زوج'], async ctx => {
-    if (!isGroup(ctx)) return;
-    const cid = ctx.chat?.id;
-    const today = new Date().toISOString().split('T')[0];
-    const ck = 'couple_' + cid + '_' + today;
-    let saved = require('../utils/cache').cacheGet ? null : null;
-    const existing = await require('../database/db').get(
-      'SELECT * FROM couple_of_day WHERE chat_id=$1 AND date=$2', [cid, today]
-    ).catch(()=>null);
-    if (existing) {
-      const hearts = ['💕','💖','💗','💝','💓'];
-      const h = hearts[Math.floor(Math.random()*hearts.length)];
-      return ctx.reply(
-        h + ' *زوج اليوم*\n━━━━━━━━━━━━━━━\n\n' +
-        '[' + existing.name1 + '](tg://user?id=' + existing.user1_id + ') ' + h + ' [' + existing.name2 + '](tg://user?id=' + existing.user2_id + ')\n\n_يتجدد غداً!_ 🌅',
-        { parse_mode:'Markdown', reply_to_message_id: ctx.message?.message_id }
-      ).catch(()=>{});
-    }
-    const members = await require('../database/db').all(
-      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 AND is_bot=0 ORDER BY RANDOM() LIMIT 20', [cid]
-    ).catch(()=>[]);
-    if (!members || members.length < 2) return ctx.reply('❌ ما في أعضاء كافيين!', { reply_to_message_id: ctx.message?.message_id }).catch(()=>{});
-    const u1 = members[0], u2 = members[1];
-    await require('../database/db').run(
-      'INSERT INTO couple_of_day(chat_id,date,user1_id,user2_id,name1,name2) VALUES($1,$2,$3,$4,$5,$6) ON CONFLICT DO NOTHING',
-      [cid, today, u1.user_id, u2.user_id, u1.first_name||'؟', u2.first_name||'؟']
-    ).catch(()=>{});
-    const hearts = ['💕','💖','💗','💝','💓'];
-    const h = hearts[Math.floor(Math.random()*hearts.length)];
-    return ctx.reply(
-      h + ' *زوج اليوم*\n━━━━━━━━━━━━━━━\n\n' +
-      '[' + (u1.first_name||'؟') + '](tg://user?id=' + u1.user_id + ') ' + h + ' [' + (u2.first_name||'؟') + '](tg://user?id=' + u2.user_id + ')\n\n_يتجدد غداً!_ 🌅',
-      { parse_mode:'Markdown', reply_to_message_id: ctx.message?.message_id }
-    ).catch(()=>{});
-  });
-
 
 module.exports = { setupGroupCommands, showGamesMenu, handleSettingsCallback, showGroupSettings };
