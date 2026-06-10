@@ -973,7 +973,10 @@ async function showChannelsMenu(ctx) {
       const url  = ch.channel_url || ('https://t.me/' + String(ch.channel_id).replace('@',''));
       text += (i+1) + '. *' + escMd(name) + '*\n';
       text += '   🆔 `' + ch.channel_id + '`\n';
-      if (url && !url.includes('undefined')) text += '   🔗 ' + url + '\n';
+      const hasUrl = ch.channel_url && ch.channel_url.trim() && !ch.channel_url.includes('undefined') && !ch.channel_url.includes('/-100');
+      if (hasUrl) text += '   🔗 ' + ch.channel_url + '\n';
+      else if (ch.channel_id && !String(ch.channel_id).startsWith('-')) text += '   🔗 https://t.me/' + String(ch.channel_id).replace('@','') + '\n';
+      else text += '   🔒 قناة خاصة\n';
       text += '\n';
       rows.push([
         btn('📣 ' + name.substring(0,20), url.startsWith('http') ? 'mg_ch_view_' + ch.id : 'mg_ch_view_' + ch.id),
