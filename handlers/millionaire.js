@@ -38,7 +38,7 @@ const logger = require('../utils/logger');
 
 /* ═══════════════════════════════════════════════════════════════
    CONSTANTS
-═══════════════════════════════════════════════════════════════ */
+ * ═══════════════════════════════════════════════════════════════ */
 const PRIZES = [
   100, 200, 300, 500, 1000,
   2000, 4000, 8000, 16000, 32000,
@@ -872,11 +872,11 @@ async function useLifeline(ctx, type) {
     await new Promise(r => setTimeout(r, 1500));
     await sendNextQuestion(ctx.telegram, chatId);
     return;
-    /* removed: ctx.telegram.sendMessage(chatId, `⏭️ unused`,
+    /* removed: ctx.telegram.sendMessage(chatId, '⏭️ unused',
       { parse_mode: 'Markdown' }
     ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     await new Promise(r => setTimeout(r, 2000));
-    await sendNextQuestion(ctx.telegram, chatId);
+    await sendNextQuestion(ctx.telegram, chatId); */
   }
 }
 
@@ -1217,6 +1217,3 @@ async function handleCallback(ctx, d) {
 }
 
 module.exports = { stopGame, register, initMillionaireSchema, startJoinPhase, handleCallback };
-
-}
-}

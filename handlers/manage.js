@@ -574,29 +574,28 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
 
         // تحقق إذا البوت ادمن في القناة
         const { addChannel, validateBotInChannel } = require('../utils/channelGuard');
-        const bot = ctx.telegram ? { telegram: ctx.telegram } : global.__bot;
-        const valid = await validateBotInChannel(bot, cid).catch(() => ({ ok: false }));
+        const bot = global.__bot || { telegram: ctx.telegram };
 
-        if (!valid.ok) {
-          clearState(uid);
-          return ctx.reply(
-            '⚠️ *البوت مش ادمن في القناة!*\n\n' +
-            '📢 القناة: `' + cid + '`\n\n' +
-            '👇 أضف البوت كـ ادمن في القناة أولاً ثم أعد الإضافة.',
-            { parse_mode: 'Markdown', ...build([[btn('🔄 إعادة المحاولة','mg_addchannel'), btn('❌ إلغاء','mg_channels_menu')]]) }
-          ).catch(()=>{});
+        // القنوات الخاصة (invite link) نضيفها مباشرة مع تحذير
+        const isPrivate = cid.startsWith('+') || cid.includes('/+');
+        let adminWarning = null;
+
+        if (!isPrivate) {
+          const valid = await validateBotInChannel(bot, cid).catch(() => ({ ok: true }));
+          if (!valid.ok) {
+            adminWarning = '⚠️ *تنبيه:* البوت مش ادمن في هذه القناة\nالفحص لن يعمل حتى تضيفه كادمن!';
+          }
         }
 
         await addChannel(cid, nm, url, bot).catch(e => { clearState(uid); return ctx.reply('❌ ' + e.message).catch(()=>{}); });
         clearState(uid);
         cacheClear('required_channels');
-        await ctx.reply(
-          '✅ *تمت إضافة القناة بنجاح!*\n\n' +
+        let successMsg = '✅ *تمت إضافة القناة بنجاح!*\n\n' +
           '📢 الاسم: *' + nm + '*\n' +
           '🆔 المعرف: `' + cid + '`\n' +
-          '🔗 الرابط: ' + url,
-          { parse_mode: 'Markdown' }
-        ).catch(()=>{});
+          '🔗 الرابط: ' + (url || 'قناة خاصة') + '\n';
+        if (adminWarning) successMsg += '\n' + adminWarning;
+        await ctx.reply(successMsg, { parse_mode: 'Markdown' }).catch(()=>{});
         return showChannelsMenu(ctx);
       }
       case 'mg_awaiting_ad_title': {
