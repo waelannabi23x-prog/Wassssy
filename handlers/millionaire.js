@@ -233,7 +233,7 @@ function buildQuestionMsg(game, q, hiddenOptions) {
     `${diff} • ${q.category || 'عام'} • ${fmtPrize(prize)}\n` +
     `${levelBar(level)}\n` +
     (isSafe ? `\n🛡️ *نقطة أمان!*\n` : '') +
-    `\n❓ *${q.question || q.question || 'سؤال'}*\n\n` +
+    `\n❓ *${q.text || q.question || 'سؤال'}*\n\n` +
     `${opts}\n\n` +
     `👥 اللاعبون النشطون: ${players.length}\n` +
     `⏱️ الوقت: ${QUESTION_SECS} ثانية` +
@@ -582,7 +582,7 @@ async function handleAnswer(ctx, letter) {
   const elapsed = Math.floor((Date.now() - (game.answerDeadline - QUESTION_SECS * 1000)) / 1000);
   player.answerTime = elapsed;
 
-  const optText = game.currentQ?.['option_'+letter] || game.currentQ?.[letter] || '';
+  const optText = game.currentQ?.['option_'+letter] || game.currentQ?.['option'+letter] || '';
   await ctx.answerCbQuery('✅ سجلنا إجابتك: ' + LETTERS['abcd'.indexOf(letter)] + ') ' + optText).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   // احفظ آخر message للاعب للـ reply
   if (player) player.lastMsgId = ctx.callbackQuery?.message?.message_id;
