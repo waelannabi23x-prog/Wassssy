@@ -246,4 +246,14 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
     else ctx.reply(txt, {parse_mode:'Markdown'}).catch(()=>{});
   });
 
+  // أمر مؤقت لحذف كل القنوات
+  bot.command('clearchannels', async ctx => {
+    if (!ctx.isOwner) return;
+    const { run } = require('../database/db');
+    const { cacheClear } = require('../utils/cache');
+    await run('UPDATE required_channels SET is_active=0').catch(e => ctx.reply('❌ ' + e.message));
+    cacheClear('required_channels');
+    return ctx.reply('✅ تم إيقاف كل القنوات');
+  });
+
 };
