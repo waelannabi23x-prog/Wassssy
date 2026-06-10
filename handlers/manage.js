@@ -961,29 +961,32 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
 async function showChannelsMenu(ctx) {
   const { getChannels } = require('../utils/channelGuard');
   const list = await getChannels().catch(() => []);
-  let text = '📢 *القنوات والإعلانات*\n';
-  text += '━━━━━━━━━━━━━━━\n\n';
-  text += '📌 *قنوات الاشتراك الإجباري:* ' + list.length + '\n\n';
+
+  let text = '📢 *قنوات الاشتراك الإجباري*\n━━━━━━━━━━━━━━━\n\n';
+  text += '📌 *المجموع:* ' + list.length + ' قناة\n\n';
+
+  const rows = [];
+
   if (list.length) {
     list.forEach((ch, i) => {
-      // تنظيف الاسم من الروابط إذا اندمجت
-      const rawName = (ch.channel_name||'قناة').replace(/https?:\/\/\S+/g, '').trim();
-      const name = escMd(rawName || ch.channel_id);
-      const url = ch.channel_url || ('https://t.me/' + (ch.channel_id||'').replace('@',''));
-      text += (i+1) + '. *' + name + '*\n';
-      text += '   🆔 `' + (ch.channel_id||'') + '`\n';
-      text += '   🔗 ' + url + '\n\n';
+      const name = (ch.channel_name||'قناة').replace(/https?:\/\/\S+/g,'').trim() || ch.channel_id;
+      const url  = ch.channel_url || ('https://t.me/' + String(ch.channel_id).replace('@',''));
+      text += (i+1) + '. *' + escMd(name) + '*\n';
+      text += '   🆔 `' + ch.channel_id + '`\n';
+      if (url && !url.includes('undefined')) text += '   🔗 ' + url + '\n';
+      text += '\n';
+      rows.push([
+        btn('📣 ' + name.substring(0,20), url.startsWith('http') ? 'mg_ch_view_' + ch.id : 'mg_ch_view_' + ch.id),
+        btn('🗑 حذف', 'mg_delch_' + ch.channel_id),
+      ]);
     });
   } else {
-    text += '_لا توجد قنوات مضافة_\n';
+    text += '_لا توجد قنوات مضافة بعد_\n\n';
+    text += '💡 أضف قناة وأجعل الاشتراك فيها إجبارياً للمستخدمين';
   }
-  const rows = [];
-  // زر حذف لكل قناة
-  list.forEach(ch => {
-    rows.push([btn('🗑 حذف: ' + (ch.channel_name||ch.channel_id).substring(0,25), 'mg_delch_' + ch.channel_id)]);
-  });
+
   rows.push([btn('➕ إضافة قناة', 'mg_addchannel')]);
-  rows.push([btn('📣 إدارة الإعلانات', 'mg_ads_menu')]);
+  rows.push([btn('🗑 حذف الكل', 'mg_delch_all'), btn('📣 الإعلانات', 'mg_ads_menu')]);
   rows.push(back('mg_menu'));
   return eos(ctx, text, { parse_mode: 'Markdown', ...build(rows) });
 }
