@@ -1217,3 +1217,6 @@ async function handleCallback(ctx, d) {
 }
 
 module.exports = { stopGame, register, initMillionaireSchema, startJoinPhase, handleCallback };
+
+}
+}
