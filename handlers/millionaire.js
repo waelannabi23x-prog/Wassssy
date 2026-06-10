@@ -1205,7 +1205,11 @@ async function handleCallback(ctx, d) {
     if (d === 'mlr_cancel')      return cancelGame(ctx);
     if (d === 'mlr_ranking')     return showRanking(ctx);
     if (d === 'mlr_howto')       return ctx.answerCbQuery('اكتب مليون في القروب لبدء اللعبة!', { show_alert: true }).catch(() => {});
-    if (d.startsWith('mar_'))    return handleAnswer(ctx, d);
+    if (d.startsWith('mar_')) {
+      const parts = d.split('_'); // mar_a_sessionId
+      const letter = parts[1];   // a, b, c, or d
+      return handleAnswer(ctx, letter);
+    }
     if (d.startsWith('mlr_')) {
       const type = d.substring(4); // mlr_fifty → fifty
       if (['fifty','audience','call','skip'].includes(type)) return useLifeline(ctx, type);
