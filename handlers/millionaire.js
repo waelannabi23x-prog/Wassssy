@@ -187,7 +187,7 @@ function shuffleArray(arr) {
 
 async function getRandomQuestion(usedIds, difficulty) {
   const diff = difficulty || 'medium';
-  const exclude = usedIds.length ? `AND id NOT IN (${usedIds.join(',')})` : '';
+  const exclude = (usedIds && usedIds.length) ? 'AND id NOT IN (' + usedIds.filter(Number.isInteger).join(',') + ')' : '';
   // Try exact difficulty first, then fallback
   // difficulty قد يكون text أو integer في DB
   const diffMap = { 'easy': 1, 'medium': 2, 'hard': 3 };
@@ -510,26 +510,27 @@ async function sendNextQuestion(telegram, chatId) {
   ];
 
   // edit رسالة السؤال القديمة أو ابعث جديدة
+  let sentMsg = null;
   if (game.msgId) {
     const edited = await telegram.editMessageText(chatId, game.msgId, null, txt, {
       parse_mode: 'Markdown',
       reply_markup: { inline_keyboard: keyboard },
     }).catch(() => null);
     if (!edited) {
-      // فشل الـ edit — ابعث جديدة
-      const msg = await telegram.sendMessage(chatId, txt, {
+      sentMsg = await telegram.sendMessage(chatId, txt, {
         parse_mode: 'Markdown',
         reply_markup: { inline_keyboard: keyboard },
       }).catch(() => null);
-      if (msg) game.msgId = msg.message_id;
+      if (sentMsg) game.msgId = sentMsg.message_id;
     }
   } else {
-    const msg = await telegram.sendMessage(chatId, txt, {
+    sentMsg = await telegram.sendMessage(chatId, txt, {
       parse_mode: 'Markdown',
       reply_markup: { inline_keyboard: keyboard },
-    }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    if (msg) game.msgId = msg.message_id;
+    }).catch(err => { require('../utils/logger').debug("[silent]", err.message); return null; });
+    if (sentMsg) game.msgId = sentMsg.message_id;
   }
+  const msg = sentMsg;
 
   // Countdown timer
   game.timer = setTimeout(async () => {
@@ -853,7 +854,7 @@ async function useLifeline(ctx, type) {
       `📞 *${ctx.from.first_name} يستشير القروب!*\n\n` +
       `❓ *${q.question}*\n\n` +
       `💡 ساعدوه! ردوا بالحرف الصحيح (أ، ب، ج، أو د)\n` +
-      `_(للمشرف فقط: الجواب ${hint}) ${hintOpt}_`,
+      `_(للمشرف فقط: الجواب *' + (LETTERS['abcd'.indexOf(q.correct)] || '؟') + '*) ${hintOpt}_`,
       { parse_mode: 'Markdown' }
     ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
