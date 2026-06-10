@@ -6,7 +6,7 @@ require('./utils/validateEnv').validateEnv();
 const { Telegraf }    = require('telegraf');
 const express         = require('express');
 const compression     = require('compression');
-const helmet = require('helmet');
+const helmet          = require('helmet');
 const logger          = require('./utils/logger');
 const { res: cbRes }  = require('./utils/cbRegistry');
 const { initSchema, getSetting, run: dbRun, all: dbAll, get: dbGet, getPg } = require('./database/db');
@@ -38,45 +38,53 @@ const filesDb       = require('./database/files');
 const { handleAiChat, resetChat } = require('./handlers/ai_chat');
 const { handleOwnerAI }           = require('./handlers/ai_owner');
 const { smartSearch }             = require('./handlers/group');
-const { handleNewMember, handleMemberLeft, showAllMembers, tagAll, muteAll, unmuteAll, showGroupStats, warnMember, banMember, unbanMember, muteMember, unmuteMember, checkAntiSpam } = require("./handlers/group_admin");
-const { setupGroupCommands, handleSettingsCallback } = require("./handlers/group_commands");
-const { migrateGroupTables } = require("./database/group_db");
-const groupBroadcast = require("./utils/groupBroadcast");
+const { handleNewMember, handleMemberLeft, showAllMembers, tagAll, muteAll, unmuteAll, showGroupStats, warnMember, banMember, unbanMember, muteMember, unmuteMember, checkAntiSpam } = require('./handlers/group_admin');
+const { setupGroupCommands, handleSettingsCallback } = require('./handlers/group_commands');
+const { migrateGroupTables } = require('./database/group_db');
+const groupBroadcast = require('./utils/groupBroadcast');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
 const { eos } = require('./utils/helpers');
 
-// ── Globals ──
-global.maintenanceMode = false;
-
-// ── Cluster-safe maintenance: يقرأ من cache كل 30s ──
-setInterval(async () => {
-  try {
-    const { cacheGet, cacheSet } = require('./utils/cache');
-    const { getSetting } = require('./database/db');
-    let val = cacheGet('_maint_mode');
-    if (val === null) {
-      val = (await getSetting('maintenance')) === 'true';
-      cacheSet('_maint_mode', val, 30000);
-    }
-    global.maintenanceMode = !!val;
-  } catch(_) {}
-}, 30000).unref();
-
 // ── Config ──
-const TOKEN        = process.env.BOT_TOKEN;
+const TOKEN          = process.env.BOT_TOKEN;
 if (!TOKEN) { logger.error('FATAL: BOT_TOKEN missing'); process.exit(1); }
 const WEBHOOK_URL    = process.env.WEBHOOK_URL || '';
 const WEBHOOK_SECRET = process.env.WEBHOOK_SECRET || '';
 const PORT           = parseInt(process.env.PORT) || 3000;
 const safeInt = v => { const n = parseInt(v); return isNaN(n) ? 0 : n; };
 
+// ── maintenanceMode — module-level (لا global) ──
+let maintenanceMode = false;
+setInterval(async () => {
+  try {
+    const { cacheGet, cacheSet } = require('./utils/cache');
+    let val = cacheGet('_maint_mode');
+    if (val === null) {
+      val = (await getSetting('maintenance')) === 'true';
+      cacheSet('_maint_mode', val, 30000);
+    }
+    maintenanceMode = !!val;
+  } catch(_) {}
+}, 30000).unref();
+
+// expose للـ middlewares التي تحتاجه
+Object.defineProperty(global, 'maintenanceMode', {
+  get: () => maintenanceMode,
+  set: v => { maintenanceMode = !!v; },
+  configurable: true,
+});
+
 // ── Express ──
 const app = express();
 app.disable('x-powered-by');
-app.use(helmet({ contentSecurityPolicy: { directives: { defaultSrc: ["'self'"], scriptSrc: ["'self'", "'unsafe-inline'", 'telegram.org', '*.telegram.org'], styleSrc: ["'self'", "'unsafe-inline'"], imgSrc: ["'self'", 'data:', 'https:'], connectSrc: ["'self'", 'https://api.telegram.org'] } } }));
+app.use(helmet({ contentSecurityPolicy: { directives: {
+  defaultSrc: ["'self'"],
+  scriptSrc:  ["'self'", "'unsafe-inline'", 'telegram.org', '*.telegram.org'],
+  styleSrc:   ["'self'", "'unsafe-inline'"],
+  imgSrc:     ["'self'", 'data:', 'https:'],
+  connectSrc: ["'self'", 'https://api.telegram.org'],
+}}}));
 app.use(compression({ level: 6, threshold: 512 }));
-
-// ── Cache Headers للـ API ──
 app.use('/api', (req, res, next) => {
   if (req.method === 'GET') {
     res.set('Cache-Control', 'private, max-age=10');
@@ -85,14 +93,17 @@ app.use('/api', (req, res, next) => {
   next();
 });
 app.use(express.json({ limit: '1mb' }));
-app.use(express.static(require('path').join(__dirname, 'public'), { etag: false, maxAge: 0, setHeaders: (res) => { res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate'); } }));
+app.use(express.static(require('path').join(__dirname, 'public'), {
+  etag: false, maxAge: 0,
+  setHeaders: (res) => res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate'),
+}));
 app.set('trust proxy', 1);
 app.get('/', (_r, res) => res.send('OK'));
 
 // ── Bot ──
 const bot = new Telegraf(TOKEN, {
   handlerTimeout: 90000,
-  telegram: { apiRoot: process.env.TELEGRAM_API_ROOT || undefined }
+  telegram: { apiRoot: process.env.TELEGRAM_API_ROOT || undefined },
 });
 
 // ── Rate Limiter ──
@@ -102,11 +113,9 @@ setInterval(() => {
   for (const [k, v] of _floodMap) if (v.t < cut) _floodMap.delete(k);
 }, 60000).unref();
 
-
 const rateLimit = (ctx, next) => {
   const uid = ctx.from?.id;
   if (!uid) return next();
-  // الأدمن والأونر بدون حد
   if (ctx.isOwner || ctx.isAdmin) return next();
   const now = Date.now();
   let u = _floodMap.get(uid);
@@ -115,81 +124,52 @@ const rateLimit = (ctx, next) => {
     return next();
   }
   u.c++;
-  // حد 4 ضغطات كل 2 ثانية
   if (u.c > 4) {
-    if (u.c === 5 && ctx.callbackQuery) ctx.answerCbQuery('⚠️ إبطاء قليلاً...', { show_alert: false }).catch(() => {});
-    return; // تجاهل بدون رد
+    if (u.c === 5 && ctx.callbackQuery)
+      ctx.answerCbQuery('⚠️ إبطاء قليلاً...', { show_alert: false }).catch(() => {});
+    return;
   }
   return next();
 };
 
-// ── Middleware ──
-bot.use(rateLimit);
+// ══════════════════════════════════════════
+// FIX 1: تحقق هل البوت أدمن — middleware مستقل على المستوى الأعلى
+// (كان متداخل داخل bot.use آخر = memory leak + double processing)
+// ══════════════════════════════════════════
+const botAdminCheck = async (ctx, next) => {
+  if (!['group', 'supergroup'].includes(ctx.chat?.type)) return next();
+  if (!ctx.message?.text?.startsWith('/')) return next();
+  try {
+    const me = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);
+    if (me.status === 'administrator' || me.status === 'creator') return next();
+    const botUn = ctx.botInfo?.username || '';
+    await ctx.reply(
+      '⚠️ أنا لست مشرفاً في هذا القروب!\n\nلكي تعمل الأوامر بشكل صحيح، يرجى إضافتي كمشرف 👇',
+      {
+        reply_to_message_id: ctx.message?.message_id,
+        reply_markup: { inline_keyboard: [[
+          { text: '➕ أضفني كمشرف', url: 'https://t.me/' + botUn + '?startgroup=admin' },
+        ]]},
+      }
+    ).catch(() => {});
+    return;
+  } catch(_) { return next(); }
+};
 
-// ── Middleware موحّد قبل auth ──
-bot.use(async (ctx, next) => {
-  const isGroup = ['group','supergroup'].includes(ctx.chat?.type);
-  const txt = (ctx.message?.text || '').trim();
+// ── Spam/Flood state ──
+const _spamProtect = new Map();
+setInterval(() => {
+  const cut = Date.now() - 10000;
+  for (const [k, v] of _spamProtect) if (v.last < cut) _spamProtect.delete(k);
+}, 10000).unref();
 
-  // القروب فقط
-  if (isGroup && ctx.message) {
-    // ألعاب
-    if (/^خمن$/i.test(txt)) return guessGame.startInvite(ctx).catch(() => next());
-    if (/^(العاب|الالعاب)$/i.test(txt)) {
-      try { await require('./handlers/group_commands').showGamesMenu(ctx); return; } catch(_) {}
-    }
-    if (/^تخمين[:\s:]+/i.test(txt)) {
-      const handled = await guessGame.handleGuessMsg(ctx).catch(() => false);
-      if (handled) return;
-    }
-    if (/^[أاآ]نا$/i.test(txt)) return guessGame.handleJoin(ctx).catch(() => next());
-    if (/^مليون$/i.test(txt)) {
-      try { await require('./handlers/millionaire').startJoinPhase(ctx); return; } catch(e) { logger.error('[Million]', e.message); }
-    }
-    // البنك
-    if (/^انشاء حساب$/i.test(txt)) return bank.createAccount(ctx).catch(() => next());
-    if (/^فلوسي$/i.test(txt)) return bank.showBalance(ctx).catch(() => next());
-    if (/^فارسي/i.test(txt)) return bank.transfer(ctx).catch(() => next());
-    if (/^rip /i.test(txt)) return bank.loan(ctx).catch(() => next());
-  }
-
-  // PV لعبة خمن
-  if (!isGroup && ctx.chat?.type === 'private') {
-    const uid = String(ctx.from?.id || '');
-    if (guessGame.hasPvState(uid)) {
-      return guessGame.handlePvDirect(ctx).catch(e => {
-        logger.error('[GuessGame PV]', e.message);
-        return next();
-      });
-    }
-  }
-
-  return next();
-});
-
-bot.use(authMiddleware);
-bot.catch((err, ctx) => {
-  if (!err.message.includes('is not modified'))
-    logger.error(`[BotErr] ${err.message}`, { uid: ctx.from?.id, type: ctx.updateType });
-  if (!ctx.callbackQuery && ctx.chat?.type === 'private') ctx.reply('⚠️ حدث خطأ. حاول مجدداً.').catch(() => {});
-});
-
-// ── تسجيل الأوامر ──
-require('./bot/commands')(bot, {
-  startHandler, manage, userH, million, tools, browse, bank,
-  contentDb, usersDb, bundlesDb, dbAll, cacheClear,
-  logger, OWNER_ID, kbBtn, kbBuild, eos, resetChat,
-  millionaire, tagAll, muteAll, unmuteAll, showAllMembers,
-});
-
-// ── Callbacks ──
-// ══ Middleware حماية القروبات ══
 const { all: _dbAll, get: _dbGet } = require('./database/db');
 const { cacheGet: _cGet, cacheSet: _cSet } = require('./utils/cache');
-const _spamProtect = new Map();
-setInterval(() => { const cut=Date.now()-10000; for(const[k,v] of _spamProtect) if(v.last<cut) _spamProtect.delete(k); }, 10000).unref();
 
-bot.use(async (ctx, next) => {
+// ══════════════════════════════════════════
+// FIX 2: Auto-Reply + حماية القروب — middleware مستقل (لا nested bot.use)
+// ══════════════════════════════════════════
+const groupProtectionMiddleware = async (ctx, next) => {
   if (ctx.chat?.type === 'private' || !ctx.message || !ctx.from) return next();
 
   const uid = ctx.from.id;
@@ -197,38 +177,13 @@ bot.use(async (ctx, next) => {
   const txt = ctx.message?.text || ctx.message?.caption || '';
   const now = Date.now();
 
-
-  // ── تحقق من صلاحيات البوت في القروب ──
-  bot.use(async (ctx, next) => {
-    if (!['group','supergroup'].includes(ctx.chat?.type)) return next();
-    if (!ctx.message?.text?.startsWith('/')) return next();
-    // تحقق هل البوت أدمن
-    try {
-      const me = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);
-      if (me.status === 'administrator' || me.status === 'creator') return next();
-      // البوت مش أدمن — أرسل رسالة مع زر
-      const botUn = ctx.botInfo?.username || '';
-      await ctx.reply(
-        '⚠️ أنا لست مشرفاً في هذا القروب!\n\n' +
-        'لكي تعمل الأوامر بشكل صحيح، يرجى إضافتي كمشرف 👇',
-        {
-          reply_to_message_id: ctx.message?.message_id,
-          reply_markup: { inline_keyboard: [[
-            { text: '➕ أضفني كمشرف', url: 'https://t.me/' + botUn + '?startgroup=admin' }
-          ]]}
-        }
-      ).catch(()=>{});
-      return; // لا تنفذ الأمر
-    } catch(_) { return next(); }
-  });
-
-    // 🤖 Auto-Reply — يشتغل للجميع حتى الأدمنز
-  // تجاهل أوامر اللعبة
-  const _isGameMsg = /^(تخمين[:\s]|خمن$|خمن |انا$|مليون$)/i.test(txt.trim()) || txt.trim() === 'خمن' || txt.trim() === 'مليون';
-  // تجاهل إذا الأدمن في وضع إضافة رد تلقائي
-  const _uid4ar = ctx.from?.id;
+  // 🤖 Auto-Reply
+  const _isGameMsg = /^(تخمين[:\s]|خمن$|خمن |انا$|مليون$)/i.test(txt.trim())
+    || txt.trim() === 'خمن' || txt.trim() === 'مليون';
+  const _uid4ar  = ctx.from?.id;
   const _state4ar = _uid4ar ? require('./utils/stateManager').getState(_uid4ar) : null;
   const _inArMode = _state4ar?.type?.startsWith('mg_ar') || _state4ar?.type?.startsWith('mg_awaiting');
+
   if (txt && txt.length > 0 && !_isGameMsg && !_inArMode) {
     const arKey = 'auto_replies_all';
     let arList = _cGet(arKey);
@@ -236,8 +191,6 @@ bot.use(async (ctx, next) => {
       arList = await _dbAll('SELECT * FROM auto_replies WHERE is_active=1').catch(() => []);
       _cSet(arKey, arList, 120000);
     }
-
-    // ابحث عن كل triggers تطابق
     const matched = [];
     for (const ar of arList) {
       try {
@@ -254,43 +207,41 @@ bot.use(async (ctx, next) => {
         if (txt.toLowerCase().includes(ar.trigger.toLowerCase())) matched.push(ar);
       }
     }
-
     if (matched.length > 0) {
-      // رد عشوائي حقيقي
-      const pick = matched[Math.floor(Math.random() * matched.length)];
+      const pick   = matched[Math.floor(Math.random() * matched.length)];
       const _rtype = pick.resp_type || 'text';
-        const _fid   = pick.file_id;
-        const _opts  = { reply_to_message_id: ctx.message.message_id };
-        if      (_rtype==='sticker'   && _fid) ctx.telegram.sendSticker(ctx.chat.id,_fid,_opts).catch(()=>{});
-        else if (_rtype==='photo'     && _fid) ctx.telegram.sendPhoto(ctx.chat.id,_fid,{..._opts,caption:pick.response||undefined,parse_mode:'Markdown'}).catch(()=>{});
-        else if (_rtype==='video'     && _fid) ctx.telegram.sendVideo(ctx.chat.id,_fid,{..._opts,caption:pick.response||undefined,parse_mode:'Markdown'}).catch(()=>{});
-        else if (_rtype==='voice'     && _fid) ctx.telegram.sendVoice(ctx.chat.id,_fid,{..._opts,caption:pick.response||undefined}).catch(()=>{});
-        else if (_rtype==='animation' && _fid) ctx.telegram.sendAnimation(ctx.chat.id,_fid,{..._opts,caption:pick.response||undefined,parse_mode:'Markdown'}).catch(()=>{});
-        else if (_rtype==='document'  && _fid) ctx.telegram.sendDocument(ctx.chat.id,_fid,{..._opts,caption:pick.response||undefined,parse_mode:'Markdown'}).catch(()=>{});
-        else ctx.reply(pick.response,{reply_to_message_id:ctx.message.message_id,parse_mode:'Markdown'}).catch(()=>{});
+      const _fid   = pick.file_id;
+      const _opts  = { reply_to_message_id: ctx.message.message_id };
+      if      (_rtype === 'sticker'   && _fid) ctx.telegram.sendSticker(ctx.chat.id, _fid, _opts).catch(() => {});
+      else if (_rtype === 'photo'     && _fid) ctx.telegram.sendPhoto(ctx.chat.id, _fid, { ..._opts, caption: pick.response || undefined, parse_mode: 'Markdown' }).catch(() => {});
+      else if (_rtype === 'video'     && _fid) ctx.telegram.sendVideo(ctx.chat.id, _fid, { ..._opts, caption: pick.response || undefined, parse_mode: 'Markdown' }).catch(() => {});
+      else if (_rtype === 'voice'     && _fid) ctx.telegram.sendVoice(ctx.chat.id, _fid, { ..._opts, caption: pick.response || undefined }).catch(() => {});
+      else if (_rtype === 'animation' && _fid) ctx.telegram.sendAnimation(ctx.chat.id, _fid, { ..._opts, caption: pick.response || undefined, parse_mode: 'Markdown' }).catch(() => {});
+      else if (_rtype === 'document'  && _fid) ctx.telegram.sendDocument(ctx.chat.id, _fid, { ..._opts, caption: pick.response || undefined, parse_mode: 'Markdown' }).catch(() => {});
+      else ctx.reply(pick.response, { reply_to_message_id: ctx.message.message_id, parse_mode: 'Markdown' }).catch(() => {});
     }
   }
 
-  // باقي الحماية للمستخدمين العاديين فقط
+  // حماية الأدمنز من الفلتر
   if (ctx.isAdmin || ctx.isOwner) return next();
 
-  // جلب إعدادات القروب
+  // إعدادات القروب
   const sk = 'grp_s_' + cid;
   let gs = _cGet(sk);
   if (!gs) {
-    gs = await _dbGet('SELECT anti_spam,anti_link,anti_flood FROM group_chats WHERE chat_id=$1',[cid]).catch(()=>null) || {};
+    gs = await _dbGet('SELECT anti_spam,anti_link,anti_flood FROM group_chats WHERE chat_id=$1', [cid]).catch(() => null) || {};
     _cSet(sk, gs, 60000);
   }
 
   // Anti-Flood
   if (gs.anti_flood) {
-    const key = uid+'_'+cid;
-    const sp = _spamProtect.get(key) || {c:0,t:now};
-    if (now - sp.t < 3000) sp.c++; else { sp.c=1; sp.t=now; }
+    const key = uid + '_' + cid;
+    const sp  = _spamProtect.get(key) || { c: 0, t: now };
+    if (now - sp.t < 3000) sp.c++; else { sp.c = 1; sp.t = now; }
     _spamProtect.set(key, sp);
     if (sp.c > 5) {
-      ctx.deleteMessage().catch(()=>{});
-      if (sp.c === 6) require('./handlers/group_admin').warnMember(ctx,cid,uid,'فلود').catch(()=>{});
+      ctx.deleteMessage().catch(() => {});
+      if (sp.c === 6) require('./handlers/group_admin').warnMember(ctx, cid, uid, 'فلود').catch(() => {});
       return;
     }
   }
@@ -298,23 +249,92 @@ bot.use(async (ctx, next) => {
   // Anti-Link
   if (gs.anti_link && txt && !txt.startsWith('/')) {
     if (/https?:\/\/|t\.me\/|telegram\.me\//i.test(txt)) {
-      ctx.deleteMessage().catch(()=>{});
-      const m = await ctx.reply('🔗 ' + (ctx.from.first_name||'') + ' الروابط ممنوعة!').catch(()=>null);
-      if (m) setTimeout(()=>ctx.telegram.deleteMessage(cid,m.message_id).catch(()=>{}),5000);
+      ctx.deleteMessage().catch(() => {});
+      const m = await ctx.reply('🔗 ' + (ctx.from.first_name || '') + ' الروابط ممنوعة!').catch(() => null);
+      if (m) setTimeout(() => ctx.telegram.deleteMessage(cid, m.message_id).catch(() => {}), 5000);
       return;
     }
   }
 
-  // Anti-Spam (رسائل متكررة)
+  // Anti-Spam
   if (gs.anti_spam && txt && txt.length > 5 && !txt.startsWith('/')) {
-    const sk2 = 'sp_'+uid+'_'+cid;
-    if (_cGet(sk2) === txt) { ctx.deleteMessage().catch(()=>{}); return; }
+    const sk2 = 'sp_' + uid + '_' + cid;
+    if (_cGet(sk2) === txt) { ctx.deleteMessage().catch(() => {}); return; }
     _cSet(sk2, txt, 10000);
   }
 
   return next();
+};
+
+// ══════════════════════════════════════════
+// FIX 3: Middleware الألعاب والبنك — trigger واحد فقط لكل أمر
+// (حذف النسخ المكررة من bot.on('message') لاحقاً)
+// ══════════════════════════════════════════
+const gameAndBankMiddleware = async (ctx, next) => {
+  const isGroup = ['group', 'supergroup'].includes(ctx.chat?.type);
+  const txt     = (ctx.message?.text || '').trim();
+
+  if (isGroup && ctx.message) {
+    if (/^خمن$/i.test(txt))           return guessGame.startInvite(ctx).catch(() => next());
+    if (/^(العاب|الالعاب)$/i.test(txt)) {
+      try { await require('./handlers/group_commands').showGamesMenu(ctx); return; } catch(_) {}
+    }
+    if (/^تخمين[:\s:]+/i.test(txt)) {
+      const handled = await guessGame.handleGuessMsg(ctx).catch(() => false);
+      if (handled) return;
+    }
+    if (/^[أاآ]نا$/i.test(txt))       return guessGame.handleJoin(ctx).catch(() => next());
+
+    // FIX: مليون — trigger واحد فقط هنا، محذوف من bot.on('message')
+    if (/^مليون$/i.test(txt)) {
+      try { await millionaire.startJoinPhase(ctx); return; }
+      catch(e) { logger.error('[Million]', e.message); }
+    }
+
+    // البنك
+    if (/^انشاء حساب$/i.test(txt))    return bank.createAccount(ctx).catch(() => next());
+    if (/^فلوسي$/i.test(txt))          return bank.showBalance(ctx).catch(() => next());
+    if (/^فارسي/i.test(txt))           return bank.transfer(ctx).catch(() => next());
+    if (/^rip /i.test(txt))            return bank.loan(ctx).catch(() => next());
+  }
+
+  // PV لعبة خمن
+  if (!isGroup && ctx.chat?.type === 'private') {
+    const uid = String(ctx.from?.id || '');
+    if (guessGame.hasPvState(uid)) {
+      return guessGame.handlePvDirect(ctx).catch(e => {
+        logger.error('[GuessGame PV]', e.message);
+        return next();
+      });
+    }
+  }
+
+  return next();
+};
+
+// ── تسجيل middleware بالترتيب الصحيح ──
+bot.use(rateLimit);
+bot.use(gameAndBankMiddleware);   // الألعاب والبنك قبل auth
+bot.use(authMiddleware);
+bot.use(botAdminCheck);           // FIX: مستوى أعلى — لا nested
+bot.use(groupProtectionMiddleware); // auto-reply + flood/spam/link
+
+bot.catch((err, ctx) => {
+  if (!err.message.includes('is not modified'))
+    logger.error('[BotErr] ' + err.message, { uid: ctx.from?.id, type: ctx.updateType });
+  if (!ctx.callbackQuery && ctx.chat?.type === 'private')
+    ctx.reply('⚠️ حدث خطأ. حاول مجدداً.').catch(() => {});
 });
 
+// ── تسجيل الأوامر ──
+require('./bot/commands')(bot, {
+  startHandler, manage, userH, million, tools, browse, bank,
+  contentDb, usersDb, bundlesDb, dbAll, cacheClear,
+  logger, OWNER_ID, kbBtn, kbBuild, eos, resetChat,
+  millionaire, tagAll, muteAll, unmuteAll, showAllMembers,
+});
+
+// ── Callbacks ──
 const { registerCallbacks } = require('./bot/callbacks');
 registerCallbacks(bot, {
   CBDedup, cbRes, startHandler, manage, browse, userH,
@@ -333,17 +353,45 @@ registerMessages(bot, {
   logger, OWNER_ID, safeInt,
 });
 
+// ── deep link: /start file_{fileId} ──
+const { handleSummarize } = require('./handlers/share_summary');
+bot.command(['لخص', 'summarize', 'sum'], handleSummarize);
+
+bot.start(async (ctx, next) => {
+  const payload = ctx.startPayload;
+  if (payload?.startsWith('file_')) {
+    const fid = parseInt(payload.replace('file_', ''));
+    if (fid) {
+      try {
+        const file = await dbGet('SELECT * FROM files WHERE id=$1 AND is_deleted=0', [fid]);
+        if (file) {
+          const type = file.file_type === 'photo' ? 'sendPhoto' : 'sendDocument';
+          await ctx.telegram[type](ctx.chat.id, file.file_id, {
+            caption: '📄 *' + file.title + '*\n\n🔽 اضغط للتحميل المباشر',
+            parse_mode: 'Markdown',
+          });
+          return;
+        }
+      } catch(_) {}
+    }
+  }
+  return next();
+});
+
 // ── Launch ──
 async function loadMaintenance() {
-  try { global.maintenanceMode = (await getSetting('maintenance')) === 'true'; } catch(_) {}
+  try { maintenanceMode = (await getSetting('maintenance')) === 'true'; } catch(_) {}
 }
+
+// FIX: _launched guard — يمنع تسجيل handlers مرتين عند retry
+let _launched = false;
 
 async function launch() {
   logger.info('🚀 Study Bot — Starting...');
   try {
     await initSchema();
     await migrateGroupTables().catch(() => {});
-    require("./utils/cache").clearAllSubCache();
+    require('./utils/cache').clearAllSubCache();
     await require('./handlers/group_panel').migrateGroupPanel().catch(() => {});
     await require('./database/db').initBankTables().catch(() => {});
     await initPersistentStates();
@@ -373,199 +421,141 @@ async function launch() {
 
     app.get('/health', async (_r, res) => {
       res.setHeader('Cache-Control', 'no-store');
-      const mu = process.memoryUsage();
+      const mu    = process.memoryUsage();
       const heapMB = Math.round(mu.heapUsed / 1048576);
       let dbOk = false;
       try { await dbAll('SELECT 1'); dbOk = true; } catch(_) {}
       res.json({
         status: dbOk && heapMB < 450 ? 'ok' : 'degraded',
         uptime: Math.floor(process.uptime()),
-        heap: heapMB + 'MB',
-        rss: Math.round(mu.rss / 1048576) + 'MB',
-        db: dbOk ? 'ok' : 'error',
+        heap:   heapMB + 'MB',
+        rss:    Math.round(mu.rss / 1048576) + 'MB',
+        db:     dbOk ? 'ok' : 'error',
         region: process.env.RAILWAY_REGION || 'local',
-        ts: Date.now(),
+        ts:     Date.now(),
       });
     });
 
-  // ══════════════════════════════════════════
-  // 📥 تسجيل القروب تلقائياً عند إضافة البوت
-  // ══════════════════════════════════════════
-  bot.on('my_chat_member', async ctx => {
-    // ⚡ لما يُضاف البوت لقروب — أرسل DM للأدمن الذي أضافه
-    try {
-      const upd    = ctx.update?.my_chat_member;
-      const newM   = upd?.new_chat_member;
-      const addedBy = upd?.from;
-      const chat   = upd?.chat;
-      if (newM?.user?.is_bot &&
-          (newM?.status === 'member' || newM?.status === 'administrator') &&
-          addedBy?.id &&
-          chat?.type !== 'private') {
-        const me = ctx.botInfo || await ctx.telegram.getMe().catch(() => ({}));
-        const un = me.username || '';
-        const chatId = chat.id;
-        const title  = chat.title || 'القروب';
-        setTimeout(async () => {
-          try {
-            // تحقق إذا البوت ادمين
-            const botMember = await ctx.telegram.getChatMember(chatId, ctx.botInfo?.id || (await ctx.telegram.getMe()).id).catch(() => null);
-            const isAdmin = botMember?.status === 'administrator';
-            if (isAdmin) {
-              // البوت ادمين — رسالة ترحيب وإعداد
-              await ctx.telegram.sendMessage(addedBy.id,
-                '✅ تم إضافتي في *' + title + '* كـ ادمين!\n\nيمكنك إعداد القروب والتحكم فيه من هنا:',
-                {
-                  parse_mode: 'Markdown',
-                  reply_markup: { inline_keyboard: [
-                    [{ text: '⚙️ إعداد القروب', url: 'https://t.me/' + un + '?start=setup_' + chatId }]
-                  ]}
-                }
-              );
-            } else {
-              // البوت مش ادمين — رسالة في القروب + DM + خروج
-              const _noAdminKb = { inline_keyboard: [
-                [{ text: '👑 أضفني كـ مشرف 🛡️', url: 'https://t.me/' + un + '?startgroup=true&admin=delete_messages+restrict_members+pin_messages+invite_users+manage_chat' }]
-              ]};
-              // نبعث في القروب أولاً
-              await ctx.telegram.sendMessage(chatId,
-                '👋 مرحباً! أنا *' + (un || 'البوت') + '*\n\n' +
-                '❌ تم إضافتي بدون صلاحيات ادمين — لن أتمكن من العمل.\n\n' +
-                '👇 اضغط لإعادة إضافتي كمشرف:',
-                { parse_mode: 'Markdown', reply_markup: _noAdminKb }
-              ).catch(() => {});
-              // نحاول نبعث في الخاص أيضاً
-              await ctx.telegram.sendMessage(addedBy.id,
-                '⚠️ أضفتني في *' + title + '* بدون صلاحيات ادمين!\n\n' +
-                '👇 اضغط لإعادة إضافتي كمشرف:',
-                { parse_mode: 'Markdown', reply_markup: _noAdminKb }
-              ).catch(() => {});
-              // البوت يبقى في القروب
-            }
-          } catch(_) {}
-        }, 2000);
-      }
-    } catch(_) {}
-    try {
-      const update = ctx.myChatMember;
-      const chat   = update?.chat;
-      const member = update?.new_chat_member;
-      if (!chat || !['group','supergroup'].includes(chat.type)) return;
-
-      if (['member','administrator'].includes(member?.status)) {
-        // البوت أُضيف — نسجله بغض النظر عن الصلاحيات
-        // البوت أُضيف للقروب كادمين
-        await dbRun(
-          `INSERT INTO group_chats(chat_id, title, specialty_id, welcome_enabled, goodbye_enabled, notify_new_files)
-           VALUES($1,$2,0,1,0,1)
-           ON CONFLICT(chat_id) DO UPDATE SET title=$2`,
-          [chat.id, chat.title || '']
-        ).catch(() => {});
-        logger.info('[GroupReg] ✅ أُضيف البوت لـ: ' + (chat.title||chat.id));
-
-      } else if (['left','kicked'].includes(member?.status)) {
-        // البوت أُزيل من القروب
-        await dbRun(
-          'UPDATE group_chats SET is_active=0 WHERE chat_id=$1',
-          [chat.id]
-        ).catch(() => {});
-        logger.info('[GroupReg] 🚪 خرج البوت من: ' + (chat.title||chat.id));
-      }
-    } catch(e) {
-      logger.error('[my_chat_member]', e.message);
-    }
-  });
-
-  // ══════════════════════════════════════════
-  // 📝 تسجيل رسائل القروب + تسجيل الأعضاء
-  // ══════════════════════════════════════════
-  bot.on('message', async (ctx, next) => {
-    try {
-      const chat = ctx.chat;
-      if (!['group','supergroup'].includes(chat?.type)) return next();
-
-      // تسجيل القروب إذا ما موجود
-      dbRun(
-        `INSERT INTO group_chats(chat_id, title) VALUES($1,$2)
-         ON CONFLICT(chat_id) DO UPDATE SET title=$2`,
-        [chat.id, chat.title || '']
-      ).catch(() => {});
-
-      // تسجيل العضو
-      const u = ctx.from;
-      if (u && !u.is_bot) {
-        dbRun(
-          `INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at)
-           VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)
-           ON CONFLICT(chat_id,user_id) DO UPDATE SET updated_at=CURRENT_TIMESTAMP`,
-          [chat.id, u.id, u.username||'', u.first_name||'']
-        ).catch(() => {});
-      }
-    } catch(_) {}
-
-    // ── كومندز البنك في القروب ──
-    try {
-      const txt = (ctx.message?.text || '').trim();
-      if (/^مليون$/i.test(txt)) {
-        try {
-          const { startJoinPhase } = require('./handlers/millionaire');
-          await startJoinPhase(ctx);
-        } catch(e) { require('./utils/logger').error('[Million]', e.message); }
-        return;
-      }
-      if (/^انشاء حساب$|^فلوسي$|^فارسي|^rip /i.test(txt)) {
-        const bank = require('./handlers/bank');
-        if (/^انشاء حساب$/i.test(txt)) { await bank.createAccount(ctx); return; }
-        if (/^فلوسي$/i.test(txt)) { await bank.showBalance(ctx); return; }
-        if (/^فارسي/i.test(txt)) { await bank.transfer(ctx); return; }
-        if (/^rip /i.test(txt)) { await bank.loan(ctx); return; }
-      }
-    } catch(e) { require('./utils/logger').error('[Bank Group]', e.message); }
-
-    return next();
-  });
-const apiRoutes = require('./routes/api');
+    // ── API Routes ──
+    const apiRoutes = require('./routes/api');
     app.use('/api', apiRoutes);
 
-// ── Global Express Error Handler ──
-app.use((err, req, res, _next) => {
-  logger.error('[API Error] ' + err.message, { path: req.path, uid: req.tgUser?.id });
-  res.status(err.status || 500).json({ error: 'حدث خطأ، حاول مجددًا.' });
-});
+    // ── Global Express Error Handler ──
+    app.use((err, req, res, _next) => {
+      logger.error('[API Error] ' + err.message, { path: req.path, uid: req.tgUser?.id });
+      res.status(err.status || 500).json({ error: 'حدث خطأ، حاول مجددًا.' });
+    });
 
     app.listen(PORT, () => logger.info('✅ Express :' + PORT));
 
-      
-// ── Share + Summarize ────────────────────────────────────────────
-const { handleShare, handleSummarize } = require('./handlers/share_summary');
+    // FIX: _launched guard — تسجيل handlers مرة واحدة فقط
+    if (!_launched) {
+      _launched = true;
 
-// share_ callbacks handled in bot/callbacks.js
+      // ══════════════════════════════════════════
+      // FIX: bot.on handlers خارج launch — لا يتراكموا عند retry
+      // ══════════════════════════════════════════
 
-// commands: /لخص أو /summarize
-bot.command(['لخص', 'summarize', 'sum'], handleSummarize);
+      // تسجيل القروب تلقائياً
+      bot.on('my_chat_member', async ctx => {
+        try {
+          const upd     = ctx.update?.my_chat_member;
+          const newM    = upd?.new_chat_member;
+          const addedBy = upd?.from;
+          const chat    = upd?.chat;
+          if (newM?.user?.is_bot &&
+              (newM?.status === 'member' || newM?.status === 'administrator') &&
+              addedBy?.id && chat?.type !== 'private') {
+            const me    = ctx.botInfo || await ctx.telegram.getMe().catch(() => ({}));
+            const un    = me.username || '';
+            const chatId = chat.id;
+            const title  = chat.title || 'القروب';
+            setTimeout(async () => {
+              try {
+                const botMember = await ctx.telegram.getChatMember(chatId, ctx.botInfo?.id || me.id).catch(() => null);
+                const isAdmin   = botMember?.status === 'administrator';
+                if (isAdmin) {
+                  await ctx.telegram.sendMessage(addedBy.id,
+                    '✅ تم إضافتي في *' + title + '* كـ ادمين!\n\nيمكنك إعداد القروب والتحكم فيه من هنا:',
+                    { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[
+                      { text: '⚙️ إعداد القروب', url: 'https://t.me/' + un + '?start=setup_' + chatId },
+                    ]]}},
+                  );
+                } else {
+                  const _kb = { inline_keyboard: [[
+                    { text: '👑 أضفني كـ مشرف 🛡️', url: 'https://t.me/' + un + '?startgroup=true&admin=delete_messages+restrict_members+pin_messages+invite_users+manage_chat' },
+                  ]]};
+                  await ctx.telegram.sendMessage(chatId,
+                    '👋 مرحباً! أنا *' + (un || 'البوت') + '*\n\n❌ تم إضافتي بدون صلاحيات ادمين.\n\n👇 اضغط لإعادة إضافتي كمشرف:',
+                    { parse_mode: 'Markdown', reply_markup: _kb }
+                  ).catch(() => {});
+                  await ctx.telegram.sendMessage(addedBy.id,
+                    '⚠️ أضفتني في *' + title + '* بدون صلاحيات ادمين!\n\n👇 اضغط لإعادة إضافتي كمشرف:',
+                    { parse_mode: 'Markdown', reply_markup: _kb }
+                  ).catch(() => {});
+                }
+              } catch(_) {}
+            }, 2000);
+          }
+        } catch(_) {}
 
-// deep link: /start file_{fileId}
-bot.start(async (ctx, next) => {
-  const payload = ctx.startPayload;
-  if (payload?.startsWith('file_')) {
-    const fid = parseInt(payload.replace('file_', ''));
-    if (fid) {
-      try {
-        const file = await dbGet('SELECT * FROM files WHERE id=$1 AND is_deleted=0', [fid]);
-        if (file) {
-          const type = file.file_type === 'photo' ? 'sendPhoto' : 'sendDocument';
-          await ctx.telegram[type](ctx.chat.id, file.file_id, {
-            caption: `📄 *${file.title}*\n\n🔽 اضغط للتحميل المباشر`,
-            parse_mode: 'Markdown'
-          });
-          return;
-        }
-      } catch(_) {}
+        try {
+          const update = ctx.myChatMember;
+          const chat   = update?.chat;
+          const member = update?.new_chat_member;
+          if (!chat || !['group', 'supergroup'].includes(chat.type)) return;
+          if (['member', 'administrator'].includes(member?.status)) {
+            await dbRun(
+              `INSERT INTO group_chats(chat_id, title, specialty_id, welcome_enabled, goodbye_enabled, notify_new_files)
+               VALUES($1,$2,0,1,0,1)
+               ON CONFLICT(chat_id) DO UPDATE SET title=$2`,
+              [chat.id, chat.title || '']
+            ).catch(() => {});
+            logger.info('[GroupReg] ✅ أُضيف البوت لـ: ' + (chat.title || chat.id));
+          } else if (['left', 'kicked'].includes(member?.status)) {
+            await dbRun('UPDATE group_chats SET is_active=false WHERE chat_id=$1', [chat.id]).catch(() => {});
+            logger.info('[GroupReg] 🚪 خرج البوت من: ' + (chat.title || chat.id));
+          }
+        } catch(e) { logger.error('[my_chat_member]', e.message); }
+      });
+
+      // تسجيل رسائل القروب + تسجيل الأعضاء
+      // FIX: لا يوجد trigger مليون/بنك هنا — موجود في gameAndBankMiddleware فقط
+      bot.on('message', async (ctx, next) => {
+        try {
+          const chat = ctx.chat;
+          if (!['group', 'supergroup'].includes(chat?.type)) return next();
+
+          dbRun(
+            `INSERT INTO group_chats(chat_id, title) VALUES($1,$2)
+             ON CONFLICT(chat_id) DO UPDATE SET title=$2`,
+            [chat.id, chat.title || '']
+          ).catch(() => {});
+
+          const u = ctx.from;
+          if (u && !u.is_bot) {
+            dbRun(
+              `INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at)
+               VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)
+               ON CONFLICT(chat_id,user_id) DO UPDATE SET updated_at=CURRENT_TIMESTAMP`,
+              [chat.id, u.id, u.username || '', u.first_name || '']
+            ).catch(() => {});
+          }
+        } catch(_) {}
+        return next();
+      });
+
+      // Games — register مرة واحدة
+      guessGame.register(bot);
+      millionaire.register(bot);
+      logger.info('[Launch] ✅ Games registered');
+
+      // BullMQ Workers
+      setImmediate(() => {
+        try { require('./workers/broadcast.worker'); } catch(e) { logger.warn('[Worker] broadcast:', e.message); }
+        try { require('./workers/notify.worker');    } catch(e) { logger.warn('[Worker] notify:', e.message); }
+      });
     }
-  }
-  return next();
-});
-
 
     if (WEBHOOK_URL) {
       await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, {
@@ -577,19 +567,9 @@ bot.start(async (ctx, next) => {
       logger.info('✅ Webhook: ' + WEBHOOK_URL);
     } else {
       logger.warn('⚠️ No WEBHOOK_URL — polling mode');
-bot.launch({ drop_pending_updates: true });
+      bot.launch({ drop_pending_updates: true });
     }
 
-    guessGame.register(bot);
-    millionaire.register(bot);
-    global.__bot = bot;
-    require('./utils/logger').info('[Launch] ✅ Games registered');
-
-// ── BullMQ Workers — بعد ما يكون bot جاهز ──
-setImmediate(() => {
-  try { require('./workers/broadcast.worker'); } catch(e) { logger.warn('[Worker] broadcast:', e.message); }
-  try { require('./workers/notify.worker');    } catch(e) { logger.warn('[Worker] notify:',    e.message); }
-});
     logger.info('🚀 Ready!');
   } catch(e) {
     logger.error('[Launch]', e.message);

@@ -815,11 +815,7 @@ async function useLifeline(ctx, type) {
       reply_markup: { inline_keyboard: keyboard },
     }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
-    await ctx.telegram.sendMessage(chatId,
-      `5️⃣0️⃣ *${ctx.from.first_name} استخدم 50/50!*\n` +
-      `حُذفت إجابتان خاطئتان.`,
-      { parse_mode: 'Markdown' }
-    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+
 
   } else if (type === 'audience') {
     // Simulate audience poll (bias toward correct)
@@ -842,32 +838,41 @@ async function useLifeline(ctx, type) {
       `${LETTERS['abcd'.indexOf(l)]}) ${'█'.repeat(Math.floor((dist[l]||0)/5))} ${dist[l]||0}%`
     ).join('\n');
 
-    await ctx.answerCbQuery('✅ نتيجة استطلاع الجمهور!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    await ctx.telegram.sendMessage(chatId,
-      `👥 *${ctx.from.first_name} استشار الجمهور!*\n\n📊 *نتيجة التصويت:*\n${bars}`,
-      { parse_mode: 'Markdown' }
-    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    await ctx.answerCbQuery('✅ نتيجة استطلاع الجمهور!').catch(()=>{});
+    // edit رسالة السؤال لتشمل نتيجة الجمهور
+    const audienceTxt = buildQuestionMsg(game, q, game.hiddenOpts) +
+      '\n\n👥 *نتيجة الجمهور:*\n' + bars;
+    await ctx.telegram.editMessageText(chatId, game.msgId, null, audienceTxt, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: [...buildAnswerKeyboard(game,q,game.hiddenOpts), ...buildLifelineKeyboard(game)] }
+    }).catch(()=>{});
 
   } else if (type === 'call') {
     // Ask the group — pause timer and reveal hint
     const hint = LETTERS['abcd'.indexOf(q.correct)];
     const hintOpt = q['option_' + (q.correct||'a')] || q[(q.correct||'a')] || '؟';
-    await ctx.answerCbQuery('✅ طُرح السؤال على القروب!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    await ctx.telegram.sendMessage(chatId,
-      `📞 *${ctx.from.first_name} يستشير القروب!*\n\n` +
-      `❓ *${q.question}*\n\n` +
-      `💡 ساعدوه! ردوا بالحرف الصحيح (أ، ب، ج، أو د)\n` +
-      '_(للمشرف فقط: الجواب *' + (LETTERS['abcd'.indexOf(q.correct)] || '؟') + '*) ' + (hintOpt||'') + '_',
-      { parse_mode: 'Markdown' }
-    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    await ctx.answerCbQuery('✅ طُرح السؤال على القروب!').catch(()=>{});
+    const callTxt = buildQuestionMsg(game, q, game.hiddenOpts) +
+      '\n\n📞 *' + ctx.from.first_name + ' يستشير القروب!*\n' +
+      '💡 ساعدوه! ردوا بالحرف الصحيح (أ، ب، ج، أو د)\n' +
+      '_(للمشرف: الجواب *' + (LETTERS['abcd'.indexOf(q.correct||'a')] || '؟') + '*) ' + (hintOpt||'') + '_';
+    await ctx.telegram.editMessageText(chatId, game.msgId, null, callTxt, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: [...buildAnswerKeyboard(game,q,game.hiddenOpts), ...buildLifelineKeyboard(game)] }
+    }).catch(()=>{});
 
   } else if (type === 'skip') {
     // Skip question (no penalty, no prize for this level)
     await ctx.answerCbQuery('✅ تم تخطي السؤال!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     if (game.timer) { clearTimeout(game.timer); game.timer = null; }
-    await ctx.telegram.sendMessage(chatId,
-      `⏭️ *${ctx.from.first_name} تخطى السؤال!*\n` +
-      `سينتقل الجميع للسؤال التالي.`,
+    const skipTxt = buildQuestionMsg(game, q, game.hiddenOpts) + '\n\n⏭️ *' + ctx.from.first_name + ' تخطى السؤال!*\nسينتقل الجميع للسؤال التالي.';
+    await ctx.telegram.editMessageText(chatId, game.msgId, null, skipTxt, {
+      parse_mode: 'Markdown', reply_markup: { inline_keyboard: [] }
+    }).catch(()=>{});
+    await new Promise(r => setTimeout(r, 1500));
+    await sendNextQuestion(ctx.telegram, chatId);
+    return;
+    /* removed: ctx.telegram.sendMessage(chatId, `⏭️ unused`,
       { parse_mode: 'Markdown' }
     ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     await new Promise(r => setTimeout(r, 2000));
