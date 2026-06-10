@@ -340,7 +340,7 @@ async function startJoinPhase(ctx) {
     '👥 اللاعبون (1):\n' +
     '1\. ' + (_starter.first_name || 'لاعب') + '\n\n' +
     '💰 الجائزة الكبرى: *1,000,000 دج*\n\n' +
-    '⏱️ تبدأ اللعبة خلال *5* ثوانٍ\.\.\.';
+    '⏱️ تبدأ اللعبة خلال *20* ثانية\.\.\.';
 
   const msg = await ctx.reply(_joinTxt, {
     parse_mode: 'Markdown',
@@ -356,7 +356,7 @@ async function startJoinPhase(ctx) {
   if (msg) { game.joinMsgId = msg.message_id; trackGameMsg(chatId, msg.message_id); }
 
   // ── بدء تلقائي بعد 5 ثوانٍ ──────────────────────────────────
-  game.joinTimer = setTimeout(() => beginGame(ctx.telegram, chatId), 5000);
+  game.joinTimer = setTimeout(() => beginGame(ctx.telegram, chatId), 20000);
 }
 
 async function joinGame(ctx) {
@@ -743,14 +743,17 @@ async function endGame(telegram, chatId, reason) {
           { parse_mode: 'Markdown' }
         );
       } catch(_) {}
-      await telegram.sendMessage(winner.id,
-        '🏆 *مبروك! ربحت ' + fmtPrize(winner.prize) + ' في لعبة المليون!*\n💰 تم إضافة الجائزة لحسابك البنكي!\n\nاكتب *فلوسي* لعرض رصيدك.',
-        { parse_mode: 'Markdown' }
-      ).catch(() => {});
+
     } catch(_) {}
   }
 
-  await telegram.sendMessage(chatId, txt, { parse_mode: 'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  if (game.msgId) {
+    await telegram.editMessageText(chatId, game.msgId, null, txt, {
+      parse_mode: 'Markdown', reply_markup: { inline_keyboard: [] }
+    }).catch(() => telegram.sendMessage(chatId, txt, { parse_mode: 'Markdown' }).catch(()=>{}));
+  } else {
+    await telegram.sendMessage(chatId, txt, { parse_mode: 'Markdown' }).catch(()=>{});
+  }
 
   // Save scores to DB
   await run('UPDATE million_sessions SET status=$1, ended_at=NOW() WHERE id=$2', ['ended', game.sessionId]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
