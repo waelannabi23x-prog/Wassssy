@@ -42,7 +42,7 @@ async function startHandler(ctx) {
       disable_web_page_preview: false,
       reply_markup: { inline_keyboard: rows }
     }).catch(() => {});
-    return;
+    // لا نرجع — نكمل لعرض القائمة الرئيسية
   }
   const rawText = ctx.message?.text || '';
   const payload = rawText.includes(' ') ? rawText.split(' ')[1] : ctx.startPayload || null;
