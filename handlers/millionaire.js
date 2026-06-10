@@ -245,10 +245,10 @@ function buildAnswerKeyboard(game, q, hiddenOptions) {
   const hidden = hiddenOptions || [];
   const rows = [];
   const opts = [
-    { l: 'a', txt: `${LETTERS[0]}) ${q.option_a}` },
-    { l: 'b', txt: `${LETTERS[1]}) ${q.option_b}` },
-    { l: 'c', txt: `${LETTERS[2]}) ${q.option_c}` },
-    { l: 'd', txt: `${LETTERS[3]}) ${q.option_d}` },
+    { l: 'a', txt: LETTERS[0] + ') ' + (q.option_a || q.a || '~~...~~') },
+    { l: 'b', txt: LETTERS[1] + ') ' + (q.option_b || q.b || '~~...~~') },
+    { l: 'c', txt: LETTERS[2] + ') ' + (q.option_c || q.c || '~~...~~') },
+    { l: 'd', txt: LETTERS[3] + ') ' + (q.option_d || q.d || '~~...~~') },
   ];
   // 2 options per row
   for (let i = 0; i < opts.length; i += 2) {
@@ -605,7 +605,7 @@ async function resolveQuestion(telegram, chatId, timeout) {
     await endGame(telegram || ctx?.telegram, chatId, 'error');
     return;
   }
-  const correct = q.correct || q.correct_answer || 'a';
+  const correct = (q.correct || q.correct_answer || 'a').toLowerCase().trim();
   const prize   = PRIZES[game.currentLevel];
   const isSafe  = SAFE_ZONES.includes(game.currentLevel);
 
@@ -626,7 +626,7 @@ async function resolveQuestion(telegram, chatId, timeout) {
   }
 
   // Build result message
-  const correctOpt  = q['option_' + correct];
+  const correctOpt = q['option_' + correct] || q[correct] || '؟';
   const wrongList   = results.wrong.map(p => `❌ ${p.name}`).join('  ');
   const noAnsList   = results.noAnswer.map(p => `⏰ ${p.name}`).join('  ');
   const correctList = results.correct.map(p => `✅ ${p.name}`).join('  ');

@@ -289,6 +289,18 @@ async function initSchema() {
     lock_voice SMALLINT DEFAULT 0, lock_poll SMALLINT DEFAULT 0
   )`); } catch(_) {}
 
+  
+  // Migration: توحيد أعمدة million_questions
+  try {
+    await pg.query("ALTER TABLE million_questions RENAME COLUMN question TO text").catch(()=>{});
+  } catch(_) {}
+  try {
+    await pg.query("ALTER TABLE million_questions RENAME COLUMN correct_answer TO correct").catch(()=>{});
+  } catch(_) {}
+  try {
+    await pg.query("ALTER TABLE million_questions ADD COLUMN IF NOT EXISTS resp_type TEXT DEFAULT 'text'").catch(()=>{});
+  } catch(_) {}
+
     // ── Seed أسئلة المليون إذا DB فارغة ──
   try {
     const qCount = await pg.query('SELECT COUNT(*) as c FROM million_questions WHERE is_active=1');
