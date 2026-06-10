@@ -153,13 +153,12 @@ async function showMainMenu(ctx, name) {
     ],
     [
       btn('🤖 المساعد الذكي', 'ai_prompt'),
-      
+      btn(sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', 'change_sp'),
     ],
     [
       btn('👤 ملفي',         'profile'),
       btn('📊 إحصائياتي',    'stats'),
     ],
-    [btn(sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', 'change_sp')],
   ];
 
   if (lastFileBtn) rows.push([lastFileBtn]);
