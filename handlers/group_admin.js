@@ -44,7 +44,7 @@ async function handleNewMember(bot, chatId, userId, firstName) {
     cacheClear('grp_count_'   + chatId);
 
     const welcomeCheck = await get('SELECT welcome_enabled FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null);
-    if (welcomeCheck && welcomeCheck.welcome_enabled === 0) return;
+    if (welcomeCheck && !welcomeCheck.welcome_enabled) return;
 
     const [grp, grpWelcome] = await Promise.all([
       get('SELECT specialty_id, welcome_msg, welcome_photo FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null),
