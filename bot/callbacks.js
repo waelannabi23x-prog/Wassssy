@@ -866,21 +866,5 @@ module.exports.registerCallbacks = function(bot, deps) {
 
     } catch(e) { logger.error('[CB]', e.message, { data, uid: ctx.from?.id }); }
   
-  // ── زر القواعد من رسالة الترحيب ──
-  if (data.startsWith('grp_rules_')) {
-    const chatId = data.replace('grp_rules_', '');
-    const grp = await require('../database/db').get(
-      'SELECT rules FROM group_chats WHERE chat_id=$1', [chatId]
-    ).catch(() => null);
-    const rules = grp?.rules || '📋 لا توجد قواعد محددة بعد.
-
-تواصل مع الأدمن.';
-    return ctx.answerCbQuery().then(() =>
-      ctx.reply('📋 *قواعد المجموعة*
-━━━━━━━━━━━━━━
-' + rules, { parse_mode: 'Markdown' }).catch(() => {})
-    );
-  }
-
-});
+  });
 };
