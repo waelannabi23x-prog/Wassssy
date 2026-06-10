@@ -120,13 +120,13 @@ async function handleNewMember(bot, chatId, userId, firstName) {
       sentMsg = await bot.telegram.sendPhoto(chatId, grp.welcome_photo, {
         caption:      customMsg,
         parse_mode:   'Markdown',
-        reply_markup: welcomeKb,
+        reply_markup: JSON.stringify(welcomeKb),
       }).catch(() => null);
     } else {
       sentMsg = await bot.telegram.sendMessage(chatId, customMsg, {
         parse_mode:               'Markdown',
         disable_web_page_preview: true,
-        reply_markup:             welcomeKb,
+        reply_markup: JSON.stringify(welcomeKb),
       }).catch(() => null);
     }
 
