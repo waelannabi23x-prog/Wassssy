@@ -296,8 +296,8 @@ async function startJoinPhase(ctx) {
 
   // Create DB session
   const session = await get(
-    'INSERT INTO million_sessions(chat_id,status) VALUES($1,$2) RETURNING id',
-    [chatId, 'waiting']
+    'INSERT INTO million_sessions(chat_id,status,started_by) VALUES($1,$2,$3) RETURNING id',
+    [chatId, 'waiting', ctx.from?.id || 0]
   );
 
   const game = {
@@ -851,13 +851,13 @@ async function useLifeline(ctx, type) {
   } else if (type === 'call') {
     // Ask the group — pause timer and reveal hint
     const hint = LETTERS['abcd'.indexOf(q.correct)];
-    const hintOpt = q['option_' + q.correct] || '';
+    const hintOpt = q['option_' + (q.correct||'a')] || q[(q.correct||'a')] || '؟';
     await ctx.answerCbQuery('✅ طُرح السؤال على القروب!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     await ctx.telegram.sendMessage(chatId,
       `📞 *${ctx.from.first_name} يستشير القروب!*\n\n` +
       `❓ *${q.question}*\n\n` +
       `💡 ساعدوه! ردوا بالحرف الصحيح (أ، ب، ج، أو د)\n` +
-      `_(للمشرف فقط: الجواب *' + (LETTERS['abcd'.indexOf(q.correct)] || '؟') + '*) ${hintOpt}_`,
+      '_(للمشرف فقط: الجواب *' + (LETTERS['abcd'.indexOf(q.correct)] || '؟') + '*) ' + (hintOpt||'') + '_',
       { parse_mode: 'Markdown' }
     ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 

@@ -290,7 +290,10 @@ async function initSchema() {
   )`); } catch(_) {}
 
   
-  // Migration: توحيد أعمدة million_questions
+
+  try { await pg.query("ALTER TABLE million_sessions ADD COLUMN IF NOT EXISTS started_by BIGINT DEFAULT 0"); } catch(_) {}
+
+    // Migration: توحيد أعمدة million_questions
   try {
     await pg.query("ALTER TABLE million_questions RENAME COLUMN question TO text").catch(()=>{});
   } catch(_) {}
