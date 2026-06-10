@@ -1181,7 +1181,11 @@ async function handleCallback(ctx, d) {
     if (d === 'mlr_ranking')     return showRanking(ctx);
     if (d === 'mlr_howto')       return ctx.answerCbQuery('اكتب مليون في القروب لبدء اللعبة!', { show_alert: true }).catch(() => {});
     if (d.startsWith('mar_'))    return handleAnswer(ctx, d);
-    if (d.startsWith('mlr_'))    return handleLifeline(ctx, d);
+    if (d.startsWith('mlr_')) {
+      const type = d.substring(4); // mlr_fifty → fifty
+      if (['fifty','audience','call','skip'].includes(type)) return useLifeline(ctx, type);
+      return ctx.answerCbQuery().catch(() => {});
+    }
   } catch(e) {
     ctx.answerCbQuery('❌ ' + e.message).catch(() => {});
   }
