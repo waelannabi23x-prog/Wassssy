@@ -552,21 +552,51 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
         return showAutoReplies(ctx);
       }
       case 'mg_awaiting_channel': {
-        const parts = text.split(' ');
-        const cidRaw = parts[0];
-        const nm = parts.slice(1).join(' ') || cidRaw;
-        let cid = cidRaw.startsWith('@') ? cidRaw
-          : cidRaw.startsWith('https://t.me/') ? '@' + cidRaw.replace('https://t.me/','').split('/')[0]
-          : cidRaw.startsWith('-') ? cidRaw
-          : '@' + cidRaw;
-        const url = cid.startsWith('@')
-          ? 'https://t.me/' + cid.replace('@','')
-          : cidRaw;
-        const { addChannel } = require('../utils/channelGuard');
-        await addChannel(cid, nm, url).catch(e => { clearState(uid); return ctx.reply('❌ ' + e.message).catch(()=>{}); });
+        // دعم: @username أو رابط أو forward
+        const fwd = ctx.message?.forward_from_chat;
+        let cid, nm, url;
+
+        if (fwd) {
+          // أُرسل forward من قناة
+          cid = fwd.username ? '@' + fwd.username : String(fwd.id);
+          nm  = fwd.title || cid;
+          url = fwd.username ? 'https://t.me/' + fwd.username : '';
+        } else {
+          const parts = text.trim().split(/\s+/);
+          const cidRaw = parts[0];
+          nm = parts.slice(1).join(' ') || cidRaw;
+          cid = cidRaw.startsWith('@') ? cidRaw
+            : cidRaw.startsWith('https://t.me/') ? '@' + cidRaw.replace('https://t.me/','').split('/')[0]
+            : cidRaw.startsWith('-') ? cidRaw
+            : '@' + cidRaw;
+          url = cid.startsWith('@') ? 'https://t.me/' + cid.replace('@','') : cidRaw;
+        }
+
+        // تحقق إذا البوت ادمن في القناة
+        const { addChannel, validateBotInChannel } = require('../utils/channelGuard');
+        const bot = ctx.telegram ? { telegram: ctx.telegram } : global.__bot;
+        const valid = await validateBotInChannel(bot, cid).catch(() => ({ ok: false }));
+
+        if (!valid.ok) {
+          clearState(uid);
+          return ctx.reply(
+            '⚠️ *البوت مش ادمن في القناة!*\n\n' +
+            '📢 القناة: `' + cid + '`\n\n' +
+            '👇 أضف البوت كـ ادمن في القناة أولاً ثم أعد الإضافة.',
+            { parse_mode: 'Markdown', ...build([[btn('🔄 إعادة المحاولة','mg_addchannel'), btn('❌ إلغاء','mg_channels_menu')]]) }
+          ).catch(()=>{});
+        }
+
+        await addChannel(cid, nm, url, bot).catch(e => { clearState(uid); return ctx.reply('❌ ' + e.message).catch(()=>{}); });
         clearState(uid);
         cacheClear('required_channels');
-        await ctx.reply('✅ *تمت إضافة القناة!*\n📢 ' + nm + '\n🆔 `' + cid + '`', { parse_mode: 'Markdown' }).catch(()=>{});
+        await ctx.reply(
+          '✅ *تمت إضافة القناة بنجاح!*\n\n' +
+          '📢 الاسم: *' + nm + '*\n' +
+          '🆔 المعرف: `' + cid + '`\n' +
+          '🔗 الرابط: ' + url,
+          { parse_mode: 'Markdown' }
+        ).catch(()=>{});
         return showChannelsMenu(ctx);
       }
       case 'mg_awaiting_ad_title': {
@@ -696,7 +726,16 @@ async function handleCallback(ctx,data){
   if(data==='mg_ads_menu') return showAdsMenu(ctx);
   if(data==='mg_addchannel') {
     setState(uid, { type: 'mg_awaiting_channel' });
-    return eos(ctx, '📢 *إضافة قناة*\n\nأرسل بهذا الشكل:\n`@username اسم_القناة`\n\nمثال:\n`@mychannel قناتي`', { parse_mode: 'Markdown', ...build([[btn('❌ إلغاء','mg_channels_menu')]]) });
+    return eos(ctx,
+      '📢 *إضافة قناة اشتراك إجباري*\n' +
+      '━━━━━━━━━━━━━━━\n\n' +
+      '*الطريقة 1 — Forward:*\n' +
+      '↩️ أعد توجيه أي رسالة من القناة هنا\n\n' +
+      '*الطريقة 2 — يدوي:*\n' +
+      '✏️ أرسل: `@username اسم القناة`\n\n' +
+      '⚠️ *تأكد إن البوت ادمن في القناة أولاً!*',
+      { parse_mode: 'Markdown', ...build([[btn('❌ إلغاء','mg_channels_menu')]]) }
+    );
   }
   if(data.startsWith('mg_delch_')) {
     const chId = data.replace('mg_delch_','');
