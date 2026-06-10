@@ -233,7 +233,7 @@ function buildQuestionMsg(game, q, hiddenOptions) {
     `${diff} • ${q.category || 'عام'} • ${fmtPrize(prize)}\n` +
     `${levelBar(level)}\n` +
     (isSafe ? `\n🛡️ *نقطة أمان!*\n` : '') +
-    `\n❓ *${q.text || q.question || 'سؤال'}*\n\n` +
+    `\n❓ *${q.question || q.question || 'سؤال'}*\n\n` +
     `${opts}\n\n` +
     `👥 اللاعبون النشطون: ${players.length}\n` +
     `⏱️ الوقت: ${QUESTION_SECS} ثانية` +
@@ -835,7 +835,7 @@ async function useLifeline(ctx, type) {
     await ctx.answerCbQuery('✅ طُرح السؤال على القروب!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     await ctx.telegram.sendMessage(chatId,
       `📞 *${ctx.from.first_name} يستشير القروب!*\n\n` +
-      `❓ *${q.text}*\n\n` +
+      `❓ *${q.question}*\n\n` +
       `💡 ساعدوه! ردوا بالحرف الصحيح (أ، ب، ج، أو د)\n` +
       `_(للمشرف فقط: الجواب ${hint})_`,
       { parse_mode: 'Markdown' }
