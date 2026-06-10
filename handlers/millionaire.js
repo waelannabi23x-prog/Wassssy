@@ -233,7 +233,7 @@ function buildQuestionMsg(game, q, hiddenOptions) {
     `${diff} • ${q.category || 'عام'} • ${fmtPrize(prize)}\n` +
     `${levelBar(level)}\n` +
     (isSafe ? `\n🛡️ *نقطة أمان!*\n` : '') +
-    `\n❓ *${q.text}*\n\n` +
+    `\n❓ *${q.text || q.question || 'سؤال'}*\n\n` +
     `${opts}\n\n` +
     `👥 اللاعبون النشطون: ${players.length}\n` +
     `⏱️ الوقت: ${QUESTION_SECS} ثانية` +
@@ -589,7 +589,7 @@ async function resolveQuestion(telegram, chatId, timeout) {
   if (game.timer) { clearTimeout(game.timer); game.timer = null; }
 
   const q       = game.currentQ;
-  const correct = q.correct;
+  const correct = q.correct || q.correct_answer || 'a';
   const prize   = PRIZES[game.currentLevel];
   const isSafe  = SAFE_ZONES.includes(game.currentLevel);
 
@@ -1055,6 +1055,21 @@ async function showMyStats(ctx) {
 /* ═══════════════════════════════════════════════════════════════
    REGISTER BOT HANDLERS
 ═══════════════════════════════════════════════════════════════ */
+async function forceStart(ctx) {
+  const chatId = ctx.chat?.id;
+  if (!chatId) return;
+  if (!ctx.isAdmin && !ctx.isOwner) {
+    return ctx.answerCbQuery('🚫 للأدمن فقط.', { show_alert: true }).catch(() => {});
+  }
+  const game = getGame(chatId);
+  if (!game || game.status !== 'waiting') {
+    return ctx.answerCbQuery('⚠️ لا توجد لعبة في انتظار.', { show_alert: true }).catch(() => {});
+  }
+  if (game.joinTimer) { clearTimeout(game.joinTimer); game.joinTimer = null; }
+  await ctx.answerCbQuery('▶️ بدأت اللعبة!').catch(() => {});
+  return beginGame(ctx.telegram, chatId);
+}
+
 function register(bot) {
   // Init schema
   initMillionaireSchema().catch(e => logger.error('[Million:Schema] ' + e.message));
