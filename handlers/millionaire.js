@@ -17,7 +17,8 @@
  *   /mstats         — إحصائياتي
  */
 
-const { run, all, get, runSilent } = require('../database/db');
+const { run, all, get } = require('../database/db');
+const runSilent = (q, p) => run(q, p).catch(() => {});
 
 // ── تتبع رسائل اللعبة للحذف ──
 const _gameMsgs = new Map();
@@ -192,7 +193,7 @@ async function getRandomQuestion(usedIds, difficulty) {
   const diffMap = { 'easy': 1, 'medium': 2, 'hard': 3 };
   const diffInt = diffMap[diff] || 2;
   let q = await get(
-    `SELECT * FROM million_questions WHERE is_active=1 AND (difficulty=$1 OR difficulty=$2::text) ${exclude}
+    `SELECT * FROM million_questions WHERE is_active=1 AND difficulty::text=$2 ${exclude}
      ORDER BY used_count ASC, RANDOM() LIMIT 1`, [diffInt, diff]
   ).catch(() => null);
   if (!q) {
