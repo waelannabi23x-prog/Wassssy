@@ -23,7 +23,7 @@ async function loadAllStates() {
 
 // ── setState: Redis أولاً + DB backup ──
 async function setState(uid, val) {
-  val._ts = Date.now();
+  if (val != null) val._ts = Date.now();
   _mem.set(uid, val);
   const json = JSON.stringify(val);
 
