@@ -571,7 +571,7 @@ async function handleAnswer(ctx, letter) {
   const elapsed = Math.floor((Date.now() - (game.answerDeadline - QUESTION_SECS * 1000)) / 1000);
   player.answerTime = elapsed;
 
-  await ctx.answerCbQuery(`✅ سجلنا إجابتك: ${LETTERS['abcd'.indexOf(letter)]}`).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  await ctx.answerCbQuery(`✅ سجلنا إجابتك: ${LETTERS['abcd'.indexOf(letter)]}) ${game.currentQ?.['option_'+letter] || ''}`).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   // احفظ آخر message للاعب للـ reply
   if (player) player.lastMsgId = ctx.callbackQuery?.message?.message_id;
 
@@ -588,7 +588,11 @@ async function resolveQuestion(telegram, chatId, timeout) {
   if (!game || game.status !== 'playing') return;
   if (game.timer) { clearTimeout(game.timer); game.timer = null; }
 
-  const q       = game.currentQ;
+  const q = game.currentQ;
+  if (!q) {
+    await endGame(telegram || ctx?.telegram, chatId, 'error');
+    return;
+  }
   const correct = q.correct || q.correct_answer || 'a';
   const prize   = PRIZES[game.currentLevel];
   const isSafe  = SAFE_ZONES.includes(game.currentLevel);
@@ -832,12 +836,13 @@ async function useLifeline(ctx, type) {
   } else if (type === 'call') {
     // Ask the group — pause timer and reveal hint
     const hint = LETTERS['abcd'.indexOf(q.correct)];
+    const hintOpt = q['option_' + q.correct] || '';
     await ctx.answerCbQuery('✅ طُرح السؤال على القروب!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     await ctx.telegram.sendMessage(chatId,
       `📞 *${ctx.from.first_name} يستشير القروب!*\n\n` +
       `❓ *${q.question}*\n\n` +
       `💡 ساعدوه! ردوا بالحرف الصحيح (أ، ب، ج، أو د)\n` +
-      `_(للمشرف فقط: الجواب ${hint})_`,
+      `_(للمشرف فقط: الجواب ${hint}) ${hintOpt}_`,
       { parse_mode: 'Markdown' }
     ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
