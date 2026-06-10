@@ -30,31 +30,29 @@ function algeriaTime() {
 // ══════════════════════════════════════════════════════════
 async function handleNewMember(bot, chatId, userId, firstName) {
   try {
-    // تسجيل العضو في DB
+    if (_isWelcomeDupe(chatId, userId)) return;
+
     await run(
       `INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at)
        VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)
        ON CONFLICT(chat_id,user_id) DO UPDATE
          SET first_name=EXCLUDED.first_name, updated_at=CURRENT_TIMESTAMP`,
       [chatId, userId, '', firstName || 'عضو']
-    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    ).catch(() => {});
 
-    // مسح الكاش عند إضافة عضو جديد
     cacheClear('grp_members_' + chatId);
-    cacheClear('grp_count_' + chatId);
+    cacheClear('grp_count_'   + chatId);
 
-    // جلب إعدادات الترحيب + تخصص القروب
-    // تحقق من welcome_enabled
     const welcomeCheck = await get('SELECT welcome_enabled FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null);
     if (welcomeCheck && welcomeCheck.welcome_enabled === 0) return;
+
     const [grp, grpWelcome] = await Promise.all([
-      get('SELECT specialty_id, welcome_enabled, welcome_msg, welcome_photo FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null),
+      get('SELECT specialty_id, welcome_msg, welcome_photo FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null),
       get('SELECT message, image_file_id FROM group_welcome WHERE chat_id=$1', [chatId]).catch(() => null)
     ]);
-    // دمج البيانات — group_welcome له الأولوية
     if (grp) {
-      if (grpWelcome?.message)      grp.welcome_msg   = grpWelcome.message;
-      if (grpWelcome?.image_file_id) grp.welcome_photo = grpWelcome.image_file_id;
+      if (grpWelcome?.message)        grp.welcome_msg   = grpWelcome.message;
+      if (grpWelcome?.image_file_id)  grp.welcome_photo = grpWelcome.image_file_id;
     }
 
     const spec = grp?.specialty_id
@@ -62,74 +60,90 @@ async function handleNewMember(bot, chatId, userId, firstName) {
       : null;
 
     const { date, time } = algeriaTime();
-    const name     = (firstName || 'عضو');
-    const uid      = userId;
-    const specName = spec?.name ? spec.name : '';
-    const specLine = specName ? `\n🎓 التخصص: *${specName}*` : '';
+    const name     = firstName || 'عضو';
+    const specName = spec?.name || '';
+    const specLine = specName ? '\n🎓 التخصص: *' + specName + '*' : '';
 
-    // عدد الأعضاء الحاليين
     let memberCount = '';
+    try { const c = await bot.telegram.getChatMembersCount(chatId); memberCount = String(c); } catch(_) {}
+
+    let groupTitle = '';
+    try { const gc = await bot.telegram.getChat(chatId); groupTitle = gc.title || ''; } catch(_) {}
+
+    // حذف رسالة الترحيب القديمة
     try {
-      const cnt = await bot.telegram.getChatMembersCount(chatId);
-      memberCount = `\n👥 أنتَ العضو رقم: *${String(cnt)}*`;
-    } catch (_) {}
+      const lastWelcome = await get('SELECT msg_id FROM group_last_welcome WHERE chat_id=$1', [chatId]).catch(() => null);
+      if (lastWelcome?.msg_id) {
+        await bot.telegram.deleteMessage(chatId, lastWelcome.msg_id).catch(() => {});
+      }
+    } catch(_) {}
 
     const defaultMsg =
 `🎉 أهلاً وسهلاً بـ *${name}*!
 
 ┌─────────────────────┐
-│ 🆔 المعرّف: [${uid}](tg://user?id=${uid})
-│ 📅 ${date}  🕐 ${time}${specLine}${memberCount}
+│ 🆔 [المعرّف: ${userId}](tg://user?id=${userId})
+│ 📅 ${date}  🕐 ${time}${specLine}
+│ 👥 العضو رقم: *${memberCount}*
 └─────────────────────┘
 
-📚 *أهلاً في مجتمعنا الأكاديمي!*
-
-🔹 احترم الجميع واحرص على التعاون
+🔹 احترم الجميع وتعاون مع الأعضاء
 🔹 شارك ملفاتك وأسئلتك بحرية
-🔹 استخدم البوت للوصول للمكتبة
-
-🔗 [ملفّك الشخصي](tg://user?id=${uid})
+🔹 استخدم /help لمعرفة أوامر البوت
 ━━━━━━━━━━━━━━━━━━━━`;
 
-    let groupTitle = ''; try { const _gc = await bot.telegram.getChat(chatId).catch(()=>null); if(_gc?.title) groupTitle=_gc.title; } catch(_){}
-    // عدد الأعضاء للرسالة المخصصة
-    let customMemberCount = '';
-    try { const c2 = await bot.telegram.getChatMembersCount(chatId); customMemberCount = String(c2); } catch(_) {}
-
-    const welcomeMsg = grp?.welcome_msg
+    const customMsg = grp?.welcome_msg
       ? grp.welcome_msg
-          .replace(/{name}/g,         firstName || 'عضو')
-          .replace(/{spec}/g,         spec?.name || '')
-          .replace(/{id}/g,           userId)
-          .replace(/{date}/g,         date)
-          .replace(/{time}/g,         time)
-          .replace(/{member_count}/g, customMemberCount)
-          .replace(/{profile}/g,      `[الملف الشخصي](tg://user?id=${userId})`)
-          .replace(/{count}/g,        customMemberCount)
-          .replace(/{group}/g,        groupTitle)
+          .replace(/{name}/g,    name)
+          .replace(/{mention}/g, '[' + name + '](tg://user?id=' + userId + ')')
+          .replace(/{id}/g,      userId)
+          .replace(/{spec}/g,    specName)
+          .replace(/{date}/g,    date)
+          .replace(/{time}/g,    time)
+          .replace(/{count}/g,   memberCount)
+          .replace(/{group}/g,   groupTitle)
       : defaultMsg;
 
-    const parse = 'Markdown';
+    // أزرار الترحيب
+    const welcomeKb = {
+      inline_keyboard: [[
+        { text: '📋 القواعد', callback_data: 'grp_rules_' + chatId },
+        { text: '👤 ملفّي', url: 'tg://user?id=' + userId },
+      ]]
+    };
+
+    let sentMsg = null;
 
     if (grp?.welcome_photo && grp.welcome_photo.startsWith('CAA')) {
       await bot.telegram.sendSticker(chatId, grp.welcome_photo).catch(() => {});
     } else if (grp?.welcome_photo) {
-      await bot.telegram.sendPhoto(chatId, grp.welcome_photo, {
-        caption:    welcomeMsg,
-        parse_mode: parse,
-      }).catch(() => {});
-    } else {
-      const wm = await bot.telegram.sendMessage(chatId, welcomeMsg, {
-        parse_mode:           parse,
-        disable_web_page_preview: true,
+      sentMsg = await bot.telegram.sendPhoto(chatId, grp.welcome_photo, {
+        caption:      customMsg,
+        parse_mode:   'Markdown',
+        reply_markup: welcomeKb,
       }).catch(() => null);
-      // auto-delete بعد دقيقتين
-      if (wm) setTimeout(() => bot.telegram.deleteMessage(chatId, wm.message_id).catch(() => {}), 120000);
+    } else {
+      sentMsg = await bot.telegram.sendMessage(chatId, customMsg, {
+        parse_mode:               'Markdown',
+        disable_web_page_preview: true,
+        reply_markup:             welcomeKb,
+      }).catch(() => null);
     }
-  } catch (e) {
+
+    // حفظ ID الرسالة لحذفها عند العضو القادم
+    if (sentMsg) {
+      await run(
+        `INSERT INTO group_last_welcome(chat_id, msg_id) VALUES($1,$2)
+         ON CONFLICT(chat_id) DO UPDATE SET msg_id=$2`,
+        [chatId, sentMsg.message_id]
+      ).catch(() => {});
+    }
+
+  } catch(e) {
     console.error('[Welcome]', e.message);
   }
 }
+
 
 // ══════════════════════════════════════════════════════════
 // 👋 رسالة وداع عند مغادرة عضو
@@ -138,27 +152,26 @@ async function handleMemberLeft(bot, chatId, userId, firstName) {
   try {
     cacheClear('grp_members_' + chatId);
     cacheClear('grp_count_'   + chatId);
+    await run('DELETE FROM group_members WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => {});
 
-    await run(
-      'DELETE FROM group_members WHERE chat_id=$1 AND user_id=$2',
-      [chatId, userId]
-    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    const grp = await get('SELECT goodbye_enabled FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null);
 
-    // إرسال رسالة وداع (اختياري — يُعطَّل إذا كان القروب كبير)
-    const grp = await get(
-      'SELECT goodbye_enabled FROM group_chats WHERE chat_id=$1',
-      [chatId]
-    ).catch(() => null);
+    let memberCount = '';
+    try { const cnt = await bot.telegram.getChatMembersCount(chatId); memberCount = String(cnt); } catch(_) {}
 
-    if (grp?.goodbye_enabled) {
-      const msg = `👋 *${firstName || 'عضو'}* غادر القروب.\n\nنتمنى لك التوفيق! 🌟`;
-      await bot.telegram.sendMessage(chatId, msg, { parse_mode: 'Markdown' })
-        .catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    }
-  } catch (e) {
+    const name = firstName || 'عضو';
+    const msg =
+`👋 وداعاً *${name}*
+
+نتمنى لك التوفيق دائماً 🌟
+👥 تبقّى في المجموعة: *${memberCount}* عضو`;
+
+    await bot.telegram.sendMessage(chatId, msg, { parse_mode: 'Markdown' }).catch(() => {});
+  } catch(e) {
     console.error('[Left]', e.message);
   }
 }
+
 
 // ══════════════════════════════════════════════════════════
 // ⚙️ إعدادات الترحيب
