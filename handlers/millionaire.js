@@ -494,6 +494,7 @@ async function sendNextQuestion(telegram, chatId) {
   }
 
   game.currentQ    = q;
+  game.lifelineUsedThisQ = new Set(); // إعادة تعيين مساعدات السؤال
   game.hiddenOpts  = [];
   game.roundAnswers.clear();
   game.usedQIds.push(q.id);
@@ -508,18 +509,27 @@ async function sendNextQuestion(telegram, chatId) {
     ...buildLifelineKeyboard(game),
   ];
 
-  // احذف رسالة السؤال القديمة
+  // edit رسالة السؤال القديمة أو ابعث جديدة
   if (game.msgId) {
-    await telegram.deleteMessage(chatId, game.msgId).catch(() => {});
-    game.msgId = null;
+    const edited = await telegram.editMessageText(chatId, game.msgId, null, txt, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: keyboard },
+    }).catch(() => null);
+    if (!edited) {
+      // فشل الـ edit — ابعث جديدة
+      const msg = await telegram.sendMessage(chatId, txt, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard },
+      }).catch(() => null);
+      if (msg) game.msgId = msg.message_id;
+    }
+  } else {
+    const msg = await telegram.sendMessage(chatId, txt, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: keyboard },
+    }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    if (msg) game.msgId = msg.message_id;
   }
-
-  const msg = await telegram.sendMessage(chatId, txt, {
-    parse_mode: 'Markdown',
-    reply_markup: { inline_keyboard: keyboard },
-  }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-
-  if (msg) game.msgId = msg.message_id;
 
   // Countdown timer
   game.timer = setTimeout(async () => {
@@ -571,7 +581,8 @@ async function handleAnswer(ctx, letter) {
   const elapsed = Math.floor((Date.now() - (game.answerDeadline - QUESTION_SECS * 1000)) / 1000);
   player.answerTime = elapsed;
 
-  await ctx.answerCbQuery(`✅ سجلنا إجابتك: ${LETTERS['abcd'.indexOf(letter)]}) ${game.currentQ?.['option_'+letter] || ''}`).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  const optText = game.currentQ?.['option_'+letter] || game.currentQ?.[letter] || '';
+  await ctx.answerCbQuery('✅ سجلنا إجابتك: ' + LETTERS['abcd'.indexOf(letter)] + ') ' + optText).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   // احفظ آخر message للاعب للـ reply
   if (player) player.lastMsgId = ctx.callbackQuery?.message?.message_id;
 
