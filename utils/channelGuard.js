@@ -78,7 +78,7 @@ async function _checkChannel(bot, userId, channelId) {
     if (msg.includes('bot is not a member') || msg.includes('bot was kicked')) {
       console.warn('[ChannelGuard] ⚠️  البوت مش ادمن في:', channelId,
         '— أضفه كادمن وإلا الفحص ما يشتغل');
-      return false;
+      return true; // ← البوت مش ادمن = نفتح ولا نعاقب المستخدم
     }
 
     // القناة محذوفة / خاصة = خطأ إعداد، لا نعاقب المستخدم
@@ -112,7 +112,7 @@ async function _checkChannel(bot, userId, channelId) {
     }
 
     console.warn('[ChannelGuard] Unknown error — uid:', userId, 'ch:', channelId, msg);
-    return false; // ← خطأ غير معروف = نمنع (أأمن)
+    return true; // ← خطأ غير معروف = نفتح (أفضل للمستخدم)
   }
 }
 

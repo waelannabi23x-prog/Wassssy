@@ -666,7 +666,10 @@ async function handleCallback(ctx,data){
   }
 
   // ── القنوات والإعلانات ──
-  if(data==='mg_channels_menu') return showChannelsMenu(ctx);
+  if(data==='mg_channels_menu') {
+    try { return await showChannelsMenu(ctx); }
+    catch(e) { console.error('[channels_menu]', e.message, e.stack); return ctx.reply('❌ ' + e.message).catch(()=>{}); }
+  }
   if(data==='mg_auto_replies') return showAutoReplies(ctx);
   if(data==='mg_games_settings') return showGamesSettings(ctx);
   if(data.startsWith('mg_gs_')) {

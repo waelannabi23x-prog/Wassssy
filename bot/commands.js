@@ -179,11 +179,28 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
   bot.command('channels', async ctx => {
     if (!ctx.isOwner && !ctx.isAdmin) return;
     try {
-      return await manage.handleCallback(ctx, 'mg_channels_menu');
+      const { getChannels } = require('../utils/channelGuard');
+      const list = await getChannels();
+      if (!list.length) return ctx.reply('📢 لا توجد قنوات مضافة.\n\nاستخدم /addchannel لإضافة قناة.').catch(()=>{});
+      let text = '📢 *قنوات الاشتراك الإجباري*\n━━━━━━━━━━━━━━━\n\n';
+      list.forEach((ch, i) => {
+        text += (i+1) + '. *' + (ch.channel_name||'قناة') + '*\n';
+        text += '   🆔 `' + ch.channel_id + '`\n\n';
+      });
+      return ctx.reply(text, { parse_mode: 'Markdown' }).catch(()=>{});
     } catch(e) {
-      console.error('[/channels error]', e.message);
-      return ctx.reply('❌ خطأ: ' + e.message).catch(()=>{});
+      console.error('[/channels]', e.message);
+      return ctx.reply('❌ ' + e.message).catch(()=>{});
     }
+  });
+
+  bot.command('clearchannels', async ctx => {
+    if (!ctx.isOwner) return;
+    const { run } = require('../database/db');
+    const { cacheClear } = require('../utils/cache');
+    await run("UPDATE required_channels SET is_active=0").catch(()=>{});
+    cacheClear('required_channels');
+    return ctx.reply('✅ تم إيقاف كل قنوات الاشتراك الإجباري.\n\nاستخدم /addchannel لإضافة قنوات جديدة.').catch(()=>{});
   });
 
   bot.command('addchannel', async ctx => {
