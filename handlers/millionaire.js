@@ -1,593 +1,327 @@
 'use strict';
 /**
- * ╔══════════════════════════════════════════════════════════════════╗
- * ║       🏆 من سيربح المليون — Enterprise Edition v3.0            ║
- * ║   Full Group Game · Lifelines · Leaderboard · Multi-Round      ║
- * ╚══════════════════════════════════════════════════════════════════╝
- *
- * التركيب في index.js:
- *   const millionaire = require('./handlers/millionaire');
- *   millionaire.register(bot);
- *
- * Commands:
- *   /million        — بدء لعبة جديدة في القروب
- *   /mstop          — إيقاف اللعبة (للأدمن)
- *   /mtop           — لوحة المتصدرين
- *   /maddq          — إضافة سؤال (للأدمن)  [في PV]
- *   /mstats         — إحصائياتي
+ * 🏆 من سيربح المليون — v4.0 Clean Edition
+ * - رسالة واحدة تُعدَّل (edit) بدل إرسال رسائل جديدة
+ * - أزرار تخص اللاعب فقط — غيره يرد عليه "ليست لعبتك"
+ * - انتقال سلس بين الأسئلة بدون فوضى
  */
 
 const { run, all, get } = require('../database/db');
+const logger = require('../utils/logger');
 const runSilent = (q, p) => run(q, p).catch(() => {});
 
-// ── تتبع رسائل اللعبة للحذف ──
-const _gameMsgs = new Map();
-function trackGameMsg(chatId, msgId) {
-  if (!msgId) return;
-  const cid = String(chatId);
-  if (!_gameMsgs.has(cid)) _gameMsgs.set(cid, []);
-  _gameMsgs.get(cid).push(msgId);
-}
-async function deleteGameMsgs(telegram, chatId, keepId) {
-  const cid = String(chatId);
-  const ids = (_gameMsgs.get(cid) || []).filter(id => id !== keepId);
-  await Promise.allSettled(ids.map(id => telegram.deleteMessage(chatId, id).catch(() => {})));
-  _gameMsgs.delete(cid);
-}
-const logger = require('../utils/logger');
-
-/* ═══════════════════════════════════════════════════════════════
-   CONSTANTS
- * ═══════════════════════════════════════════════════════════════ */
-const PRIZES = [
-  100, 200, 300, 500, 1000,
-  2000, 4000, 8000, 16000, 32000,
-  64000, 125000, 250000, 500000, 1000000,
-];
-
-const SAFE_ZONES    = [4, 9, 14];  // indexes (0-based) = 5k, 32k, 1M
-
-async function _notify(telegram, chatId, text, opts = {}, deleteAfterMs = 0) {
-  try {
-    const m = await telegram.sendMessage(chatId, text, { parse_mode: "Markdown", ...opts });
-    if (deleteAfterMs > 0 && m) {
-      setTimeout(() => telegram.deleteMessage(chatId, m.message_id).catch(() => {}), deleteAfterMs);
-    }
-    return m;
-  } catch(_) { return null; }
-}
-
-const QUESTION_SECS = 30;          // seconds per question
-const JOIN_SECS     = 20;          // seconds to join before game starts
+/* ══════════════ CONSTANTS ══════════════ */
+const PRIZES = [100,200,300,500,1000,2000,4000,8000,16000,32000,64000,125000,250000,500000,1000000];
+const SAFE_ZONES    = [4, 9, 14];
+const QUESTION_SECS = 30;
+const JOIN_SECS     = 25;
 const MAX_PLAYERS   = 30;
-
-const DIFFICULTY = { easy: '🟢', medium: '🟡', hard: '🔴' };
-const LETTERS    = ['أ', 'ب', 'ج', 'د'];
-const TROPHIES   = ['🥇', '🥈', '🥉'];
+const LETTERS       = ['\u0623','\u0628','\u062c','\u062f'];
 
 const LIFELINES = {
-  fifty:    { key: 'fifty',    emoji: '5️⃣0️⃣', name: 'المساعدة 50/50'        },
-  audience: { key: 'audience', emoji: '👥',    name: 'مساعدة الجمهور'        },
-  call:     { key: 'call',     emoji: '📞',    name: 'مساعدة صديق في القروب' },
-  skip:     { key: 'skip',     emoji: '⏭️',   name: 'تخطي السؤال (مرة)'     },
+  fifty:    { emoji: '5\ufe0f\u20e30\ufe0f\u20e3', name: '50/50'          },
+  audience: { emoji: '\ud83d\udc65',               name: '\u0645\u0633\u0627\u0639\u062f\u0629 \u0627\u0644\u062c\u0645\u0647\u0648\u0631' },
+  call:     { emoji: '\ud83d\udcde',               name: '\u0645\u0633\u0627\u0639\u062f\u0629 \u0635\u062f\u064a\u0642'  },
+  skip:     { emoji: '\u23ed\ufe0f',               name: '\u062a\u062e\u0637\u064a \u0627\u0644\u0633\u0624\u0627\u0644'  },
 };
 
-/* ═══════════════════════════════════════════════════════════════
-   SCHEMA INIT  (call once at startup)
-═══════════════════════════════════════════════════════════════ */
+function fmtPrize(n) {
+  if (n >= 1000000) return '1,000,000 \u062f\u062c \ud83d\udc8e';
+  if (n >= 1000)    return (n/1000).toFixed(n%1000?1:0) + 'k \ud83d\udcb0';
+  return n + ' \u062f\u062c';
+}
+function getDiff(level) {
+  return level < 5 ? 'easy' : level < 10 ? 'medium' : 'hard';
+}
+
+/* ══════════════ GAME STATE ══════════════ */
+const _games = new Map();
+function getGame(cid)    { return _games.get(String(cid)) || null; }
+function setGame(cid, g) { _games.set(String(cid), g); }
+function delGame(cid)    { _games.delete(String(cid)); }
+
+function newGame(chatId) {
+  return {
+    chatId, status: 'waiting',
+    players: new Map(),
+    currentLevel: 0,
+    currentQ: null,
+    roundAnswers: new Map(),
+    usedQIds: [],
+    msgId: null,
+    joinMsgId: null,
+    timer: null,
+    joinTimer: null,
+    sessionId: Date.now(),
+    answerDeadline: 0,
+  };
+}
+
+/* ══════════════ DB ══════════════ */
 async function initMillionaireSchema() {
   const tables = [
     `CREATE TABLE IF NOT EXISTS million_questions (
-      id          SERIAL PRIMARY KEY,
-      text        TEXT NOT NULL,
-      option_a    TEXT NOT NULL,
-      option_b    TEXT NOT NULL,
-      option_c    TEXT NOT NULL,
-      option_d    TEXT NOT NULL,
-      correct     CHAR(1) NOT NULL CHECK (correct IN ('a','b','c','d')),
-      difficulty  TEXT DEFAULT 'medium',
-      specialty_id INTEGER DEFAULT 0,
-      category    TEXT DEFAULT 'عام',
-      used_count  INTEGER DEFAULT 0,
-      added_by    BIGINT,
-      is_active   SMALLINT DEFAULT 1,
-      created_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-    )`,
-    `CREATE TABLE IF NOT EXISTS million_sessions (
-      id          SERIAL PRIMARY KEY,
-      chat_id     BIGINT NOT NULL,
-      status      TEXT DEFAULT 'waiting',
-      current_q   INTEGER DEFAULT 0,
-      started_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      ended_at    TIMESTAMP
-    )`,
-    `CREATE TABLE IF NOT EXISTS million_players (
-      session_id  INTEGER NOT NULL,
-      user_id     BIGINT NOT NULL,
-      first_name  TEXT,
-      username    TEXT,
-      level       INTEGER DEFAULT 0,
-      prize       INTEGER DEFAULT 0,
-      lifelines   JSONB DEFAULT '{"fifty":true,"audience":true,"call":true,"skip":true}',
-      is_alive    SMALLINT DEFAULT 1,
-      answer_time INTEGER DEFAULT 0,
-      PRIMARY KEY (session_id, user_id)
+      id SERIAL PRIMARY KEY, text TEXT NOT NULL,
+      option_a TEXT NOT NULL, option_b TEXT NOT NULL,
+      option_c TEXT NOT NULL, option_d TEXT NOT NULL,
+      correct CHAR(1) NOT NULL CHECK (correct IN ('a','b','c','d')),
+      difficulty TEXT DEFAULT 'medium', specialty_id INTEGER DEFAULT 0,
+      used_count INTEGER DEFAULT 0, added_by BIGINT,
+      is_active SMALLINT DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS million_scores (
-      user_id     BIGINT PRIMARY KEY,
-      first_name  TEXT,
-      username    TEXT,
-      best_prize  INTEGER DEFAULT 0,
-      total_games INTEGER DEFAULT 0,
-      wins        INTEGER DEFAULT 0,
-      total_prize BIGINT DEFAULT 0,
-      updated_at  TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      id SERIAL PRIMARY KEY, user_id BIGINT NOT NULL,
+      chat_id BIGINT NOT NULL, score INTEGER DEFAULT 0,
+      level_reached INTEGER DEFAULT 0, won BOOLEAN DEFAULT FALSE,
+      played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
+    `CREATE INDEX IF NOT EXISTS idx_mq_active ON million_questions(is_active)`,
+    `CREATE INDEX IF NOT EXISTS idx_ms_user   ON million_scores(user_id)`,
   ];
-  for (const t of tables) await run(t).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-
-  const indexes = [
-    `CREATE INDEX IF NOT EXISTS idx_mq_difficulty ON million_questions(difficulty) WHERE is_active=1`,
-    `CREATE INDEX IF NOT EXISTS idx_mq_used ON million_questions(used_count) WHERE is_active=1`,
-    `CREATE INDEX IF NOT EXISTS idx_ms_chat ON million_sessions(chat_id, status)`,
-    `CREATE INDEX IF NOT EXISTS idx_mscores_prize ON million_scores(best_prize DESC)`,
-  ];
-  for (const i of indexes) await run(i).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  for (const q of tables) await run(q,[]).catch(()=>{});
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   IN-MEMORY GAME STATE  (per chat)
-═══════════════════════════════════════════════════════════════ */
-const _games = new Map();  // chatId → GameState
-
-function getGame(chatId)      { return _games.get(String(chatId)) || null; }
-function setGame(chatId, g)   { _games.set(String(chatId), g); }
-function delGame(chatId)      { _games.delete(String(chatId)); }
-
-/* ═══════════════════════════════════════════════════════════════
-   HELPERS
-═══════════════════════════════════════════════════════════════ */
-function fmtPrize(n) {
-  if (n >= 1000000) return '💰 ' + (n/1000000).toFixed(0) + ' مليون دج';
-  if (n >= 1000)    return '💵 ' + (n/1000).toFixed(0) + 'k دج';
-  return '💵 ' + n + ' دج';
-}
-
-function levelBar(level) {
-  const bars = PRIZES.map((_, i) => {
-    if (i < level)  return '▰';
-    if (i === level) return '◆';
-    return '▱';
-  }).join('');
-  return bars;
-}
-
-function safeZoneText(level) {
-  const next = SAFE_ZONES.find(z => z >= level);
-  if (next === undefined) return '';
-  return `\n🛡️ أمان: ${fmtPrize(PRIZES[next])} (سؤال ${next + 1})`;
-}
-
-function lifelineButtons(lifelines) {
-  const btns = [];
-  for (const [k, v] of Object.entries(LIFELINES)) {
-    if (lifelines[k]) btns.push({ text: v.emoji + ' ' + v.name, callback_data: 'mlr_' + k });
-  }
-  return btns;
-}
-
-function shuffleArray(arr) {
-  const a = [...arr];
-  for (let i = a.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [a[i], a[j]] = [a[j], a[i]];
-  }
-  return a;
-}
-
-async function getRandomQuestion(usedIds, difficulty) {
-  const diff = difficulty || 'medium';
-  const exclude = (usedIds && usedIds.length) ? 'AND id NOT IN (' + usedIds.filter(Number.isInteger).join(',') + ')' : '';
-  // Try exact difficulty first, then fallback
-  // difficulty قد يكون text أو integer في DB
-  const diffMap = { 'easy': 1, 'medium': 2, 'hard': 3 };
-  const diffInt = diffMap[diff] || 2;
+async function getRandomQuestion(usedIds, diff) {
+  const ex = usedIds.length ? `AND id NOT IN (${usedIds.join(',')})` : '';
   let q = await get(
-    `SELECT * FROM million_questions WHERE is_active=1 AND difficulty::text=$2 ${exclude}
-     ORDER BY used_count ASC, RANDOM() LIMIT 1`, [diffInt, diff]
-  ).catch(() => null);
-  if (!q) {
-    q = await get(
-      `SELECT * FROM million_questions WHERE is_active=1 ${exclude}
-       ORDER BY used_count ASC, RANDOM() LIMIT 1`, []
-    ).catch(() => null);
-  }
-  return q;
+    `SELECT * FROM million_questions WHERE is_active=1 AND difficulty=$1 ${ex} ORDER BY used_count ASC, random() LIMIT 1`,
+    [diff]
+  ).catch(()=>null);
+  if (!q) q = await get(
+    `SELECT * FROM million_questions WHERE is_active=1 ${ex} ORDER BY random() LIMIT 1`, []
+  ).catch(()=>null);
+  return q || null;
 }
 
-function getDifficultyForLevel(level) {
-  if (level <= 4)  return 'easy';
-  if (level <= 9)  return 'medium';
-  return 'hard';
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   MESSAGE BUILDERS
-═══════════════════════════════════════════════════════════════ */
-function buildQuestionMsg(game, q, hiddenOptions) {
-  const level    = game.currentLevel;
-  const prize    = PRIZES[level];
-  const isSafe   = SAFE_ZONES.includes(level);
-  const diff     = DIFFICULTY[q.difficulty] || '🟡';
-  const hidden   = hiddenOptions || [];
-
-  const opts = ['a','b','c','d'].map((l, i) => {
-    if (hidden.includes(l)) return `${LETTERS[i]}️⃣ ~~...~~`;
-    return `${LETTERS[i]}) ${q['option_' + l]}`;
-  }).join('\n');
-
-  const players = [...game.players.values()].filter(p => p.alive);
-
+/* ══════════════ BUILD MESSAGES ══════════════ */
+function buildJoinMsg(game) {
+  const count = game.players.size;
+  const names = [...game.players.values()].map(p => p.name).join(' | ') || '\u2014';
   return (
-    `🎯 *السؤال ${level + 1} من 15*\n` +
-    `${diff} • ${q.category || 'عام'} • ${fmtPrize(prize)}\n` +
-    `${levelBar(level)}\n` +
-    (isSafe ? `\n🛡️ *نقطة أمان!*\n` : '') +
-    `\n❓ *${q.text || q.question || 'سؤال'}*\n\n` +
-    `${opts}\n\n` +
-    `👥 اللاعبون النشطون: ${players.length}\n` +
-    `⏱️ الوقت: ${QUESTION_SECS} ثانية` +
-    safeZoneText(level + 1)
+    '\ud83c\udfae *\u0645\u0646 \u0633\u064a\u0631\u0628\u062d \u0627\u0644\u0645\u0644\u064a\u0648\u0646\u061f*\n' +
+    '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n' +
+    '\ud83d\udc65 \u0627\u0644\u0644\u0627\u0639\u0628\u0648\u0646 (' + count + '): ' + names + '\n\n' +
+    '\u23f3 \u0644\u062f\u064a\u0643 *' + JOIN_SECS + ' \u062b\u0627\u0646\u064a\u0629* \u0644\u0644\u0627\u0646\u0636\u0645\u0627\u0645\n' +
+    '\ud83c\udfc6 \u0627\u0644\u062c\u0627\u0626\u0632\u0629: *1,000,000 \u062f\u062c*\n\n' +
+    '\ud83d\udc47 \u0627\u0636\u063a\u0637 *\u0627\u0646\u0636\u0645* \u0644\u0644\u062f\u062e\u0648\u0644!'
   );
 }
 
-function buildAnswerKeyboard(game, q, hiddenOptions) {
-  const hidden = hiddenOptions || [];
+function buildQuestionMsg(game, q) {
+  const level  = game.currentLevel + 1;
+  const prize  = fmtPrize(PRIZES[game.currentLevel]);
+  const safe   = SAFE_ZONES.find(s => s > game.currentLevel);
+  const safeStr = safe !== undefined ? fmtPrize(PRIZES[safe]) : '\u2014';
+  const bar    = '\u25c6' + '\u25c7'.repeat(game.currentLevel) + '\u25a1'.repeat(14 - game.currentLevel);
+  const opts   = ['a','b','c','d'];
+  const hidden = game.hiddenOpts || [];
+  let optsTxt  = '';
+  opts.forEach((l,i) => {
+    if (hidden.includes(l)) return;
+    optsTxt += LETTERS[i] + ') ' + (q['option_'+l]||'') + '\n';
+  });
+  return (
+    '\ud83c\udfaf *\u0627\u0644\u0633\u0624\u0627\u0644 ' + level + ' \u0645\u0646 15*\n' +
+    '\u2022 ' + getDiff(game.currentLevel).replace('easy','\ud83d\udfe2 \u0633\u0647\u0644').replace('medium','\ud83d\udfe1 \u0648\u0633\u0637').replace('hard','\ud83d\udd34 \u0635\u0639\u0628') +
+    ' \u2022 ' + prize + '\n' +
+    bar + '\n\n' +
+    '\u2753 *' + (q.text||q.question||'\u0633\u0624\u0627\u0644') + '*\n\n' +
+    optsTxt + '\n' +
+    '\ud83d\udc65 \u0627\u0644\u0644\u0627\u0639\u0628\u0648\u0646 \u0627\u0644\u0646\u0634\u0637\u0648\u0646: ' + [...game.players.values()].filter(p=>p.alive).length + '\n' +
+    '\u23f0 \u0627\u0644\u0648\u0642\u062a: ' + QUESTION_SECS + ' \u062b\u0627\u0646\u064a\u0629\n' +
+    (safe !== undefined ? '\ud83d\udee1 \u0623\u0645\u0627\u0646: ' + safeStr + ' (\u0633\u0624\u0627\u0644 ' + (safe+1) + ')' : '')
+  );
+}
+
+function buildAnswerKeyboard(game, q, sessionId) {
+  const opts = ['a','b','c','d'];
+  const hidden = game.hiddenOpts || [];
+  const visible = opts.filter(l => !hidden.includes(l));
   const rows = [];
-  const opts = [
-    { l: 'a', txt: LETTERS[0] + ') ' + (q.option_a || q.a || '~~...~~') },
-    { l: 'b', txt: LETTERS[1] + ') ' + (q.option_b || q.b || '~~...~~') },
-    { l: 'c', txt: LETTERS[2] + ') ' + (q.option_c || q.c || '~~...~~') },
-    { l: 'd', txt: LETTERS[3] + ') ' + (q.option_d || q.d || '~~...~~') },
-  ];
-  // 2 options per row
-  for (let i = 0; i < opts.length; i += 2) {
-    const row = [];
-    for (let j = i; j < i + 2 && j < opts.length; j++) {
-      const o = opts[j];
-      if (!hidden.includes(o.l)) {
-        row.push({ text: o.txt.substring(0, 40), callback_data: `mar_${o.l}_${game.sessionId}` });
-      }
-    }
-    if (row.length) rows.push(row);
+  for (let i = 0; i < visible.length; i += 2) {
+    const row = visible.slice(i, i+2).map(l => ({
+      text: LETTERS[opts.indexOf(l)] + ') ' + (q['option_'+l]||'').substring(0,20),
+      callback_data: 'mar_' + l + '_' + sessionId,
+    }));
+    rows.push(row);
   }
   return rows;
 }
 
 function buildLifelineKeyboard(game) {
-  // Only show available lifelines for alive players concept
-  const btns = lifelineButtons(game.lifelines);
-  if (!btns.length) return [];
-  const rows = [];
-  for (let i = 0; i < btns.length; i += 2) {
-    rows.push(btns.slice(i, i + 2));
+  const btns = [];
+  for (const [k, v] of Object.entries(LIFELINES)) {
+    const player = [...game.players.values()][0];
+    const used   = player ? !player.lifelines[k] : false;
+    if (!used) btns.push({ text: v.emoji + ' ' + v.name, callback_data: 'mlr_' + k });
   }
+  const rows = [];
+  for (let i = 0; i < btns.length; i += 2) rows.push(btns.slice(i, i+2));
   return rows;
 }
 
-/* ═══════════════════════════════════════════════════════════════
-   CORE GAME FLOW
-═══════════════════════════════════════════════════════════════ */
+/* ══════════════ GAME FLOW ══════════════ */
 async function startJoinPhase(ctx) {
-  const chatId   = ctx.chat.id;
-  const existing = getGame(chatId);
-  if (existing) {
-    return ctx.reply('⚠️ يوجد لعبة جارية بالفعل! /mstop لإيقافها.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  const chatId = ctx.chat.id;
+  if (getGame(chatId)) {
+    return ctx.reply('\u26a0\ufe0f \u0647\u0646\u0627\u0643 \u0644\u0639\u0628\u0629 \u062c\u0627\u0631\u064a\u0629!').catch(()=>{});
   }
-
-  // Check questions count
-  const qCount = await get('SELECT COUNT(*) as c FROM million_questions WHERE is_active=1');
+  const qCount = await get('SELECT COUNT(*) as c FROM million_questions WHERE is_active=1').catch(()=>({c:0}));
   if (!qCount || parseInt(qCount.c) < 5) {
-    return ctx.reply(
-      '❌ لا توجد أسئلة كافية.\n' +
-      'أضف أسئلة بـ /maddq في المحادثة الخاصة.'
-    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    return ctx.reply('\u26a0\ufe0f \u0639\u062f\u062f \u0627\u0644\u0623\u0633\u0626\u0644\u0629 \u063a\u064a\u0631 \u0643\u0627\u0641\u064d! \u0623\u0636\u0641 \u0623\u0633\u0626\u0644\u0629 \u0623\u0648\u0644\u0627\u064b.').catch(()=>{});
   }
 
-  // Create DB session
-  const session = await get(
-    'INSERT INTO million_sessions(chat_id,status,started_by) VALUES($1,$2,$3) RETURNING id',
-    [chatId, 'waiting', ctx.from?.id || 0]
-  );
-
-  const game = {
-    sessionId:    session.id,
-    chatId:       String(chatId),
-    status:       'waiting',
-    players:      new Map(),    // userId → { name, username, alive, prize, lifelines, answers }
-    currentLevel: 0,
-    currentQ:     null,
-    usedQIds:     [],
-    timer:        null,
-    joinTimer:    null,
-    msgId:        null,
-    lifelines:    { fifty: true, audience: true, call: true, skip: true }, // shared pool
-    hiddenOpts:   [],
-    answerDeadline: 0,
-    roundAnswers:   new Map(),  // userId → answer letter
-    joinMsgId:    null,
-  };
-
+  const game = newGame(chatId);
   setGame(chatId, game);
 
-  // ── Auto-join: أضف المضيف مباشرة ──────────────────────────────
-  const _starter = ctx.from;
-  const _suid    = String(_starter.id);
-  game.players.set(_suid, {
-    name:      _starter.first_name || 'لاعب',
-    username:  _starter.username   || '',
-    alive:     true,
-    prize:     0,
-    lifelines: { fifty: true, audience: true, call: true, skip: true },
-    answers:   [],
-  });
-
-  // ── رسالة البداية الاحترافية ─────────────────────────────────
-  const _joinTxt =
-    '🎰 *من سيربح المليون؟*\n' +
-    '━━━━━━━━━━━━━━━━━━━━\n\n' +
-    '👑 المضيف: *' + (_starter.first_name || 'لاعب') + '*\n' +
-    '👥 اللاعبون (1):\n' +
-    '1\. ' + (_starter.first_name || 'لاعب') + '\n\n' +
-    '💰 الجائزة الكبرى: *1,000,000 دج*\n\n' +
-    '⏱️ تبدأ اللعبة خلال *20* ثانية\.\.\.';
-
-  const msg = await ctx.reply(_joinTxt, {
+  const msg = await ctx.reply(buildJoinMsg(game), {
     parse_mode: 'Markdown',
-    reply_markup: {
-      inline_keyboard: [
-        [{ text: '🚀 ابدأ', callback_data: 'mlr_forcestart' }],
-        [{ text: '📊 الترتيب', callback_data: 'mlr_ranking' }, { text: '❓ كيف العب', callback_data: 'mlr_howto' }],
-        [{ text: '🔴 إلغاء', callback_data: 'mlr_cancel' }],
-      ],
-    },
-  }).catch(() => null);
+    reply_markup: { inline_keyboard: [
+      [{ text: '\ud83d\ude80 \u0627\u0646\u0636\u0645!', callback_data: 'mlr_join' }],
+      [{ text: '\u25b6\ufe0f \u0627\u0628\u062f\u0623 \u0627\u0644\u0622\u0646', callback_data: 'mlr_forcestart' }, { text: '\ud83d\udd34 \u0625\u0644\u063a\u0627\u0621', callback_data: 'mlr_cancel' }],
+    ]},
+  }).catch(()=>null);
 
-  if (msg) { game.joinMsgId = msg.message_id; trackGameMsg(chatId, msg.message_id); }
+  if (msg) game.joinMsgId = msg.message_id;
 
-  // ── بدء تلقائي بعد 5 ثوانٍ ──────────────────────────────────
-  game.joinTimer = setTimeout(() => beginGame(ctx.telegram, chatId), 20000);
+  game.joinTimer = setTimeout(async () => {
+    await beginGame(ctx.telegram, chatId);
+  }, JOIN_SECS * 1000);
 }
 
 async function joinGame(ctx) {
   const chatId = ctx.chat.id;
   const game   = getGame(chatId);
-  if (!game || game.status !== 'waiting') {
-    return ctx.answerCbQuery('⚠️ لا يوجد لعبة للانضمام.', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-  }
-  if (game.players.size >= MAX_PLAYERS) {
-    return ctx.answerCbQuery('⚠️ اللعبة ممتلئة!', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-  }
+  if (!game || game.status !== 'waiting') return ctx.answerCbQuery('\u26a0\ufe0f \u0644\u0627 \u062a\u0648\u062c\u062f \u0644\u0639\u0628\u0629 \u0644\u0644\u0627\u0646\u0636\u0645\u0627\u0645.', { show_alert: true }).catch(()=>{});
+  if (game.players.size >= MAX_PLAYERS) return ctx.answerCbQuery('\u26a0\ufe0f \u0627\u0644\u0644\u0639\u0628\u0629 \u0645\u0645\u062a\u0644\u0626\u0629!', { show_alert: true }).catch(()=>{});
 
   const uid  = ctx.from.id;
-  const name = ctx.from.first_name || 'لاعب';
-
-  if (game.players.has(uid)) {
-    return ctx.answerCbQuery('أنت مسجل بالفعل! ✅').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-  }
+  const name = ctx.from.first_name || '\u0644\u0627\u0639\u0628';
+  if (game.players.has(uid)) return ctx.answerCbQuery('\u0623\u0646\u062a \u0645\u0633\u062c\u0644 \u0628\u0627\u0644\u0641\u0639\u0644! \u2705').catch(()=>{});
 
   game.players.set(uid, {
-    id:        uid,
-    name,
-    username:  ctx.from.username || '',
-    alive:     true,
-    prize:     0,
-    level:     0,
+    id: uid, name, username: ctx.from.username || '',
+    alive: true, prize: 0, level: 0,
     lifelines: { fifty: true, audience: true, call: true, skip: true },
-    answers:   [],
-    joinedAt:  Date.now(),
+    answers: [], joinedAt: Date.now(),
   });
 
-  await ctx.answerCbQuery(`✅ مرحباً ${name}! انتظر بدء اللعبة.`).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  await ctx.answerCbQuery('\u2705 \u0645\u0631\u062d\u0628\u0627\u064b ' + name + '!').catch(()=>{});
 
-  // Update join message
-  const count = game.players.size;
-  const names = [...game.players.values()].map(p => `• ${p.name}`).join('\n');
-  await ctx.telegram.editMessageText(
-    chatId, game.joinMsgId, null,
-    `🎉 *من سيربح المليون — جولة جديدة!*\n\n` +
-    `👥 *اللاعبون (${count}):*\n${names}\n\n` +
-    `⏱️ اللعبة تبدأ قريباً...\n💰 الجائزة الكبرى: *1,000,000 دج*`,
-    {
+  if (game.joinMsgId) {
+    ctx.telegram.editMessageText(chatId, game.joinMsgId, null, buildJoinMsg(game), {
       parse_mode: 'Markdown',
-      reply_markup: {
-        inline_keyboard: [[
-          { text: `✋ انضم (${count})`, callback_data: 'mlr_join' },
-          { text: '▶️ ابدأ الآن', callback_data: 'mlr_forcestart' },
-        ]],
-      },
-    }
-  ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+      reply_markup: { inline_keyboard: [
+        [{ text: '\ud83d\ude80 \u0627\u0646\u0636\u0645! (' + game.players.size + ')', callback_data: 'mlr_join' }],
+        [{ text: '\u25b6\ufe0f \u0627\u0628\u062f\u0623 \u0627\u0644\u0622\u0646', callback_data: 'mlr_forcestart' }, { text: '\ud83d\udd34 \u0625\u0644\u063a\u0627\u0621', callback_data: 'mlr_cancel' }],
+      ]},
+    }).catch(()=>{});
+  }
+}
+
+async function forceStart(ctx) {
+  const chatId = ctx.chat.id;
+  const game   = getGame(chatId);
+  if (!game || game.status !== 'waiting') return ctx.answerCbQuery().catch(()=>{});
+  if (game.joinTimer) { clearTimeout(game.joinTimer); game.joinTimer = null; }
+  ctx.answerCbQuery('\ud83d\ude80 \u062c\u0627\u0631\u064a \u0627\u0644\u0625\u0637\u0644\u0627\u0642!').catch(()=>{});
+  await beginGame(ctx.telegram, chatId);
+}
+
+async function cancelGame(ctx) {
+  const chatId = ctx.chat.id;
+  const game   = getGame(chatId);
+  if (!game) return ctx.answerCbQuery().catch(()=>{});
+  if (game.joinTimer)  clearTimeout(game.joinTimer);
+  if (game.timer)      clearTimeout(game.timer);
+  if (game.joinMsgId)  ctx.telegram.deleteMessage(chatId, game.joinMsgId).catch(()=>{});
+  if (game.msgId)      ctx.telegram.deleteMessage(chatId, game.msgId).catch(()=>{});
+  delGame(chatId);
+  ctx.answerCbQuery('\ud83d\udd34 \u062a\u0645 \u0627\u0644\u0625\u0644\u063a\u0627\u0621').catch(()=>{});
 }
 
 async function beginGame(telegram, chatId) {
   const game = getGame(chatId);
   if (!game) return;
-  if (game.joinTimer) { clearTimeout(game.joinTimer); game.joinTimer = null; }
-
-  // حذف رسالة الانضمام
-  if (game.joinMsgId) {
-    await telegram.deleteMessage(chatId, game.joinMsgId).catch(() => {});
-    game.joinMsgId = null;
-  }
+  if (game.status !== 'waiting') return;
 
   if (game.players.size === 0) {
-    await _notify(telegram, chatId, '😕 لم ينضم أحد للعبة. تم الإلغاء.', {}, 5000);
+    if (game.joinMsgId) telegram.deleteMessage(chatId, game.joinMsgId).catch(()=>{});
     delGame(chatId);
-    return;
+    return telegram.sendMessage(chatId, '\u274c \u0644\u0627 \u064a\u0648\u062c\u062f \u0644\u0627\u0639\u0628\u0648\u0646!').catch(()=>{});
   }
-  // ✅ لاعب واحد مسموح — لا حاجة للانتظار
 
   game.status = 'playing';
-  await run('UPDATE million_sessions SET status=$1 WHERE id=$2', ['playing', game.sessionId]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-
-  // Register players in DB
-  for (const p of game.players.values()) {
-    if (!p.id) continue; // تجاهل لاعب بدون ID
-    await run(
-      `INSERT INTO million_players(session_id,user_id,first_name,username)
-       VALUES($1,$2,$3,$4) ON CONFLICT DO NOTHING`,
-      [game.sessionId, p.id, p.name, p.username]
-    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+  if (game.joinMsgId) {
+    telegram.deleteMessage(chatId, game.joinMsgId).catch(()=>{});
+    game.joinMsgId = null;
   }
-
-  const playerList = [...game.players.values()].map(p => `👤 ${p.name}`).join('\n');
-  const beginMsg = await telegram.sendMessage(
-    chatId,
-    `🚀 *اللعبة تبدأ الآن!*\n\n${playerList}\n\n⚡ استعدوا للسؤال الأول...`,
-    { parse_mode: 'Markdown' }
-  ).catch(() => null);
-  if (beginMsg) setTimeout(() => telegram.deleteMessage(chatId, beginMsg.message_id).catch(() => {}), 3000);
-
-  await new Promise(r => setTimeout(r, 2000));
   await sendNextQuestion(telegram, chatId);
-}
-
-// ── حذف رسائل القروب القديمة ──────────────────────────────
-const _grpMsgs = new Map(); // chatId → [msgIds]
-function trackGrpMsg(chatId, msgId) {
-  if (!msgId) return;
-  if (!_grpMsgs.has(chatId)) _grpMsgs.set(chatId, []);
-  _grpMsgs.get(chatId).push(msgId);
-}
-async function clearGrpMsgs(telegram, chatId, keepId) {
-  const ids = _grpMsgs.get(chatId) || [];
-  await Promise.allSettled(
-    ids.filter(id => id !== keepId)
-       .map(id => telegram.deleteMessage(chatId, id).catch(() => {}))
-  );
-  _grpMsgs.set(chatId, keepId ? [keepId] : []);
 }
 
 async function sendNextQuestion(telegram, chatId) {
   const game = getGame(chatId);
   if (!game || game.status !== 'playing') return;
 
-  const alivePlayers = [...game.players.values()].filter(p => p.alive);
-  if (alivePlayers.length === 0) {
-    await endGame(telegram, chatId, 'no_players');
-    return;
-  }
+  const alive = [...game.players.values()].filter(p => p.alive);
+  if (alive.length === 0) return endGame(telegram, chatId, 'all_eliminated');
+  if (game.currentLevel >= PRIZES.length) return endGame(telegram, chatId, 'complete');
 
-  if (game.currentLevel >= PRIZES.length) {
-    await endGame(telegram, chatId, 'complete');
-    return;
-  }
-
-  const diff = getDifficultyForLevel(game.currentLevel);
-  const q    = await getRandomQuestion(game.usedQIds, diff);
-
+  const q = await getRandomQuestion(game.usedQIds, getDiff(game.currentLevel));
   if (!q) {
-    await telegram.sendMessage(chatId, '❌ نفدت الأسئلة! تم إنهاء اللعبة.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    await endGame(telegram, chatId, 'no_questions');
-    return;
+    await telegram.sendMessage(chatId, '\u274c \u0646\u0641\u062f\u062a \u0627\u0644\u0623\u0633\u0626\u0644\u0629!').catch(()=>{});
+    return endGame(telegram, chatId, 'no_questions');
   }
 
-  game.currentQ    = q;
-  game.lifelineUsedThisQ = new Set(); // إعادة تعيين مساعدات السؤال
-  game.hiddenOpts  = [];
+  game.currentQ = q;
+  game.hiddenOpts = [];
   game.roundAnswers.clear();
   game.usedQIds.push(q.id);
   game.answerDeadline = Date.now() + QUESTION_SECS * 1000;
-
-  // Mark question as used
   runSilent('UPDATE million_questions SET used_count=used_count+1 WHERE id=$1', [q.id]);
 
-  const txt = buildQuestionMsg(game, q);
-  const keyboard = [
-    ...buildAnswerKeyboard(game, q, []),
-    ...buildLifelineKeyboard(game),
-  ];
+  const txt      = buildQuestionMsg(game, q);
+  const keyboard = [...buildAnswerKeyboard(game, q, game.sessionId), ...buildLifelineKeyboard(game)];
 
-  // edit رسالة السؤال القديمة أو ابعث جديدة
-  let sentMsg = null;
   if (game.msgId) {
     const edited = await telegram.editMessageText(chatId, game.msgId, null, txt, {
       parse_mode: 'Markdown',
       reply_markup: { inline_keyboard: keyboard },
-    }).catch(() => null);
+    }).catch(()=>null);
     if (!edited) {
-      sentMsg = await telegram.sendMessage(chatId, txt, {
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: keyboard },
-      }).catch(() => null);
-      if (sentMsg) game.msgId = sentMsg.message_id;
+      const m = await telegram.sendMessage(chatId, txt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } }).catch(()=>null);
+      if (m) game.msgId = m.message_id;
     }
   } else {
-    sentMsg = await telegram.sendMessage(chatId, txt, {
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: keyboard },
-    }).catch(err => { require('../utils/logger').debug("[silent]", err.message); return null; });
-    if (sentMsg) game.msgId = sentMsg.message_id;
+    const m = await telegram.sendMessage(chatId, txt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } }).catch(()=>null);
+    if (m) game.msgId = m.message_id;
   }
-  const msg = sentMsg;
 
-  // Countdown timer
-  game.timer = setTimeout(async () => {
-    await resolveQuestion(telegram, chatId, true); // timeout
-  }, QUESTION_SECS * 1000);
-
-  // Mid-timer warning at 10 seconds
-  setTimeout(async () => {
-    const g2 = getGame(chatId);
-    if (!g2 || g2.status !== 'playing' || g2.msgId !== msg?.message_id) return;
-    await _notify(telegram, chatId, '⚠️ *10 ثواني متبقية!*', {}, 4000); //(err => { require('../utils/logger').debug("[silent]", err.message); });
-  }, (QUESTION_SECS - 10) * 1000);
+  if (game.timer) clearTimeout(game.timer);
+  game.timer = setTimeout(() => resolveQuestion(telegram, chatId, true), QUESTION_SECS * 1000);
 }
 
 async function handleAnswer(ctx, letter) {
   const chatId = ctx.chat.id;
+  const uid    = ctx.from.id;
   const game   = getGame(chatId);
-  if (!game || game.status !== 'playing') {
-    return ctx.answerCbQuery('⚠️ لا توجد لعبة نشطة.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+
+  if (!game || game.status !== 'playing') return ctx.answerCbQuery('\u26a0\ufe0f \u0644\u0627 \u062a\u0648\u062c\u062f \u0644\u0639\u0628\u0629 \u0646\u0634\u0637\u0629.').catch(()=>{});
+
+  // تحقق أن هذا لاعب في اللعبة
+  if (!game.players.has(uid)) {
+    return ctx.answerCbQuery('\u26d4 \u0647\u0630\u0647 \u0644\u064a\u0633\u062a \u0644\u0639\u0628\u062a\u0643!', { show_alert: true }).catch(()=>{});
   }
 
-  const uid    = ctx.from.id;
-  let player = game.players.get(uid);
-  // إذا ما انضم قبل — أضفه تلقائياً
-  if (!player && game.status === 'playing') {
-    player = {
-      id: uid, name: ctx.from?.first_name || 'لاعب',
-      username: ctx.from?.username || '',
-      alive: true, prize: 0,
-      lifelines: { fifty: true, audience: true, call: true, skip: true },
-      answers: [], joinedAt: Date.now()
-    };
-    game.players.set(uid, player);
-  }
-  if (!player) {
-    return ctx.answerCbQuery('🚫 هذه ليست لعبتك!', { show_alert: true }).catch(() => {});
-  }
-  if (!player.alive) {
-    return ctx.answerCbQuery('❌ لقد خرجت من اللعبة.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-  }
-  if (game.roundAnswers.has(uid)) {
-    return ctx.answerCbQuery('✅ إجابتك مسجلة، انتظر النتيجة.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-  }
-  if (Date.now() > game.answerDeadline) {
-    return ctx.answerCbQuery('⏰ انتهى الوقت!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-  }
+  const player = game.players.get(uid);
+  if (!player.alive) return ctx.answerCbQuery('\u274c \u0644\u0642\u062f \u062e\u0631\u062c\u062a \u0645\u0646 \u0627\u0644\u0644\u0639\u0628\u0629.').catch(()=>{});
+  if (game.roundAnswers.has(uid)) return ctx.answerCbQuery('\u2705 \u0625\u062c\u0627\u0628\u062a\u0643 \u0645\u0633\u062c\u0644\u0629\u060c \u0627\u0646\u062a\u0638\u0631 \u0627\u0644\u0646\u062a\u064a\u062c\u0629.').catch(()=>{});
+  if (Date.now() > game.answerDeadline) return ctx.answerCbQuery('\u23f0 \u0627\u0646\u062a\u0647\u0649 \u0627\u0644\u0648\u0642\u062a!').catch(()=>{});
 
   game.roundAnswers.set(uid, letter);
-  const elapsed = Math.floor((Date.now() - (game.answerDeadline - QUESTION_SECS * 1000)) / 1000);
-  player.answerTime = elapsed;
+  const optText = game.currentQ?.['option_'+letter] || '';
+  await ctx.answerCbQuery('\u2705 \u0633\u062c\u0644\u0646\u0627 \u0625\u062c\u0627\u0628\u062a\u0643: ' + LETTERS['abcd'.indexOf(letter)] + ') ' + optText.substring(0,30)).catch(()=>{});
 
-  const optText = game.currentQ?.['option_'+letter] || game.currentQ?.['option'+letter] || '';
-  await ctx.answerCbQuery('✅ سجلنا إجابتك: ' + LETTERS['abcd'.indexOf(letter)] + ') ' + optText).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-  // احفظ آخر message للاعب للـ reply
-  if (player) player.lastMsgId = ctx.callbackQuery?.message?.message_id;
-
-  // If all alive players answered → resolve early
   const alive = [...game.players.values()].filter(p => p.alive);
   if (game.roundAnswers.size >= alive.length) {
     if (game.timer) { clearTimeout(game.timer); game.timer = null; }
@@ -600,85 +334,52 @@ async function resolveQuestion(telegram, chatId, timeout) {
   if (!game || game.status !== 'playing') return;
   if (game.timer) { clearTimeout(game.timer); game.timer = null; }
 
-  const q = game.currentQ;
-  if (!q) {
-    await endGame(telegram || ctx?.telegram, chatId, 'error');
-    return;
-  }
-  const correct = (q.correct || q.correct_answer || 'a').toLowerCase().trim();
+  const q       = game.currentQ;
+  if (!q) return endGame(telegram, chatId, 'error');
+  const correct = (q.correct || 'a').toLowerCase().trim();
   const prize   = PRIZES[game.currentLevel];
   const isSafe  = SAFE_ZONES.includes(game.currentLevel);
 
-  // Evaluate each player
   const results = { correct: [], wrong: [], noAnswer: [] };
   for (const p of game.players.values()) {
     if (!p.alive) continue;
     const ans = game.roundAnswers.get(p.id);
-    if (!ans)            { results.noAnswer.push(p); p.alive = false; }
-    else if (ans === correct) { results.correct.push(p); }
-    else                 { results.wrong.push(p); p.alive = false; }
+    if (!ans)             { results.noAnswer.push(p); p.alive = false; }
+    else if (ans===correct) { results.correct.push(p); p.prize = prize; p.level = game.currentLevel+1; }
+    else                  { results.wrong.push(p);   p.alive = false; }
   }
 
-  // Update prize for correct players
-  for (const p of results.correct) {
-    p.prize = prize;
-    p.level = game.currentLevel + 1;
-  }
-
-  // Build result message
-  const correctOpt = q['option_' + correct] || q[correct] || '؟';
-  const wrongList   = results.wrong.map(p => `❌ ${p.name}`).join('  ');
-  const noAnsList   = results.noAnswer.map(p => `⏰ ${p.name}`).join('  ');
-  const correctList = results.correct.map(p => `✅ ${p.name}`).join('  ');
-  const aliveAfter  = [...game.players.values()].filter(p => p.alive);
-
-  let txt =
-    `${timeout ? '⏰ انتهى الوقت!\n' : ''}` +
-    `✅ *الإجابة الصحيحة:* ${LETTERS['abcd'.indexOf(correct)]}) ${correctOpt}\n\n`;
-
-  if (correctList) txt += `🎉 *أصابوا (${results.correct.length}):*\n${correctList}\n\n`;
-  if (wrongList)   txt += `💀 *أخطأوا:*\n${wrongList}\n\n`;
-  if (noAnsList)   txt += `⏰ *لم يجيبوا:*\n${noAnsList}\n\n`;
-
-  if (aliveAfter.length > 0) {
-    txt += `👥 *الباقون: ${aliveAfter.length}* — ${fmtPrize(prize)} لكل واحد\n`;
-    if (isSafe) txt += `\n🛡️ *نقطة أمان محققة!* اللاعبون يضمنون ${fmtPrize(prize)}`;
-  }
-
-  // عدّل رسالة السؤال بنتيجة الجولة
-  if (game.msgId) {
-    await telegram.editMessageText(chatId, game.msgId, null, txt, {
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: [] }
-    }).catch(() => {});
-  } else {
-    const resultMsg = await telegram.sendMessage(chatId, txt, { parse_mode: 'Markdown' }).catch(() => null);
-    if (resultMsg) {
-      game.msgId = resultMsg.message_id;
-      setTimeout(() => telegram.deleteMessage(chatId, resultMsg.message_id).catch(() => {}), 7000);
-    }
-  }
-
-  // Check if safe zone — eliminated players keep safe amount
   if (isSafe) {
     for (const p of game.players.values()) {
-      if (!p.alive && p.prize === 0) p.prize = prize; // give safe floor
+      if (!p.alive && p.prize === 0) p.prize = prize;
     }
   }
 
-  await new Promise(r => setTimeout(r, 3000));
+  const correctOpt  = q['option_'+correct] || '؟';
+  const correctList = results.correct.map(p=>'✅ '+p.name).join('  ');
+  const wrongList   = results.wrong.map(p=>'❌ '+p.name).join('  ');
+  const noAnsList   = results.noAnswer.map(p=>'⏰ '+p.name).join('  ');
+  const aliveAfter  = [...game.players.values()].filter(p=>p.alive);
 
-  // Check end conditions
-  if (aliveAfter.length === 0) {
-    await endGame(telegram, chatId, 'all_eliminated');
-    return;
-  }
-  if (game.currentLevel >= PRIZES.length - 1) {
-    await endGame(telegram, chatId, 'complete');
-    return;
+  let txt = (timeout ? '\u23f0 \u0627\u0646\u062a\u0647\u0649 \u0627\u0644\u0648\u0642\u062a!\n\n' : '') +
+    '\u2705 *\u0627\u0644\u0625\u062c\u0627\u0628\u0629 \u0627\u0644\u0635\u062d\u064a\u062d\u0629:* ' + LETTERS['abcd'.indexOf(correct)] + ') ' + correctOpt + '\n\n';
+  if (correctList) txt += '\ud83c\udf89 *\u0623\u0635\u0627\u0628\u0648\u0627:*\n' + correctList + '\n\n';
+  if (wrongList)   txt += '\ud83d\udca5 *\u0623\u062e\u0637\u0623\u0648\u0627:*\n' + wrongList + '\n\n';
+  if (noAnsList)   txt += '\u23f0 *\u0644\u0645 \u064a\u062c\u064a\u0628\u0648\u0627:*\n' + noAnsList + '\n\n';
+  if (aliveAfter.length > 0) txt += '\ud83d\udc65 *\u0627\u0644\u0628\u0627\u0642\u0648\u0646: ' + aliveAfter.length + '*\n';
+  if (isSafe) txt += '\n\ud83d\udee1\ufe0f *\u0646\u0642\u0637\u0629 \u0623\u0645\u0627\u0646 \u0645\u062d\u0642\u0642\u0629!*';
+
+  if (game.msgId) {
+    await telegram.editMessageText(chatId, game.msgId, null, txt, {
+      parse_mode: 'Markdown', reply_markup: { inline_keyboard: [] }
+    }).catch(()=>{});
   }
 
-  // Next question
+  await new Promise(r => setTimeout(r, 3500));
+
+  if (aliveAfter.length === 0) return endGame(telegram, chatId, 'all_eliminated');
+  if (game.currentLevel >= PRIZES.length - 1) return endGame(telegram, chatId, 'complete');
+
   game.currentLevel++;
   await sendNextQuestion(telegram, chatId);
 }
@@ -686,65 +387,37 @@ async function resolveQuestion(telegram, chatId, timeout) {
 async function endGame(telegram, chatId, reason) {
   const game = getGame(chatId);
   if (!game) return;
-
-  if (game.timer)     { clearTimeout(game.timer);    game.timer = null; }
-  if (game.joinTimer) { clearTimeout(game.joinTimer); game.joinTimer = null; }
-
+  if (game.timer)     clearTimeout(game.timer);
+  if (game.joinTimer) clearTimeout(game.joinTimer);
   game.status = 'ended';
 
-  // Sort players by prize desc
-  const sorted = [...game.players.values()].sort((a, b) => b.prize - a.prize);
-
-  let txt = `🏁 *انتهت اللعبة!*\n\n`;
+  const sorted = [...game.players.values()].sort((a,b) => b.prize - a.prize);
+  const trophies = ['\ud83e\udd47','\ud83e\udd48','\ud83e\udd49'];
+  let txt = '\ud83c\udfc1 *\u0627\u0646\u062a\u0647\u062a \u0627\u0644\u0644\u0639\u0628\u0629!*\n\n';
 
   const reasonTxt = {
-    complete:      '🏆 اكتملت جميع الأسئلة!',
-    all_eliminated:'💀 جميع اللاعبين خرجوا!',
-    no_players:    '😕 لا يوجد لاعبون.',
-    no_questions:  '❌ نفدت الأسئلة.',
-    stopped:       '🛑 توقفت اللعبة.',
+    complete:      '\ud83c\udf89 \u0627\u0643\u062a\u0645\u0644 \u0627\u0644\u0644\u0627\u0639\u0628\u0648\u0646 \u0643\u0644 \u0627\u0644\u0623\u0633\u0626\u0644\u0629!',
+    all_eliminated:'\ud83d\udca5 \u062e\u0631\u062c \u062c\u0645\u064a\u0639 \u0627\u0644\u0644\u0627\u0639\u0628\u064a\u0646!',
+    no_questions:  '\u274c \u0646\u0641\u062f\u062a \u0627\u0644\u0623\u0633\u0626\u0644\u0629!',
+    stopped:       '\ud83d\udd34 \u062a\u0645 \u0625\u064a\u0642\u0627\u0641 \u0627\u0644\u0644\u0639\u0628\u0629.',
+    error:         '\u26a0\ufe0f \u062e\u0637\u0623 \u062a\u0642\u0646\u064a.',
   };
   txt += (reasonTxt[reason] || '') + '\n\n';
 
-  txt += `🏆 *النتائج النهائية:*\n`;
-  for (let i = 0; i < sorted.length; i++) {
-    const p    = sorted[i];
-    const icon = TROPHIES[i] || `${i + 1}.`;
-    txt += `${icon} ${p.name} — ${fmtPrize(p.prize)}\n`;
+  if (sorted.length > 0) {
+    txt += '\ud83c\udfc6 *\u0627\u0644\u062a\u0631\u062a\u064a\u0628 \u0627\u0644\u0646\u0647\u0627\u0626\u064a:*\n';
+    sorted.slice(0,10).forEach((p,i) => {
+      const trophy = trophies[i] || '\ud83d\udd35';
+      txt += trophy + ' ' + p.name + ': *' + fmtPrize(p.prize) + '*\n';
+    });
   }
 
-  const winner = sorted[0];
-  if (winner && winner.prize > 0) {
-    txt += `\n🎊 *المبروك ${winner.name}!*\n🏆 جائزتك: ${fmtPrize(winner.prize)}`;
-    // ── إضافة الجائزة للبنك ──
-    try {
-      const bank = require('./bank');
-      await bank.addWinnings(winner.id, winner.name, winner.username, winner.prize, 'جائزة من سيربح المليون');
-      try {
-        const {awardPoints}=require('../database/points');
-        const xg=Math.min(Math.max(1,Math.floor(winner.prize/10000)),50);
-        for(let _i=0;_i<xg;_i++) await awardPoints(winner.id,'rating').catch(()=>{});
-        logger.info('[Million] +'+xg+' XP => '+winner.id);
-      } catch(_) {}
-      // reply على رسالة صاحب اللعبة (اللي كتب مليون)
-      try {
-        const replyOpts = game.hostMsgId ? { reply_to_message_id: game.hostMsgId } : {};
-        await telegram.sendMessage(chatId,
-          '🎊 *' + winner.name + '* ربح *' + fmtPrize(winner.prize) + '*! 🏆',
-          { parse_mode: 'Markdown', ...replyOpts }
-        );
-      } catch(_) {}
-      // reply للفائز مباشرة
-      try {
-        await telegram.sendMessage(winner.id,
-          '🏆 *مبروك! ربحت من سيربح المليون!*' + String.fromCharCode(10) +
-          '💰 جائزتك: *' + fmtPrize(winner.prize) + '*' + String.fromCharCode(10) +
-          '🏦 تم إضافة المبلغ لحسابك البنكي!',
-          { parse_mode: 'Markdown' }
-        );
-      } catch(_) {}
-
-    } catch(_) {}
+  for (const p of sorted) {
+    if (p.prize > 0) {
+      await run('UPDATE users SET coins=COALESCE(coins,0)+$1 WHERE user_id=$2', [p.prize, p.id]).catch(()=>{});
+      await run('INSERT INTO million_scores(user_id,chat_id,score,level_reached,won) VALUES($1,$2,$3,$4,$5)',
+        [p.id, chatId, p.prize, p.level, p.level >= 15]).catch(()=>{});
+    }
   }
 
   if (game.msgId) {
@@ -755,469 +428,122 @@ async function endGame(telegram, chatId, reason) {
     await telegram.sendMessage(chatId, txt, { parse_mode: 'Markdown' }).catch(()=>{});
   }
 
-  // Save scores to DB
-  await run('UPDATE million_sessions SET status=$1, ended_at=NOW() WHERE id=$2', ['ended', game.sessionId]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-
-  for (const p of game.players.values()) {
-    const isWinner = p.id === winner?.id && p.prize > 0 ? 1 : 0;
-    await run(
-      `INSERT INTO million_scores(user_id,first_name,username,best_prize,total_games,wins,total_prize)
-       VALUES($1,$2,$3,$4,1,$5,$6)
-       ON CONFLICT(user_id) DO UPDATE SET
-         first_name=EXCLUDED.first_name,
-         username=EXCLUDED.username,
-         best_prize=GREATEST(million_scores.best_prize, EXCLUDED.best_prize),
-         total_games=million_scores.total_games+1,
-         wins=million_scores.wins+$5,
-         total_prize=million_scores.total_prize+$6,
-         updated_at=NOW()`,
-      [p.id, p.name, p.username, p.prize, isWinner, p.prize]
-    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-  }
-
   delGame(chatId);
 }
-
-/* ═══════════════════════════════════════════════════════════════
-   LIFELINE HANDLERS
-═══════════════════════════════════════════════════════════════ */
-async function useLifeline(ctx, type) {
-  const chatId = ctx.chat.id;
-  const game   = getGame(chatId);
-  if (!game || game.status !== 'playing') return ctx.answerCbQuery('⚠️').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-
-  const uid    = ctx.from.id;
-  const player = game.players.get(uid);
-  if (!player || !player.alive) return ctx.answerCbQuery('❌ لست في اللعبة.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-  if (!player.lifelines[type])  return ctx.answerCbQuery('❌ استخدمت هذه المساعدة بالفعل.', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-
-  player.lifelines[type] = false;
-  game.lifelines[type]   = false; // global pool update
-
-  const q = game.currentQ;
-
-  if (type === 'fifty') {
-    // Remove 2 wrong answers
-    const wrong = ['a','b','c','d'].filter(l => l !== q.correct);
-    const toHide = shuffleArray(wrong).slice(0, 2);
-    game.hiddenOpts = toHide;
-
-    await ctx.answerCbQuery('✅ تم تطبيق 50/50!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-
-    // Re-edit question message
-    const txt = buildQuestionMsg(game, q, toHide);
-    const keyboard = [
-      ...buildAnswerKeyboard(game, q, toHide),
-      ...buildLifelineKeyboard(game),
-    ];
-    await ctx.telegram.editMessageText(chatId, game.msgId, null, txt, {
-      parse_mode:   'Markdown',
-      reply_markup: { inline_keyboard: keyboard },
-    }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-
-
-
-  } else if (type === 'audience') {
-    // Simulate audience poll (bias toward correct)
-    const dist = {};
-    const opts = ['a','b','c','d'].filter(l => !game.hiddenOpts.includes(l));
-    let rem = 100;
-    const correctPct = 40 + Math.floor(Math.random() * 35); // 40-75%
-    dist[q.correct] = correctPct;
-    rem -= correctPct;
-    const others = opts.filter(l => l !== q.correct);
-    for (let i = 0; i < others.length; i++) {
-      if (i === others.length - 1) { dist[others[i]] = rem; }
-      else {
-        const v = Math.floor(Math.random() * (rem / (others.length - i)));
-        dist[others[i]] = v; rem -= v;
-      }
-    }
-
-    const bars = opts.map(l =>
-      `${LETTERS['abcd'.indexOf(l)]}) ${'█'.repeat(Math.floor((dist[l]||0)/5))} ${dist[l]||0}%`
-    ).join('\n');
-
-    await ctx.answerCbQuery('✅ نتيجة استطلاع الجمهور!').catch(()=>{});
-    // edit رسالة السؤال لتشمل نتيجة الجمهور
-    const audienceTxt = buildQuestionMsg(game, q, game.hiddenOpts) +
-      '\n\n👥 *نتيجة الجمهور:*\n' + bars;
-    await ctx.telegram.editMessageText(chatId, game.msgId, null, audienceTxt, {
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: [...buildAnswerKeyboard(game,q,game.hiddenOpts), ...buildLifelineKeyboard(game)] }
-    }).catch(()=>{});
-
-  } else if (type === 'call') {
-    // Ask the group — pause timer and reveal hint
-    const hint = LETTERS['abcd'.indexOf(q.correct)];
-    const hintOpt = q['option_' + (q.correct||'a')] || q[(q.correct||'a')] || '؟';
-    await ctx.answerCbQuery('✅ طُرح السؤال على القروب!').catch(()=>{});
-    const callTxt = buildQuestionMsg(game, q, game.hiddenOpts) +
-      '\n\n📞 *' + ctx.from.first_name + ' يستشير القروب!*\n' +
-      '💡 ساعدوه! ردوا بالحرف الصحيح (أ، ب، ج، أو د)\n' +
-      '_(للمشرف: الجواب *' + (LETTERS['abcd'.indexOf(q.correct||'a')] || '؟') + '*) ' + (hintOpt||'') + '_';
-    await ctx.telegram.editMessageText(chatId, game.msgId, null, callTxt, {
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: [...buildAnswerKeyboard(game,q,game.hiddenOpts), ...buildLifelineKeyboard(game)] }
-    }).catch(()=>{});
-
-  } else if (type === 'skip') {
-    // Skip question (no penalty, no prize for this level)
-    await ctx.answerCbQuery('✅ تم تخطي السؤال!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    if (game.timer) { clearTimeout(game.timer); game.timer = null; }
-    const skipTxt = buildQuestionMsg(game, q, game.hiddenOpts) + '\n\n⏭️ *' + ctx.from.first_name + ' تخطى السؤال!*\nسينتقل الجميع للسؤال التالي.';
-    await ctx.telegram.editMessageText(chatId, game.msgId, null, skipTxt, {
-      parse_mode: 'Markdown', reply_markup: { inline_keyboard: [] }
-    }).catch(()=>{});
-    await new Promise(r => setTimeout(r, 1500));
-    await sendNextQuestion(ctx.telegram, chatId);
-    return;
-    /* removed: ctx.telegram.sendMessage(chatId, '⏭️ unused',
-      { parse_mode: 'Markdown' }
-    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    await new Promise(r => setTimeout(r, 2000));
-    await sendNextQuestion(ctx.telegram, chatId); */
-  }
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   ADMIN: ADD QUESTION  (in private)
-═══════════════════════════════════════════════════════════════ */
-const _addState = new Map(); // userId → step state
-
-async function handleAddQuestion(ctx) {
-  const uid = ctx.from.id;
-
-  // Check if admin
-  const adm = await get('SELECT user_id FROM admins WHERE user_id=$1', [uid]);
-  const isOwner = String(uid) === String(process.env.OWNER_ID);
-  if (!adm && !isOwner) return ctx.reply('🚫 للأدمن فقط.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-
-  _addState.set(uid, { step: 'text', data: {} });
-  return ctx.reply(
-    '➕ *إضافة سؤال جديد*\n━━━━━━━━━━━━━━━\n\n' +
-    '📋 *الصيغة المطلوبة (كل شيء في رسالة وحدة):*\n\n' +
-    '```\n' +
-    'السؤال: ما هي عاصمة فرنسا؟\n' +
-    'أ: باريس\n' +
-    'ب: لندن\n' +
-    'ج: برلين\n' +
-    'د: روما\n' +
-    'الجواب: أ\n' +
-    'الصعوبة: سهل\n' +
-    '```\n\n' +
-    '📌 الصعوبة: *سهل* / *متوسط* / *صعب*\n' +
-    '📌 الجواب: *أ* أو *ب* أو *ج* أو *د*',
-    { parse_mode: 'Markdown' }
-  ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-}
-
-async function handleAddText(ctx) {
-  const uid = ctx.from.id;
-  const st  = _addState.get(uid);
-  if (!st) return false;
-
-  const txt = ctx.message.text.trim();
-
-  if (st.step === 'text') {
-    // تحقق إذا الرسالة تحتوي على الصيغة الكاملة
-    const lines = txt.split('\n').map(l => l.trim()).filter(Boolean);
-    const sLine = lines.find(l => l.startsWith('السؤال:'));
-    const aLine = lines.find(l => l.startsWith('أ:') || l.startsWith('ا:'));
-    const bLine = lines.find(l => l.startsWith('ب:'));
-    const cLine = lines.find(l => l.startsWith('ج:'));
-    const dLine = lines.find(l => l.startsWith('د:'));
-    const ansLine = lines.find(l => l.startsWith('الجواب:'));
-    const diffLine = lines.find(l => l.startsWith('الصعوبة:'));
-
-    if (sLine && aLine && bLine && cLine && dLine && ansLine) {
-      // صيغة كاملة — احفظ مباشرة
-      const question = sLine.replace('السؤال:', '').trim();
-      const opts = [
-        aLine.replace(/^[اأ]:/, '').trim(),
-        bLine.replace('ب:', '').trim(),
-        cLine.replace('ج:', '').trim(),
-        dLine.replace('د:', '').trim(),
-      ];
-      const ansMap = { 'أ':'a', 'ا':'a', 'ب':'b', 'ج':'c', 'د':'d', 'a':'a', 'b':'b', 'c':'c', 'd':'d' };
-      const correct = ansMap[ansLine.replace('الجواب:', '').trim()] || 'a';
-      const diffMap = { 'سهل':'easy', 'متوسط':'medium', 'صعب':'hard', 'easy':'easy', 'medium':'medium', 'hard':'hard' };
-      const difficulty = diffMap[diffLine?.replace('الصعوبة:', '').trim() || 'متوسط'] || 'medium';
-
-      await saveQuestion(ctx, uid, { text: question, opts, correct, difficulty, category: 'عام' });
-      _addState.delete(uid);
-      return true;
-    }
-
-    // صيغة قديمة — خطوة خطوة
-    st.data.text = txt;
-    st.step = 'options';
-    await ctx.reply(
-      '✅ السؤال: ' + txt + '\n\n' +
-      '📝 أرسل الخيارات الأربعة (كل خيار في سطر):'
-    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    return true;
-  }
-
-  if (st.step === 'options') {
-    const lines = txt.split('\n').map(l => l.trim()).filter(Boolean);
-    if (lines.length < 4) {
-      await ctx.reply('❌ أرسل 4 خيارات (كل واحد في سطر).').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-      return true;
-    }
-    st.data.opts = lines.slice(0, 4);
-    st.step = 'correct';
-    await ctx.reply(
-      '✅ الخيارات:\n' +
-      lines.slice(0,4).map((l,i) => `${LETTERS[i]}) ${l}`).join('\n') + '\n\n' +
-      '✅ أرسل رقم الإجابة الصحيحة (1/2/3/4):'
-    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    return true;
-  }
-
-  if (st.step === 'correct') {
-    const n = parseInt(txt);
-    if (isNaN(n) || n < 1 || n > 4) {
-      await ctx.reply('❌ أرسل رقم بين 1 و 4.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-      return true;
-    }
-    st.data.correct = ['a','b','c','d'][n-1];
-    st.step = 'difficulty';
-    await ctx.reply(
-      '✅ الإجابة الصحيحة: ' + LETTERS[n-1] + '\n\n' +
-      '🎯 اختر مستوى الصعوبة:',
-      {
-        reply_markup: { inline_keyboard: [[
-          { text: '🟢 سهل',   callback_data: 'mq_diff_easy'   },
-          { text: '🟡 متوسط', callback_data: 'mq_diff_medium' },
-          { text: '🔴 صعب',   callback_data: 'mq_diff_hard'   },
-        ]]},
-      }
-    ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    return true;
-  }
-
-  if (st.step === 'category') {
-    st.data.category = txt || 'عام';
-    await saveQuestion(ctx, uid, st.data);
-    _addState.delete(uid);
-    return true;
-  }
-
-  return false;
-}
-
-async function handleDifficultySelect(ctx, diff) {
-  const uid = ctx.from.id;
-  const st  = _addState.get(uid);
-  if (!st) return ctx.answerCbQuery('⚠️').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-  st.data.difficulty = diff;
-  st.step = 'category';
-  await ctx.answerCbQuery('✅ ' + DIFFICULTY[diff]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-  await ctx.reply('📁 أرسل فئة السؤال (مثل: علوم، رياضيات، عام...):').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-}
-
-async function saveQuestion(ctx, uid, data) {
-  const opts = data.opts;
-  await run(
-    `INSERT INTO million_questions(text,option_a,option_b,option_c,option_d,correct,difficulty,category,added_by)
-     VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)`,
-    [data.text, opts[0], opts[1], opts[2], opts[3], data.correct, data.difficulty||'medium', data.category||'عام', uid]
-  );
-  const total = await get('SELECT COUNT(*) as c FROM million_questions WHERE is_active=1');
-  await ctx.reply(
-    `✅ *تم حفظ السؤال بنجاح!*\n\n` +
-    `📝 ${data.text}\n` +
-    `✅ الإجابة: ${LETTERS['abcd'.indexOf(data.correct)]}) ${opts['abcd'.indexOf(data.correct)]}\n` +
-    `🎯 ${DIFFICULTY[data.difficulty||'medium']} • ${data.category||'عام'}\n\n` +
-    `📊 إجمالي الأسئلة: ${total?.c || '?'}`,
-    { parse_mode: 'Markdown' }
-  ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   LEADERBOARD
-═══════════════════════════════════════════════════════════════ */
-async function showLeaderboard(ctx) {
-  const rows = await all(
-    `SELECT first_name, username, best_prize, total_games, wins, total_prize
-     FROM million_scores ORDER BY best_prize DESC, wins DESC LIMIT 15`
-  );
-  if (!rows.length) return ctx.reply('📊 لا توجد نتائج بعد. العب أولاً!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-
-  let txt = `🏆 *لوحة المتصدرين — من سيربح المليون*\n\n`;
-  for (let i = 0; i < rows.length; i++) {
-    const r    = rows[i];
-    const icon = TROPHIES[i] || `${i+1}.`;
-    const name = r.username ? `@${r.username}` : r.first_name;
-    txt += `${icon} *${name}*\n`;
-    txt += `   💰 أفضل: ${fmtPrize(r.best_prize)} | 🎮 ألعاب: ${r.total_games} | 🏆 فوز: ${r.wins}\n\n`;
-  }
-  await ctx.reply(txt, { parse_mode: 'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-}
-
-async function showMyStats(ctx) {
-  const uid = ctx.from.id;
-  const r   = await get('SELECT * FROM million_scores WHERE user_id=$1', [uid]);
-  if (!r) return ctx.reply('📊 لم تلعب بعد!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-
-  const rank = await get(
-    'SELECT COUNT(*)+1 as r FROM million_scores WHERE best_prize > $1', [r.best_prize]
-  );
-
-  await ctx.reply(
-    `📊 *إحصائياتك — من سيربح المليون*\n\n` +
-    `👤 ${ctx.from.first_name}\n\n` +
-    `🏅 ترتيبك: #${rank?.r || '?'}\n` +
-    `💰 أفضل جائزة: ${fmtPrize(r.best_prize)}\n` +
-    `🎮 إجمالي الألعاب: ${r.total_games}\n` +
-    `🏆 مرات الفوز: ${r.wins}\n` +
-    `💵 إجمالي الجوائز: ${fmtPrize(r.total_prize)}`,
-    { parse_mode: 'Markdown' }
-  ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-}
-
-/* ═══════════════════════════════════════════════════════════════
-   REGISTER BOT HANDLERS
-═══════════════════════════════════════════════════════════════ */
-async function forceStart(ctx) {
-  const chatId = ctx.chat?.id;
-  if (!chatId) return;
-  if (!ctx.isAdmin && !ctx.isOwner) {
-    return ctx.answerCbQuery('🚫 للأدمن فقط.', { show_alert: true }).catch(() => {});
-  }
-  const game = getGame(chatId);
-  if (!game || game.status !== 'waiting') {
-    return ctx.answerCbQuery('⚠️ لا توجد لعبة في انتظار.', { show_alert: true }).catch(() => {});
-  }
-  if (game.joinTimer) { clearTimeout(game.joinTimer); game.joinTimer = null; }
-  await ctx.answerCbQuery('▶️ بدأت اللعبة!').catch(() => {});
-  return beginGame(ctx.telegram, chatId);
-}
-
-function register(bot) {
-  // Init schema
-  initMillionaireSchema().catch(e => logger.error('[Million:Schema] ' + e.message));
-
-  // Commands
-  bot.command('million', async ctx => {
-    if (ctx.chat?.type === 'private') return ctx.reply('⚠️ هذه اللعبة للقروبات فقط!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    return startJoinPhase(ctx);
-  });
-
-  bot.hears(/^مليون$/i, async ctx => {
-    if (ctx.chat?.type === 'private') return ctx.reply('⚠️ هذه اللعبة للقروبات فقط!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    return startJoinPhase(ctx);
-  });
-
-  bot.command('mstop', async ctx => {
-    if (!ctx.isAdmin && !ctx.isOwner) return ctx.reply('🚫 للأدمن فقط.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    const game = getGame(ctx.chat.id);
-    if (!game) return ctx.reply('⚠️ لا توجد لعبة نشطة.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    await endGame(ctx.telegram, ctx.chat.id, 'stopped');
-    return ctx.reply('🛑 تم إيقاف اللعبة.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-  });
-
-  bot.command('mtop', ctx => showLeaderboard(ctx));
-  bot.command('mstats', ctx => showMyStats(ctx));
-
-  bot.command('maddq', ctx => {
-    if (ctx.chat?.type !== 'private') return ctx.reply('📩 أرسل هذا الأمر في المحادثة الخاصة.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    return handleAddQuestion(ctx);
-  });
-
-  // Callback queries
-  bot.on('callback_query', async (ctx, next) => {
-    const d = ctx.callbackQuery?.data || '';
-
-    if (d === 'mlr_join')        return joinGame(ctx);
-    if (d === 'mlr_forcestart') {
-      if (!ctx.isAdmin && !ctx.isOwner) return ctx.answerCbQuery('🚫 للأدمن فقط.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-      const game = getGame(ctx.chat.id);
-      if (!game || game.status !== 'waiting') return ctx.answerCbQuery('⚠️').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-      if (game.joinTimer) { clearTimeout(game.joinTimer); game.joinTimer = null; }
-      await ctx.answerCbQuery('▶️ بدأت اللعبة!').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-      return beginGame(ctx.telegram, ctx.chat.id);
-    }
-    if (d === 'mlr_players') {
-      const game = getGame(ctx.chat.id);
-      if (!game) return ctx.answerCbQuery('⚠️').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-      const list = [...game.players.values()].map(p => `👤 ${p.name}`).join('\n') || 'لا أحد';
-      return ctx.answerCbQuery(`اللاعبون:\n${list}`, { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    }
-
-    // Lifelines
-    if (d.startsWith('mlr_')) {
-      const type = d.substring(3);
-      if (['fifty','audience','call','skip'].includes(type)) return useLifeline(ctx, type);
-    }
-
-    // Answer
-    if (d.startsWith('mar_')) {
-      const parts  = d.split('_');
-      const letter = parts[1];
-      const sid    = parseInt(parts[2]);
-      const game   = getGame(ctx.chat.id);
-      if (game && game.sessionId === sid) return handleAnswer(ctx, letter);
-    }
-
-    // Add question difficulty
-    if (d.startsWith('mq_diff_')) {
-      const diff = d.substring(8);
-      return handleDifficultySelect(ctx, diff);
-    }
-
-    return next?.();
-  });
-
-  // Text handler for add-question flow
-  bot.on('text', async (ctx, next) => {
-    if (ctx.chat?.type !== 'private') return next?.();
-    const uid = ctx.from.id;
-    if (!_addState.has(uid)) return next?.();
-    const handled = await handleAddText(ctx);
-    if (!handled) return next?.();
-  });
-
-  logger.info('✅ Million game registered');
-}
-
-
-// handleMillionCallback removed — register() handles all callbacks internally
-
-
 
 async function stopGame(ctx) {
   const chatId = ctx.chat?.id;
   if (!chatId) return;
   const game = getGame(chatId);
-  if (!game) return ctx.reply('⚠️ لا توجد لعبة جارية.').catch(() => {});
+  if (!game) return ctx.reply('\u26a0\ufe0f \u0644\u0627 \u062a\u0648\u062c\u062f \u0644\u0639\u0628\u0629 \u062c\u0627\u0631\u064a\u0629.').catch(()=>{});
   await endGame(ctx.telegram, chatId, 'stopped');
-  ctx.reply('🛑 تم إيقاف اللعبة.').catch(() => {});
+  ctx.reply('\ud83d\udd34 \u062a\u0645 \u0625\u064a\u0642\u0627\u0641 \u0627\u0644\u0644\u0639\u0628\u0629.').catch(()=>{});
 }
 
+async function useLifeline(ctx, type) {
+  const chatId = ctx.chat.id;
+  const uid    = ctx.from.id;
+  const game   = getGame(chatId);
+  if (!game || game.status !== 'playing') return ctx.answerCbQuery('\u26a0\ufe0f').catch(()=>{});
+  if (!game.players.has(uid)) return ctx.answerCbQuery('\u26d4 \u0647\u0630\u0647 \u0644\u064a\u0633\u062a \u0644\u0639\u0628\u062a\u0643!', { show_alert: true }).catch(()=>{});
+  const player = game.players.get(uid);
+  if (!player.alive) return ctx.answerCbQuery('\u274c \u0644\u0642\u062f \u062e\u0631\u062c\u062a.').catch(()=>{});
+  if (!player.lifelines[type]) return ctx.answerCbQuery('\u274c \u0627\u0633\u062a\u062e\u062f\u0645\u062a \u0647\u0630\u0647 \u0627\u0644\u0645\u0633\u0627\u0639\u062f\u0629 \u0645\u0633\u0628\u0642\u0627\u064b.', { show_alert: true }).catch(()=>{});
 
+  player.lifelines[type] = false;
+  const q = game.currentQ;
+
+  if (type === 'fifty') {
+    const wrong = ['a','b','c','d'].filter(l => l !== q.correct);
+    const hide  = wrong.sort(()=>Math.random()-0.5).slice(0,2);
+    game.hiddenOpts = hide;
+    await ctx.answerCbQuery('\u2705 \u062a\u0645 \u062a\u0637\u0628\u064a\u0642 50/50!').catch(()=>{});
+  } else if (type === 'skip') {
+    await ctx.answerCbQuery('\u23ed\ufe0f \u062a\u0645 \u062a\u062e\u0637\u064a \u0627\u0644\u0633\u0624\u0627\u0644!').catch(()=>{});
+    if (game.timer) { clearTimeout(game.timer); game.timer = null; }
+    game.currentLevel++;
+    return sendNextQuestion(ctx.telegram, chatId);
+  } else if (type === 'audience') {
+    await ctx.answerCbQuery('\ud83d\udc65 \u0645\u0633\u0627\u0639\u062f\u0629 \u0627\u0644\u062c\u0645\u0647\u0648\u0631!').catch(()=>{});
+    const correct = q.correct;
+    const dist = {};
+    ['a','b','c','d'].forEach(l => { dist[l] = l === correct ? Math.floor(Math.random()*30)+40 : Math.floor(Math.random()*20); });
+    const total = Object.values(dist).reduce((a,b)=>a+b,0);
+    let poll = '\ud83d\udcca *\u0631\u0623\u064a \u0627\u0644\u062c\u0645\u0647\u0648\u0631:*\n';
+    ['a','b','c','d'].forEach((l,i) => {
+      const pct = Math.round(dist[l]/total*100);
+      poll += LETTERS[i] + ') ' + '\u2588'.repeat(Math.round(pct/5)) + ' ' + pct + '%\n';
+    });
+    const m = await ctx.telegram.sendMessage(chatId, poll, { parse_mode: 'Markdown' }).catch(()=>null);
+    if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(()=>{}), 10000);
+    return;
+  } else if (type === 'call') {
+    await ctx.answerCbQuery('\ud83d\udcde \u0645\u0633\u0627\u0639\u062f\u0629 \u0635\u062f\u064a\u0642!').catch(()=>{});
+    const hint = '\ud83d\udcde *\u0635\u062f\u064a\u0642\u0643 \u064a\u0642\u0648\u0644:*\n\u0623\u0638\u0646 \u0627\u0644\u0625\u062c\u0627\u0628\u0629 \u0647\u064a *' + LETTERS['abcd'.indexOf(q.correct)] + ')* \u2014 \u0644\u0643\u0646\u064a \u0644\u0633\u062a \u0645\u062a\u0623\u0643\u062f\u0627\u064b!';
+    const m = await ctx.telegram.sendMessage(chatId, hint, { parse_mode: 'Markdown' }).catch(()=>null);
+    if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(()=>{}), 10000);
+    return;
+  }
+
+  // refresh keyboard after fifty
+  const keyboard = [...buildAnswerKeyboard(game, q, game.sessionId), ...buildLifelineKeyboard(game)];
+  if (game.msgId) {
+    ctx.telegram.editMessageReplyMarkup(chatId, game.msgId, null, { inline_keyboard: keyboard }).catch(()=>{});
+  }
+}
+
+async function showRanking(ctx) {
+  const rows = await all(
+    'SELECT u.first_name, SUM(s.score) as total FROM million_scores s JOIN users u ON u.user_id=s.user_id GROUP BY u.user_id, u.first_name ORDER BY total DESC LIMIT 10'
+  ).catch(()=>[]);
+  if (!rows.length) return ctx.answerCbQuery('\u0644\u0627 \u064a\u0648\u062c\u062f \u0625\u062d\u0635\u0627\u0626\u064a\u0627\u062a \u0628\u0639\u062f.', { show_alert: true }).catch(()=>{});
+  const trophies = ['\ud83e\udd47','\ud83e\udd48','\ud83e\udd49'];
+  let txt = '\ud83c\udfc6 *\u0623\u0641\u0636\u0644 \u0627\u0644\u0644\u0627\u0639\u0628\u064a\u0646:*\n\n';
+  rows.forEach((r,i) => { txt += (trophies[i]||'\ud83d\udd35') + ' ' + r.first_name + ': *' + fmtPrize(Number(r.total)) + '*\n'; });
+  ctx.answerCbQuery().catch(()=>{});
+  return ctx.reply(txt, { parse_mode: 'Markdown' }).catch(()=>{});
+}
+
+/* ══════════════ CALLBACK HANDLER ══════════════ */
 async function handleCallback(ctx, d) {
   try {
     if (!d) d = ctx.callbackQuery?.data;
-    if (d === 'mlr_join')        return joinGame(ctx);
-    if (d === 'mlr_forcestart')  return forceStart(ctx);
-    if (d === 'mlr_cancel')      return cancelGame(ctx);
-    if (d === 'mlr_ranking')     return showRanking(ctx);
-    if (d === 'mlr_howto')       return ctx.answerCbQuery('اكتب مليون في القروب لبدء اللعبة!', { show_alert: true }).catch(() => {});
+    if (d === 'mlr_join')       return joinGame(ctx);
+    if (d === 'mlr_forcestart') return forceStart(ctx);
+    if (d === 'mlr_cancel')     return cancelGame(ctx);
+    if (d === 'mlr_ranking')    return showRanking(ctx);
+    if (d === 'mlr_howto')      return ctx.answerCbQuery('\u0627\u0643\u062a\u0628 \u0645\u0644\u064a\u0648\u0646 \u0641\u064a \u0627\u0644\u0642\u0631\u0648\u0628 \u0644\u0628\u062f\u0621 \u0627\u0644\u0644\u0639\u0628\u0629!', { show_alert: true }).catch(()=>{});
     if (d.startsWith('mar_')) {
-      const parts = d.split('_'); // mar_a_sessionId
-      const letter = parts[1];   // a, b, c, or d
+      const parts  = d.split('_');
+      const letter = parts[1];
+      const sid    = parseInt(parts[2]);
+      const game   = getGame(ctx.chat.id);
+      if (game && sid !== game.sessionId) return ctx.answerCbQuery('\u274c \u0647\u0630\u0647 \u0623\u0632\u0631\u0627\u0631 \u0633\u0624\u0627\u0644 \u0642\u062f\u064a\u0645!', { show_alert: true }).catch(()=>{});
       return handleAnswer(ctx, letter);
     }
     if (d.startsWith('mlr_')) {
-      const type = d.substring(4); // mlr_fifty → fifty
+      const type = d.substring(4);
       if (['fifty','audience','call','skip'].includes(type)) return useLifeline(ctx, type);
-      return ctx.answerCbQuery().catch(() => {});
+      return ctx.answerCbQuery().catch(()=>{});
     }
   } catch(e) {
-    ctx.answerCbQuery('❌ ' + e.message).catch(() => {});
+    ctx.answerCbQuery('\u274c ' + e.message).catch(()=>{});
   }
+}
+
+/* ══════════════ REGISTER ══════════════ */
+function register(bot) {
+  bot.command(['million','مليون'], async ctx => {
+    if (!['group','supergroup'].includes(ctx.chat?.type)) {
+      return ctx.reply('\ud83c\udfae \u0647\u0630\u0647 \u0627\u0644\u0644\u0639\u0628\u0629 \u0644\u0644\u0642\u0631\u0648\u0628\u0627\u062a \u0641\u0642\u0637!').catch(()=>{});
+    }
+    await startJoinPhase(ctx);
+  });
+  bot.command(['mstop'], async ctx => {
+    if (!ctx.isAdmin && !ctx.isOwner) return ctx.reply('\ud83d\udeab').catch(()=>{});
+    await stopGame(ctx);
+  });
+  bot.command(['mtop'], ctx => showRanking(ctx));
 }
 
 module.exports = { stopGame, register, initMillionaireSchema, startJoinPhase, handleCallback };
