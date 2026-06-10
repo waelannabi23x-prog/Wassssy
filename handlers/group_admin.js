@@ -155,6 +155,7 @@ async function handleMemberLeft(bot, chatId, userId, firstName) {
     await run('DELETE FROM group_members WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => {});
 
     const grp = await get('SELECT goodbye_enabled FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => null);
+    if (!grp?.goodbye_enabled) return;
 
     let memberCount = '';
     try { const cnt = await bot.telegram.getChatMembersCount(chatId); memberCount = String(cnt); } catch(_) {}

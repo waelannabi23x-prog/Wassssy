@@ -866,23 +866,22 @@ module.exports.registerCallbacks = function(bot, deps) {
 
     } catch(e) { logger.error('[CB]', e.message, { data, uid: ctx.from?.id }); }
   
-  });
-};
+
   // تحقق من الاشتراك
   if (data === 'check_subscription') {
     const uid = ctx.from.id;
     const name = ctx.from.first_name || 'صديقي';
     const guard = require('../utils/channelGuard');
-    const bot = ctx.telegram ? { telegram: ctx.telegram } : global.__bot;
+    const bot = global.__bot || { telegram: ctx.telegram };
     const res = await guard.checkAllChannels(bot, uid);
     if (!res.ok) {
       const { text, buttons } = guard.buildSubscribeMessage(res.missing, name);
-      return ctx.answerCbQuery('❌ لم تشترك بعد!', { show_alert: true })
-        .then(() => ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(() => {}))
-        .catch(() => {});
+      await ctx.answerCbQuery('❌ لم تشترك بعد!', { show_alert: true }).catch(()=>{});
+      return ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(() => ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(()=>{}));
     }
-    await ctx.answerCbQuery('✅ تم التحقق!').catch(() => {});
-    await ctx.deleteMessage().catch(() => {});
+    await ctx.answerCbQuery('✅ تم التحقق!').catch(()=>{});
+    await ctx.deleteMessage().catch(()=>{});
     return startHandler(ctx);
   }
-
+  });
+};
