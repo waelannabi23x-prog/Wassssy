@@ -178,7 +178,28 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
 
   bot.command('channels', async ctx => {
     if (!ctx.isOwner && !ctx.isAdmin) return;
-    return manage.handleCallback(ctx, 'mg_channels_menu');
+    try {
+      return await manage.handleCallback(ctx, 'mg_channels_menu');
+    } catch(e) {
+      console.error('[/channels error]', e.message);
+      return ctx.reply('❌ خطأ: ' + e.message).catch(()=>{});
+    }
+  });
+
+  bot.command('addchannel', async ctx => {
+    if (!ctx.isOwner && !ctx.isAdmin) return;
+    const { setState } = require('../utils/stateManager');
+    setState(ctx.from.id, { type: 'mg_awaiting_channel' });
+    return ctx.reply(
+      '📢 *إضافة قناة اشتراك إجباري*\n' +
+      '━━━━━━━━━━━━━━━\n\n' +
+      '*الطريقة 1 — Forward:*\n' +
+      '↩️ أعد توجيه أي رسالة من القناة هنا\n\n' +
+      '*الطريقة 2 — يدوي:*\n' +
+      '✏️ أرسل: `@username اسم القناة`\n\n' +
+      '⚠️ *تأكد إن البوت ادمن في القناة أولاً!*',
+      { parse_mode: 'Markdown' }
+    ).catch(()=>{});
   });
 
   bot.command('setwelcome', async ctx => {
