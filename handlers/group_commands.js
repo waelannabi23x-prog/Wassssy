@@ -639,15 +639,23 @@ function setupGroupCommands(bot) {
     if (!isGroup(ctx)) return;
     if (!await isTgAdmin(ctx)) return ctx.reply("🚫 للمشرفين فقط").catch(() => {});
     delCmd(ctx);
-    const n = Math.min(parseInt(ctx.message.text.split(" ")[1]) || 10, 50);
-    let deleted = 0;
+    const n       = Math.min(parseInt(ctx.message.text.split(" ")[1]) || 10, 200);
     const startId = ctx.message.message_id;
-    for (let i = startId; i > startId - n - 1 && i > 0; i--) {
-      try { await ctx.telegram.deleteMessage(ctx.chat.id, i); deleted++; } catch(_) {}
-      await new Promise(r => setTimeout(r, 80));
+    const m       = await ctx.reply("🗑 جاري الحذف...").catch(() => null);
+    // batch حذف — 100 في وقت واحد
+    const ids = [];
+    for (let i = startId - 1; i > startId - n - 1 && i > 0; i--) ids.push(i);
+    let deleted = 0;
+    for (let i = 0; i < ids.length; i += 100) {
+      const batch = ids.slice(i, i + 100);
+      await Promise.allSettled(batch.map(id =>
+        ctx.telegram.deleteMessage(ctx.chat.id, id).then(() => deleted++).catch(() => {})
+      ));
+      if (i + 100 < ids.length) await new Promise(r => setTimeout(r, 300));
     }
-    const m = await ctx.reply("✅ تم حذف " + deleted + " رسالة").catch(() => null);
-    if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 4000);
+    if (m) await ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {});
+    const done = await ctx.reply("✅ تم حذف " + deleted + " رسالة").catch(() => null);
+    if (done) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, done.message_id).catch(() => {}), 4000);
   });
 
   // ══ /cmds ══
@@ -677,15 +685,17 @@ function setupGroupCommands(bot) {
     const toId    = ctx.message.message_id - 1;
     if (toId < fromId) return ctx.reply("⚠️ ما في رسائل للحذف").catch(() => {});
     const total = toId - fromId + 1;
-    if (total > 100) return ctx.reply("⚠️ الحد الأقصى 100 رسالة").catch(() => {});
+    if (total > 200) return ctx.reply("⚠️ الحد الأقصى 200 رسالة").catch(() => {});
     const m = await ctx.reply("🗑 جاري حذف " + total + " رسالة...").catch(() => null);
     let deleted = 0;
-    for (let i = fromId; i <= toId; i++) {
-      try {
-        await ctx.telegram.deleteMessage(ctx.chat.id, i);
-        deleted++;
-      } catch(_) {}
-      if (deleted % 10 === 0) await new Promise(r => setTimeout(r, 200));
+    const allIds = [];
+    for (let i = fromId; i <= toId; i++) allIds.push(i);
+    for (let i = 0; i < allIds.length; i += 100) {
+      const batch = allIds.slice(i, i + 100);
+      await Promise.allSettled(batch.map(id =>
+        ctx.telegram.deleteMessage(ctx.chat.id, id).then(() => deleted++).catch(() => {})
+      ));
+      if (i + 100 < allIds.length) await new Promise(r => setTimeout(r, 300));
     }
     if (m) await ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {});
     const done = await ctx.reply("✅ تم حذف " + deleted + " رسالة").catch(() => null);
