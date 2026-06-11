@@ -341,10 +341,10 @@ module.exports.registerCallbacks = function(bot, deps) {
 
       // ── toggle أذونات (يشتغل من الخاص) ──
       if (data.startsWith('grp_ptog_')) {
-        const parts2 = data.replace('grp_ptog_', '').split('_');
-        const permKey = parts2[0];
-        const uid3    = parseInt(parts2[1]);
-        const cid3    = parseInt(parts2[2]);
+        const raw2    = data.replace('grp_ptog_', '').split('_');
+        const cid3    = parseInt(raw2[raw2.length - 1]);
+        const uid3    = parseInt(raw2[raw2.length - 2]);
+        const permKey = raw2.slice(0, -2).join('_');
         const curKb   = ctx.callbackQuery?.message?.reply_markup?.inline_keyboard || [];
         const labels  = {
           can_send_messages:'الرسائل النصية',
