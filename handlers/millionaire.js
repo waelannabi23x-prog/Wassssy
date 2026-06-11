@@ -110,6 +110,7 @@ async function getRandomQuestion(usedIds, diff) {
       'SELECT * FROM million_questions WHERE is_active=1 ORDER BY random() LIMIT 1', []
     ).catch(()=>null);
   }
+  require('../utils/logger').info('[getQ] diff=' + diff + ' found=' + (q ? q.id : 'null'));
   return q || null;
 }
 
