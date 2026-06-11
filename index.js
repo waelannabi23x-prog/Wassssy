@@ -293,10 +293,7 @@ const gameAndBankMiddleware = async (ctx, next) => {
     }
 
     // البنك
-    if (/^انشاء حساب$/i.test(txt))    return bank.createAccount(ctx).catch(() => next());
-    if (/^فلوسي$/i.test(txt))          return bank.showBalance(ctx).catch(() => next());
-    if (/^فارسي/i.test(txt))           return bank.transfer(ctx).catch(() => next());
-    if (/^rip /i.test(txt))            return bank.loan(ctx).catch(() => next());
+    // bank.js القديم محذوف — استخدم bank_pro.js
 
     // 🏦 Taline Bank
     if (/^بنك$/i.test(txt))                       return bankPro.openAccount(ctx).catch(() => next());

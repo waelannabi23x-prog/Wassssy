@@ -468,6 +468,7 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
       case 'mg_pb_add_id': {
         const targetId = parseInt(text.trim());
         if (isNaN(targetId)) return ctx.reply('❌ ID غير صحيح').catch(()=>{});
+        const { get: dbG } = require('../database/db');
         const acc = await dbG('SELECT * FROM pro_bank_accounts WHERE user_id=$1',[targetId]).catch(()=>null);
         if (!acc) return ctx.reply('❌ لا يوجد حساب بهذا ID').catch(()=>{});
         setState(uid, { ...state, type: 'mg_pb_add_amount', targetId, targetName: acc.first_name||String(targetId) });
@@ -489,6 +490,7 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
           await dbR('UPDATE pro_bank_accounts SET balance=balance+$1 WHERE user_id=$2',[amount,state.targetId]);
           await dbR(`INSERT INTO pro_bank_transactions(from_id,to_id,amount,fee,type,note) VALUES(0,$1,$2,0,'admin','إضافة يدوية من الأدمن')`,[state.targetId,amount]);
         }
+        const { get: dbG } = require('../database/db');
         const newAcc = await dbG('SELECT balance,card_type FROM pro_bank_accounts WHERE user_id=$1',[state.targetId]).catch(()=>null);
         clearState(uid);
         // أبلغ المستخدم
