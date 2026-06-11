@@ -865,33 +865,7 @@ function setupGroupCommands(bot) {
     }
   });
 
-  bot.command(['couples', 'زوج', 'زواج'], async ctx => {
-    if (!isGroup(ctx)) return;
-    delCmd(ctx);
-    const { all: dbAll } = require('../database/db');
-    const members = await dbAll(
-      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 AND first_name IS NOT NULL AND first_name != \'\'',
-      [ctx.chat.id]
-    ).catch(() => []);
-    if (members.length < 2) return ctx.reply('❌ لا يوجد أعضاء كافيون!').catch(() => {});
-    const today = new Date().toISOString().split('T')[0];
-    const seed = (String(ctx.chat.id) + today).split('').reduce((a,c) => a + c.charCodeAt(0), 0);
-    const idx1 = seed % members.length;
-    let idx2 = (seed * 7 + 3) % members.length;
-    if (idx2 === idx1) idx2 = (idx2 + 1) % members.length;
-    const p1 = members[idx1];
-    const p2 = members[idx2];
-    const hearts = ['\u{1F495}','\u{1F496}','\u{1F497}','\u{1F49D}','\u{1F493}','\u{1F49E}','\u{1F970}','\u{1F60D}'];
-    const heart = hearts[seed % hearts.length];
-    const chatTitle = ctx.chat.title || 'القروب';
-    const txt = heart + ' *زوج اليوم في ' + chatTitle + '*\n'
-      + '\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\u2501\n\n'
-      + '\u{1F46B} [' + p1.first_name + '](tg://user?id=' + p1.user_id + ')\n'
-      + heart + ' *\u00D7* ' + heart + '\n'
-      + '\u{1F46B} [' + p2.first_name + '](tg://user?id=' + p2.user_id + ')\n\n'
-      + '_يتجدد كل يوم_ \u{1F5D3}';
-    ctx.reply(txt, { parse_mode: 'Markdown' }).catch(() => {});
-  });
+
 
 
   // 💑 Couple of the Day

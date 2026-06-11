@@ -358,6 +358,9 @@ async function initSchema() {
   // Migration: resp_type و file_id لجدول auto_replies
   try { if(pg) await pg.query("ALTER TABLE auto_replies ADD COLUMN IF NOT EXISTS resp_type TEXT DEFAULT 'text'"); } catch(_) {}
   try { if(pg) await pg.query("ALTER TABLE auto_replies ADD COLUMN IF NOT EXISTS file_id TEXT"); } catch(_) {}
+  // Migration: group_members is_bot + group_chats log_channel
+  try { if(pg) await pg.query('ALTER TABLE group_members ADD COLUMN IF NOT EXISTS is_bot INTEGER DEFAULT 0'); } catch(_) {}
+  try { if(pg) await pg.query('ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS log_channel TEXT'); } catch(_) {}
 
   // Migration: group_chats is_active column
   try { if(pg) await pg.query('ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
