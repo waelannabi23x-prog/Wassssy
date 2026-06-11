@@ -209,7 +209,7 @@ async function handleCallback(ctx, data) {
     }
     const { q } = st;
     await run(
-      'INSERT INTO million_questions(text,option_a,option_b,option_c,option_d,correct,difficulty,added_by,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,1)',
+      'INSERT INTO million_questions(text,option_a,option_b,option_c,option_d,correct,difficulty,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,1)',
       [q.question, q.optA, q.optB, q.optC, q.optD, q.correctLetter, q.difficulty, uid2]
     ).catch(() => {});
     await delState(uid2);

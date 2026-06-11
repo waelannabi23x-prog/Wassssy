@@ -66,7 +66,7 @@ async function initMillionaireSchema() {
       option_c TEXT NOT NULL, option_d TEXT NOT NULL,
       correct CHAR(1) NOT NULL CHECK (correct IN ('a','b','c','d')),
       difficulty TEXT DEFAULT 'medium', specialty_id INTEGER DEFAULT 0,
-      used_count INTEGER DEFAULT 0, added_by BIGINT,
+      used_count INTEGER DEFAULT 0,
       is_active SMALLINT DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS million_scores (
