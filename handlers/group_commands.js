@@ -598,33 +598,65 @@ function setupGroupCommands(bot) {
     const warnCnt   = warnsRows.length;
     const name      = [target.first_name, target.last_name].filter(Boolean).join(" ");
 
+    // ── تاريخ انضمام Telegram (لو متاح) ──
+    let tgJoin = "";
+    try {
+      if (uid > 0) {
+        const approxYear = Math.floor((uid / 1e9) * 3.5 + 2013);
+        tgJoin = approxYear >= 2013 ? "~" + approxYear : "";
+      }
+    } catch(_) {}
+
+    const joinDate = userRow?.joined_at
+      ? new Date(userRow.joined_at).toLocaleDateString("ar-DZ")
+      : "—";
+
+    const roleEmoji = { creator:"👑", administrator:"⚡", member:"👤", restricted:"🔒", left:"🚪", kicked:"🚫" };
+    const rEmoji = roleEmoji[member?.status] || "👤";
+
     let txt = "";
-    txt += "[" + name + "](tg://user?id=" + uid + ")";
-    if (target.username) txt += "  @" + target.username;
-    txt += "\n";
-    txt += "ID: `" + uid + "`\n";
-    txt += "الدور: " + role + "\n";
-    if (target.is_bot) txt += "بوت: نعم\n";
-    txt += "\n";
-    txt += "التحذيرات: " + warnCnt + " / 3\n";
-    if (bankAcc) txt += "الرصيد: " + Number(bankAcc.balance||0).toLocaleString("en") + " $\n";
-    if (xpRow)   txt += "XP: " + (xpRow.xp||0) + "  |  المستوى: " + (xpRow.level||1) + "\n";
-    if (userRow?.joined_at) txt += "انضم: " + new Date(userRow.joined_at).toLocaleDateString("ar-DZ") + "\n";
+    txt += "🪪 *الرقم التعريفي:* `" + uid + "`
+";
+    txt += "👤 الاسم: [" + name + "](tg://user?id=" + uid + ")
+";
+    if (target.last_name) txt += "👨‍👩‍👧 اسم العائلة: " + target.last_name + "
+";
+    txt += rEmoji + " الحالة: " + role + "
+";
+    if (target.is_bot) txt += "🤖 بوت: نعم
+";
+    txt += "
+";
+    txt += "⚠️ الإنذارات: *" + warnCnt + "/3*
+";
+    if (bankAcc) txt += "💰 الرصيد: *" + Number(bankAcc.balance||0).toLocaleString("en") + " $*
+";
+    if (xpRow)   txt += "✨ XP: *" + (xpRow.xp||0) + "* | المستوى: *" + (xpRow.level||1) + "*
+";
+    txt += "📅 الانضمام: *" + joinDate + "*
+";
 
     const kb = [];
-    if (isAdm && !isTarget && uid !== ctx.from.id) {
-      kb.push([
-        { text: "＋ تحذير",    callback_data: "grp_warn1_"     + uid },
-        { text: "－ تحذير",    callback_data: "grp_unwarn1_"   + uid },
-        { text: "🗑 مسح الكل", callback_data: "grp_clearwarn_" + uid },
-      ]);
-      kb.push([
-        { text: "🚫 حظر", callback_data: "grp_ban_confirm_" + uid },
-        { text: "🔇 كتم", callback_data: "grp_mute_menu_"   + uid },
-      ]);
-      kb.push([
-        { text: "⚙️ الإذونات", callback_data: "grp_perms_" + uid + "_" + ctx.chat.id },
-      ]);
+    if (isAdm && uid !== ctx.from.id) {
+      if (!isTarget) {
+        // زر الإنذارات — يظهر العدد ويفتح قائمة +/-
+        kb.push([
+          { text: "⚠️ الإنذارات " + warnCnt + "/3", callback_data: "grp_warnmenu_" + uid + "_" + ctx.chat.id },
+          { text: "🎛 الصلاحيات",                    callback_data: "grp_perms_"    + uid + "_" + ctx.chat.id },
+        ]);
+        kb.push([
+          { text: "🔇 كتم", callback_data: "grp_mute_menu_"   + uid },
+          { text: "🚫 حظر", callback_data: "grp_ban_confirm_" + uid },
+        ]);
+        kb.push([
+          { text: "🎛 أذونات ↗", callback_data: "grp_perms_" + uid + "_" + ctx.chat.id },
+        ]);
+      } else {
+        // مشرف — فقط زر الصلاحيات
+        kb.push([
+          { text: "🎛 الصلاحيات", callback_data: "grp_perms_" + uid + "_" + ctx.chat.id },
+        ]);
+      }
     }
 
     ctx.reply(txt, {

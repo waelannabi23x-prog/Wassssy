@@ -382,7 +382,24 @@ module.exports.registerCallbacks = function(bot, deps) {
           }
         }
         try {
-          await ctx.telegram.restrictChatMember(cid3, uid3, { permissions: permsToSave });
+          // لو can_send_messages=true لازم يكون أول شيء يُرسل
+          // نرسل الإذونات كاملة دفعة واحدة
+          const fullPerms = {
+            can_send_messages:       permsToSave.can_send_messages       ?? true,
+            can_send_photos:         permsToSave.can_send_photos         ?? true,
+            can_send_videos:         permsToSave.can_send_videos         ?? true,
+            can_send_audios:         permsToSave.can_send_audios         ?? true,
+            can_send_documents:      permsToSave.can_send_documents      ?? true,
+            can_send_voice_notes:    permsToSave.can_send_voice_notes    ?? true,
+            can_send_video_notes:    permsToSave.can_send_video_notes    ?? true,
+            can_send_polls:          permsToSave.can_send_polls          ?? true,
+            can_send_other_messages: permsToSave.can_send_other_messages ?? true,
+            can_add_web_page_previews: permsToSave.can_add_web_page_previews ?? true,
+            can_change_info:         permsToSave.can_change_info         ?? false,
+            can_invite_users:        permsToSave.can_invite_users        ?? true,
+            can_pin_messages:        permsToSave.can_pin_messages        ?? false,
+          };
+          await ctx.telegram.restrictChatMember(cid3, uid3, { permissions: fullPerms });
           await ctx.editMessageText('✅ *تم حفظ الأذونات!*', { parse_mode: 'Markdown' }).catch(() => {});
           return ctx.answerCbQuery('✅ تم الحفظ').catch(() => {});
         } catch(e) {
@@ -615,6 +632,7 @@ module.exports.registerCallbacks = function(bot, deps) {
             data.startsWith('grp_ptog_') || data.startsWith('grp_psave_') ||
             data.startsWith('grp_wadd_') || data.startsWith('grp_wdel_') ||
             data.startsWith('grp_warn1_') || data.startsWith('grp_unwarn1_') ||
+            data.startsWith('grp_warnmenu_') || data.startsWith('grp_warnback_') ||
             data.startsWith('grp_clearwarn_') || data.startsWith('grp_pall_') ||
             data.startsWith('grp_pnone_') || data.startsWith('grp_aptog_') ||
             data.startsWith('grp_apsave_') || data.startsWith('grp_demote_') ||
@@ -623,6 +641,49 @@ module.exports.registerCallbacks = function(bot, deps) {
           const callerMember = await ctx.telegram.getChatMember(chatIdCheck, ctx.from.id).catch(() => null);
           const isCallerAdm  = ctx.isAdmin || ctx.isOwner || ['administrator','creator'].includes(callerMember?.status);
           if (!isCallerAdm) return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(() => {});
+        }
+
+        // ── قائمة الإنذارات (تفتح من زر /info) ──
+        if (data.startsWith('grp_warnmenu_')) {
+          const parts2  = data.replace('grp_warnmenu_', '').split('_');
+          const uid2    = parseInt(parts2[0]);
+          const chatId2 = parseInt(parts2[1]);
+          const { all: dbA } = require('../database/db');
+          const warns = await dbA('SELECT id FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId2, uid2]).catch(() => []);
+          const cnt = warns.length;
+          return ctx.editMessageReplyMarkup({ inline_keyboard: [
+            [
+              { text: '＋ تحذير',    callback_data: 'grp_warn1_'     + uid2 },
+              { text: '－ تحذير',    callback_data: 'grp_unwarn1_'   + uid2 },
+              { text: '🗑 مسح الكل', callback_data: 'grp_clearwarn_' + uid2 },
+            ],
+            [
+              { text: '↩️ رجوع (' + cnt + '/3)', callback_data: 'grp_warnback_' + uid2 + '_' + chatId2 },
+            ],
+          ]}).catch(() => ctx.answerCbQuery('').catch(() => {}));
+        }
+
+        // ── رجوع لقائمة /info ──
+        if (data.startsWith('grp_warnback_')) {
+          const parts2  = data.replace('grp_warnback_', '').split('_');
+          const uid2    = parseInt(parts2[0]);
+          const chatId2 = parseInt(parts2[1]);
+          const { all: dbA } = require('../database/db');
+          const warns = await dbA('SELECT id FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId2, uid2]).catch(() => []);
+          const cnt = warns.length;
+          return ctx.editMessageReplyMarkup({ inline_keyboard: [
+            [
+              { text: '⚠️ الإنذارات ' + cnt + '/3', callback_data: 'grp_warnmenu_' + uid2 + '_' + chatId2 },
+              { text: '🎛 الصلاحيات',               callback_data: 'grp_perms_'    + uid2 + '_' + chatId2 },
+            ],
+            [
+              { text: '🔇 كتم', callback_data: 'grp_mute_menu_'   + uid2 },
+              { text: '🚫 حظر', callback_data: 'grp_ban_confirm_' + uid2 },
+            ],
+            [
+              { text: '🎛 أذونات ↗', callback_data: 'grp_perms_' + uid2 + '_' + chatId2 },
+            ],
+          ]}).catch(() => ctx.answerCbQuery('').catch(() => {}));
         }
 
         // ── +1 تحذير ──
