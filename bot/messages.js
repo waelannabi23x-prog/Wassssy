@@ -272,8 +272,8 @@ module.exports.registerMessages = function(bot, deps) {
         const gamesPanel = require('../handlers/games_panel');
         return gamesPanel.handleText(ctx, txt, s);
       }
-      // ── ألعاب panel — فقط لما في state مناسب ──
-      if (s?.type?.startsWith('gp_million') || s?.type?.startsWith('gp_guess')) {
+      // ── ألعاب panel — mq_step_* و gp_million* و gp_guess* ──
+      if (s?.type?.startsWith('mq_step') || s?.type?.startsWith('gp_million') || s?.type?.startsWith('gp_guess')) {
         const handled = await require('../handlers/games_panel').handleText(ctx).catch(() => false);
         if (handled) return;
       }
