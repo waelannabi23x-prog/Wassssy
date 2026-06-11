@@ -610,24 +610,61 @@ module.exports.registerCallbacks = function(bot, deps) {
         }
 
         
-        // ── أزرار info/warn السريعة ──
-        if (data.startsWith('grp_mute_1h_')) {
-          const uid2 = parseInt(data.replace('grp_mute_1h_', ''));
+        // ── فحص admin لكل أزرار grp_ ──
+        if (data.startsWith('grp_mute_') || data.startsWith('grp_ban_') ||
+            data.startsWith('grp_warns_') || data.startsWith('grp_perms_') ||
+            data.startsWith('grp_ptog_') || data.startsWith('grp_psave_') ||
+            data.startsWith('grp_wadd_') || data.startsWith('grp_wdel_') ||
+            data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_')) {
+          const chatIdCheck = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+          const callerMember = await ctx.telegram.getChatMember(chatIdCheck, ctx.from.id).catch(() => null);
+          const isCallerAdm  = ctx.isAdmin || ctx.isOwner || ['administrator','creator'].includes(callerMember?.status);
+          if (!isCallerAdm) return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(() => {});
+        }
+
+        // ── قائمة خيارات الكتم ──
+        if (data.startsWith('grp_mute_menu_')) {
+          const uid2 = parseInt(data.replace('grp_mute_menu_', ''));
+          const kb = [[
+            { text: '5 دقائق',  callback_data: 'grp_mute_5_'  + uid2 },
+            { text: '30 دقيقة', callback_data: 'grp_mute_30_' + uid2 },
+          ],[
+            { text: 'ساعة',     callback_data: 'grp_mute_60_'  + uid2 },
+            { text: '6 ساعات',  callback_data: 'grp_mute_360_' + uid2 },
+          ],[
+            { text: 'يوم كامل', callback_data: 'grp_mute_1440_' + uid2 },
+            { text: '❌ إلغاء',  callback_data: 'grp_cancel' },
+          ]];
+          return ctx.editMessageReplyMarkup({ inline_keyboard: kb }).catch(() => ctx.answerCbQuery('').catch(() => {}));
+        }
+
+        // ── تنفيذ الكتم بالوقت ──
+        if (/^grp_mute_\d+_/.test(data)) {
+          const parts = data.replace('grp_mute_', '').split('_');
+          const mins  = parseInt(parts[0]);
+          const uid2  = parseInt(parts[1]);
           const { muteMember } = require('../handlers/group_admin');
-          await muteMember(ctx, ctx.chat.id, uid2, 60);
-          return ctx.answerCbQuery('🔇 تم الإسكات ساعة').catch(() => {});
+          await muteMember(ctx, ctx.chat.id, uid2, mins).catch(() => {});
+          const label = mins < 60 ? mins + ' دقيقة' : (mins/60) + ' ساعة';
+          await ctx.editMessageReplyMarkup({ inline_keyboard: [[
+            { text: '🔊 رفع الكتم', callback_data: 'grp_unmute_' + uid2 }
+          ]]}).catch(() => {});
+          return ctx.answerCbQuery('🔇 تم الكتم ' + label).catch(() => {});
         }
-        if (data.startsWith('grp_ban_')) {
-          const uid2 = parseInt(data.replace('grp_ban_', ''));
-          await ctx.telegram.banChatMember(ctx.chat.id, uid2).catch(() => {});
-          await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '🔓 رفع الحظر', callback_data: 'grp_unban_' + uid2 }]] }).catch(() => {});
-          return ctx.answerCbQuery('🚫 تم الحظر').catch(() => {});
+
+        // ── تأكيد الحظر ──
+        if (data.startsWith('grp_ban_confirm_')) {
+          const uid2 = parseInt(data.replace('grp_ban_confirm_', ''));
+          const kb = [[
+            { text: '✅ تأكيد الحظر', callback_data: 'grp_ban_now_' + uid2 },
+            { text: '❌ إلغاء',        callback_data: 'grp_cancel' },
+          ]];
+          return ctx.editMessageReplyMarkup({ inline_keyboard: kb }).catch(() => ctx.answerCbQuery('').catch(() => {}));
         }
-        if (data.startsWith('grp_warns_')) {
-          const uid2 = parseInt(data.replace('grp_warns_', ''));
-          const { get: dbGet } = require('../database/db');
-          const w = await dbGet('SELECT COUNT(*) as c FROM group_warns WHERE chat_id=$1 AND user_id=$2', [ctx.chat.id, uid2]).catch(() => ({ c:0 }));
-          return ctx.answerCbQuery('❗ الإنذارات: ' + (w?.c||0) + '/3', { show_alert: true }).catch(() => {});
+
+        // ── إلغاء ──
+        if (data === 'grp_cancel') {
+          return ctx.deleteMessage().catch(() => ctx.answerCbQuery('').catch(() => {}));
         }
         if (data.startsWith('grp_perms_')) {
           const parts   = data.replace('grp_perms_', '').split('_');

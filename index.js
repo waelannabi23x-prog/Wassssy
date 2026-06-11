@@ -506,10 +506,10 @@ async function launch() {
           if (!chat || !['group', 'supergroup'].includes(chat.type)) return;
           if (['member', 'administrator'].includes(member?.status)) {
             await dbRun(
-              `INSERT INTO group_chats(chat_id, title, specialty_id, welcome_enabled, goodbye_enabled, notify_new_files)
-               VALUES($1,$2,0,1,0,1)
-               ON CONFLICT(chat_id) DO UPDATE SET title=$2`,
-              [chat.id, chat.title || '']
+              `INSERT INTO group_chats(chat_id, title, specialty_id, welcome_enabled, goodbye_enabled, notify_new_files, added_by)
+               VALUES($1,$2,0,1,0,1,$3)
+               ON CONFLICT(chat_id) DO UPDATE SET title=$2, added_by=COALESCE(group_chats.added_by,$3)`,
+              [chat.id, chat.title || '', update?.from?.id || null]
             ).catch(() => {});
             logger.info('[GroupReg] ✅ أُضيف البوت لـ: ' + (chat.title || chat.id));
           } else if (['left', 'kicked'].includes(member?.status)) {
