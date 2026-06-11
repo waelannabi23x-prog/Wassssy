@@ -89,20 +89,16 @@ async function initMillionaireSchema() {
 async function getRandomQuestion(usedIds, diff) {
   const ex = usedIds.length ? `AND id NOT IN (${usedIds.join(',')})` : '';
   // أولاً: جرب نفس الصعوبة مع عشوائية كاملة
+  // جرب نفس الصعوبة أو أقل
   let q = await get(
-    `SELECT * FROM million_questions WHERE is_active=1 AND difficulty<=$1 ${ex} ORDER BY random() LIMIT 1`,
-    [diff]
+    `SELECT * FROM million_questions WHERE is_active=1 ${ex} ORDER BY random() LIMIT 1`,
+    []
   ).catch(()=>null);
-  // إذا ما لقى: جرب أي صعوبة
-  if (!q) q = await get(
-    `SELECT * FROM million_questions WHERE is_active=1 ${ex} ORDER BY random() LIMIT 1`, []
-  ).catch(()=>null);
-  // إذا ما لقى (كل الأسئلة استُخدمت): reset used_count وابدأ من جديد
-  if (!q) {
-    await run('UPDATE million_questions SET used_count=0', []).catch(()=>{});
+  // إذا كل الأسئلة استُخدمت — reset وابدأ من جديد
+  if (!q && usedIds.length > 0) {
+    await run('UPDATE million_questions SET used_count=0 WHERE is_active=1', []).catch(()=>{});
     q = await get(
-      `SELECT * FROM million_questions WHERE is_active=1 AND difficulty=$1 ORDER BY random() LIMIT 1`,
-      [diff]
+      `SELECT * FROM million_questions WHERE is_active=1 ORDER BY random() LIMIT 1`, []
     ).catch(()=>null);
   }
   return q || null;
