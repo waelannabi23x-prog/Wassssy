@@ -463,6 +463,14 @@ async function initBankTables() {
     await pg.query('CREATE TABLE IF NOT EXISTS bank_accounts(user_id BIGINT PRIMARY KEY, username TEXT, first_name TEXT, balance NUMERIC DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)');
     await pg.query('CREATE TABLE IF NOT EXISTS bank_transactions(id SERIAL PRIMARY KEY, from_id BIGINT, to_id BIGINT, amount NUMERIC, type TEXT, note TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)');
     await pg.query('CREATE TABLE IF NOT EXISTS bank_loans(id SERIAL PRIMARY KEY, user_id BIGINT, amount NUMERIC, due_at TIMESTAMP, paid INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)');
+
+    await pg.query(`CREATE TABLE IF NOT EXISTS pro_bank_accounts (user_id BIGINT PRIMARY KEY, first_name TEXT DEFAULT '', username TEXT DEFAULT '', balance NUMERIC DEFAULT 0, card_type TEXT DEFAULT 'classic', account_type TEXT DEFAULT 'current', iban TEXT UNIQUE, pin TEXT DEFAULT NULL, is_frozen INTEGER DEFAULT 0, total_deposits NUMERIC DEFAULT 0, loans_count INTEGER DEFAULT 0, loans_paid INTEGER DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+    await pg.query(`CREATE TABLE IF NOT EXISTS pro_bank_transactions (id SERIAL PRIMARY KEY, from_id BIGINT, to_id BIGINT, amount NUMERIC NOT NULL, fee NUMERIC DEFAULT 0, type TEXT DEFAULT 'transfer', note TEXT DEFAULT '', created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+    await pg.query('CREATE INDEX IF NOT EXISTS idx_pbt_from ON pro_bank_transactions(from_id)');
+    await pg.query('CREATE INDEX IF NOT EXISTS idx_pbt_to ON pro_bank_transactions(to_id)');
+    await pg.query(`CREATE TABLE IF NOT EXISTS pro_bank_loans (id SERIAL PRIMARY KEY, user_id BIGINT NOT NULL, amount NUMERIC NOT NULL, total_due NUMERIC NOT NULL, paid INTEGER DEFAULT 0, paid_at TIMESTAMP, due_at TIMESTAMP NOT NULL, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+    await pg.query(`CREATE TABLE IF NOT EXISTS pro_bank_investments (id SERIAL PRIMARY KEY, user_id BIGINT NOT NULL, amount NUMERIC NOT NULL, daily_rate NUMERIC NOT NULL, tier TEXT DEFAULT 'أساسي', active INTEGER DEFAULT 1, profit_earned NUMERIC DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
+    console.log('[BankPro] ✅ Tables ready');
     console.log('[Bank] ✅ Tables ready');
   } catch(e) { console.error('[Bank]', e.message); }
 }

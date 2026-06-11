@@ -27,6 +27,7 @@ const millionaire   = require('./handlers/millionaire');
 const guessGame     = require('./handlers/guess_game');
 const tools         = require('./handlers/owner_tools');
 const bank          = require('./handlers/bank');
+const bankPro       = require('./handlers/bank_pro');
 const ownerH        = require('./handlers/owner');
 const contentDb     = require('./database/content');
 const usersDb       = require('./database/users');
@@ -296,6 +297,19 @@ const gameAndBankMiddleware = async (ctx, next) => {
     if (/^فلوسي$/i.test(txt))          return bank.showBalance(ctx).catch(() => next());
     if (/^فارسي/i.test(txt))           return bank.transfer(ctx).catch(() => next());
     if (/^rip /i.test(txt))            return bank.loan(ctx).catch(() => next());
+
+    // 🏦 Taline Bank
+    if (/^بنك$/i.test(txt))                       return bankPro.openAccount(ctx).catch(() => next());
+    if (/^محفظتي$/i.test(txt))                    return bankPro.showWallet(ctx).catch(() => next());
+    if (/^بطاقتي$/i.test(txt))                    return bankPro.showCard(ctx).catch(() => next());
+    if (/^كشف$/i.test(txt))                       return bankPro.showStatement(ctx).catch(() => next());
+    if (/^تحويل\s+\d/i.test(txt))                return bankPro.transfer(ctx).catch(() => next());
+    if (/^قرض(\s+\d.*)?$/i.test(txt))            return bankPro.requestLoan(ctx).catch(() => next());
+    if (/^ديوني$/i.test(txt))                     return bankPro.showLoans(ctx).catch(() => next());
+    if (/^سداد$/i.test(txt))                      return bankPro.repayLoan(ctx).catch(() => next());
+    if (/^استثمار(\s+\d.*)?$/i.test(txt))        return bankPro.invest(ctx).catch(() => next());
+    if (/^سحب استثمار$/i.test(txt))               return bankPro.withdrawInvest(ctx).catch(() => next());
+    if (/^(الاثرياء|أثرياء|اثرياء)$/i.test(txt)) return bankPro.richList(ctx).catch(() => next());
   }
 
   // PV لعبة خمن
