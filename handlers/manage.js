@@ -679,7 +679,7 @@ async function handleCallback(ctx,data){
     if (!s || s.type !== 'mq_wizard_correct') return ctx.answerCbQuery('❌ انتهت الجلسة').catch(()=>{});
     const insertRes = await run(
       'INSERT INTO million_questions(text,option_a,option_b,option_c,option_d,correct,difficulty,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,1)',
-      [s.question, s.opt_a, s.opt_b, s.opt_c, s.opt_d, correct, 'medium']
+      [s.question, s.opt_a, s.opt_b, s.opt_c, s.opt_d, correct, 1]
     ).catch(e => { require('../utils/logger').error('[mq insert]', e.message); return null; });
     await delState(uid).catch(()=>{});
     const L = { a:'أ', b:'ب', c:'ج', d:'د' };

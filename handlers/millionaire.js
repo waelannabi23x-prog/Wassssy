@@ -70,11 +70,16 @@ async function initMillionaireSchema() {
       is_active SMALLINT DEFAULT 1, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
     `CREATE TABLE IF NOT EXISTS million_scores (
-      id SERIAL PRIMARY KEY, user_id BIGINT NOT NULL,
-      chat_id BIGINT NOT NULL, score INTEGER DEFAULT 0,
-      level_reached INTEGER DEFAULT 0, won BOOLEAN DEFAULT FALSE,
+      id SERIAL PRIMARY KEY,
+      user_id BIGINT NOT NULL,
+      chat_id BIGINT NOT NULL,
+      score INTEGER DEFAULT 0,
+      level_reached INTEGER DEFAULT 0,
+      won BOOLEAN DEFAULT FALSE,
       played_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )`,
+    `ALTER TABLE million_scores ADD COLUMN IF NOT EXISTS user_id BIGINT`,
+    `ALTER TABLE million_scores ADD COLUMN IF NOT EXISTS chat_id BIGINT`,
     `CREATE INDEX IF NOT EXISTS idx_mq_active ON million_questions(is_active)`,
     `CREATE INDEX IF NOT EXISTS idx_ms_user   ON million_scores(user_id)`,
   ];
@@ -85,8 +90,8 @@ async function getRandomQuestion(usedIds, diff) {
   const ex = usedIds.length ? `AND id NOT IN (${usedIds.join(',')})` : '';
   // أولاً: جرب نفس الصعوبة مع عشوائية كاملة
   let q = await get(
-    `SELECT * FROM million_questions WHERE is_active=1 AND difficulty=$1 ${ex} ORDER BY random() LIMIT 1`,
-    [diff]
+    `SELECT * FROM million_questions WHERE is_active=1 ${ex} ORDER BY random() LIMIT 1`,
+    []
   ).catch(()=>null);
   // إذا ما لقى: جرب أي صعوبة
   if (!q) q = await get(
@@ -435,7 +440,7 @@ async function endGame(telegram, chatId, reason) {
     if (p.prize > 0) {
       await run('UPDATE users SET coins=COALESCE(coins,0)+$1 WHERE user_id=$2', [p.prize, p.id]).catch(()=>{});
       await run('INSERT INTO million_scores(user_id,chat_id,score,level_reached,won) VALUES($1,$2,$3,$4,$5)',
-        [p.id, chatId, p.prize, p.level, p.level >= 15]).catch(()=>{});
+        [p.id, chatId, p.prize, p.level, p.level >= 15]).catch(e => require('../utils/logger').debug('[ms insert]', e.message));
     }
   }
 
