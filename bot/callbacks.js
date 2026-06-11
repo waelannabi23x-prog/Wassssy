@@ -1151,8 +1151,6 @@ module.exports.registerCallbacks = function(bot, deps) {
     await ctx.deleteMessage().catch(()=>{});
     return startHandler(ctx);
   }
-  });
-};
   // ── ألعاب القروب — شرح كل لعبة ──
   if (data.startsWith('grp_game_info_')) {
     const game = data.replace('grp_game_info_', '');
@@ -1281,3 +1279,5 @@ module.exports.registerCallbacks = function(bot, deps) {
   }
 
 
+  });
+};
