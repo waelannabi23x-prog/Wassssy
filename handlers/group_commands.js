@@ -575,40 +575,62 @@ function setupGroupCommands(bot) {
     } catch(e) { ctx.reply("❌ فشل: " + e.message).catch(() => {}); }
   });
 
-  // ══ /info ══
+  // ══ /info ══ (v2 — بسيط واحترافي)
   bot.command("info", async ctx => {
     if (!isGroup(ctx)) return;
     delCmd(ctx);
-    const target   = ctx.message.reply_to_message?.from || ctx.from;
-    const isReqAdm = await isTgAdmin(ctx);
-    const { get: dbGet } = require("../database/db");
-    const [member, warnsRow] = await Promise.all([
-      ctx.telegram.getChatMember(ctx.chat.id, target.id).catch(() => null),
-      dbGet("SELECT COUNT(*) as c FROM group_warns WHERE chat_id=$1 AND user_id=$2", [ctx.chat.id, target.id]).catch(() => ({ c: 0 }))
+    const target = ctx.message.reply_to_message?.from || ctx.from;
+    const uid    = target.id;
+    const isAdm  = await isTgAdmin(ctx);
+    const { get: dbGet, all: dbAll } = require("../database/db");
+
+    const [member, warnsRows, bankAcc, xpRow, userRow] = await Promise.all([
+      ctx.telegram.getChatMember(ctx.chat.id, uid).catch(() => null),
+      dbAll("SELECT id FROM group_warns WHERE chat_id=$1 AND user_id=$2", [ctx.chat.id, uid]).catch(() => []),
+      dbGet("SELECT balance FROM bank_accounts WHERE user_id=$1", [uid]).catch(() => null),
+      dbGet("SELECT xp, level FROM user_xp WHERE user_id=$1", [uid]).catch(() => null),
+      dbGet("SELECT joined_at FROM users WHERE user_id=$1", [uid]).catch(() => null),
     ]);
-    const statusMap = { member:"عضو 👤", administrator:"مشرف 🛡️", creator:"مؤسس 👑", restricted:"مقيّد 🔒", left:"غادر 🚪", kicked:"محظور 🚫" };
-    const name     = [target.first_name, target.last_name].filter(Boolean).join(" ");
-    const isTarget = ["administrator","creator"].includes(member?.status);
-    const warnCnt  = parseInt(warnsRow?.c || 0);
-    let txt = "👤 *معلومات المستخدم*\n━━━━━━━━━━━━━━\n\n";
-    txt += "🪪 الاسم: *" + name + "*\n";
-    if (target.username) txt += "🔗 يوزر: @" + target.username + "\n";
-    txt += "🆔 ID: `" + target.id + "`\n";
-    txt += "📊 الحالة: " + (statusMap[member?.status] || "غير معروف") + "\n";
-    if (isReqAdm) txt += "⚠️ الإنذارات: *" + warnCnt + "/3*\n";
+
+    const roleMap = { creator:"صاحب القروب", administrator:"مشرف", member:"عضو", restricted:"مقيّد", left:"غادر", kicked:"محظور" };
+    const role      = roleMap[member?.status] || "عضو";
+    const isTarget  = ["administrator","creator"].includes(member?.status);
+    const warnCnt   = warnsRows.length;
+    const name      = [target.first_name, target.last_name].filter(Boolean).join(" ");
+
+    let txt = "";
+    txt += "[" + name + "](tg://user?id=" + uid + ")";
+    if (target.username) txt += "  @" + target.username;
+    txt += "\n";
+    txt += "ID: `" + uid + "`\n";
+    txt += "الدور: " + role + "\n";
+    if (target.is_bot) txt += "بوت: نعم\n";
+    txt += "\n";
+    txt += "التحذيرات: " + warnCnt + " / 3\n";
+    if (bankAcc) txt += "الرصيد: " + Number(bankAcc.balance||0).toLocaleString("en") + " $\n";
+    if (xpRow)   txt += "XP: " + (xpRow.xp||0) + "  |  المستوى: " + (xpRow.level||1) + "\n";
+    if (userRow?.joined_at) txt += "انضم: " + new Date(userRow.joined_at).toLocaleDateString("ar-DZ") + "\n";
+
     const kb = [];
-    if (isReqAdm && !isTarget && target.id !== ctx.from.id) {
-      kb.push([{ text: "⚠️ إنذارات: " + warnCnt + "/3", callback_data: "grp_warns_show_" + target.id + "_" + ctx.chat.id }]);
+    if (isAdm && !isTarget && uid !== ctx.from.id) {
       kb.push([
-        { text: "🔇 كتم",  callback_data: "grp_mute_menu_" + target.id },
-        { text: "🚫 حظر",  callback_data: "grp_ban_confirm_" + target.id },
+        { text: "＋ تحذير",    callback_data: "grp_warn1_"     + uid },
+        { text: "－ تحذير",    callback_data: "grp_unwarn1_"   + uid },
+        { text: "🗑 مسح الكل", callback_data: "grp_clearwarn_" + uid },
       ]);
-      kb.push([{ text: "🎛 الأذونات", callback_data: "grp_perms_" + target.id + "_" + ctx.chat.id }]);
+      kb.push([
+        { text: "🚫 حظر", callback_data: "grp_ban_confirm_" + uid },
+        { text: "🔇 كتم", callback_data: "grp_mute_menu_"   + uid },
+      ]);
+      kb.push([
+        { text: "⚙️ الإذونات", callback_data: "grp_perms_" + uid + "_" + ctx.chat.id },
+      ]);
     }
+
     ctx.reply(txt, {
       parse_mode: "Markdown",
-      reply_to_message_id: ctx.message?.reply_to_message?.message_id,
-      reply_markup: kb.length ? { inline_keyboard: kb } : undefined
+      reply_to_message_id: ctx.message?.reply_to_message?.message_id || ctx.message?.message_id,
+      reply_markup: kb.length ? { inline_keyboard: kb } : undefined,
     }).catch(() => {});
   });
 
