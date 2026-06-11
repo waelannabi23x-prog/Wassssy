@@ -644,6 +644,21 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
 async function handleCallback(ctx,data){
   const uid=ctx.uid;
   try{
+  if (data.startsWith('mq_correct_')) {
+    const correct = data.replace('mq_correct_', '');
+    const { getState, delState } = require('../utils/stateManager');
+    const s = await getState(uid).catch(()=>null);
+    if (!s || s.type !== 'mq_wizard_correct') return ctx.answerCbQuery('❌ انتهت الجلسة').catch(()=>{});
+    await run('INSERT INTO million_questions(text,option_a,option_b,option_c,option_d,correct,difficulty,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,1)',
+      [s.question, s.opt_a, s.opt_b, s.opt_c, s.opt_d, correct, 'medium']).catch(()=>{});
+    await delState(uid).catch(()=>{});
+    const L = { a:'أ', b:'ب', c:'ج', d:'د' };
+    return ctx.editMessageText(
+      '✅ *تم حفظ السؤال!*\n\n❓ ' + s.question + '\n🎯 الصحيحة: *' + L[correct] + ')*',
+      { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[
+        [{ text:'➕ إضافة آخر', callback_data:'mq_add' }, { text:'◀️ رجوع', callback_data:'mg_million_q' }]
+      ]}}).catch(()=>ctx.reply('✅ تم الحفظ!').catch(()=>{}));
+  }
   if(data==='mg_menu')         return mainMenu(ctx);
   if(data==='mg_sec_users')    return showSectionUsers(ctx);
   if(data==='mg_sec_content')  return showSectionContent(ctx);
@@ -1184,11 +1199,11 @@ async function showMillionQList(ctx, page) {
 
 async function startMillionQAdd(ctx) {
   const { setState } = require('../utils/stateManager');
-  setState(ctx.from.id, { type:'mq_add_q', step:'question' });
-  await ctx.editMessageText(
-    '➕ *إضافة سؤال جديد*\n\n✏️ أرسل نص السؤال:',
+  await setState(ctx.from?.id || ctx.uid, { type:'mq_wizard_q' });
+  await ctx.reply(
+    '➕ *إضافة سؤال — الخطوة 1/6*\n\n❓ أرسل نص السؤال:',
     { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[[{ text:'❌ إلغاء', callback_data:'mg_million_q' }]] }}
-  ).catch(()=> ctx.reply('✏️ أرسل نص السؤال:').catch(()=>{}));
+  ).catch(()=>{});
 }
 
 async function startMillionQDel(ctx) {
@@ -1198,6 +1213,34 @@ async function startMillionQDel(ctx) {
     '🗑 *حذف سؤال*\n\n🔢 أرسل رقم ID السؤال:\n_(شوف الأرقام من قائمة الأسئلة)_',
     { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[[{ text:'❌ إلغاء', callback_data:'mg_million_q' }]] }}
   ).catch(()=> ctx.reply('🔢 أرسل رقم السؤال:').catch(()=>{}));
+  // ── wizard إضافة سؤال مليون ──
+  if (state && state.type === 'mq_wizard_q') {
+    await setState(uid, { type:'mq_wizard_a', question: text });
+    return ctx.reply('✅ السؤال: *' + text + '*\n\n📝 الخطوة 2/6 — أرسل *الإجابة أ*:', { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[[{ text:'❌ إلغاء', callback_data:'mg_million_q' }]] }}).catch(()=>{});
+  }
+  if (state && state.type === 'mq_wizard_a') {
+    await setState(uid, { ...state, type:'mq_wizard_b', opt_a: text });
+    return ctx.reply('✅ أ: ' + text + '\n\n📝 الخطوة 3/6 — أرسل *الإجابة ب*:', { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[[{ text:'❌ إلغاء', callback_data:'mg_million_q' }]] }}).catch(()=>{});
+  }
+  if (state && state.type === 'mq_wizard_b') {
+    await setState(uid, { ...state, type:'mq_wizard_c', opt_b: text });
+    return ctx.reply('✅ ب: ' + text + '\n\n📝 الخطوة 4/6 — أرسل *الإجابة ج*:', { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[[{ text:'❌ إلغاء', callback_data:'mg_million_q' }]] }}).catch(()=>{});
+  }
+  if (state && state.type === 'mq_wizard_c') {
+    await setState(uid, { ...state, type:'mq_wizard_d', opt_c: text });
+    return ctx.reply('✅ ج: ' + text + '\n\n📝 الخطوة 5/6 — أرسل *الإجابة د*:', { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[[{ text:'❌ إلغاء', callback_data:'mg_million_q' }]] }}).catch(()=>{});
+  }
+  if (state && state.type === 'mq_wizard_d') {
+    await setState(uid, { ...state, type:'mq_wizard_correct', opt_d: text });
+    return ctx.reply(
+      '✅ د: ' + text + '\n\n🎯 الخطوة 6/6 — اختر *الإجابة الصحيحة*:',
+      { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[
+        [{ text:'أ) ' + state.opt_a, callback_data:'mq_correct_a' }, { text:'ب) ' + state.opt_b, callback_data:'mq_correct_b' }],
+        [{ text:'ج) ' + state.opt_c, callback_data:'mq_correct_c' }, { text:'د) ' + text,        callback_data:'mq_correct_d' }],
+        [{ text:'❌ إلغاء', callback_data:'mg_million_q' }],
+      ]}}).catch(()=>{});
+  }
+
 }
 
 module.exports={showAutoReplyDetail,mainMenu,handleCallback,handleText,handleFileUpload,handleBulkUpload,showUserProfile,showUsers,handleBundleFileUpload};

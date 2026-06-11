@@ -260,6 +260,7 @@ module.exports.registerMessages = function(bot, deps) {
         return browse.showComments(ctx, s.fid, s.spId, s.yrId, s.smId, s.sbId, s.catId);
       }
       if (s?.type === 'admin_contact') return manage.handleText(ctx, s);
+      if (s?.type && s.type.startsWith('mq_wizard')) return manage.handleText(ctx, s);
       if ((s?.type || '').startsWith('mg_') && (ctx.isAdmin || ctx.isOwner)) return manage.handleText(ctx, s);
       if ((s?.type || '').startsWith('gp_')) return groupPanel.handleText(ctx, txt, s);
       if (s?.type === 'million_add_q' || s?.type === 'million_del_q') {
