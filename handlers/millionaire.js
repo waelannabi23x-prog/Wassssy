@@ -277,10 +277,11 @@ async function beginGame(telegram, chatId) {
 
   game.status = 'playing';
   if (game.joinMsgId) {
-    telegram.editMessageText(chatId, game.joinMsgId, null,
+    await telegram.editMessageText(chatId, game.joinMsgId, null,
       '🎮 *بدأت اللعبة!* انتبه للسؤال...',
       { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [] } }
     ).catch(()=>{});
+    game.msgId = game.joinMsgId; // استخدم نفس الرسالة للأسئلة
     game.joinMsgId = null;
   }
   await new Promise(r => setTimeout(r, 1500));
