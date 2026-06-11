@@ -423,8 +423,13 @@ async function showMyGroups(ctx) {
       allGroups.map(g => ctx.telegram.getChatMember(g.chat_id, uid).catch(() => null))
     );
     checks.forEach((res, i) => {
-      const status = res.value?.status;
-      if (['administrator','creator'].includes(status)) myGroups.push(allGroups[i]);
+      const g = allGroups[i];
+      const member = res.value;
+      const status = member?.status;
+      // admin في Telegram أو هو من أضاف البوت (added_by)
+      if (['administrator','creator'].includes(status) || String(g.added_by) === String(uid)) {
+        myGroups.push(g);
+      }
     });
   }
 
