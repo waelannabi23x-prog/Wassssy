@@ -273,4 +273,8 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
     return ctx.reply('✅ تم إيقاف كل القنوات');
   });
 
+  // ── /help ──
+  const { handleHelp } = require('../handlers/help');
+  bot.command(['help', 'مساعدة', 'اوامر', 'cmds'], handleHelp);
+
 };
