@@ -1227,7 +1227,7 @@ async function showMillionQList(ctx, page) {
 
 async function startMillionQAdd(ctx) {
   const { setState } = require('../utils/stateManager');
-  await setState(ctx.from?.id || ctx.uid, { type:'mq_wizard_q' });
+  await setState(String(ctx.uid || ctx.from?.id), { type:'mq_wizard_q' });
   await ctx.reply(
     '➕ *إضافة سؤال — الخطوة 1/6*\n\n❓ أرسل نص السؤال:',
     { parse_mode:'Markdown', reply_markup:{ inline_keyboard:[[{ text:'❌ إلغاء', callback_data:'mg_million_q' }]] }}

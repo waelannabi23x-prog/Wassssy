@@ -54,7 +54,7 @@ module.exports.registerMessages = function(bot, deps) {
         return;
       }
 
-      const s = require('../utils/stateManager').getState(ctx.uid);
+      const s = await (require('../utils/stateManager').getStateAsync || require('../utils/stateManager').getState)(ctx.uid).catch(()=>null);
       if (s?.type === 'mg_bundle_files' && ctx.message.media_group_id) {
         const mgId = ctx.message.media_group_id;
         MGColl.add(mgId, ctx.message);
@@ -206,7 +206,9 @@ module.exports.registerMessages = function(bot, deps) {
       if (ctx.message.text.startsWith('/')) return;
       const _tid = 't_' + ctx.message?.message_id + '_' + (ctx.from?.id || '');
       if (isDupMsg(_tid)) return;
-      const uid = ctx.uid, s = await require('../utils/stateManager').getState(uid).catch(()=>null);
+      const uid = ctx.uid;
+      const _sm = require('../utils/stateManager');
+      const s = await (_sm.getStateAsync || _sm.getState)(uid).catch(()=>null);
       if (!s) return;
       const txt = ctx.message.text.trim();
 
