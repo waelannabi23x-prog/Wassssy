@@ -361,7 +361,8 @@ async function handleFileUpload(ctx){
   }catch(e){clearState(uid);ctx.reply(e.message==='exists'?'❌ يوجد ملف بهذا الاسم!':'❌ فشل: '+e.message);}
 }
 async function handleText(ctx,state){
-  const uid=ctx.uid;const text=ctx.message.text?.trim()||ctx.message.caption?.trim()||'';
+  const uid=ctx.uid;
+  const { run: dbR, get: dbG, all: dbA } = require('../database/db');const text=ctx.message.text?.trim()||ctx.message.caption?.trim()||'';
   if(text==='/cancel'){clearState(uid);return ctx.reply('تم الإلغاء.',build([back('mg_menu')]));}
   const done=(msg,cb)=>{clearState(uid);ctx.reply(msg,{parse_mode:'Markdown',...build([[btn('◀️ رجوع',cb)]])});};
   
@@ -468,7 +469,6 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
       case 'mg_pb_add_id': {
         const targetId = parseInt(text.trim());
         if (isNaN(targetId)) return ctx.reply('❌ ID غير صحيح').catch(()=>{});
-        const { get: dbG } = require('../database/db');
         const acc = await dbG('SELECT * FROM pro_bank_accounts WHERE user_id=$1',[targetId]).catch(()=>null);
         if (!acc) return ctx.reply('❌ لا يوجد حساب بهذا ID').catch(()=>{});
         setState(uid, { ...state, type: 'mg_pb_add_amount', targetId, targetName: acc.first_name||String(targetId) });
@@ -481,7 +481,6 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
       case 'mg_pb_add_amount': {
         const amount = parseFloat(text.trim());
         if (isNaN(amount) || amount <= 0) return ctx.reply('❌ مبلغ غير صحيح').catch(()=>{});
-        const { run: dbR2 } = require('../database/db');
         const op = state.op || 'add';
         if (op === 'deduct') {
           await dbR('UPDATE pro_bank_accounts SET balance=GREATEST(0,balance-$1) WHERE user_id=$2',[amount,state.targetId]);
@@ -490,7 +489,6 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
           await dbR('UPDATE pro_bank_accounts SET balance=balance+$1 WHERE user_id=$2',[amount,state.targetId]);
           await dbR(`INSERT INTO pro_bank_transactions(from_id,to_id,amount,fee,type,note) VALUES(0,$1,$2,0,'admin','إضافة يدوية من الأدمن')`,[state.targetId,amount]);
         }
-        const { get: dbG } = require('../database/db');
         const newAcc = await dbG('SELECT balance,card_type FROM pro_bank_accounts WHERE user_id=$1',[state.targetId]).catch(()=>null);
         clearState(uid);
         // أبلغ المستخدم
@@ -586,7 +584,6 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
         if(!targetId || isNaN(targetId)) {
           return ctx.reply('❌ ID غير صحيح، أرسل رقم ID فقط').catch(()=>{});
         }
-        const { get: dbG } = require('../database/db');
         const acc = await dbG('SELECT * FROM bank_accounts WHERE user_id=$1',[targetId]).catch(()=>null);
         if(!acc) {
           return ctx.reply('❌ هذا المستخدم ليس لديه حساب بنكي').catch(()=>{});
@@ -602,7 +599,6 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
         if(!amount || isNaN(amount) || amount === 0) {
           return ctx.reply('❌ أرسل رقم صحيح (يمكن أن يكون سالباً للخصم)').catch(()=>{});
         }
-        const { run: dbR, get: dbG } = require('../database/db');
         await dbR('UPDATE bank_accounts SET balance=balance+$1 WHERE user_id=$2',[amount, state.targetId]);
         await dbR("INSERT INTO bank_transactions(from_id,to_id,amount,type,note) VALUES(0,$1,$2,'admin','إضافة يدوية من الأدمن')",[state.targetId, Math.abs(amount)]);
         const newAcc = await dbG('SELECT balance FROM bank_accounts WHERE user_id=$1',[state.targetId]).catch(()=>null);
