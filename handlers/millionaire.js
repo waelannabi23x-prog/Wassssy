@@ -301,11 +301,18 @@ async function sendNextQuestion(telegram, chatId) {
       reply_markup: { inline_keyboard: keyboard },
     }).catch(()=>null);
     if (!edited) {
-      const m = await telegram.sendMessage(chatId, txt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } }).catch(()=>null);
+      const m = await telegram.sendMessage(chatId, txt, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: keyboard },
+        reply_to_message_id: game.msgId || undefined,
+      }).catch(()=>null);
       if (m) game.msgId = m.message_id;
     }
   } else {
-    const m = await telegram.sendMessage(chatId, txt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: keyboard } }).catch(()=>null);
+    const m = await telegram.sendMessage(chatId, txt, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: keyboard },
+    }).catch(()=>null);
     if (m) game.msgId = m.message_id;
   }
 
