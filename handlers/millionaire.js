@@ -89,16 +89,14 @@ async function initMillionaireSchema() {
 async function getRandomQuestion(usedIds, diff) {
   const ex = usedIds.length ? `AND id NOT IN (${usedIds.join(',')})` : '';
   // أولاً: جرب نفس الصعوبة مع عشوائية كاملة
-  // جرب نفس الصعوبة أو أقل
   let q = await get(
-    `SELECT * FROM million_questions WHERE is_active=1 ${ex} ORDER BY random() LIMIT 1`,
-    []
+    `SELECT * FROM million_questions WHERE is_active=1 ${ex} ORDER BY random() LIMIT 1`, []
   ).catch(()=>null);
-  // إذا كل الأسئلة استُخدمت — reset وابدأ من جديد
-  if (!q && usedIds.length > 0) {
+  if (!q) {
+    // كل الأسئلة استُخدمت — reset وابدأ من جديد
     await run('UPDATE million_questions SET used_count=0 WHERE is_active=1', []).catch(()=>{});
     q = await get(
-      `SELECT * FROM million_questions WHERE is_active=1 ORDER BY random() LIMIT 1`, []
+      'SELECT * FROM million_questions WHERE is_active=1 ORDER BY random() LIMIT 1', []
     ).catch(()=>null);
   }
   return q || null;
@@ -267,9 +265,13 @@ async function beginGame(telegram, chatId) {
 
   game.status = 'playing';
   if (game.joinMsgId) {
-    telegram.deleteMessage(chatId, game.joinMsgId).catch(()=>{});
+    telegram.editMessageText(chatId, game.joinMsgId, null,
+      '🎮 *بدأت اللعبة!* انتبه للسؤال...',
+      { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [] } }
+    ).catch(()=>{});
     game.joinMsgId = null;
   }
+  await new Promise(r => setTimeout(r, 1500));
   await sendNextQuestion(telegram, chatId);
 }
 
