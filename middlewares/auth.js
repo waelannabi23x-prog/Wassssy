@@ -122,6 +122,17 @@ async function authMiddleware(ctx, next) {
     const chatType = ctx.chat?.type;
     if (!ctx.isOwner && !ctx.isAdmin && chatType === 'private') {
       const cbData = ctx.callbackQuery?.data;
+
+      // ✅ البنك مفتوح للجميع في الخاص
+      const BANK_CMDS = ['بنك','محفظتي','بطاقتي','كشف','ديوني','سداد','الاثرياء','أثرياء','اثرياء'];
+      const msgTxt = (ctx.message?.text||'').trim();
+      const isBankCmd = BANK_CMDS.includes(msgTxt)
+        || /^تحويل\s+\d/i.test(msgTxt)
+        || /^قرض/i.test(msgTxt)
+        || /^استثمار/i.test(msgTxt)
+        || /^سحب استثمار/i.test(msgTxt)
+        || (cbData && cbData.startsWith('bankpro:'));
+      if (isBankCmd) return next();
       
       if (cbData === 'check_subscription') {
         // ⚡ أجب فوراً + امسح الكاش + افحص من جديد
