@@ -203,9 +203,10 @@ async function startJoinPhase(ctx) {
 }
 
 async function joinGame(ctx) {
-  const chatId = ctx.chat.id;
+  const chatId = ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id;
+  if (!chatId) return ctx.answerCbQuery('❌ خطأ').catch(()=>{});
   const game   = getGame(chatId);
-  if (!game || game.status !== 'waiting') return ctx.answerCbQuery('\u26a0\ufe0f \u0644\u0627 \u062a\u0648\u062c\u062f \u0644\u0639\u0628\u0629 \u0644\u0644\u0627\u0646\u0636\u0645\u0627\u0645.', { show_alert: true }).catch(()=>{});
+  if (!game || game.status !== 'waiting') return ctx.answerCbQuery('⚠️ لا توجد لعبة للانضمام.', { show_alert: true }).catch(()=>{});
   if (game.players.size >= MAX_PLAYERS) return ctx.answerCbQuery('\u26a0\ufe0f \u0627\u0644\u0644\u0639\u0628\u0629 \u0645\u0645\u062a\u0644\u0626\u0629!', { show_alert: true }).catch(()=>{});
 
   const uid  = ctx.from.id;
@@ -233,7 +234,7 @@ async function joinGame(ctx) {
 }
 
 async function forceStart(ctx) {
-  const chatId = ctx.chat.id;
+  const chatId = ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id;
   const game   = getGame(chatId);
   if (!game || game.status !== 'waiting') return ctx.answerCbQuery().catch(()=>{});
   if (game.joinTimer) { clearTimeout(game.joinTimer); game.joinTimer = null; }
@@ -242,7 +243,7 @@ async function forceStart(ctx) {
 }
 
 async function cancelGame(ctx) {
-  const chatId = ctx.chat.id;
+  const chatId = ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id;
   const game   = getGame(chatId);
   if (!game) return ctx.answerCbQuery().catch(()=>{});
   if (game.joinTimer)  clearTimeout(game.joinTimer);
@@ -322,7 +323,7 @@ async function sendNextQuestion(telegram, chatId) {
 }
 
 async function handleAnswer(ctx, letter) {
-  const chatId = ctx.chat.id;
+  const chatId = ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id;
   const uid    = ctx.from.id;
   const game   = getGame(chatId);
 
@@ -461,7 +462,7 @@ async function stopGame(ctx) {
 }
 
 async function useLifeline(ctx, type) {
-  const chatId = ctx.chat.id;
+  const chatId = ctx.callbackQuery?.message?.chat?.id || ctx.chat?.id;
   const uid    = ctx.from.id;
   const game   = getGame(chatId);
   if (!game || game.status !== 'playing') return ctx.answerCbQuery('\u26a0\ufe0f').catch(()=>{});
