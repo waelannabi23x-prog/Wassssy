@@ -314,7 +314,13 @@ module.exports.registerCallbacks = function(bot, deps) {
 
     try {
       // ── ألعاب ──
-      if (data === 'mb_panel' || data.startsWith('gp_million') || data.startsWith('gp_guess') || data.startsWith('mq_') || data.startsWith('gp_slot')) {
+      if (data === 'mb_panel' || data.startsWith('gp_million') || data.startsWith('gp_guess') || data.startsWith('gp_slot')) {
+        return gamesPanel.handleCallback(ctx, data);
+      }
+      if (data.startsWith('mq_correct_') || data.startsWith('mq_add') || data.startsWith('mq_del')) {
+        return manage.handleCallback(ctx, data);
+      }
+      if (data.startsWith('mq_')) {
         return gamesPanel.handleCallback(ctx, data);
       }
 
