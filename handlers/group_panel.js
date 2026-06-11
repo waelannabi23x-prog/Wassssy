@@ -19,7 +19,8 @@ async function showGroupPanel(ctx) {
   const allG = await all('SELECT chat_id, title FROM group_chats WHERE is_active=1 ORDER BY title').catch(() => []);
   const botId = ctx.botInfo?.id || (await ctx.telegram.getMe().catch(() => ({}))).id;
   const { run: dbRun2 } = require('../database/db');
-  for (const g of allG.slice(0, 20)) {
+  // parallel بدل sequential — أسرع بـ 10x
+  await Promise.allSettled(allG.slice(0, 20).map(async g => {
     try {
       const bm = await ctx.telegram.getChatMember(g.chat_id, botId).catch(() => null);
       if (!bm || ['left','kicked'].includes(bm.status)) {
@@ -30,7 +31,7 @@ async function showGroupPanel(ctx) {
       await dbRun2('UPDATE group_chats SET is_active=0 WHERE chat_id=$1', [g.chat_id]).catch(() => {});
       g._remove = true;
     }
-  }
+  }));
   const groups = allG.filter(g => !g._remove);
   const total = groups.length;
 
@@ -417,12 +418,14 @@ async function showMyGroups(ctx) {
   if (isOwner) {
     allGroups.forEach(g => myGroups.push(g));
   } else {
-    for (const g of allGroups) {
-      try {
-        const m = await ctx.telegram.getChatMember(g.chat_id, uid);
-        if (['administrator','creator'].includes(m?.status)) myGroups.push(g);
-      } catch(_) {}
-    }
+    // parallel — كل القروبات دفعة واحدة
+    const checks = await Promise.allSettled(
+      allGroups.map(g => ctx.telegram.getChatMember(g.chat_id, uid).catch(() => null))
+    );
+    checks.forEach((res, i) => {
+      const status = res.value?.status;
+      if (['administrator','creator'].includes(status)) myGroups.push(allGroups[i]);
+    });
   }
 
   if (!myGroups.length) {
