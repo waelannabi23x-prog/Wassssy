@@ -463,8 +463,8 @@ async function handleOwnerState(ctx, state) {
   if (step === 'difficulty') {
     const diff = Math.min(3, Math.max(1, parseInt(text) || 1));
     await run(
-      'INSERT INTO million_questions(question,option_a,option_b,option_c,option_d,correct,media_file_id,media_type,difficulty) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9)',
-      [state.question,state.option_a,state.option_b,state.option_c,state.option_d,state.correct,state.mediaFileId||null,state.mediaType||null,diff]
+      'INSERT INTO million_questions(text,option_a,option_b,option_c,option_d,correct,difficulty,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,1)',
+      [state.question,state.option_a,state.option_b,state.option_c,state.option_d,state.correct,diff]
     );
     await require('../utils/stateManager').delState(uid);
     return ctx.reply('✅ تم إضافة السؤال! 🎮').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
