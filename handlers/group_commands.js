@@ -560,31 +560,31 @@ function setupGroupCommands(bot) {
   bot.command("info", async ctx => {
     if (!isGroup(ctx)) return;
     delCmd(ctx);
-    const target = ctx.message.reply_to_message?.from || ctx.from;
+    const target   = ctx.message.reply_to_message?.from || ctx.from;
+    const isReqAdm = await isTgAdmin(ctx);
     const { get: dbGet } = require("../database/db");
-    const member = await ctx.telegram.getChatMember(ctx.chat.id, target.id).catch(() => null);
-    const warns  = await dbGet("SELECT COUNT(*) as c FROM group_warns WHERE chat_id=$1 AND user_id=$2", [ctx.chat.id, target.id]).catch(() => ({ c: 0 }));
+    const [member, warnsRow] = await Promise.all([
+      ctx.telegram.getChatMember(ctx.chat.id, target.id).catch(() => null),
+      dbGet("SELECT COUNT(*) as c FROM group_warns WHERE chat_id=$1 AND user_id=$2", [ctx.chat.id, target.id]).catch(() => ({ c: 0 }))
+    ]);
     const statusMap = { member:"عضو 👤", administrator:"مشرف 🛡️", creator:"مؤسس 👑", restricted:"مقيّد 🔒", left:"غادر 🚪", kicked:"محظور 🚫" };
-    const name = [target.first_name, target.last_name].filter(Boolean).join(" ");
-    const isAdm = ['administrator','creator'].includes(member?.status);
-    // join date من restricted info
-    const joinDate = member?.status === 'restricted' ? '' : '';
-    let txt = "👤 *معلومات العضو*\n\n";
-    txt += "🔴 الاسم: *" + name + "*\n";
+    const name     = [target.first_name, target.last_name].filter(Boolean).join(" ");
+    const isTarget = ["administrator","creator"].includes(member?.status);
+    const warnCnt  = parseInt(warnsRow?.c || 0);
+    let txt = "👤 *معلومات المستخدم*\n━━━━━━━━━━━━━━\n\n";
+    txt += "🪪 الاسم: *" + name + "*\n";
     if (target.username) txt += "🔗 يوزر: @" + target.username + "\n";
-    txt += "🆔 الرقم التعريفي: " + target.id + "\n";
-    if (target.last_name) txt += "👨‍👩 اسم العائلة: " + target.last_name + "\n";
-    txt += "👀 الحالة: " + (statusMap[member?.status] || "غير معروف") + "\n";
-    txt += "❗ الإنذارات: " + (warns?.c || 0) + "/3\n";
-    txt += "⬇️ الانضمام: " + (member?.status === 'left' ? 'غير متاح' : 'متاح') + "\n";
+    txt += "🆔 ID: `" + target.id + "`\n";
+    txt += "📊 الحالة: " + (statusMap[member?.status] || "غير معروف") + "\n";
+    if (isReqAdm) txt += "⚠️ الإنذارات: *" + warnCnt + "/3*\n";
     const kb = [];
-    if (!isAdm) {
-      kb.push([{ text: '❗ الإنذارات', callback_data: 'grp_warns_' + target.id }]);
+    if (isReqAdm && !isTarget && target.id !== ctx.from.id) {
+      kb.push([{ text: "⚠️ إنذارات: " + warnCnt + "/3", callback_data: "grp_warns_show_" + target.id + "_" + ctx.chat.id }]);
       kb.push([
-        { text: '🔇 كتم 🪃',   callback_data: 'grp_mute_1h_' + target.id },
-        { text: '🚫 حظر 🏹',   callback_data: 'grp_ban_' + target.id },
+        { text: "🔇 كتم",  callback_data: "grp_mute_menu_" + target.id },
+        { text: "🚫 حظر",  callback_data: "grp_ban_confirm_" + target.id },
       ]);
-      kb.push([{ text: '🎛 أذونات 📡', callback_data: 'grp_perms_' + target.id + '_' + ctx.chat.id }]);
+      kb.push([{ text: "🎛 الأذونات", callback_data: "grp_perms_" + target.id + "_" + ctx.chat.id }]);
     }
     ctx.reply(txt, {
       parse_mode: "Markdown",
