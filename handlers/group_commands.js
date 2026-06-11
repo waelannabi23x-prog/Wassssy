@@ -64,126 +64,90 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   // 🚫 /ban — حظر عضو
   // ══════════════════════════════════════════
+  // ══ /ban ══
   bot.command('ban', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return;
     delCmd(ctx);
     const target = await getTarget(ctx);
-    if (!target) return ctx.reply('⚠️ رد على رسالة المستخدم أو اكتب:\n`/ban @username السبب`', { parse_mode: 'Markdown' }).catch(() => {});
-    const args = ctx.message.text.split(' ').slice(2);
-    const reason = args.join(' ') || 'لم يُذكر سبب';
+    if (!target) return _reply(ctx, '⚠️ رد على رسالة المستخدم', 5000);
+    const reason = ctx.message.text.split(' ').slice(2).join(' ') || 'مخالفة القواعد';
     try {
       await ctx.telegram.banChatMember(ctx.chat.id, target.id);
-      await run(
-        `INSERT INTO group_bans(chat_id,user_id,banned_by,reason) VALUES($1,$2,$3,$4)
-         ON CONFLICT(chat_id,user_id) DO UPDATE SET reason=$4, banned_by=$3`,
-        [ctx.chat.id, target.id, ctx.from.id, reason]
-      ).catch(() => {});
-      const msg = await ctx.reply(
-        `🚫 *تم الحظر*\n👤 ${target.name}\n📝 السبب: ${reason}`,
-        { parse_mode: 'Markdown', ...build([[{ text: '🔓 رفع الحظر', callback_data: 'grp_unban_' + target.id }]]) }
-      ).catch(() => {});
-      if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 15000);
-    } catch(e) {
-      ctx.reply('❌ فشل الحظر: ' + e.message).catch(() => {});
-    }
+      await run(`INSERT INTO group_bans(chat_id,user_id,banned_by,reason) VALUES($1,$2,$3,$4) ON CONFLICT(chat_id,user_id) DO UPDATE SET reason=$4,banned_by=$3`, [ctx.chat.id, target.id, ctx.from.id, reason]).catch(() => {});
+      const m = await ctx.reply(`🚫 *${target.name}* محظور\n📝 ${reason}`, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: [[{ text: '🔓 رفع الحظر', callback_data: 'grp_unban_' + target.id }]] }
+      }).catch(() => null);
+      if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 20000);
+    } catch(e) { _reply(ctx, '❌ ' + e.message, 5000); }
   });
 
-  // ══════════════════════════════════════════
-  // ✅ /unban — رفع الحظر
-  // ══════════════════════════════════════════
+  // ══ /unban ══
   bot.command('unban', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return;
     delCmd(ctx);
     const target = await getTarget(ctx);
-    if (!target) return ctx.reply('⚠️ `/unban @username`', { parse_mode: 'Markdown' }).catch(() => {});
+    if (!target) return _reply(ctx, '⚠️ `/unban @username`', 5000);
     try {
       await ctx.telegram.unbanChatMember(ctx.chat.id, target.id);
       await run('DELETE FROM group_bans WHERE chat_id=$1 AND user_id=$2', [ctx.chat.id, target.id]).catch(() => {});
-      const msg = await ctx.reply(`✅ *رُفع الحظر عن ${target.name}*`, { parse_mode: 'Markdown' }).catch(() => {});
-      if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 8000);
-    } catch(e) {
-      ctx.reply('❌ فشل: ' + e.message).catch(() => {});
-    }
+      _reply(ctx, `✅ رُفع الحظر عن *${target.name}*`, 8000);
+    } catch(e) { _reply(ctx, '❌ ' + e.message, 5000); }
   });
 
-  // ══════════════════════════════════════════
-  // 🦵 /kick — طرد بدون حظر
-  // ══════════════════════════════════════════
+  // ══ /kick ══
   bot.command('kick', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return;
     delCmd(ctx);
     const target = await getTarget(ctx);
-    if (!target) return ctx.reply('⚠️ رد على رسالة المستخدم أو `/kick @username`', { parse_mode: 'Markdown' }).catch(() => {});
+    if (!target) return _reply(ctx, '⚠️ رد على رسالة المستخدم', 5000);
     try {
       await ctx.telegram.banChatMember(ctx.chat.id, target.id);
       await ctx.telegram.unbanChatMember(ctx.chat.id, target.id);
-      const msg = await ctx.reply(`🦵 *تم طرد ${target.name}*\n_(يمكنه العودة بالرابط)_`, { parse_mode: 'Markdown' }).catch(() => {});
-      if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 8000);
-    } catch(e) {
-      ctx.reply('❌ فشل: ' + e.message).catch(() => {});
-    }
+      _reply(ctx, `🦵 *${target.name}* طُرد من المجموعة`, 8000);
+    } catch(e) { _reply(ctx, '❌ ' + e.message, 5000); }
   });
 
-  // ══════════════════════════════════════════
-  // 🔇 /mute — إسكات عضو معين أو الكل
-  // ══════════════════════════════════════════
+  // ══ /mute ══
   bot.command('mute', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return;
     delCmd(ctx);
     const args = ctx.message.text.split(' ').slice(1);
-
-    // إذا ما في args أو مكتوب "all" → إسكات الكل
-    if (!args.length || args[0] === 'all') {
-      return muteAll(ctx, ctx.chat.id);
-    }
-
+    if (!args.length || args[0] === 'all') return muteAll(ctx, ctx.chat.id);
     const target = await getTarget(ctx);
-    if (!target) return ctx.reply('⚠️ رد على رسالة أو:\n`/mute @user 10m`\nالمدة: m=دقائق h=ساعات d=أيام', { parse_mode: 'Markdown' }).catch(() => {});
-
-    // المدة: آخر argument إذا كان رقم+وحدة
+    if (!target) return _reply(ctx, '⚠️ `/mute @user 10m` — m=دقائق h=ساعات d=أيام', 8000);
     const lastArg = args[args.length - 1];
     const minutes = parseDuration(/^\d/.test(lastArg) ? lastArg : null);
-    const durText = minutes < 60 ? minutes + ' دقيقة'
-      : minutes < 1440 ? (minutes/60) + ' ساعة'
-      : (minutes/1440) + ' يوم';
-
+    const durText = minutes < 60 ? minutes + 'د' : minutes < 1440 ? (minutes/60) + 'س' : (minutes/1440) + 'ي';
     try {
       await muteMember(ctx, ctx.chat.id, target.id, minutes);
-      const msg = await ctx.reply(
-        `🔇 *تم الإسكات*\n👤 ${target.name}\n⏱ المدة: ${durText}`,
-        { parse_mode: 'Markdown', ...build([[{ text: '🔊 رفع الإسكات', callback_data: 'grp_unmute_' + target.id }]]) }
-      ).catch(() => {});
-      if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 15000);
-    } catch(e) {
-      ctx.reply('❌ فشل: ' + e.message).catch(() => {});
-    }
+      const m = await ctx.reply(`🔇 *${target.name}* — كُتم ${durText}`, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: [[{ text: '🔊 رفع الكتم', callback_data: 'grp_unmute_' + target.id }]] }
+      }).catch(() => null);
+      if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 20000);
+    } catch(e) { _reply(ctx, '❌ ' + e.message, 5000); }
   });
 
-  // ══════════════════════════════════════════
-  // 🔊 /unmute — رفع الإسكات عن عضو أو الكل
-  // ══════════════════════════════════════════
+  // ══ /unmute ══
   bot.command('unmute', async ctx => {
     if (!isGroup(ctx)) return;
-    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    if (!await isTgAdmin(ctx)) return;
     delCmd(ctx);
     const args = ctx.message.text.split(' ').slice(1);
-    if (!args.length || args[0] === 'all') {
-      return unmuteAll(ctx, ctx.chat.id);
-    }
+    if (!args.length || args[0] === 'all') return unmuteAll(ctx, ctx.chat.id);
     const target = await getTarget(ctx);
-    if (!target) return ctx.reply('⚠️ رد على رسالة أو `/unmute @user`', { parse_mode: 'Markdown' }).catch(() => {});
+    if (!target) return _reply(ctx, '⚠️ `/unmute @user`', 5000);
     try {
       await unmuteMember(ctx, ctx.chat.id, target.id);
-      const msg = await ctx.reply(`🔊 *رُفع الإسكات عن ${target.name}*`, { parse_mode: 'Markdown' }).catch(() => {});
-      if (msg) setTimeout(() => ctx.deleteMessage(msg.message_id).catch(() => {}), 8000);
-    } catch(e) {
-      ctx.reply('❌ فشل: ' + e.message).catch(() => {});
-    }
+      _reply(ctx, `🔊 رُفع الكتم عن *${target.name}*`, 8000);
+    } catch(e) { _reply(ctx, '❌ ' + e.message, 5000); }
   });
+
 
   // ══════════════════════════════════════════
   // ⚠️ /warn — تحذير عضو
@@ -475,25 +439,36 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   bot.command(["العاب", "games", "العبوا", "الالعاب"], async ctx => {
     if (!isGroup(ctx)) return;
+    delCmd(ctx);
     const { get: dbG } = require('../database/db');
-    const qc = await dbG('SELECT COUNT(*) AS c FROM million_questions WHERE is_active=1').catch(() => ({ c: 0 }));
-    const qs = qc?.c || 0;
-    const text =
-      '🎮 *ألعاب القروب*\n━━━━━━━━━━━━━━━━━━━━\n\n' +
-      '🏆 *من سيربح المليون* — ' + qs + ' سؤال — اكتب *مليون*\n' +
-      '📸 *خمن الصورة* — اكتب *خمن*\n' +
-      '🎲 *قلب العملة* — /flip [مبلغ]\n' +
-      '🦹 *السرقة* — رد + /rob\n' +
-      '🎁 *مكافأة يومية* — /daily\n' +
-      '🏅 *المتصدرون* — /leaderboard';
-    const rows = [
-      [{ text: '🏆 مليون', callback_data: 'games_start_million' }, { text: '📸 خمن', callback_data: 'games_start_guess' }],
-      [{ text: '🎲 قلب عملة', callback_data: 'games_start_flip' }, { text: '🏦 حسابي البنكي', callback_data: 'games_bank' }],
-      [{ text: '🎁 مكافأة يومية', callback_data: 'games_daily' }, { text: '🏅 متصدرون', callback_data: 'games_leaderboard' }],
+    const qc = await dbG('SELECT COUNT(*) AS c FROM million_questions WHERE is_active=1').catch(() => ({ c:0 }));
+    const qs = parseInt(qc?.c || 0);
+
+    const mainText =
+      '🎮 *ألعاب القروب*\n' +
+      '━━━━━━━━━━━━━━━━━━━━\n\n' +
+      '🏆 *من سيربح المليون*\n' +
+      '📸 *خمّن الصورة*\n' +
+      '🎲 *قلب العملة*\n' +
+      '🦹 *السرقة*\n' +
+      '🏦 *البنك والمكافآت*\n\n' +
+      '👇 اختر لعبة لمعرفة التفاصيل:';
+
+    const mainKb = [
+      [{ text: '🏆 من سيربح المليون', callback_data: 'grp_game_info_million' }],
+      [{ text: '📸 خمّن الصورة',      callback_data: 'grp_game_info_guess'   }],
+      [{ text: '🎲 قلب العملة',       callback_data: 'grp_game_info_flip'    }],
+      [{ text: '🦹 السرقة',           callback_data: 'grp_game_info_rob'     }],
+      [{ text: '🏦 البنك',            callback_data: 'grp_game_info_bank'    }],
     ];
-    const msg = await ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: rows } }).catch(() => null);
-    if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(() => {}), 120000);
+
+    const msg = await ctx.reply(mainText, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: mainKb }
+    }).catch(() => null);
+    if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(() => {}), 180000);
   });
+
 
   // ══════════════════════════════════════════
   // 🎮 Million Battle
@@ -1094,6 +1069,13 @@ async function showGamesMenu(ctx) {
     reply_to_message_id: ctx.message?.message_id,
     reply_markup: { inline_keyboard: rows }
   }).catch(() => null);
+}
+
+// helper: رسالة تُحذف تلقائياً
+function _reply(ctx, text, delay=10000) {
+  ctx.reply(text, { parse_mode: 'Markdown' })
+    .then(m => { if (m && delay) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), delay); })
+    .catch(() => {});
 }
 
 module.exports = { setupGroupCommands, showGamesMenu, handleSettingsCallback, showGroupSettings };

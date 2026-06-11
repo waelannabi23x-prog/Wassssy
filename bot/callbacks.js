@@ -1153,3 +1153,131 @@ module.exports.registerCallbacks = function(bot, deps) {
   }
   });
 };
+  // ── ألعاب القروب — شرح كل لعبة ──
+  if (data.startsWith('grp_game_info_')) {
+    const game = data.replace('grp_game_info_', '');
+    const info = {
+      million: {
+        text:
+          '🏆 *من سيربح المليون*\n' +
+          '━━━━━━━━━━━━━━━━━━━━\n\n' +
+          '📌 *طريقة اللعب:*\n' +
+          'اكتب *مليون* في القروب لبدء جلسة\n' +
+          'سيظهر زر انضمام للأعضاء\n' +
+          'تبدأ الأسئلة بعد 60 ثانية\n\n' +
+          '🃏 *المساعدات:*\n' +
+          '50/50 — استطلاع الجمهور — اتصال صديق — تخطي\n\n' +
+          '💰 *الجوائز:* تصاعدية من 1,000 → 1,000,000\n\n' +
+          '⚡ كل إجابة خاطئة = خروج من اللعبة',
+        btn: '▶️ ابدأ المليون الآن'
+      },
+      guess: {
+        text:
+          '📸 *خمّن الصورة*\n' +
+          '━━━━━━━━━━━━━━━━━━━━\n\n' +
+          '📌 *طريقة اللعب:*\n' +
+          'اكتب *خمن* لبدء التحدي\n' +
+          'يظهر جزء من صورة مخفية\n' +
+          'اكتب إجابتك في القروب\n\n' +
+          '⏱ وقت الإجابة: 30 ثانية\n' +
+          '🏅 الفائز يحصل على XP ونقاط\n\n' +
+          '💡 يمكن للمشرف إضافة صور جديدة',
+        btn: '▶️ ابدأ خمن الصورة'
+      },
+      flip: {
+        text:
+          '🎲 *قلب العملة*\n' +
+          '━━━━━━━━━━━━━━━━━━━━\n\n' +
+          '📌 *طريقة اللعب:*\n' +
+          '/flip [مبلغ] [صورة/كتابة]\n\n' +
+          '🔹 مثال: /flip 500 صورة\n' +
+          '🔹 الحد الأدنى: 10 دج\n' +
+          '🔹 الحد الأقصى: رصيدك كاملاً\n\n' +
+          '✅ ربح = ضعف المبلغ\n' +
+          '❌ خسارة = تخسر المبلغ',
+        btn: '🎲 العب الآن'
+      },
+      rob: {
+        text:
+          '🦹 *السرقة*\n' +
+          '━━━━━━━━━━━━━━━━━━━━\n\n' +
+          '📌 *طريقة اللعب:*\n' +
+          'رد على رسالة شخص + اكتب /rob\n\n' +
+          '⚠️ *شروط:*\n' +
+          '🔹 الضحية يملك أكثر من 100 دج\n' +
+          '🔹 انتظر ساعة بين كل سرقة\n\n' +
+          '✅ نجاح = تسرق 10-30% من رصيده\n' +
+          '❌ فشل = تخسر 50 دج غرامة',
+        btn: '🦹 سرق الآن'
+      },
+      bank: {
+        text:
+          '🏦 *البنك والمكافآت*\n' +
+          '━━━━━━━━━━━━━━━━━━━━\n\n' +
+          '📌 *الأوامر:*\n' +
+          '/daily — مكافأة يومية مجانية\n' +
+          '/leaderboard — أغنى الأعضاء\n' +
+          '/flip — قلب العملة\n' +
+          '/rob — سرق عضو\n\n' +
+          '💰 *طرق الكسب:*\n' +
+          '🔹 المكافأة اليومية\n' +
+          '🔹 الفوز في الألعاب\n' +
+          '🔹 تصدر القوائم',
+        btn: '💰 رصيدي'
+      },
+    };
+
+    const g = info[game];
+    if (!g) return ctx.answerCbQuery('').catch(() => {});
+
+    const backKb = [[
+      { text: g.btn, callback_data: 'grp_game_start_' + game },
+      { text: '◀️ رجوع', callback_data: 'grp_game_back' },
+    ]];
+
+    await ctx.answerCbQuery('').catch(() => {});
+    return ctx.editMessageText(g.text, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: backKb }
+    }).catch(() => {});
+  }
+
+  // ── رجوع للقائمة الرئيسية للألعاب ──
+  if (data === 'grp_game_back') {
+    const { get: dbG } = require('../database/db');
+    const qc = await dbG('SELECT COUNT(*) AS c FROM million_questions WHERE is_active=1').catch(() => ({ c:0 }));
+    const mainText =
+      '🎮 *ألعاب القروب*\n' +
+      '━━━━━━━━━━━━━━━━━━━━\n\n' +
+      '🏆 *من سيربح المليون*\n' +
+      '📸 *خمّن الصورة*\n' +
+      '🎲 *قلب العملة*\n' +
+      '🦹 *السرقة*\n' +
+      '🏦 *البنك والمكافآت*\n\n' +
+      '👇 اختر لعبة لمعرفة التفاصيل:';
+    const mainKb = [
+      [{ text: '🏆 من سيربح المليون', callback_data: 'grp_game_info_million' }],
+      [{ text: '📸 خمّن الصورة',      callback_data: 'grp_game_info_guess'   }],
+      [{ text: '🎲 قلب العملة',       callback_data: 'grp_game_info_flip'    }],
+      [{ text: '🦹 السرقة',           callback_data: 'grp_game_info_rob'     }],
+      [{ text: '🏦 البنك',            callback_data: 'grp_game_info_bank'    }],
+    ];
+    await ctx.answerCbQuery('').catch(() => {});
+    return ctx.editMessageText(mainText, {
+      parse_mode: 'Markdown',
+      reply_markup: { inline_keyboard: mainKb }
+    }).catch(() => {});
+  }
+
+  // ── بدء لعبة من الزر ──
+  if (data.startsWith('grp_game_start_')) {
+    const game = data.replace('grp_game_start_', '');
+    await ctx.answerCbQuery('').catch(() => {});
+    if (game === 'million') return ctx.reply('🏆 اكتب *مليون* لبدء اللعبة!', { parse_mode: 'Markdown' }).catch(() => {});
+    if (game === 'guess')   return ctx.reply('📸 اكتب *خمن* لبدء التحدي!',   { parse_mode: 'Markdown' }).catch(() => {});
+    if (game === 'flip')    return ctx.reply('🎲 استخدم /flip [مبلغ]',        { parse_mode: 'Markdown' }).catch(() => {});
+    if (game === 'rob')     return ctx.reply('🦹 رد على رسالة شخص + /rob',    { parse_mode: 'Markdown' }).catch(() => {});
+    if (game === 'bank')    return ctx.reply('💰 استخدم /daily للمكافأة اليومية', { parse_mode: 'Markdown' }).catch(() => {});
+  }
+
+
