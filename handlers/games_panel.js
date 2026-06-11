@@ -139,6 +139,28 @@ async function handleCallback(ctx, data) {
     );
   }
 
+  // تأكيد حفظ السؤال
+  if (data === 'mq_confirm_save') {
+    const { getState, delState } = require('../utils/stateManager');
+    const uid2 = ctx.uid || ctx.from?.id;
+    const st = await getState(uid2);
+    if (!st || st.type !== 'million_confirm_q') {
+      return ctx.answerCbQuery('⚠️ انتهت الجلسة، أعد الإضافة', { show_alert: true }).catch(() => {});
+    }
+    const { q } = st;
+    await run(
+      'INSERT INTO million_questions(text,option_a,option_b,option_c,option_d,correct,difficulty,added_by,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,$8,1)',
+      [q.question, q.optA, q.optB, q.optC, q.optD, q.correctLetter, q.difficulty, uid2]
+    ).catch(() => {});
+    await delState(uid2);
+    const cnt = await get('SELECT COUNT(*) AS c FROM million_questions WHERE is_active=1').catch(() => ({ c: 0 }));
+    ctx.answerCbQuery('✅ تم الحفظ!').catch(() => {});
+    return eos(ctx,
+      '✅ *تم حفظ السؤال بنجاح!*\n\n❓ ' + q.question + '\n✅ ' + q.correctText + '\n\n📊 المجموع: *' + cnt.c + '* سؤال',
+      { parse_mode: 'Markdown', ...kbBuild([[kbBtn('➕ إضافة آخر', 'gp_million_add'), kbBtn('◀️ رجوع', 'gp_million_panel')]]) }
+    );
+  }
+
   if (data === 'gp_million_del') {
     const { setState } = require('../utils/stateManager');
     await setState(ctx.uid || ctx.from?.id, { type: 'million_del_q' });
@@ -162,28 +184,80 @@ async function handleText(ctx) {
   if (state.type === 'million_add_q') {
     const text = ctx.message?.text || '';
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-    if (lines.length < 6) {
-      await ctx.reply('❌ الصيغة غير صحيحة! أرسل السؤال كاملاً مع 4 خيارات والإجابة.').catch(() => {});
+
+    // parser مرن — يقبل فراغات وصيغ مختلفة
+    const answerLetterMap = { 'أ': 'a', 'ب': 'b', 'ج': 'c', 'د': 'd', 'a': 'a', 'b': 'b', 'c': 'c', 'd': 'd', '1': 'a', '2': 'b', '3': 'c', '4': 'd' };
+
+    // استخراج الإجابة من أي سطر يحتوي "الإجابة" أو "الجواب"
+    const answerLine = lines.find(l => /الإجابة|الجواب|correct/i.test(l));
+    const answerRaw  = answerLine ? answerLine.replace(/.*[:\s]+/, '').trim() : '';
+    const correctLetter = answerLetterMap[answerRaw] || answerLetterMap[answerRaw?.charAt(0)] || null;
+
+    // استخراج الخيارات — أي سطر يبدأ بـ أ/ب/ج/د أو a/b/c/d أو 1/2/3/4
+    const optLines = lines.filter(l => /^[أبجدabcd1234][)\-)\s]/i.test(l));
+    const optA = optLines[0]?.replace(/^[أa1][)\-)\s]+/, '').trim() || '';
+    const optB = optLines[1]?.replace(/^[بb2][)\-)\s]+/, '').trim() || '';
+    const optC = optLines[2]?.replace(/^[جc3][)\-)\s]+/, '').trim() || '';
+    const optD = optLines[3]?.replace(/^[دd4][)\-)\s]+/, '').trim() || '';
+
+    // السؤال = أول سطر لا يطابق الخيارات ولا الإجابة
+    const question = lines.find(l =>
+      !/^[أبجدabcd1234][)\-)\s]/i.test(l) &&
+      !/الإجابة|الجواب|correct/i.test(l)
+    ) || '';
+
+    // التحقق
+    if (!question || !optA || !optB || !optC || !optD || !correctLetter) {
+      await ctx.reply(
+        '❌ *الصيغة غير مكتملة!*\n\n' +
+        'تأكد من وجود:\n' +
+        '• السؤال\n• 4 خيارات (أ ب ج د)\n• الإجابة\n\n' +
+        '_ما وصل:_ ' +
+        (!question ? '⚠️ السؤال ' : '') +
+        ((!optA||!optB||!optC||!optD) ? '⚠️ الخيارات ' : '') +
+        (!correctLetter ? '⚠️ الإجابة' : ''),
+        { parse_mode: 'Markdown' }
+      ).catch(() => {});
       return true;
     }
-    const question = lines[0];
-    const optA = lines[1].replace(/^أ[)\s]+/, '').trim();
-    const optB = lines[2].replace(/^ب[)\s]+/, '').trim();
-    const optC = lines[3].replace(/^ج[)\s]+/, '').trim();
-    const optD = lines[4].replace(/^د[)\s]+/, '').trim();
-    const answerLine = lines[5].replace(/الإجابة[:\s]+/, '').trim();
-    // حوّل الإجابة لحرف a/b/c/d
-    const answerLetterMap = { 'أ': 'a', 'ب': 'b', 'ج': 'c', 'د': 'd', 'a': 'a', 'b': 'b', 'c': 'c', 'd': 'd' };
-    const correctLetter = answerLetterMap[answerLine] || 'a';
-    const correctText = { 'a': optA, 'b': optB, 'c': optC, 'd': optD }[correctLetter];
 
-    await run(
-      'INSERT INTO million_questions(text, option_a, option_b, option_c, option_d, correct, difficulty, is_active) VALUES($1,$2,$3,$4,$5,$6,$7,1)',
-      [question, optA, optB, optC, optD, correctLetter, 'medium']
+    const correctText = { a: optA, b: optB, c: optC, d: optD }[correctLetter];
+
+    // استخرج الصعوبة إذا ذُكرت
+    const diffLine = lines.find(l => /سهل|متوسط|صعب|easy|medium|hard/i.test(l));
+    let difficulty = 'medium';
+    if (diffLine) {
+      if (/سهل|easy/i.test(diffLine))   difficulty = 'easy';
+      if (/صعب|hard/i.test(diffLine))   difficulty = 'hard';
+    }
+
+    // حفظ مع state انتظار تأكيد
+    await require('../utils/stateManager').setState(uid, {
+      type: 'million_confirm_q',
+      q: { question, optA, optB, optC, optD, correctLetter, correctText, difficulty }
+    });
+
+    const diffEmoji = { easy: '🟢 سهل', medium: '🟡 متوسط', hard: '🔴 صعب' }[difficulty];
+    await ctx.reply(
+      '👀 *معاينة السؤال قبل الحفظ:*\n' +
+      '━━━━━━━━━━━━━━━━━━━━\n\n' +
+      '❓ ' + question + '\n\n' +
+      'أ) ' + optA + '\n' +
+      'ب) ' + optB + '\n' +
+      'ج) ' + optC + '\n' +
+      'د) ' + optD + '\n\n' +
+      '✅ *الإجابة:* ' + correctText + '\n' +
+      '📊 *الصعوبة:* ' + diffEmoji,
+      { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [
+        [{ text: '✅ حفظ', callback_data: 'mq_confirm_save' }, { text: '❌ إلغاء', callback_data: 'gp_million_panel' }],
+      ]}}
     ).catch(() => {});
-    await delState(uid);
-    await ctx.reply('✅ *تم إضافة السؤال!*\n\n❓ ' + question + '\n✅ الإجابة: ' + correctText, { parse_mode: 'Markdown' }).catch(() => {});
     return true;
+  }
+
+  // تأكيد حفظ السؤال (callback)
+  if (state.type === 'million_confirm_q') {
+    return false; // يُعالج في handleCallback
   }
 
   // حذف سؤال

@@ -176,6 +176,8 @@ async function startJoinPhase(ctx) {
 
   const msg = await ctx.reply(buildJoinMsg(game), {
     parse_mode: 'Markdown',
+    reply_to_message_id: ctx.message?.message_id,
+    allow_sending_without_reply: true,
     reply_markup: { inline_keyboard: [
       [{ text: '\ud83d\ude80 \u0627\u0646\u0636\u0645!', callback_data: 'mlr_join' }],
       [{ text: '\u25b6\ufe0f \u0627\u0628\u062f\u0623 \u0627\u0644\u0622\u0646', callback_data: 'mlr_forcestart' }, { text: '\ud83d\udd34 \u0625\u0644\u063a\u0627\u0621', callback_data: 'mlr_cancel' }],
