@@ -144,9 +144,9 @@ async function handleCallback(ctx, data) {
   // ── اختيار الإجابة الصحيحة (step 6) ──
   if (data.startsWith('mq_ans_')) {
     const letter = data.replace('mq_ans_', '');
-    const { getState, getStateAsync, setState: _ss2 } = require('../utils/stateManager');
+    const { getStateAsync: _gsa, setState: _ss2 } = require('../utils/stateManager');
     const uid2 = ctx.uid || ctx.from?.id;
-    const st = await (getStateAsync || getState)(uid2);
+    const st = await _gsa(uid2);
     if (!st || st.type !== 'mq_step_answer') {
       return ctx.answerCbQuery('⚠️ انتهت الجلسة', { show_alert: true }).catch(() => {});
     }
@@ -172,9 +172,9 @@ async function handleCallback(ctx, data) {
   // ── اختيار الصعوبة + معاينة نهائية ──
   if (data.startsWith('mq_diff_')) {
     const diff = data.replace('mq_diff_', '');
-    const { getState, getStateAsync, setState: _ss3 } = require('../utils/stateManager');
+    const { getStateAsync: _gsa, setState: _ss3 } = require('../utils/stateManager');
     const uid2 = ctx.uid || ctx.from?.id;
-    const st = await (getStateAsync || getState)(uid2);
+    const st = await _gsa(uid2);
     if (!st || st.type !== 'mq_step_diff') {
       return ctx.answerCbQuery('⚠️ انتهت الجلسة', { show_alert: true }).catch(() => {});
     }
@@ -201,9 +201,9 @@ async function handleCallback(ctx, data) {
 
   // تأكيد حفظ السؤال
   if (data === 'mq_confirm_save') {
-    const { getState, getStateAsync, delState } = require('../utils/stateManager');
+    const { getStateAsync: _gsa, delState } = require('../utils/stateManager');
     const uid2 = ctx.uid || ctx.from?.id;
-    const st = await (getStateAsync || getState)(uid2);
+    const st = await _gsa(uid2);
     if (!st || st.type !== 'million_confirm_q') {
       return ctx.answerCbQuery('⚠️ انتهت الجلسة، أعد الإضافة', { show_alert: true }).catch(() => {});
     }
