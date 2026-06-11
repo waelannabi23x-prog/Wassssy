@@ -575,94 +575,40 @@ function setupGroupCommands(bot) {
     } catch(e) { ctx.reply("❌ فشل: " + e.message).catch(() => {}); }
   });
 
-  // ══ /info ══ (v2 — بسيط واحترافي)
+  // ══ /info ══
   bot.command("info", async ctx => {
     if (!isGroup(ctx)) return;
     delCmd(ctx);
-    const target = ctx.message.reply_to_message?.from || ctx.from;
-    const uid    = target.id;
-    const isAdm  = await isTgAdmin(ctx);
-    const { get: dbGet, all: dbAll } = require("../database/db");
-
-    const [member, warnsRows, bankAcc, xpRow, userRow] = await Promise.all([
-      ctx.telegram.getChatMember(ctx.chat.id, uid).catch(() => null),
-      dbAll("SELECT id FROM group_warns WHERE chat_id=$1 AND user_id=$2", [ctx.chat.id, uid]).catch(() => []),
-      dbGet("SELECT balance FROM bank_accounts WHERE user_id=$1", [uid]).catch(() => null),
-      dbGet("SELECT xp, level FROM user_xp WHERE user_id=$1", [uid]).catch(() => null),
-      dbGet("SELECT joined_at FROM users WHERE user_id=$1", [uid]).catch(() => null),
+    const target   = ctx.message.reply_to_message?.from || ctx.from;
+    const isReqAdm = await isTgAdmin(ctx);
+    const { get: dbGet } = require("../database/db");
+    const [member, warnsRow] = await Promise.all([
+      ctx.telegram.getChatMember(ctx.chat.id, target.id).catch(() => null),
+      dbGet("SELECT COUNT(*) as c FROM group_warns WHERE chat_id=$1 AND user_id=$2", [ctx.chat.id, target.id]).catch(() => ({ c: 0 }))
     ]);
-
-    const roleMap = { creator:"صاحب القروب", administrator:"مشرف", member:"عضو", restricted:"مقيّد", left:"غادر", kicked:"محظور" };
-    const role      = roleMap[member?.status] || "عضو";
-    const isTarget  = ["administrator","creator"].includes(member?.status);
-    const warnCnt   = warnsRows.length;
-    const name      = [target.first_name, target.last_name].filter(Boolean).join(" ");
-
-    // ── تاريخ انضمام Telegram (لو متاح) ──
-    let tgJoin = "";
-    try {
-      if (uid > 0) {
-        const approxYear = Math.floor((uid / 1e9) * 3.5 + 2013);
-        tgJoin = approxYear >= 2013 ? "~" + approxYear : "";
-      }
-    } catch(_) {}
-
-    const joinDate = userRow?.joined_at
-      ? new Date(userRow.joined_at).toLocaleDateString("ar-DZ")
-      : "—";
-
-    const roleEmoji = { creator:"👑", administrator:"⚡", member:"👤", restricted:"🔒", left:"🚪", kicked:"🚫" };
-    const rEmoji = roleEmoji[member?.status] || "👤";
-
-    let txt = "";
-    txt += "🪪 *الرقم التعريفي:* `" + uid + "`
-";
-    txt += "👤 الاسم: [" + name + "](tg://user?id=" + uid + ")
-";
-    if (target.last_name) txt += "👨‍👩‍👧 اسم العائلة: " + target.last_name + "
-";
-    txt += rEmoji + " الحالة: " + role + "
-";
-    if (target.is_bot) txt += "🤖 بوت: نعم
-";
-    txt += "
-";
-    txt += "⚠️ الإنذارات: *" + warnCnt + "/3*
-";
-    if (bankAcc) txt += "💰 الرصيد: *" + Number(bankAcc.balance||0).toLocaleString("en") + " $*
-";
-    if (xpRow)   txt += "✨ XP: *" + (xpRow.xp||0) + "* | المستوى: *" + (xpRow.level||1) + "*
-";
-    txt += "📅 الانضمام: *" + joinDate + "*
-";
-
+    const statusMap = { member:"عضو 👤", administrator:"مشرف 🛡️", creator:"مؤسس 👑", restricted:"مقيّد 🔒", left:"غادر 🚪", kicked:"محظور 🚫" };
+    const name     = [target.first_name, target.last_name].filter(Boolean).join(" ");
+    const isTarget = ["administrator","creator"].includes(member?.status);
+    const warnCnt  = parseInt(warnsRow?.c || 0);
+    let txt = "👤 *معلومات المستخدم*\n━━━━━━━━━━━━━━\n\n";
+    txt += "🪪 الاسم: *" + name + "*\n";
+    if (target.username) txt += "🔗 يوزر: @" + target.username + "\n";
+    txt += "🆔 ID: `" + target.id + "`\n";
+    txt += "📊 الحالة: " + (statusMap[member?.status] || "غير معروف") + "\n";
+    if (isReqAdm) txt += "⚠️ الإنذارات: *" + warnCnt + "/3*\n";
     const kb = [];
-    if (isAdm && uid !== ctx.from.id) {
-      if (!isTarget) {
-        // زر الإنذارات — يظهر العدد ويفتح قائمة +/-
-        kb.push([
-          { text: "⚠️ الإنذارات " + warnCnt + "/3", callback_data: "grp_warnmenu_" + uid + "_" + ctx.chat.id },
-          { text: "🎛 الصلاحيات",                    callback_data: "grp_perms_"    + uid + "_" + ctx.chat.id },
-        ]);
-        kb.push([
-          { text: "🔇 كتم", callback_data: "grp_mute_menu_"   + uid },
-          { text: "🚫 حظر", callback_data: "grp_ban_confirm_" + uid },
-        ]);
-        kb.push([
-          { text: "🎛 أذونات ↗", callback_data: "grp_perms_" + uid + "_" + ctx.chat.id },
-        ]);
-      } else {
-        // مشرف — فقط زر الصلاحيات
-        kb.push([
-          { text: "🎛 الصلاحيات", callback_data: "grp_perms_" + uid + "_" + ctx.chat.id },
-        ]);
-      }
+    if (isReqAdm && !isTarget && target.id !== ctx.from.id) {
+      kb.push([{ text: "⚠️ إنذارات: " + warnCnt + "/3", callback_data: "grp_warns_show_" + target.id + "_" + ctx.chat.id }]);
+      kb.push([
+        { text: "🔇 كتم",  callback_data: "grp_mute_menu_" + target.id },
+        { text: "🚫 حظر",  callback_data: "grp_ban_confirm_" + target.id },
+      ]);
+      kb.push([{ text: "🎛 الأذونات", callback_data: "grp_perms_" + target.id + "_" + ctx.chat.id }]);
     }
-
     ctx.reply(txt, {
       parse_mode: "Markdown",
-      reply_to_message_id: ctx.message?.reply_to_message?.message_id || ctx.message?.message_id,
-      reply_markup: kb.length ? { inline_keyboard: kb } : undefined,
+      reply_to_message_id: ctx.message?.reply_to_message?.message_id,
+      reply_markup: kb.length ? { inline_keyboard: kb } : undefined
     }).catch(() => {});
   });
 
@@ -671,23 +617,15 @@ function setupGroupCommands(bot) {
     if (!isGroup(ctx)) return;
     if (!await isTgAdmin(ctx)) return ctx.reply("🚫 للمشرفين فقط").catch(() => {});
     delCmd(ctx);
-    const n       = Math.min(parseInt(ctx.message.text.split(" ")[1]) || 10, 200);
-    const startId = ctx.message.message_id;
-    const m       = await ctx.reply("🗑 جاري الحذف...").catch(() => null);
-    // batch حذف — 100 في وقت واحد
-    const ids = [];
-    for (let i = startId - 1; i > startId - n - 1 && i > 0; i--) ids.push(i);
+    const n = Math.min(parseInt(ctx.message.text.split(" ")[1]) || 10, 50);
     let deleted = 0;
-    for (let i = 0; i < ids.length; i += 100) {
-      const batch = ids.slice(i, i + 100);
-      await Promise.allSettled(batch.map(id =>
-        ctx.telegram.deleteMessage(ctx.chat.id, id).then(() => deleted++).catch(() => {})
-      ));
-      if (i + 100 < ids.length) await new Promise(r => setTimeout(r, 300));
+    const startId = ctx.message.message_id;
+    for (let i = startId; i > startId - n - 1 && i > 0; i--) {
+      try { await ctx.telegram.deleteMessage(ctx.chat.id, i); deleted++; } catch(_) {}
+      await new Promise(r => setTimeout(r, 80));
     }
-    if (m) await ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {});
-    const done = await ctx.reply("✅ تم حذف " + deleted + " رسالة").catch(() => null);
-    if (done) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, done.message_id).catch(() => {}), 4000);
+    const m = await ctx.reply("✅ تم حذف " + deleted + " رسالة").catch(() => null);
+    if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 4000);
   });
 
   // ══ /cmds ══
@@ -717,17 +655,15 @@ function setupGroupCommands(bot) {
     const toId    = ctx.message.message_id - 1;
     if (toId < fromId) return ctx.reply("⚠️ ما في رسائل للحذف").catch(() => {});
     const total = toId - fromId + 1;
-    if (total > 200) return ctx.reply("⚠️ الحد الأقصى 200 رسالة").catch(() => {});
+    if (total > 100) return ctx.reply("⚠️ الحد الأقصى 100 رسالة").catch(() => {});
     const m = await ctx.reply("🗑 جاري حذف " + total + " رسالة...").catch(() => null);
     let deleted = 0;
-    const allIds = [];
-    for (let i = fromId; i <= toId; i++) allIds.push(i);
-    for (let i = 0; i < allIds.length; i += 100) {
-      const batch = allIds.slice(i, i + 100);
-      await Promise.allSettled(batch.map(id =>
-        ctx.telegram.deleteMessage(ctx.chat.id, id).then(() => deleted++).catch(() => {})
-      ));
-      if (i + 100 < allIds.length) await new Promise(r => setTimeout(r, 300));
+    for (let i = fromId; i <= toId; i++) {
+      try {
+        await ctx.telegram.deleteMessage(ctx.chat.id, i);
+        deleted++;
+      } catch(_) {}
+      if (deleted % 10 === 0) await new Promise(r => setTimeout(r, 200));
     }
     if (m) await ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {});
     const done = await ctx.reply("✅ تم حذف " + deleted + " رسالة").catch(() => null);
