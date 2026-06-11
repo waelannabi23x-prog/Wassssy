@@ -236,8 +236,8 @@ async function handleCallback(ctx, data) {
 // ══════════════════════════════════════════
 async function handleText(ctx) {
   const uid = ctx.uid || ctx.from?.id;
-  const { getState, delState } = require('../utils/stateManager');
-  const state = await getState(uid);
+  const _sm = require('../utils/stateManager');
+  const state = await (_sm.getStateAsync ? _sm.getStateAsync(uid) : Promise.resolve(_sm.getState(uid))).catch(() => null);
   if (!state) return false;
 
   // ── STEP BY STEP ──
