@@ -621,11 +621,50 @@ module.exports.registerCallbacks = function(bot, deps) {
             data.startsWith('grp_warns_') || data.startsWith('grp_perms_') ||
             data.startsWith('grp_ptog_') || data.startsWith('grp_psave_') ||
             data.startsWith('grp_wadd_') || data.startsWith('grp_wdel_') ||
+            data.startsWith('grp_warn1_') || data.startsWith('grp_unwarn1_') ||
+            data.startsWith('grp_clearwarn_') ||
             data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_')) {
           const chatIdCheck = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
           const callerMember = await ctx.telegram.getChatMember(chatIdCheck, ctx.from.id).catch(() => null);
           const isCallerAdm  = ctx.isAdmin || ctx.isOwner || ['administrator','creator'].includes(callerMember?.status);
           if (!isCallerAdm) return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(() => {});
+        }
+
+        // ── +1 تحذير ──
+        if (data.startsWith('grp_warn1_')) {
+          const uid2   = parseInt(data.replace('grp_warn1_', ''));
+          const chatId2 = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+          const { run: dbR, all: dbA } = require('../database/db');
+          await dbR(
+            'INSERT INTO group_warns(chat_id,user_id,reason,warned_by) VALUES($1,$2,$3,$4)',
+            [chatId2, uid2, 'مخالفة القواعد', ctx.from.id]
+          ).catch(() => {});
+          const warns = await dbA('SELECT id FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId2, uid2]).catch(() => []);
+          const count = warns.length;
+          if (count >= 3) {
+            await ctx.telegram.banChatMember(chatId2, uid2).catch(() => {});
+            await dbR('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId2, uid2]).catch(() => {});
+            return ctx.answerCbQuery('🚫 وصل 3 تحذيرات — تم الحظر!', { show_alert: true }).catch(() => {});
+          }
+          return ctx.answerCbQuery('⚠️ تحذير ' + count + '/3', { show_alert: false }).catch(() => {});
+        }
+
+        // ── -1 تحذير ──
+        if (data.startsWith('grp_unwarn1_')) {
+          const uid2    = parseInt(data.replace('grp_unwarn1_', ''));
+          const chatId2 = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+          const { run: dbR, get: dbG } = require('../database/db');
+          // احذف آخر تحذير فقط
+          const last = await dbG(
+            'SELECT id FROM group_warns WHERE chat_id=$1 AND user_id=$2 ORDER BY id DESC LIMIT 1',
+            [chatId2, uid2]
+          ).catch(() => null);
+          if (last) await dbR('DELETE FROM group_warns WHERE id=$1', [last.id]).catch(() => {});
+          const remaining = await dbG(
+            'SELECT COUNT(*) AS c FROM group_warns WHERE chat_id=$1 AND user_id=$2',
+            [chatId2, uid2]
+          ).catch(() => ({ c: 0 }));
+          return ctx.answerCbQuery('✅ تحذير ' + remaining.c + '/3', { show_alert: false }).catch(() => {});
         }
 
         // ── قائمة خيارات الكتم ──

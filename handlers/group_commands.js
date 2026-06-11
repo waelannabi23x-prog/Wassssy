@@ -220,27 +220,42 @@ function setupGroupCommands(bot) {
     };
     const role = roleMap[chatMember?.status] || '👤 عضو';
 
-    let text = '👤 *معلومات المستخدم*\n━━━━━━━━━━━━━━━\n\n';
-    text += '🆔 ID: `' + uid + '`\n';
-    text += '📛 الاسم: [' + (target.first_name||'؟') + '](tg://user?id=' + uid + ')\n';
-    if (target.username) text += '🔗 يوزر: @' + target.username + '\n';
-    text += '🎭 الدور: ' + role + '\n';
-    if (target.is_bot) text += '🤖 بوت\n';
-    text += '\n📊 *الإحصائيات:*\n';
-    text += '⚠️ التحذيرات: *' + warns.length + '/3*\n';
-    if (bankAcc) text += '💰 الرصيد: *' + Number(bankAcc.balance||0).toLocaleString('en') + ' $*\n';
-    if (xpRow) text += '✨ XP: *' + (xpRow.xp||0) + '* | المستوى: *' + (xpRow.level||1) + '*\n';
-    if (userRow?.joined_at) text += '📅 انضم للبوت: *' + new Date(userRow.joined_at).toLocaleDateString('ar') + '*\n';
+    const isAdminOrOwner = ctx.isAdmin || ctx.isOwner;
+    const targetIsAdmin  = ['administrator','creator'].includes(chatMember?.status);
+
+    // نص بدون emoji مفرط — احترافي وبسيط
+    let text = '';
+    text += '[' + (target.first_name||'؟') + (target.last_name ? ' '+target.last_name : '') + '](tg://user?id=' + uid + ')';
+    if (target.username) text += '  @' + target.username;
+    text += '\n';
+    text += 'ID: `' + uid + '`\n';
+    text += 'الدور: ' + role + '\n';
+    if (target.is_bot) text += 'بوت: نعم\n';
+    text += '\n';
+    text += 'التحذيرات: ' + warns.length + ' / 3\n';
+    if (bankAcc) text += 'الرصيد: ' + Number(bankAcc.balance||0).toLocaleString('en') + ' $\n';
+    if (xpRow)   text += 'XP: ' + (xpRow.xp||0) + '  |  المستوى: ' + (xpRow.level||1) + '\n';
+    if (userRow?.joined_at) text += 'انضم: ' + new Date(userRow.joined_at).toLocaleDateString('ar-DZ') + '\n';
 
     const rows = [];
-    if (warns.length && (ctx.isAdmin || ctx.isOwner)) {
-      rows.push([{ text: '🗑 مسح التحذيرات', callback_data: 'grp_clearwarn_' + uid }]);
-    }
-    if (ctx.isAdmin || ctx.isOwner) {
+    if (isAdminOrOwner) {
+      // زر تحذير +1 / -1
       rows.push([
-        { text: '🚫 حظر', callback_data: 'grp_ban_' + uid },
-        { text: '🔇 كتم', callback_data: 'grp_mute_1h_' + uid },
+        { text: '＋ تحذير', callback_data: 'grp_warn1_'     + uid },
+        { text: '－ تحذير', callback_data: 'grp_unwarn1_'   + uid },
+        { text: '🗑 مسح الكل', callback_data: 'grp_clearwarn_' + uid },
       ]);
+      // إجراءات
+      rows.push([
+        { text: '🚫 حظر',  callback_data: 'grp_ban_'      + uid },
+        { text: '🔇 كتم',  callback_data: 'grp_mute_1h_'  + uid },
+      ]);
+      // إذونات (يُرسل للخاص) — يظهر فقط للمشرفين
+      if (!targetIsAdmin) {
+        rows.push([
+          { text: '⚙️ الإذونات', callback_data: 'grp_perms_' + uid + '_' + ctx.chat.id },
+        ]);
+      }
     }
 
     return ctx.reply(text, {
@@ -281,8 +296,12 @@ function setupGroupCommands(bot) {
       (count >= MAX ? '🚫 *تم الحظر تلقائياً بعد ' + MAX + ' تحذيرات!*' : '_تحذير ' + count + ' من ' + MAX + '_');
 
     const rows = [[
-      { text: '🗑 مسح التحذيرات', callback_data: 'grp_clearwarn_' + target.id },
-      { text: '🚫 حظر', callback_data: 'grp_ban_' + target.id },
+      { text: '＋ تحذير',      callback_data: 'grp_warn1_'     + target.id },
+      { text: '－ تحذير',      callback_data: 'grp_unwarn1_'   + target.id },
+      { text: '🗑 مسح الكل',   callback_data: 'grp_clearwarn_' + target.id },
+    ],[
+      { text: '🚫 حظر',        callback_data: 'grp_ban_'        + target.id },
+      { text: '🔇 كتم',        callback_data: 'grp_mute_1h_'    + target.id },
     ]];
 
     await ctx.reply(warnText, {
