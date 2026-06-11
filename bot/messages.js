@@ -215,7 +215,7 @@ module.exports.registerMessages = function(bot, deps) {
       // ── إضافة سؤال مليون — أولوية عالية ──
       if (s?.type?.startsWith('mq_step')) {
         const gp = require('../handlers/games_panel');
-        const handled = await gp.handleText(ctx).catch(() => false);
+        const handled = await gp.handleText(ctx, s).catch(() => false);
         if (handled) return;
       }
 

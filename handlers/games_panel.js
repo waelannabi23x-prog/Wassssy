@@ -234,10 +234,13 @@ async function handleCallback(ctx, data) {
 // ══════════════════════════════════════════
 // handleText — إضافة/حذف سؤال
 // ══════════════════════════════════════════
-async function handleText(ctx) {
+async function handleText(ctx, _passedState) {
   const uid = ctx.uid || ctx.from?.id;
-  const _sm = require('../utils/stateManager');
-  const state = await (_sm.getStateAsync ? _sm.getStateAsync(uid) : Promise.resolve(_sm.getState(uid))).catch(() => null);
+  let state = _passedState || null;
+  if (!state) {
+    const _sm = require('../utils/stateManager');
+    state = await (_sm.getStateAsync ? _sm.getStateAsync(uid) : Promise.resolve(_sm.getState(uid))).catch(() => null);
+  }
   if (!state) return false;
 
   // ── STEP BY STEP ──
