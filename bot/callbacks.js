@@ -371,26 +371,19 @@ module.exports.registerCallbacks = function(bot, deps) {
         const uid3    = parseInt(parts3[0]);
         const cid3    = parseInt(parts3[1]);
         const curKb2  = ctx.callbackQuery?.message?.reply_markup?.inline_keyboard || [];
-        const keyMap  = {
-          'الرسائل النصية':'can_send_messages',
-          'الوسائط (صور/فيديو)':'can_send_media_messages',
-          'الاستطلاعات':'can_send_polls',
-          'معاينة الروابط':'can_add_web_page_previews',
-          'دعوة أعضاء':'can_invite_users',
-          'تثبيت الرسائل':'can_pin_messages',
-        };
+        // نستخرج الإذونات من الأزرار — كل key يبدأ بـ grp_ptog_
         const permsToSave = {};
         for (const row of curKb2) {
           for (const btn of row) {
-            const isOn = btn.text.startsWith('✅');
-            for (const [label, key] of Object.entries(keyMap)) {
-              if (btn.text.includes(label)) permsToSave[key] = isOn;
+            if (btn.callback_data?.startsWith('grp_ptog_')) {
+              const key = btn.callback_data.replace('grp_ptog_', '').split('_').slice(0, -2).join('_');
+              permsToSave[key] = btn.text.startsWith('✅');
             }
           }
         }
         try {
           await ctx.telegram.restrictChatMember(cid3, uid3, { permissions: permsToSave });
-          await ctx.editMessageText('✅ *تم حفظ الأذونات بنجاح!*', { parse_mode: 'Markdown' }).catch(() => {});
+          await ctx.editMessageText('✅ *تم حفظ الأذونات!*', { parse_mode: 'Markdown' }).catch(() => {});
           return ctx.answerCbQuery('✅ تم الحفظ').catch(() => {});
         } catch(e) {
           return ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {});
@@ -622,7 +615,9 @@ module.exports.registerCallbacks = function(bot, deps) {
             data.startsWith('grp_ptog_') || data.startsWith('grp_psave_') ||
             data.startsWith('grp_wadd_') || data.startsWith('grp_wdel_') ||
             data.startsWith('grp_warn1_') || data.startsWith('grp_unwarn1_') ||
-            data.startsWith('grp_clearwarn_') ||
+            data.startsWith('grp_clearwarn_') || data.startsWith('grp_pall_') ||
+            data.startsWith('grp_pnone_') || data.startsWith('grp_aptog_') ||
+            data.startsWith('grp_apsave_') || data.startsWith('grp_demote_') ||
             data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_')) {
           const chatIdCheck = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
           const callerMember = await ctx.telegram.getChatMember(chatIdCheck, ctx.from.id).catch(() => null);
@@ -717,30 +712,160 @@ module.exports.registerCallbacks = function(bot, deps) {
           const chatId2 = parts[1] ? parseInt(parts[1]) : ctx.chat.id;
           const adminId = ctx.from.id;
           const member  = await ctx.telegram.getChatMember(chatId2, uid2).catch(() => null);
-          const p = member?.status === 'restricted' ? member : null;
+          const isAdminMember = ['administrator','creator'].includes(member?.status);
+          const p = member?.can_send_messages !== undefined ? member : null;
           const can = (key) => p ? (p[key] !== false) : true;
-          const tog = (label, key, val) => [{
-            text: (can(key) ? '✅ ' : '❌ ') + label,
-            callback_data: 'grp_ptog_' + key + '_' + uid2 + '_' + chatId2
-          }];
-          const kb = [
-            tog('الرسائل النصية',      'can_send_messages',          true),
-            tog('الوسائط (صور/فيديو)', 'can_send_media_messages',    true),
-            tog('الاستطلاعات',         'can_send_polls',             true),
-            tog('معاينة الروابط',      'can_add_web_page_previews',  true),
-            tog('دعوة أعضاء',          'can_invite_users',           true),
-            tog('تثبيت الرسائل',       'can_pin_messages',           false),
-            [{ text: '💾 حفظ', callback_data: 'grp_psave_' + uid2 + '_' + chatId2 }],
-          ];
-          const txt = '🎛 *أذونات العضو*\n🆔 ' + uid2 + '\n\n_اضغط لتفعيل/تعطيل كل إذن ثم اضغط حفظ_';
+          const acan = (key) => member ? (member[key] === true) : false;
+          const tog  = (label, key) => [{ text: (can(key)  ? '✅ ' : '❌ ') + label, callback_data: 'grp_ptog_'  + key + '_' + uid2 + '_' + chatId2 }];
+          const atog = (label, key) => [{ text: (acan(key) ? '✅ ' : '❌ ') + label, callback_data: 'grp_aptog_' + key + '_' + uid2 + '_' + chatId2 }];
+
+          let kb, txt;
+          if (isAdminMember) {
+            // إذونات المشرف
+            txt = '👮 *إذونات المشرف*\n' +
+                  '[' + (member?.user?.first_name||'مشرف') + '](tg://user?id=' + uid2 + ')  •  ' + chatId2 + '\n\n' +
+                  '_اضغط لتفعيل/تعطيل ثم احفظ_';
+            kb = [
+              atog('حذف الرسائل',       'can_delete_messages'),
+              atog('حظر الأعضاء',       'can_restrict_members'),
+              atog('تثبيت الرسائل',     'can_pin_messages'),
+              atog('دعوة عبر رابط',     'can_invite_users'),
+              atog('تغيير معلومات',     'can_change_info'),
+              atog('إدارة البث المباشر','can_manage_video_chats'),
+              atog('إدارة القروب',       'can_manage_chat'),
+              atog('إضافة مشرفين',      'can_promote_members'),
+              [{ text: '💾 حفظ', callback_data: 'grp_apsave_' + uid2 + '_' + chatId2 }],
+              [{ text: '🗑 إزالة من المشرفين', callback_data: 'grp_demote_' + uid2 + '_' + chatId2 }],
+            ];
+          } else {
+            // إذونات العضو
+            txt = '👤 *إذونات العضو*\n' +
+                  '[' + (member?.user?.first_name||'عضو') + '](tg://user?id=' + uid2 + ')  •  ' + chatId2 + '\n\n' +
+                  '_اضغط لتفعيل/تعطيل ثم احفظ_';
+            kb = [
+              tog('الرسائل النصية',       'can_send_messages'),
+              [
+                { text: (can('can_send_photos')  ? '✅ ' : '❌ ') + 'صورة',  callback_data: 'grp_ptog_can_send_photos_'  + uid2 + '_' + chatId2 },
+                { text: (can('can_send_videos')  ? '✅ ' : '❌ ') + 'فيديو', callback_data: 'grp_ptog_can_send_videos_'  + uid2 + '_' + chatId2 },
+              ],
+              [
+                { text: (can('can_send_audios')  ? '✅ ' : '❌ ') + 'صوتي', callback_data: 'grp_ptog_can_send_audios_'   + uid2 + '_' + chatId2 },
+                { text: (can('can_send_documents')? '✅ ' : '❌ ') + 'ملف',  callback_data: 'grp_ptog_can_send_documents_'+ uid2 + '_' + chatId2 },
+              ],
+              [
+                { text: (can('can_send_voice_notes')  ? '✅ ' : '❌ ') + 'بصمة صوت',  callback_data: 'grp_ptog_can_send_voice_notes_'  + uid2 + '_' + chatId2 },
+                { text: (can('can_send_video_notes')  ? '✅ ' : '❌ ') + 'بصمة فيديو',callback_data: 'grp_ptog_can_send_video_notes_'  + uid2 + '_' + chatId2 },
+              ],
+              [
+                { text: (can('can_send_polls')        ? '✅ ' : '❌ ') + 'استطلاع',   callback_data: 'grp_ptog_can_send_polls_'        + uid2 + '_' + chatId2 },
+                { text: (can('can_send_other_messages')? '✅ ' : '❌ ') + 'ملصق/GIF', callback_data: 'grp_ptog_can_send_other_messages_'+ uid2 + '_' + chatId2 },
+              ],
+              tog('تمكين معاينات الروابط', 'can_add_web_page_previews'),
+              tog('تعديل لقبه الخاص',      'can_change_info'),
+              tog('دعوة أعضاء',             'can_invite_users'),
+              tog('تثبيت الرسائل',          'can_pin_messages'),
+              [{ text: '✅ كل الإذونات',   callback_data: 'grp_pall_'  + uid2 + '_' + chatId2 },
+               { text: '❌ سحب الكل',      callback_data: 'grp_pnone_' + uid2 + '_' + chatId2 }],
+              [{ text: '💾 حفظ', callback_data: 'grp_psave_' + uid2 + '_' + chatId2 }],
+            ];
+          }
           try {
             await ctx.telegram.sendMessage(adminId, txt, {
               parse_mode: 'Markdown',
               reply_markup: { inline_keyboard: kb }
             });
-            return ctx.answerCbQuery('📨 تم الإرسال للخاص', { show_alert: false }).catch(() => {});
+            return ctx.answerCbQuery('📨 تم الإرسال للخاص').catch(() => {});
           } catch(_) {
             return ctx.answerCbQuery('⚠️ افتح الخاص مع البوت أولاً', { show_alert: true }).catch(() => {});
+          }
+        }
+
+        // ── إعطاء كل الإذونات دفعة ──
+        if (data.startsWith('grp_pall_')) {
+          const [uid2, cid2] = data.replace('grp_pall_', '').split('_').map(Number);
+          await ctx.telegram.restrictChatMember(cid2, uid2, { permissions: {
+            can_send_messages: true, can_send_photos: true, can_send_videos: true,
+            can_send_audios: true, can_send_documents: true, can_send_voice_notes: true,
+            can_send_video_notes: true, can_send_polls: true, can_send_other_messages: true,
+            can_add_web_page_previews: true, can_change_info: true,
+            can_invite_users: true, can_pin_messages: true,
+          }}).catch(() => {});
+          return ctx.answerCbQuery('✅ كل الإذونات مُعطاة').catch(() => {});
+        }
+
+        // ── سحب كل الإذونات دفعة ──
+        if (data.startsWith('grp_pnone_')) {
+          const [uid2, cid2] = data.replace('grp_pnone_', '').split('_').map(Number);
+          await ctx.telegram.restrictChatMember(cid2, uid2, { permissions: {
+            can_send_messages: false, can_send_photos: false, can_send_videos: false,
+            can_send_audios: false, can_send_documents: false, can_send_voice_notes: false,
+            can_send_video_notes: false, can_send_polls: false, can_send_other_messages: false,
+            can_add_web_page_previews: false, can_change_info: false,
+            can_invite_users: false, can_pin_messages: false,
+          }}).catch(() => {});
+          return ctx.answerCbQuery('❌ كل الإذونات مسحوبة').catch(() => {});
+        }
+
+        // ── toggle إذونات Admin ──
+        if (data.startsWith('grp_aptog_')) {
+          const curKb = ctx.callbackQuery?.message?.reply_markup?.inline_keyboard || [];
+          const newKb = curKb.map(row => row.map(btn => {
+            if (btn.callback_data === data) {
+              const isOn = btn.text.startsWith('✅');
+              return { ...btn, text: (isOn ? '❌ ' : '✅ ') + btn.text.slice(2) };
+            }
+            return btn;
+          }));
+          await ctx.editMessageReplyMarkup({ inline_keyboard: newKb }).catch(() => {});
+          return ctx.answerCbQuery('').catch(() => {});
+        }
+
+        // ── حفظ إذونات Admin ──
+        if (data.startsWith('grp_apsave_')) {
+          const parts3 = data.replace('grp_apsave_', '').split('_');
+          const uid3   = parseInt(parts3[0]);
+          const cid3   = parseInt(parts3[1]);
+          const curKb  = ctx.callbackQuery?.message?.reply_markup?.inline_keyboard || [];
+          const adminPerms = {};
+          const keyMap = {
+            'حذف الرسائل':'can_delete_messages', 'حظر الأعضاء':'can_restrict_members',
+            'تثبيت الرسائل':'can_pin_messages', 'دعوة عبر رابط':'can_invite_users',
+            'تغيير معلومات':'can_change_info', 'إدارة البث المباشر':'can_manage_video_chats',
+            'إدارة القروب':'can_manage_chat', 'إضافة مشرفين':'can_promote_members',
+          };
+          for (const row of curKb) {
+            for (const btn of row) {
+              const isOn = btn.text.startsWith('✅');
+              for (const [label, key] of Object.entries(keyMap)) {
+                if (btn.text.includes(label)) adminPerms[key] = isOn;
+              }
+            }
+          }
+          try {
+            await ctx.telegram.promoteChatMember(cid3, uid3, adminPerms);
+            await ctx.editMessageText('✅ *تم حفظ إذونات المشرف!*', { parse_mode: 'Markdown' }).catch(() => {});
+            return ctx.answerCbQuery('✅ تم الحفظ').catch(() => {});
+          } catch(e) {
+            return ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {});
+          }
+        }
+
+        // ── إزالة من المشرفين ──
+        if (data.startsWith('grp_demote_')) {
+          const parts3 = data.replace('grp_demote_', '').split('_');
+          const uid3   = parseInt(parts3[0]);
+          const cid3   = parseInt(parts3[1]);
+          try {
+            await ctx.telegram.promoteChatMember(cid3, uid3, {
+              can_delete_messages: false, can_restrict_members: false,
+              can_pin_messages: false, can_manage_chat: false,
+              can_invite_users: false, can_change_info: false,
+              can_promote_members: false, can_manage_video_chats: false,
+            });
+            await ctx.editMessageText('✅ *تمت إزالة المشرف*', { parse_mode: 'Markdown' }).catch(() => {});
+            return ctx.answerCbQuery('✅ تمت الإزالة').catch(() => {});
+          } catch(e) {
+            return ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {});
           }
         }
         if (data.startsWith('grp_restrict_')) {
