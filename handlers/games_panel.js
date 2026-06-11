@@ -123,7 +123,11 @@ async function handleCallback(ctx, data) {
   if (data === 'gp_slot_bet') {
     return eos(ctx, '💰 *تغيير الرهان*\n\nأرسل المبلغ الجديد (الحد الأدنى 10 دج):', { parse_mode:'Markdown', ...kbBuild([[kbBtn('❌ إلغاء','gp_slot_panel')]]) });
   }
-  if (data === 'gp_million_panel') return showMillionPanel(ctx);
+  if (data === 'gp_million_panel') {
+    const { delState } = require('../utils/stateManager');
+    await delState(ctx.from.id).catch(() => {});
+    return showMillionPanel(ctx);
+  }
   if (data === 'gp_guess_panel') return showGuessPanel(ctx);
   if (data.startsWith('gp_million_list_')) return showMillionQuestions(ctx, data.replace('gp_million_list_', ''));
 
