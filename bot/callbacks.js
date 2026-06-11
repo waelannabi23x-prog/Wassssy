@@ -314,7 +314,7 @@ module.exports.registerCallbacks = function(bot, deps) {
 
     try {
       // ── ألعاب ──
-      if (data === 'mb_panel' || data.startsWith('gp_million') || data.startsWith('gp_guess')) {
+      if (data === 'mb_panel' || data.startsWith('gp_million') || data.startsWith('gp_guess') || data.startsWith('mq_') || data.startsWith('gp_slot')) {
         return gamesPanel.handleCallback(ctx, data);
       }
 
