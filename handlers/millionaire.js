@@ -31,7 +31,7 @@ function fmtPrize(n) {
   return n + ' \u062f\u062c';
 }
 function getDiff(level) {
-  return level < 5 ? 'easy' : level < 10 ? 'medium' : 'hard';
+  return level < 5 ? 1 : level < 10 ? 2 : 3;
 }
 
 /* ══════════════ GAME STATE ══════════════ */
@@ -90,8 +90,8 @@ async function getRandomQuestion(usedIds, diff) {
   const ex = usedIds.length ? `AND id NOT IN (${usedIds.join(',')})` : '';
   // أولاً: جرب نفس الصعوبة مع عشوائية كاملة
   let q = await get(
-    `SELECT * FROM million_questions WHERE is_active=1 ${ex} ORDER BY random() LIMIT 1`,
-    []
+    `SELECT * FROM million_questions WHERE is_active=1 AND difficulty<=$1 ${ex} ORDER BY random() LIMIT 1`,
+    [diff]
   ).catch(()=>null);
   // إذا ما لقى: جرب أي صعوبة
   if (!q) q = await get(
