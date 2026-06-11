@@ -309,8 +309,14 @@ async function sendNextQuestion(telegram, chatId) {
   game.answerDeadline = Date.now() + QUESTION_SECS * 1000;
   runSilent('UPDATE million_questions SET used_count=used_count+1 WHERE id=$1', [q.id]);
 
-  const txt      = buildQuestionMsg(game, q);
-  const keyboard = [...buildAnswerKeyboard(game, q, game.sessionId), ...buildLifelineKeyboard(game)];
+  let txt, keyboard;
+  try {
+    txt      = buildQuestionMsg(game, q);
+    keyboard = [...buildAnswerKeyboard(game, q, game.sessionId), ...buildLifelineKeyboard(game)];
+  } catch(e) {
+    require('../utils/logger').error('[sendNextQ build]', e.message);
+    return endGame(telegram, chatId, 'error');
+  }
 
   if (game.msgId) {
     const edited = await telegram.editMessageText(chatId, game.msgId, null, txt, {
