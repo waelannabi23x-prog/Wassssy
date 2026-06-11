@@ -212,6 +212,13 @@ module.exports.registerMessages = function(bot, deps) {
       if (!s) return;
       const txt = ctx.message.text.trim();
 
+      // ── إضافة سؤال مليون — أولوية عالية ──
+      if (s?.type?.startsWith('mq_step')) {
+        const gp = require('../handlers/games_panel');
+        const handled = await gp.handleText(ctx).catch(() => false);
+        if (handled) return;
+      }
+
       if (s.type === 'ai_mode' && ctx.chat?.type === 'private') {
         if (txt.length > 1000) return ctx.reply('⚠️ الحد 1000 حرف.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
         if (ctx.isOwner && await handleOwnerAI(ctx, txt, null, null)) return;
