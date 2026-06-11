@@ -83,13 +83,23 @@ async function initMillionaireSchema() {
 
 async function getRandomQuestion(usedIds, diff) {
   const ex = usedIds.length ? `AND id NOT IN (${usedIds.join(',')})` : '';
+  // أولاً: جرب نفس الصعوبة مع عشوائية كاملة
   let q = await get(
-    `SELECT * FROM million_questions WHERE is_active=1 AND difficulty=$1 ${ex} ORDER BY used_count ASC, random() LIMIT 1`,
+    `SELECT * FROM million_questions WHERE is_active=1 AND difficulty=$1 ${ex} ORDER BY random() LIMIT 1`,
     [diff]
   ).catch(()=>null);
+  // إذا ما لقى: جرب أي صعوبة
   if (!q) q = await get(
     `SELECT * FROM million_questions WHERE is_active=1 ${ex} ORDER BY random() LIMIT 1`, []
   ).catch(()=>null);
+  // إذا ما لقى (كل الأسئلة استُخدمت): reset used_count وابدأ من جديد
+  if (!q) {
+    await run('UPDATE million_questions SET used_count=0', []).catch(()=>{});
+    q = await get(
+      `SELECT * FROM million_questions WHERE is_active=1 AND difficulty=$1 ORDER BY random() LIMIT 1`,
+      [diff]
+    ).catch(()=>null);
+  }
   return q || null;
 }
 
