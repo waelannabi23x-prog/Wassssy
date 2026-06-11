@@ -141,9 +141,10 @@ function buildQuestionMsg(game, q) {
     if (hidden.includes(l)) return;
     optsTxt += LETTERS[i] + ') ' + (q['option_'+l]||'') + '\n';
   });
+  const diffLabel = getDiff(game.currentLevel) === 1 ? '\ud83d\udfe2 \u0633\u0647\u0644' : getDiff(game.currentLevel) === 2 ? '\ud83d\udfe1 \u0648\u0633\u0637' : '\ud83d\udd34 \u0635\u0639\u0628';
   return (
     '\ud83c\udfaf *\u0627\u0644\u0633\u0624\u0627\u0644 ' + level + ' \u0645\u0646 15*\n' +
-    '\u2022 ' + getDiff(game.currentLevel).replace('easy','\ud83d\udfe2 \u0633\u0647\u0644').replace('medium','\ud83d\udfe1 \u0648\u0633\u0637').replace('hard','\ud83d\udd34 \u0635\u0639\u0628') +
+    '\u2022 ' + diffLabel +
     ' \u2022 ' + prize + '\n' +
     bar + '\n\n' +
     '\u2753 *' + (q.text||q.question||'\u0633\u0624\u0627\u0644') + '*\n\n' +
