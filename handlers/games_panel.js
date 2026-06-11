@@ -210,7 +210,7 @@ async function handleCallback(ctx, data) {
     const { q } = st;
     await run(
       'INSERT INTO million_questions(text,option_a,option_b,option_c,option_d,correct,difficulty,is_active) VALUES($1,$2,$3,$4,$5,$6,$7,1)',
-      [q.question, q.optA, q.optB, q.optC, q.optD, q.correctLetter, q.difficulty, uid2]
+      [q.question, q.optA, q.optB, q.optC, q.optD, q.correctLetter, 1]
     ).catch(() => {});
     await delState(uid2);
     const cnt = await get('SELECT COUNT(*) AS c FROM million_questions WHERE is_active=1').catch(() => ({ c: 0 }));
