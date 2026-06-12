@@ -1,5 +1,45 @@
 'use strict';
 const { run, get, all } = require('../database/db');
+
+// ══ Auto Migration ══
+async function migrate() {
+  await Promise.all([
+    run(`CREATE TABLE IF NOT EXISTS grp_logs (
+      id SERIAL PRIMARY KEY, chat_id BIGINT NOT NULL,
+      action TEXT NOT NULL, target_id BIGINT, by_id BIGINT,
+      reason TEXT, extra TEXT, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`),
+    run('CREATE INDEX IF NOT EXISTS idx_grp_logs ON grp_logs(chat_id, created_at DESC)'),
+    run(`CREATE TABLE IF NOT EXISTS grp_settings (
+      chat_id BIGINT PRIMARY KEY,
+      anti_flood BOOLEAN DEFAULT false, flood_limit INT DEFAULT 5, flood_window INT DEFAULT 5,
+      anti_link BOOLEAN DEFAULT false, anti_invite BOOLEAN DEFAULT false,
+      anti_forward BOOLEAN DEFAULT false, anti_spam BOOLEAN DEFAULT false,
+      anti_mention BOOLEAN DEFAULT false, anti_media BOOLEAN DEFAULT false,
+      max_warns INT DEFAULT 3, warn_action TEXT DEFAULT 'escalate',
+      log_channel BIGINT, updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`),
+    run(`CREATE TABLE IF NOT EXISTS grp_blacklist (
+      id SERIAL PRIMARY KEY, chat_id BIGINT NOT NULL,
+      word TEXT NOT NULL, action TEXT DEFAULT 'delete+warn',
+      UNIQUE(chat_id, word)
+    )`),
+    run(`CREATE TABLE IF NOT EXISTS grp_member_stats (
+      chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL,
+      msg_count INT DEFAULT 0, warn_count INT DEFAULT 0,
+      mute_count INT DEFAULT 0, ban_count INT DEFAULT 0,
+      violations INT DEFAULT 0, last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+      PRIMARY KEY(chat_id, user_id)
+    )`),
+    run(`CREATE TABLE IF NOT EXISTS group_last_welcome (
+      chat_id BIGINT PRIMARY KEY, msg_id BIGINT NOT NULL
+    )`),
+    run('ALTER TABLE users ADD COLUMN IF NOT EXISTS xp INT DEFAULT 0'),
+    run('ALTER TABLE users ADD COLUMN IF NOT EXISTS level INT DEFAULT 0'),
+    run('ALTER TABLE users ADD COLUMN IF NOT EXISTS balance BIGINT DEFAULT 0'),
+  ]).catch(e => require('../utils/logger').debug('[migrate]', e.message));
+}
+migrate();
 const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
 const logger = require('../utils/logger');
 
