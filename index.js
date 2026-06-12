@@ -341,11 +341,7 @@ const gameAndBankMiddleware = async (ctx, next) => {
 bot.use(rateLimit);
 bot.use(gameAndBankMiddleware);   // الألعاب والبنك قبل auth
 
-// 🛡️ نظام الحماية الاحترافي (group_pro)
-bot.use(async (ctx, next) => {
-  if (!['group','supergroup'].includes(ctx.chat?.type)) return next();
-  return groupPro.protect(bot, ctx, next);
-});
+// 🛡️ نظام الحماية الاحترافي (group_pro) — مسجّل بالفعل في bot/messages.js، لا تكرار هنا
 
 // 🛡️ مكافحة التعديل
 bot.on('edited_message', async (ctx, next) => {
