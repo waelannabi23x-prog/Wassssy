@@ -452,7 +452,86 @@ async function getP(name, values) {
   return rows?.[0] || null;
 }
 
-module.exports = { batchDownload, queryP, getP, get, all, run, transaction, getPg, initSchema, getSetting, setSetting, saveDB };
+
+// ══════════════════════════════════════════
+// Group Management Pro — schema
+// ══════════════════════════════════════════
+async function migrateGroupPro() {
+  if (!pg) return;
+  const queries = [
+    `CREATE TABLE IF NOT EXISTS grp_settings (
+      chat_id BIGINT PRIMARY KEY,
+      anti_spam BOOLEAN DEFAULT false,
+      anti_link BOOLEAN DEFAULT false,
+      anti_flood BOOLEAN DEFAULT false,
+      anti_forward BOOLEAN DEFAULT false,
+      anti_short_link BOOLEAN DEFAULT false,
+      anti_invite BOOLEAN DEFAULT false,
+      anti_new_account BOOLEAN DEFAULT false,
+      anti_bot BOOLEAN DEFAULT false,
+      anti_mention BOOLEAN DEFAULT false,
+      anti_media BOOLEAN DEFAULT false,
+      anti_file BOOLEAN DEFAULT false,
+      anti_arabic_repeat BOOLEAN DEFAULT false,
+      anti_edit BOOLEAN DEFAULT false,
+      max_warns INTEGER DEFAULT 3,
+      flood_limit INTEGER DEFAULT 5,
+      flood_window INTEGER DEFAULT 5,
+      max_msg_length INTEGER DEFAULT 4000,
+      warn_action TEXT DEFAULT 'mute',
+      escalation TEXT DEFAULT 'warn,mute10,mute60,ban',
+      auto_reset_days INTEGER DEFAULT 30,
+      updated_at TIMESTAMP DEFAULT NOW()
+    )`,
+    `CREATE TABLE IF NOT EXISTS grp_logs (
+      id SERIAL PRIMARY KEY,
+      chat_id BIGINT NOT NULL,
+      action TEXT NOT NULL,
+      target_id BIGINT,
+      by_id BIGINT,
+      reason TEXT,
+      extra TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`,
+    `CREATE INDEX IF NOT EXISTS idx_grp_logs_chat ON grp_logs(chat_id, created_at DESC)`,
+    `CREATE TABLE IF NOT EXISTS grp_member_stats (
+      chat_id BIGINT NOT NULL,
+      user_id BIGINT NOT NULL,
+      msg_count INTEGER DEFAULT 0,
+      warn_count INTEGER DEFAULT 0,
+      mute_count INTEGER DEFAULT 0,
+      ban_count INTEGER DEFAULT 0,
+      joined_at TIMESTAMP DEFAULT NOW(),
+      last_active TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY (chat_id, user_id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS grp_roles (
+      id SERIAL PRIMARY KEY,
+      chat_id BIGINT NOT NULL,
+      user_id BIGINT NOT NULL,
+      role TEXT NOT NULL,
+      permissions TEXT DEFAULT '',
+      assigned_by BIGINT,
+      created_at TIMESTAMP DEFAULT NOW(),
+      UNIQUE(chat_id, user_id)
+    )`,
+    `CREATE TABLE IF NOT EXISTS grp_blacklist_words (
+      id SERIAL PRIMARY KEY,
+      chat_id BIGINT NOT NULL,
+      word TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`,
+  ];
+  for (const q of queries) {
+    await pg.query(q).catch(e => {
+      if (!e.message?.includes('already exists')) console.error('[GroupPro Migration]', e.message);
+    });
+  }
+  console.log('✅ [GroupPro] Migration complete');
+}
+
+module.exports = {
+  migrateGroupPro, batchDownload, queryP, getP, get, all, run, transaction, getPg, initSchema, getSetting, setSetting, saveDB };
 // هذا السطر ما يضاف هنا — شغّل الكومند التالي مباشرة على DB
 
 // ── Migration: جداول البنك ──

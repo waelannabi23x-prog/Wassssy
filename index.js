@@ -402,6 +402,8 @@ async function launch() {
   try {
     await initSchema();
     await migrateGroupTables().catch(() => {});
+    const { migrateGroupPro } = require('./database/db');
+    await migrateGroupPro().catch(() => {});
     require('./utils/cache').clearAllSubCache();
     await require('./handlers/group_panel').migrateGroupPanel().catch(() => {});
     await require('./database/db').initBankTables().catch(() => {});
