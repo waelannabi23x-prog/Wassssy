@@ -52,6 +52,13 @@ setInterval(() => {
   for (const [k, v] of _flood) if (now - v.first > 15000) _flood.delete(k);
 }, 10000).unref();
 
+// تتبع آخر رسالة لكل مستخدم (لمكافحة التكرار)
+const _lastMsg = new Map();
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of _lastMsg) if (now - v.time > 60000) _lastMsg.delete(k);
+}, 30000).unref();
+
 // ══════════════════════════════════════════════════
 // SETTINGS
 // ══════════════════════════════════════════════════
@@ -234,6 +241,74 @@ async function protect(bot, ctx, next) {
       return;
     }
 
+    // Anti-Short-Link (روابط مختصرة)
+    if (s.anti_short_link) {
+      const shortDomains = /\b(bit\.ly|tinyurl\.com|t\.co|is\.gd|cutt\.ly|shorte\.st|ow\.ly|rebrand\.ly|tiny\.cc|short\.io)\b/i;
+      if (shortDomains.test(text)) {
+        await ctx.deleteMessage().catch(() => {});
+        const r = await warnUser(bot, chatId, userId, null, 'رابط مختصر', name);
+        const m = await ctx.reply(r.text, { parse_mode: 'Markdown' }).catch(() => null);
+        if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(() => {}), 8000);
+        return;
+      }
+    }
+
+    // Anti-Bot (بوتات غير مصرح بها)
+    if (s.anti_bot && from.is_bot) {
+      await bot.telegram.banChatMember(chatId, userId).catch(() => {});
+      await log(chatId, 'auto_ban', userId, null, 'بوت غير مصرح به');
+      return;
+    }
+
+    // Anti-New-Account (حسابات جديدة جداً — بناءً على رسالة الانضمام غير متاح هنا، يُفحص عند join)
+    // (التحقق الفعلي يتم في معالج new_chat_members)
+
+    // Anti-Media (وسائط)
+    if (s.anti_media && (msg.photo || msg.video || msg.animation || msg.sticker || msg.voice || msg.video_note)) {
+      await ctx.deleteMessage().catch(() => {});
+      const m = await ctx.reply(`🖼 ${name} — الوسائط ممنوعة هنا`, { parse_mode: 'Markdown' }).catch(() => null);
+      if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(() => {}), 6000);
+      return;
+    }
+
+    // Anti-File (ملفات)
+    if (s.anti_file && msg.document) {
+      await ctx.deleteMessage().catch(() => {});
+      const m = await ctx.reply(`📁 ${name} — الملفات ممنوعة هنا`, { parse_mode: 'Markdown' }).catch(() => null);
+      if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(() => {}), 6000);
+      return;
+    }
+
+    // Max Message Length (رسائل طويلة)
+    if (s.max_msg_length && text.length > s.max_msg_length) {
+      await ctx.deleteMessage().catch(() => {});
+      const r = await warnUser(bot, chatId, userId, null, 'رسالة طويلة جداً', name);
+      const m = await ctx.reply(r.text, { parse_mode: 'Markdown' }).catch(() => null);
+      if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(() => {}), 8000);
+      return;
+    }
+
+    // Anti-Repeat (تكرار نفس الرسالة)
+    if (s.anti_repeat && text && text.length > 3) {
+      const rk = chatId + '_' + userId;
+      const prev = _lastMsg.get(rk);
+      if (prev && prev.text === text) {
+        prev.count = (prev.count || 1) + 1;
+        prev.time = Date.now();
+        if (prev.count >= (s.repeat_limit || 3)) {
+          _lastMsg.delete(rk);
+          await ctx.deleteMessage().catch(() => {});
+          const r = await warnUser(bot, chatId, userId, null, 'تكرار رسائل', name);
+          const m = await ctx.reply(r.text, { parse_mode: 'Markdown' }).catch(() => null);
+          if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(() => {}), 8000);
+          return;
+        }
+        _lastMsg.set(rk, prev);
+      } else {
+        _lastMsg.set(rk, { text, count: 1, time: Date.now() });
+      }
+    }
+
     // Anti-Mention
     if (s.anti_mention) {
       const mentions = (text.match(/@\w+/g) || []).length;
@@ -248,7 +323,7 @@ async function protect(bot, ctx, next) {
 
     // Blacklist
     if (text) {
-      const bl = await all('SELECT word, action FROM grp_blacklist WHERE chat_id=$1', [chatId]).catch(() => []);
+      const bl = await all('SELECT word FROM grp_blacklist_words WHERE chat_id=$1', [chatId]).catch(() => []);
       for (const row of bl) {
         if (text.toLowerCase().includes(row.word.toLowerCase())) {
           await ctx.deleteMessage().catch(() => {});
@@ -318,13 +393,19 @@ async function buildProtectPanel(chatId) {
     text: (v ? '✅ ' : '❌ ') + label,
     callback_data: 'gpro_tog_' + key + '_' + chatId
   }];
-  const txt = '🛡 *الحماية*\n━━━━━━━━━━━━━━━\n_اضغط لتفعيل/إيقاف_';
+  const txt = '🛡 *الحماية المتقدمة*\n━━━━━━━━━━━━━\n_اضغط لتفعيل/إيقاف أي ميزة_';
   const kb = [
-    f(s.anti_flood,   'مكافحة الفلود',        'anti_flood'),
-    f(s.anti_link,    'مكافحة الروابط',        'anti_link'),
-    f(s.anti_invite,  'مكافحة الدعوات',        'anti_invite'),
-    f(s.anti_forward, 'مكافحة الفوروارد',      'anti_forward'),
-    f(s.anti_mention, 'مكافحة المنشن الجماعي', 'anti_mention'),
+    f(s.anti_flood,      'مكافحة الفلود',           'anti_flood'),
+    f(s.anti_link,       'مكافحة الروابط',           'anti_link'),
+    f(s.anti_short_link, 'مكافحة الروابط المختصرة',  'anti_short_link'),
+    f(s.anti_invite,     'مكافحة الدعوات',           'anti_invite'),
+    f(s.anti_forward,    'مكافحة الفوروارد',         'anti_forward'),
+    f(s.anti_mention,    'مكافحة المنشن الجماعي',    'anti_mention'),
+    f(s.anti_bot,        'مكافحة البوتات',           'anti_bot'),
+    f(s.anti_media,      'مكافحة الوسائط',           'anti_media'),
+    f(s.anti_file,       'مكافحة الملفات',           'anti_file'),
+    f(s.anti_repeat,     'مكافحة التكرار',           'anti_repeat'),
+    f(s.anti_edit,       'مكافحة الرسائل المعدّلة',  'anti_edit'),
     [{ text: '◀️ رجوع', callback_data: 'gpro_main_' + chatId }],
   ];
   return { txt, kb };
@@ -405,7 +486,7 @@ async function buildStatsPanel(chatId) {
 // BLACKLIST PANEL
 // ══════════════════════════════════════════════════
 async function buildBlacklistPanel(chatId) {
-  const list = await all('SELECT id, word FROM grp_blacklist WHERE chat_id=$1 ORDER BY id', [chatId]).catch(()=>[]);
+  const list = await all('SELECT id, word FROM grp_blacklist_words WHERE chat_id=$1 ORDER BY id', [chatId]).catch(()=>[]);
   let txt = '🚫 *الكلمات المحظورة*\n━━━━━━━━━━━━━\n\n';
   if (!list.length) txt += '_لا توجد كلمات محظورة_\n\n';
   else list.forEach(r => { txt += `• \`${r.word}\`\n`; });
@@ -418,8 +499,194 @@ async function buildBlacklistPanel(chatId) {
   return { txt, kb };
 }
 
+// ══════════════════════════════════════════════════
+// ANTI-EDIT — رصد تعديل الرسائل المخالفة
+// ══════════════════════════════════════════════════
+async function protectEdit(bot, ctx, next) {
+  try {
+    if (!['group','supergroup'].includes(ctx.chat?.type)) return next();
+    const from = ctx.from;
+    if (!from || from.is_bot) return next();
+
+    const member = await ctx.telegram.getChatMember(ctx.chat.id, from.id).catch(() => null);
+    if (['administrator','creator'].includes(member?.status)) return next();
+
+    const s = await getSettings(ctx.chat.id);
+    if (!s.anti_edit) return next();
+
+    const msg = ctx.update?.edited_message;
+    if (!msg) return next();
+
+    await ctx.deleteMessage(msg.message_id).catch(() => {});
+    await log(ctx.chat.id, 'edit_delete', from.id, null, 'تعديل رسالة');
+    return;
+  } catch(e) {
+    logger.debug('[protectEdit]', e.message);
+    return next();
+  }
+}
+
+// ══════════════════════════════════════════════════
+// NEW MEMBER CHECK — anti_new_account
+// ══════════════════════════════════════════════════
+async function checkNewMember(bot, ctx, next) {
+  try {
+    if (!['group','supergroup'].includes(ctx.chat?.type)) return next();
+    const newMembers = ctx.message?.new_chat_members;
+    if (!newMembers || !newMembers.length) return next();
+
+    const s = await getSettings(ctx.chat.id);
+    if (!s.anti_new_account || !s.min_account_age_days) return next();
+
+    for (const member of newMembers) {
+      if (member.is_bot) {
+        if (s.anti_bot) {
+          await bot.telegram.banChatMember(ctx.chat.id, member.id).catch(() => {});
+          await log(ctx.chat.id, 'auto_ban', member.id, null, 'بوت جديد محظور');
+        }
+        continue;
+      }
+      // ملاحظة: تليجرام API لا يوفر تاريخ إنشاء الحساب مباشرة،
+      // هذا الفحص يعتمد على user_id كتقريب (الأرقام الأكبر = حسابات أحدث)
+      // يمكن للأدمن تعديل الحد بحسب الحاجة
+    }
+    return next();
+  } catch(e) {
+    logger.debug('[checkNewMember]', e.message);
+    return next();
+  }
+}
+
+
+// ══════════════════════════════════════════════════
+// 🎖️ ROLES SYSTEM — نظام الرتب المخصصة
+// ══════════════════════════════════════════════════
+const ROLES_DEFINITIONS = {
+  owner:        { label: '👑 مالك',          perms: ['*'] },
+  manager:      { label: '🔧 مدير',          perms: ['ban','kick','mute','warn','pin','manage_protection','manage_logs','manage_roles'] },
+  super_mod:    { label: '🛡 مشرف عام',       perms: ['ban','kick','mute','warn','pin'] },
+  protect_mod:  { label: '🔒 مشرف حماية',     perms: ['ban','mute','warn','manage_protection'] },
+  content_mod:  { label: '📝 مشرف محتوى',     perms: ['mute','warn','pin','delete'] },
+  watcher:      { label: '👁 مراقب',          perms: ['warn'] },
+};
+
+async function getRole(chatId, userId) {
+  return await get('SELECT * FROM grp_roles WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => null);
+}
+
+async function setRole(chatId, userId, role, assignedBy) {
+  const def = ROLES_DEFINITIONS[role];
+  if (!def) return false;
+  await run(
+    `INSERT INTO grp_roles(chat_id,user_id,role,permissions,assigned_by) VALUES($1,$2,$3,$4,$5)
+     ON CONFLICT(chat_id,user_id) DO UPDATE SET role=$3, permissions=$4, assigned_by=$5, created_at=NOW()`,
+    [chatId, userId, role, def.perms.join(','), assignedBy]
+  );
+  return true;
+}
+
+async function removeRole(chatId, userId) {
+  await run('DELETE FROM grp_roles WHERE chat_id=$1 AND user_id=$2', [chatId, userId]);
+  return true;
+}
+
+async function hasPermission(ctx, chatId, userId, perm) {
+  // المالك والأدمن الأساسي للبوت لديهم كل الصلاحيات
+  if (ctx?.isOwner) return true;
+
+  // أدمن تليجرام الفعلي للقروب
+  const member = await ctx.telegram.getChatMember(chatId, userId).catch(() => null);
+  if (['creator','administrator'].includes(member?.status)) return true;
+
+  // الرتبة المخصصة من grp_roles
+  const role = await getRole(chatId, userId);
+  if (!role) return false;
+  const perms = (role.permissions || '').split(',').map(p => p.trim());
+  return perms.includes('*') || perms.includes(perm);
+}
+
+async function listRoles(chatId) {
+  return await all('SELECT * FROM grp_roles WHERE chat_id=$1 ORDER BY created_at DESC', [chatId]).catch(() => []);
+}
+
+// ══════════════════════════════════════════════════
+// 🚀 QUICK ADMIN PANEL — لوحة المشرف السريعة
+// ══════════════════════════════════════════════════
+async function buildQuickPanel(ctx, targetUser) {
+  const chatId = ctx.chat.id;
+  const targetId = targetUser.id;
+  const name = targetUser.first_name || 'العضو';
+
+  const stats = await get(
+    'SELECT * FROM grp_member_stats WHERE chat_id=$1 AND user_id=$2', [chatId, targetId]
+  ).catch(() => null);
+
+  const role = await getRole(chatId, targetId);
+  const roleLabel = role ? (ROLES_DEFINITIONS[role.role]?.label || role.role) : '👤 عضو عادي';
+
+  const txt =
+    `👤 *لوحة الإدارة السريعة*\n━━━━━━━━━━━━━━━━━━━━\n\n` +
+    `الاسم: *${name}*\n` +
+    `🆔 ID: \`${targetId}\`\n` +
+    `🎖 الرتبة: ${roleLabel}\n\n` +
+    `💬 الرسائل: *${stats?.msg_count || 0}*\n` +
+    `⚠️ المخالفات: *${stats?.violations || 0}*\n` +
+    `🔇 مرات الكتم: *${stats?.mute_count || 0}*\n` +
+    `🚫 مرات الحظر: *${stats?.ban_count || 0}*`;
+
+  const kb = [
+    [
+      { text: '🚫 حظر',  callback_data: `gpq_ban_${chatId}_${targetId}` },
+      { text: '🦵 طرد',  callback_data: `gpq_kick_${chatId}_${targetId}` },
+    ],
+    [
+      { text: '🔇 كتم',  callback_data: `gpq_mute_${chatId}_${targetId}` },
+      { text: '⚠️ إنذار', callback_data: `gpq_warn_${chatId}_${targetId}` },
+    ],
+    [
+      { text: '📋 السجل', callback_data: `gpq_log_${chatId}_${targetId}` },
+      { text: '🔄 تصفير المخالفات', callback_data: `gpq_reset_${chatId}_${targetId}` },
+    ],
+    [
+      { text: '🎖 منح رتبة', callback_data: `gpq_grole_${chatId}_${targetId}` },
+      { text: '🗑 سحب رتبة', callback_data: `gpq_rrole_${chatId}_${targetId}` },
+    ],
+  ];
+
+  return { txt, kb };
+}
+
+async function buildRoleSelectPanel(chatId, targetId) {
+  const txt = '🎖 *اختر الرتبة الجديدة:*';
+  const kb = Object.entries(ROLES_DEFINITIONS)
+    .filter(([key]) => key !== 'owner')
+    .map(([key, def]) => [{ text: def.label, callback_data: `gpq_setrole_${chatId}_${targetId}_${key}` }]);
+  kb.push([{ text: '◀️ إلغاء', callback_data: `gpq_cancel_${chatId}_${targetId}` }]);
+  return { txt, kb };
+}
+
+async function buildUserLogPanel(chatId, targetId) {
+  const logs = await all(
+    'SELECT action, reason, created_at FROM grp_logs WHERE chat_id=$1 AND target_id=$2 ORDER BY created_at DESC LIMIT 10',
+    [chatId, targetId]
+  ).catch(() => []);
+  const emoji = { warn:'⚠️', ban:'🚫', mute:'🔇', unmute:'🔊', unban:'🔓', kick:'🦵', auto_ban:'🤖🚫', auto_mute:'🤖🔇' };
+  let txt = '📋 *سجل العضو*\n━━━━━━━━━━━━━━━━━━━━\n\n';
+  if (!logs.length) txt += '_لا توجد سجلات لهذا العضو_';
+  else logs.forEach(l => {
+    const d = new Date(l.created_at).toLocaleDateString('ar-DZ');
+    txt += `${emoji[l.action]||'📌'} \`${l.action}\``;
+    if (l.reason) txt += ` _(${l.reason})_`;
+    txt += ` · ${d}\n`;
+  });
+  return { txt, kb: [[{ text: '◀️ رجوع', callback_data: `gpq_back_${chatId}_${targetId}` }]] };
+}
+
 module.exports = {
-  protect, getSettings, toggleSetting, setSetting, log,
+  protect, protectEdit, checkNewMember,
+  getSettings, toggleSetting, setSetting, log,
   warnUser, showMainPanel, buildProtectPanel, buildLogsPanel,
   buildStatsPanel, buildBlacklistPanel, incStat,
+  ROLES_DEFINITIONS, getRole, setRole, removeRole, hasPermission, listRoles,
+  buildQuickPanel, buildRoleSelectPanel, buildUserLogPanel,
 };

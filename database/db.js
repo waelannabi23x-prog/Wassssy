@@ -483,6 +483,10 @@ async function migrateGroupPro() {
       auto_reset_days INTEGER DEFAULT 30,
       updated_at TIMESTAMP DEFAULT NOW()
     )`,
+    `ALTER TABLE grp_settings ADD COLUMN IF NOT EXISTS anti_repeat BOOLEAN DEFAULT false`,
+    `ALTER TABLE grp_settings ADD COLUMN IF NOT EXISTS repeat_limit INTEGER DEFAULT 3`,
+    `ALTER TABLE grp_settings ADD COLUMN IF NOT EXISTS max_mentions INTEGER DEFAULT 5`,
+    `ALTER TABLE grp_settings ADD COLUMN IF NOT EXISTS min_account_age_days INTEGER DEFAULT 0`,
     `CREATE TABLE IF NOT EXISTS grp_logs (
       id SERIAL PRIMARY KEY,
       chat_id BIGINT NOT NULL,
@@ -501,10 +505,12 @@ async function migrateGroupPro() {
       warn_count INTEGER DEFAULT 0,
       mute_count INTEGER DEFAULT 0,
       ban_count INTEGER DEFAULT 0,
+      violations INTEGER DEFAULT 0,
       joined_at TIMESTAMP DEFAULT NOW(),
       last_active TIMESTAMP DEFAULT NOW(),
       PRIMARY KEY (chat_id, user_id)
     )`,
+    `ALTER TABLE grp_member_stats ADD COLUMN IF NOT EXISTS violations INTEGER DEFAULT 0`,
     `CREATE TABLE IF NOT EXISTS grp_roles (
       id SERIAL PRIMARY KEY,
       chat_id BIGINT NOT NULL,

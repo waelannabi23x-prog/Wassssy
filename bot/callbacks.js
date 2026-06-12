@@ -1319,6 +1319,112 @@ module.exports.registerCallbacks = function(bot, deps) {
     return showLogs(ctx, chatId, page);
   }
 
+
+  // ══ QUICK ADMIN PANEL CALLBACKS (gpq_) ══
+  if (data.startsWith('gpq_')) {
+    const gp = require('../handlers/group_pro');
+    const db = require('../database/db');
+    const parts = data.split('_');
+    const action = parts[1];
+
+    // gpq_setrole_chatId_targetId_roleKey
+    if (action === 'setrole') {
+      const [, , chatId, targetId, roleKey] = parts;
+      const allowed = await gp.hasPermission(ctx, chatId, ctx.from.id, 'manage_roles').catch(()=>false);
+      if (!allowed && !ctx.isOwner && !ctx.isAdmin) return ctx.answerCbQuery('❌ لا تملك صلاحية').catch(()=>{});
+      await gp.setRole(chatId, targetId, roleKey, ctx.from.id);
+      await gp.log(chatId, 'role_grant', targetId, ctx.from.id, roleKey);
+      await ctx.answerCbQuery('✅ تم منح الرتبة').catch(()=>{});
+      const targetUser = { id: targetId, first_name: 'العضو' };
+      const { txt, kb } = await gp.buildQuickPanel(ctx, targetUser);
+      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
+    }
+
+    const chatId   = parts[2];
+    const targetId = parts[3];
+
+    if (action === 'cancel' || action === 'back') {
+      const targetUser = { id: targetId, first_name: 'العضو' };
+      const { txt, kb } = await gp.buildQuickPanel(ctx, targetUser);
+      await ctx.answerCbQuery('').catch(()=>{});
+      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
+    }
+
+    // صلاحيات
+    const permMap = { ban:'ban', kick:'kick', mute:'mute', warn:'warn', reset:'manage_protection', grole:'manage_roles', rrole:'manage_roles', log:'manage_logs' };
+    const requiredPerm = permMap[action];
+    if (requiredPerm) {
+      const allowed = await gp.hasPermission(ctx, chatId, ctx.from.id, requiredPerm).catch(()=>false);
+      if (!allowed && !ctx.isOwner && !ctx.isAdmin) return ctx.answerCbQuery('❌ لا تملك صلاحية لهذا الإجراء').catch(()=>{});
+    }
+
+    if (action === 'ban') {
+      await bot.telegram.banChatMember(chatId, targetId).catch(()=>{});
+      await db.run('UPDATE grp_member_stats SET ban_count=ban_count+1 WHERE chat_id=$1 AND user_id=$2',[chatId,targetId]).catch(()=>{});
+      await gp.log(chatId, 'ban', targetId, ctx.from.id, 'حظر يدوي');
+      await ctx.answerCbQuery('🚫 تم الحظر').catch(()=>{});
+      return ctx.editMessageText('🚫 تم حظر العضو بنجاح.', { parse_mode:'Markdown' }).catch(()=>{});
+    }
+
+    if (action === 'kick') {
+      await bot.telegram.banChatMember(chatId, targetId).catch(()=>{});
+      await bot.telegram.unbanChatMember(chatId, targetId).catch(()=>{});
+      await gp.log(chatId, 'kick', targetId, ctx.from.id, 'طرد يدوي');
+      await ctx.answerCbQuery('🦵 تم الطرد').catch(()=>{});
+      return ctx.editMessageText('🦵 تم طرد العضو بنجاح.', { parse_mode:'Markdown' }).catch(()=>{});
+    }
+
+    if (action === 'mute') {
+      const until = Math.floor(Date.now()/1000) + 3600; // ساعة
+      await bot.telegram.restrictChatMember(chatId, targetId, {
+        permissions: { can_send_messages: false }, until_date: until,
+      }).catch(()=>{});
+      await db.run('UPDATE grp_member_stats SET mute_count=mute_count+1 WHERE chat_id=$1 AND user_id=$2',[chatId,targetId]).catch(()=>{});
+      await gp.log(chatId, 'mute', targetId, ctx.from.id, 'كتم يدوي (ساعة)');
+      await ctx.answerCbQuery('🔇 تم الكتم لمدة ساعة').catch(()=>{});
+      return ctx.editMessageText('🔇 تم كتم العضو لمدة ساعة.', { parse_mode:'Markdown' }).catch(()=>{});
+    }
+
+    if (action === 'warn') {
+      const targetUser = { id: targetId, first_name: 'العضو' };
+      const r = await gp.warnUser(bot, chatId, targetId, ctx.from.id, 'إنذار يدوي', targetUser.first_name);
+      await ctx.answerCbQuery('⚠️ تم الإنذار').catch(()=>{});
+      return ctx.editMessageText(r.text, { parse_mode:'Markdown' }).catch(()=>{});
+    }
+
+    if (action === 'reset') {
+      await db.run('UPDATE grp_member_stats SET violations=0, warn_count=0 WHERE chat_id=$1 AND user_id=$2',[chatId,targetId]).catch(()=>{});
+      await db.run('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2',[chatId,targetId]).catch(()=>{});
+      await gp.log(chatId, 'reset_violations', targetId, ctx.from.id, 'تصفير المخالفات');
+      await ctx.answerCbQuery('🔄 تم تصفير المخالفات').catch(()=>{});
+      return ctx.editMessageText('🔄 تم تصفير مخالفات العضو.', { parse_mode:'Markdown' }).catch(()=>{});
+    }
+
+    if (action === 'log') {
+      const { txt, kb } = await gp.buildUserLogPanel(chatId, targetId);
+      await ctx.answerCbQuery('').catch(()=>{});
+      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
+    }
+
+    if (action === 'grole') {
+      const { txt, kb } = await gp.buildRoleSelectPanel(chatId, targetId);
+      await ctx.answerCbQuery('').catch(()=>{});
+      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
+    }
+
+    if (action === 'rrole') {
+      await gp.removeRole(chatId, targetId);
+      await gp.log(chatId, 'role_revoke', targetId, ctx.from.id, 'سحب رتبة');
+      await ctx.answerCbQuery('✅ تم سحب الرتبة').catch(()=>{});
+      const targetUser = { id: targetId, first_name: 'العضو' };
+      const { txt, kb } = await gp.buildQuickPanel(ctx, targetUser);
+      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
+    }
+
+    await ctx.answerCbQuery('').catch(()=>{});
+    return;
+  }
+
   // ══ GROUP PRO CALLBACKS ══
   if (data.startsWith('gpro_')) {
     const gp = require('../handlers/group_pro');
@@ -1380,7 +1486,7 @@ module.exports.registerCallbacks = function(bot, deps) {
       const parts = data.replace('gpro_bl_del_','').split('_');
       const rowId = parts[0];
       const cid   = parts[1];
-      await require('../database/db').run('DELETE FROM grp_blacklist WHERE id=$1', [rowId]).catch(()=>{});
+      await require('../database/db').run('DELETE FROM grp_blacklist_words WHERE id=$1', [rowId]).catch(()=>{});
       await ctx.answerCbQuery('✅ حُذفت').catch(()=>{});
       const { txt, kb } = await gp.buildBlacklistPanel(cid);
       return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});

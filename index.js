@@ -27,6 +27,7 @@ const millionaire   = require('./handlers/millionaire');
 const guessGame     = require('./handlers/guess_game');
 const tools         = require('./handlers/owner_tools');
 const bank          = require('./handlers/bank');
+const groupPro      = require('./handlers/group_pro');
 const bankPro       = require('./handlers/bank_pro');
 const ownerH        = require('./handlers/owner');
 const contentDb     = require('./database/content');
@@ -295,6 +296,19 @@ const gameAndBankMiddleware = async (ctx, next) => {
     // البنك
     // bank.js القديم محذوف — استخدم bank_pro.js
 
+    // gpq_quick_panel_trigger — لوحة الإدارة السريعة (رد على عضو + "ادارة")
+    if (/^(ادارة|إدارة)$/i.test(txt) && ctx.message?.reply_to_message) {
+      const target = ctx.message.reply_to_message.from;
+      if (target && !target.is_bot) {
+        const allowed = await groupPro.hasPermission(ctx, ctx.chat.id, ctx.from.id, 'manage_protection')
+          .catch(() => false);
+        if (allowed || ctx.isAdmin || ctx.isOwner) {
+          const { txt: pTxt, kb: pKb } = await groupPro.buildQuickPanel(ctx, target);
+          return ctx.reply(pTxt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: pKb } }).catch(() => next());
+        }
+      }
+    }
+
     // 🏦 Taline Bank
     if (/^بنك$/i.test(txt))                       return bankPro.openAccount(ctx).catch(() => next());
     if (/^محفظتي$/i.test(txt))                    return bankPro.showWallet(ctx).catch(() => next());
@@ -326,6 +340,26 @@ const gameAndBankMiddleware = async (ctx, next) => {
 // ── تسجيل middleware بالترتيب الصحيح ──
 bot.use(rateLimit);
 bot.use(gameAndBankMiddleware);   // الألعاب والبنك قبل auth
+
+// 🛡️ نظام الحماية الاحترافي (group_pro)
+bot.use(async (ctx, next) => {
+  if (!['group','supergroup'].includes(ctx.chat?.type)) return next();
+  return groupPro.protect(bot, ctx, next);
+});
+
+// 🛡️ مكافحة التعديل
+bot.on('edited_message', async (ctx, next) => {
+  if (!['group','supergroup'].includes(ctx.chat?.type)) return next();
+  return groupPro.protectEdit(bot, ctx, next);
+});
+
+// 🛡️ فحص الأعضاء الجدد (بوتات/حسابات جديدة)
+bot.use(async (ctx, next) => {
+  if (ctx.message?.new_chat_members) {
+    return groupPro.checkNewMember(bot, ctx, next);
+  }
+  return next();
+});
 bot.use(authMiddleware);
 bot.use(botAdminCheck);           // FIX: مستوى أعلى — لا nested
 bot.use(groupProtectionMiddleware); // auto-reply + flood/spam/link
