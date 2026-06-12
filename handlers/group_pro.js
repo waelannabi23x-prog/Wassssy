@@ -171,6 +171,7 @@ async function warnUser(bot, chatId, userId, byId, reason, firstName) {
 // ══════════════════════════════════════════════════
 async function protect(bot, ctx, next) {
   try {
+    logger.info('[PROTECT_DEBUG] enter chat=' + ctx.chat?.id + ' type=' + ctx.chat?.type + ' from=' + ctx.from?.id);
     if (!['group','supergroup'].includes(ctx.chat?.type)) return next();
     const from = ctx.from;
     if (!from || from.is_bot) return next();
