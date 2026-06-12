@@ -1,138 +1,229 @@
 'use strict';
-/**
- * group_pro.js — نظام إدارة القروبات الاحترافي
- */
 const { run, get, all } = require('../database/db');
 const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
 const logger = require('../utils/logger');
 
-// ══════════════════════════════════════════
-// FLOOD TRACKER — في الذاكرة
-// ══════════════════════════════════════════
-const _flood = new Map(); // chatId_userId → { count, first }
+// ══════════════════════════════════════════════════
+// FLOOD TRACKER
+// ══════════════════════════════════════════════════
+const _flood = new Map();
 setInterval(() => {
   const now = Date.now();
-  for (const [k, v] of _flood) {
-    if (now - v.first > 10000) _flood.delete(k);
-  }
+  for (const [k, v] of _flood) if (now - v.first > 15000) _flood.delete(k);
 }, 10000).unref();
 
-// ══════════════════════════════════════════
-// SETTINGS — مع cache
-// ══════════════════════════════════════════
+// ══════════════════════════════════════════════════
+// SETTINGS
+// ══════════════════════════════════════════════════
 async function getSettings(chatId) {
-  const key = 'grp_set_' + chatId;
-  const hit = cacheGet(key);
+  const k = 'gpro_' + chatId;
+  const hit = cacheGet(k);
   if (hit) return hit;
   let s = await get('SELECT * FROM grp_settings WHERE chat_id=$1', [chatId]).catch(() => null);
   if (!s) {
     await run('INSERT INTO grp_settings(chat_id) VALUES($1) ON CONFLICT DO NOTHING', [chatId]).catch(() => {});
-    s = { chat_id: chatId, anti_spam: false, anti_link: false, anti_flood: false,
-          anti_forward: false, max_warns: 3, flood_limit: 5, flood_window: 5, warn_action: 'mute' };
+    s = { chat_id: chatId, anti_flood: false, flood_limit: 5, flood_window: 5,
+          anti_link: false, anti_invite: false, anti_forward: false,
+          anti_spam: false, anti_mention: false, anti_media: false,
+          max_warns: 3, warn_action: 'escalate' };
   }
-  cacheSet(key, s, 60000);
+  cacheSet(k, s, 60000);
   return s;
 }
 
-async function updateSetting(chatId, key, val) {
-  await run(`UPDATE grp_settings SET ${key}=$1, updated_at=NOW() WHERE chat_id=$2`, [val, chatId]);
-  cacheClear('grp_set_' + chatId);
+async function toggleSetting(chatId, key) {
+  const s = await getSettings(chatId);
+  const cur = s[key] || false;
+  await run(`UPDATE grp_settings SET ${key}=$1, updated_at=NOW() WHERE chat_id=$2`, [!cur, chatId]);
+  cacheClear('gpro_' + chatId);
+  return !cur;
 }
 
-// ══════════════════════════════════════════
-// LOG — سجل الأحداث
-// ══════════════════════════════════════════
-async function addLog(chatId, action, targetId, byId, reason, extra) {
-  await run(
-    'INSERT INTO grp_logs(chat_id,action,target_id,by_id,reason,extra) VALUES($1,$2,$3,$4,$5,$6)',
-    [chatId, action, targetId || null, byId || null, reason || null, extra || null]
-  ).catch(() => {});
+async function setSetting(chatId, key, val) {
+  await run(`INSERT INTO grp_settings(chat_id,${key}) VALUES($1,$2)
+    ON CONFLICT(chat_id) DO UPDATE SET ${key}=$2, updated_at=NOW()`, [chatId, val]);
+  cacheClear('gpro_' + chatId);
 }
 
-// ══════════════════════════════════════════
-// AUTO-PROTECTION MIDDLEWARE
-// ══════════════════════════════════════════
+// ══════════════════════════════════════════════════
+// LOGS
+// ══════════════════════════════════════════════════
+async function log(chatId, action, targetId, byId, reason, extra) {
+  await run('INSERT INTO grp_logs(chat_id,action,target_id,by_id,reason,extra) VALUES($1,$2,$3,$4,$5,$6)',
+    [chatId, action, targetId||null, byId||null, reason||null, extra||null]).catch(() => {});
+}
+
+// ══════════════════════════════════════════════════
+// MEMBER STATS
+// ══════════════════════════════════════════════════
+async function incStat(chatId, userId, col) {
+  await run(`INSERT INTO grp_member_stats(chat_id,user_id,${col}) VALUES($1,$2,1)
+    ON CONFLICT(chat_id,user_id) DO UPDATE SET ${col}=grp_member_stats.${col}+1, last_active=NOW()`,
+    [chatId, userId]).catch(() => {});
+}
+
+// ══════════════════════════════════════════════════
+// PUNISHMENT ESCALATION
+// ══════════════════════════════════════════════════
+async function punish(bot, chatId, userId, firstName, violations) {
+  const name = firstName || 'عضو';
+  const uid = Math.floor(Date.now()/1000);
+  if (violations <= 1) {
+    // إنذار فقط
+    return { type: 'warn', text: `⚠️ ${name} — إنذار (${violations}/3)` };
+  } else if (violations === 2) {
+    // كتم 10 دقائق
+    await bot.telegram.restrictChatMember(chatId, userId, {
+      permissions: { can_send_messages: false },
+      until_date: uid + 600,
+    }).catch(() => {});
+    await incStat(chatId, userId, 'mute_count');
+    return { type: 'mute', text: `🔇 ${name} — كتم 10 دقائق (${violations}/3)` };
+  } else if (violations === 3) {
+    // كتم ساعة
+    await bot.telegram.restrictChatMember(chatId, userId, {
+      permissions: { can_send_messages: false },
+      until_date: uid + 3600,
+    }).catch(() => {});
+    await incStat(chatId, userId, 'mute_count');
+    return { type: 'mute1h', text: `🔇 ${name} — كتم ساعة (${violations}/3)` };
+  } else {
+    // حظر
+    await bot.telegram.banChatMember(chatId, userId).catch(() => {});
+    await run('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => {});
+    await run('UPDATE grp_member_stats SET ban_count=ban_count+1, violations=0 WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => {});
+    return { type: 'ban', text: `🚫 ${name} — حظر تلقائي` };
+  }
+}
+
+// ══════════════════════════════════════════════════
+// WARN
+// ══════════════════════════════════════════════════
+async function warnUser(bot, chatId, userId, byId, reason, firstName) {
+  await run('INSERT INTO group_warns(chat_id,user_id,warned_by,reason,created_at) VALUES($1,$2,$3,$4,NOW())',
+    [chatId, userId, byId, reason || 'مخالفة']).catch(() => {});
+  await incStat(chatId, userId, 'warn_count');
+  await incStat(chatId, userId, 'violations');
+
+  const cnt = await get('SELECT COUNT(*) AS c FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, userId])
+    .then(r => parseInt(r?.c || 0)).catch(() => 0);
+
+  const stats = await get('SELECT violations FROM grp_member_stats WHERE chat_id=$1 AND user_id=$2', [chatId, userId])
+    .catch(() => null);
+  const violations = stats?.violations || cnt;
+
+  const result = await punish(bot, chatId, userId, firstName, violations);
+  await log(chatId, result.type === 'ban' ? 'auto_ban' : result.type === 'warn' ? 'warn' : 'auto_mute',
+    userId, byId, reason, cnt + '/' + 3);
+
+  return { ...result, cnt };
+}
+
+// ══════════════════════════════════════════════════
+// PROTECTION MIDDLEWARE
+// ══════════════════════════════════════════════════
 async function protect(bot, ctx, next) {
   try {
-    const chat = ctx.chat;
-    if (!chat || !['group','supergroup'].includes(chat.type)) return next();
+    if (!['group','supergroup'].includes(ctx.chat?.type)) return next();
     const from = ctx.from;
     if (!from || from.is_bot) return next();
 
-    // تحقق من صلاحيات البوت
-    const me = await ctx.telegram.getChatMember(chat.id, ctx.botInfo?.id).catch(() => null);
-    if (!me || !['administrator','creator'].includes(me.status)) return next();
-
-    // لا نطبق على المشرفين
-    const member = await ctx.telegram.getChatMember(chat.id, from.id).catch(() => null);
+    const member = await ctx.telegram.getChatMember(ctx.chat.id, from.id).catch(() => null);
     if (['administrator','creator'].includes(member?.status)) return next();
 
-    const s = await getSettings(chat.id);
+    const s = await getSettings(ctx.chat.id);
     const msg = ctx.message;
     if (!msg) return next();
 
-    const chatId = chat.id;
+    const chatId = ctx.chat.id;
     const userId = from.id;
     const name = from.first_name || 'عضو';
+    const text = msg.text || msg.caption || '';
 
-    // ── Anti-Flood ──
+    // Anti-Flood
     if (s.anti_flood) {
       const fk = chatId + '_' + userId;
       const now = Date.now();
       const fd = _flood.get(fk) || { count: 0, first: now };
       fd.count++;
-      if (now - fd.first > (s.flood_window || 5) * 1000) {
-        fd.count = 1; fd.first = now;
-      }
+      if (now - fd.first > (s.flood_window || 5) * 1000) { fd.count = 1; fd.first = now; }
       _flood.set(fk, fd);
       if (fd.count >= (s.flood_limit || 5)) {
         _flood.delete(fk);
         await ctx.deleteMessage().catch(() => {});
         await ctx.telegram.restrictChatMember(chatId, userId, {
           permissions: { can_send_messages: false },
-          until_date: Math.floor(Date.now() / 1000) + 300,
+          until_date: Math.floor(Date.now()/1000) + 300,
         }).catch(() => {});
-        const m = await ctx.reply(`🌊 ${name} — كتم 5 دقائق (فلود)`, { parse_mode: 'Markdown' }).catch(() => null);
+        const r = await warnUser(bot, chatId, userId, null, 'فلود', name);
+        const m = await ctx.reply(r.text, { parse_mode: 'Markdown' }).catch(() => null);
         if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(() => {}), 8000);
-        await addLog(chatId, 'flood_mute', userId, null, 'فلود تلقائي', null);
         return;
       }
     }
 
-    // ── Anti-Link ──
+    // Anti-Link
     if (s.anti_link) {
-      const text = msg.text || msg.caption || '';
-      const hasLink = /https?:\/\/|t\.me\/|@\w{4,}/.test(text);
+      const hasLink = /https?:\/\/\S+|t\.me\/\S+/.test(text);
       if (hasLink) {
         await ctx.deleteMessage().catch(() => {});
-        const m = await ctx.reply(`🔗 ${name} — حذف رابط`, { parse_mode: 'Markdown' }).catch(() => null);
-        if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(() => {}), 5000);
-        await addLog(chatId, 'link_delete', userId, null, 'رابط محذوف', text.substring(0, 100));
+        const r = await warnUser(bot, chatId, userId, null, 'رابط', name);
+        const m = await ctx.reply(r.text, { parse_mode: 'Markdown' }).catch(() => null);
+        if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(() => {}), 8000);
         return;
       }
     }
 
-    // ── Anti-Forward ──
-    if (s.anti_forward && msg.forward_from) {
+    // Anti-Invite
+    if (s.anti_invite) {
+      const hasInvite = /t\.me\/\+\S+|t\.me\/joinchat\/\S+/.test(text);
+      if (hasInvite) {
+        await ctx.deleteMessage().catch(() => {});
+        const r = await warnUser(bot, chatId, userId, null, 'دعوة', name);
+        const m = await ctx.reply(r.text, { parse_mode: 'Markdown' }).catch(() => null);
+        if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(() => {}), 8000);
+        return;
+      }
+    }
+
+    // Anti-Forward
+    if (s.anti_forward && (msg.forward_from || msg.forward_from_chat)) {
       await ctx.deleteMessage().catch(() => {});
-      const m = await ctx.reply(`↩️ ${name} — حذف forward`, { parse_mode: 'Markdown' }).catch(() => null);
+      const m = await ctx.reply(`↩️ ${name} — حذف توجيه`, { parse_mode: 'Markdown' }).catch(() => null);
       if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(() => {}), 5000);
       return;
     }
 
-    // ── Blacklist ──
-    const text = (msg.text || msg.caption || '').toLowerCase();
+    // Anti-Mention
+    if (s.anti_mention) {
+      const mentions = (text.match(/@\w+/g) || []).length;
+      if (mentions >= 5) {
+        await ctx.deleteMessage().catch(() => {});
+        const r = await warnUser(bot, chatId, userId, null, 'منشن جماعي', name);
+        const m = await ctx.reply(r.text, { parse_mode: 'Markdown' }).catch(() => null);
+        if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(() => {}), 8000);
+        return;
+      }
+    }
+
+    // Blacklist
     if (text) {
-      const bl = await all('SELECT word FROM grp_blacklist WHERE chat_id=$1', [chatId]).catch(() => []);
+      const bl = await all('SELECT word, action FROM grp_blacklist WHERE chat_id=$1', [chatId]).catch(() => []);
       for (const row of bl) {
-        if (text.includes(row.word.toLowerCase())) {
+        if (text.toLowerCase().includes(row.word.toLowerCase())) {
           await ctx.deleteMessage().catch(() => {});
-          const m = await ctx.reply(`🚫 ${name} — كلمة محظورة`, { parse_mode: 'Markdown' }).catch(() => null);
-          if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(() => {}), 5000);
+          const r = await warnUser(bot, chatId, userId, null, 'كلمة محظورة: ' + row.word, name);
+          const m = await ctx.reply(r.text, { parse_mode: 'Markdown' }).catch(() => null);
+          if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(() => {}), 8000);
           return;
         }
       }
     }
+
+    // إحصاء الرسائل
+    await run(`INSERT INTO grp_member_stats(chat_id,user_id,msg_count,last_active) VALUES($1,$2,1,NOW())
+      ON CONFLICT(chat_id,user_id) DO UPDATE SET msg_count=grp_member_stats.msg_count+1, last_active=NOW()`,
+      [chatId, userId]).catch(() => {});
 
     return next();
   } catch(e) {
@@ -141,82 +232,154 @@ async function protect(bot, ctx, next) {
   }
 }
 
-// ══════════════════════════════════════════
-// WARN SYSTEM
-// ══════════════════════════════════════════
-async function warnUser(bot, chatId, userId, byId, reason) {
-  const s = await getSettings(chatId);
-  const maxWarns = s.max_warns || 3;
+// ══════════════════════════════════════════════════
+// PANEL — لوحة الإدارة الرئيسية
+// ══════════════════════════════════════════════════
+async function showMainPanel(ctx, chatId) {
+  const [memberCount, s, warnCount, banCount, logCount] = await Promise.all([
+    ctx.telegram.getChatMembersCount(chatId).catch(() => 0),
+    getSettings(chatId),
+    get('SELECT COUNT(*) AS c FROM group_warns WHERE chat_id=$1', [chatId]).then(r=>parseInt(r?.c||0)).catch(()=>0),
+    get('SELECT COUNT(*) AS c FROM group_bans WHERE chat_id=$1', [chatId]).then(r=>parseInt(r?.c||0)).catch(()=>0),
+    get('SELECT COUNT(*) AS c FROM grp_logs WHERE chat_id=$1', [chatId]).then(r=>parseInt(r?.c||0)).catch(()=>0),
+  ]);
 
-  await run(
-    'INSERT INTO group_warns(chat_id,user_id,warned_by,reason,created_at) VALUES($1,$2,$3,$4,NOW())',
-    [chatId, userId, byId, reason || 'مخالفة']
-  ).catch(() => {});
+  const on  = '🟢';
+  const off = '🔴';
+  const txt =
+    '⚙️ *لوحة الإدارة*\n━━━━━━━━━━━━━━━\n\n' +
+    '👥 الأعضاء: *' + memberCount + '*\n' +
+    '⚠️ الإنذارات: *' + warnCount + '*  |  🚫 محظورون: *' + banCount + '*\n' +
+    '📋 السجلات: *' + logCount + '*\n\n' +
+    '🛡 الحماية: ' +
+    (s.anti_flood ? on : off) + 'فلود  ' +
+    (s.anti_link  ? on : off) + 'روابط  ' +
+    (s.anti_forward ? on : off) + 'فوروارد';
 
-  const cnt = await get('SELECT COUNT(*) AS c FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, userId])
-    .then(r => parseInt(r?.c || 0)).catch(() => 0);
+  const kb = [
+    [{ text: '🛡 الحماية',    callback_data: 'gpro_protect_' + chatId },
+     { text: '⚠️ العقوبات',  callback_data: 'gpro_punish_'  + chatId }],
+    [{ text: '👥 الأعضاء',   callback_data: 'gpro_members_' + chatId },
+     { text: '📋 السجلات',   callback_data: 'gpro_logs_'    + chatId + '_0' }],
+    [{ text: '🚫 الكلمات المحظورة', callback_data: 'gpro_bl_' + chatId },
+     { text: '📊 الإحصائيات',       callback_data: 'gpro_stats_' + chatId }],
+    [{ text: '⚙️ الإعدادات', callback_data: 'gpro_cfg_' + chatId }],
+  ];
 
-  await addLog(chatId, 'warn', userId, byId, reason, cnt + '/' + maxWarns);
-
-  if (cnt >= maxWarns) {
-    // تنفيذ العقوبة
-    if (s.warn_action === 'ban') {
-      await bot.telegram.banChatMember(chatId, userId).catch(() => {});
-      await run('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => {});
-      await addLog(chatId, 'auto_ban', userId, null, 'وصل ' + maxWarns + ' إنذارات', null);
-      return { action: 'ban', cnt };
-    } else {
-      // كتم افتراضي
-      await bot.telegram.restrictChatMember(chatId, userId, {
-        permissions: { can_send_messages: false },
-        until_date: Math.floor(Date.now() / 1000) + 3600,
-      }).catch(() => {});
-      await run('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => {});
-      await addLog(chatId, 'auto_mute', userId, null, 'وصل ' + maxWarns + ' إنذارات', null);
-      return { action: 'mute', cnt };
-    }
-  }
-  return { action: 'warn', cnt, max: maxWarns };
+  return { txt, kb };
 }
 
-// ══════════════════════════════════════════
-// LOGS VIEWER
-// ══════════════════════════════════════════
-async function showLogs(ctx, chatId, page = 0) {
-  const limit = 10;
+// ══════════════════════════════════════════════════
+// PROTECTION PANEL
+// ══════════════════════════════════════════════════
+async function buildProtectPanel(chatId) {
+  const s = await getSettings(chatId);
+  const f = (v, label, key) => [{
+    text: (v ? '✅ ' : '❌ ') + label,
+    callback_data: 'gpro_tog_' + key + '_' + chatId
+  }];
+  const txt = '🛡 *الحماية*\n━━━━━━━━━━━━━━━\n_اضغط لتفعيل/إيقاف_';
+  const kb = [
+    f(s.anti_flood,   'مكافحة الفلود',        'anti_flood'),
+    f(s.anti_link,    'مكافحة الروابط',        'anti_link'),
+    f(s.anti_invite,  'مكافحة الدعوات',        'anti_invite'),
+    f(s.anti_forward, 'مكافحة الفوروارد',      'anti_forward'),
+    f(s.anti_mention, 'مكافحة المنشن الجماعي', 'anti_mention'),
+    [{ text: '◀️ رجوع', callback_data: 'gpro_main_' + chatId }],
+  ];
+  return { txt, kb };
+}
+
+// ══════════════════════════════════════════════════
+// LOGS PANEL
+// ══════════════════════════════════════════════════
+async function buildLogsPanel(ctx, chatId, page) {
+  const limit = 8;
   const offset = page * limit;
   const logs = await all(
-    `SELECT action, target_id, by_id, reason, created_at FROM grp_logs
+    `SELECT action,target_id,by_id,reason,created_at FROM grp_logs
      WHERE chat_id=$1 ORDER BY created_at DESC LIMIT $2 OFFSET $3`,
     [chatId, limit, offset]
   ).catch(() => []);
 
-  if (!logs.length) return ctx.reply('📋 لا توجد سجلات').catch(() => {});
+  const total = await get('SELECT COUNT(*) AS c FROM grp_logs WHERE chat_id=$1', [chatId])
+    .then(r=>parseInt(r?.c||0)).catch(()=>0);
 
-  const actionEmoji = {
-    warn: '⚠️', ban: '🚫', mute: '🔇', unmute: '🔊', unban: '🔓',
-    kick: '🦵', flood_mute: '🌊', link_delete: '🔗', auto_ban: '🚫🤖',
-    auto_mute: '🔇🤖',
-  };
+  const emoji = { warn:'⚠️', ban:'🚫', mute:'🔇', unmute:'🔊', unban:'🔓',
+    kick:'🦵', auto_ban:'🤖🚫', auto_mute:'🤖🔇', flood_mute:'🌊', link_delete:'🔗' };
 
-  let txt = `📋 *سجل القروب* (صفحة ${page+1})\n━━━━━━━━━━━━━\n\n`;
-  for (const log of logs) {
-    const emoji = actionEmoji[log.action] || '📌';
-    const date = new Date(log.created_at).toLocaleDateString('ar-DZ');
-    txt += `${emoji} \`${log.action}\``;
-    if (log.target_id) txt += ` — [${log.target_id}](tg://user?id=${log.target_id})`;
-    if (log.reason) txt += ` — ${log.reason}`;
-    txt += ` _(${date})_\n`;
+  let txt = `📋 *السجلات* (${page+1}/${Math.ceil(total/limit)||1})\n━━━━━━━━━━━━━\n\n`;
+  if (!logs.length) { txt += '_لا توجد سجلات_'; }
+  else for (const l of logs) {
+    const e = emoji[l.action] || '📌';
+    const d = new Date(l.created_at).toLocaleDateString('ar-DZ');
+    txt += `${e} \`${l.action}\``;
+    if (l.target_id) txt += ` — [${l.target_id}](tg://user?id=${l.target_id})`;
+    if (l.reason) txt += ` _(${l.reason})_`;
+    txt += ` · ${d}\n`;
   }
 
-  const kb = [];
   const nav = [];
-  if (page > 0) nav.push({ text: '◀️', callback_data: `grp_logs_${chatId}_${page-1}` });
-  if (logs.length === limit) nav.push({ text: '▶️', callback_data: `grp_logs_${chatId}_${page+1}` });
-  if (nav.length) kb.push(nav);
-  kb.push([{ text: '🗑 مسح السجلات', callback_data: `grp_logs_clear_${chatId}` }]);
+  if (page > 0) nav.push({ text: '◀️', callback_data: `gpro_logs_${chatId}_${page-1}` });
+  if (offset + limit < total) nav.push({ text: '▶️', callback_data: `gpro_logs_${chatId}_${page+1}` });
 
-  return ctx.reply(txt, { parse_mode: 'Markdown', disable_web_page_preview: true, reply_markup: { inline_keyboard: kb } }).catch(() => {});
+  const kb = [];
+  if (nav.length) kb.push(nav);
+  kb.push([
+    { text: '🗑 مسح الكل', callback_data: 'gpro_logs_clear_' + chatId },
+    { text: '◀️ رجوع',     callback_data: 'gpro_main_'        + chatId },
+  ]);
+  return { txt, kb };
 }
 
-module.exports = { protect, getSettings, updateSetting, addLog, warnUser, showLogs };
+// ══════════════════════════════════════════════════
+// STATS PANEL
+// ══════════════════════════════════════════════════
+async function buildStatsPanel(chatId) {
+  const [top, totalMsg, warnC, muteC, banC] = await Promise.all([
+    all(`SELECT user_id, msg_count, warn_count FROM grp_member_stats
+         WHERE chat_id=$1 ORDER BY msg_count DESC LIMIT 5`, [chatId]).catch(()=>[]),
+    get('SELECT SUM(msg_count) AS t FROM grp_member_stats WHERE chat_id=$1',[chatId]).then(r=>r?.t||0).catch(()=>0),
+    get('SELECT COUNT(*) AS c FROM group_warns WHERE chat_id=$1',[chatId]).then(r=>r?.c||0).catch(()=>0),
+    get("SELECT COUNT(*) AS c FROM grp_logs WHERE chat_id=$1 AND action LIKE '%mute%'",[chatId]).then(r=>r?.c||0).catch(()=>0),
+    get('SELECT COUNT(*) AS c FROM group_bans WHERE chat_id=$1',[chatId]).then(r=>r?.c||0).catch(()=>0),
+  ]);
+
+  let txt = '📊 *إحصائيات القروب*\n━━━━━━━━━━━━━\n\n';
+  txt += '💬 إجمالي الرسائل: *' + totalMsg + '*\n';
+  txt += '⚠️ الإنذارات: *' + warnC + '*\n';
+  txt += '🔇 الكتم: *' + muteC + '*\n';
+  txt += '🚫 الحظر: *' + banC + '*\n\n';
+  if (top.length) {
+    txt += '🏆 *أكثر الأعضاء نشاطاً:*\n';
+    top.forEach((r,i) => {
+      txt += `${i+1}. [${r.user_id}](tg://user?id=${r.user_id}) — ${r.msg_count} رسالة\n`;
+    });
+  }
+
+  const kb = [[{ text: '◀️ رجوع', callback_data: 'gpro_main_' + chatId }]];
+  return { txt, kb };
+}
+
+// ══════════════════════════════════════════════════
+// BLACKLIST PANEL
+// ══════════════════════════════════════════════════
+async function buildBlacklistPanel(chatId) {
+  const list = await all('SELECT id, word FROM grp_blacklist WHERE chat_id=$1 ORDER BY id', [chatId]).catch(()=>[]);
+  let txt = '🚫 *الكلمات المحظورة*\n━━━━━━━━━━━━━\n\n';
+  if (!list.length) txt += '_لا توجد كلمات محظورة_\n\n';
+  else list.forEach(r => { txt += `• \`${r.word}\`\n`; });
+  txt += '\n_أرسل كلمة لإضافتها، أو /unblacklist كلمة_';
+
+  const kb = [
+    ...list.map(r => [{ text: '🗑 ' + r.word, callback_data: 'gpro_bl_del_' + r.id + '_' + chatId }]),
+    [{ text: '◀️ رجوع', callback_data: 'gpro_main_' + chatId }],
+  ];
+  return { txt, kb };
+}
+
+module.exports = {
+  protect, getSettings, toggleSetting, setSetting, log,
+  warnUser, showMainPanel, buildProtectPanel, buildLogsPanel,
+  buildStatsPanel, buildBlacklistPanel, incStat,
+};

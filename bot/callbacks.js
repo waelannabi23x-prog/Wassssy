@@ -1278,9 +1278,8 @@ module.exports.registerCallbacks = function(bot, deps) {
     if (game === 'bank')    return ctx.reply('💰 استخدم /daily للمكافأة اليومية', { parse_mode: 'Markdown' }).catch(() => {});
   }
 
-
-  // ── toggle إعدادات الحماية ──
-  if (data.startsWith('gp_pro_tog_')) {
+  // __ old protect removed
+  if (false && data.startsWith('_old_pro_tog_')) {
     const raw    = data.replace('gp_pro_tog_', '');
     const chatId = raw.split('_').pop();
     const key    = raw.replace('_' + chatId, '');
@@ -1320,6 +1319,81 @@ module.exports.registerCallbacks = function(bot, deps) {
     return showLogs(ctx, chatId, page);
   }
 
+  // ══ GROUP PRO CALLBACKS ══
+  if (data.startsWith('gpro_')) {
+    const gp = require('../handlers/group_pro');
+    const chatIdStr = data.split('_').slice(-1)[0].replace(/\D/g,'');
+    const chatId = chatIdStr ? (parseInt(chatIdStr) || ctx.chat?.id) : ctx.chat?.id;
 
+    // الرئيسية
+    if (data.startsWith('gpro_main_')) {
+      const { txt, kb } = await gp.showMainPanel(ctx, chatId);
+      await ctx.answerCbQuery('').catch(()=>{});
+      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
+    }
+
+    // الحماية
+    if (data.startsWith('gpro_protect_')) {
+      const { txt, kb } = await gp.buildProtectPanel(chatId);
+      await ctx.answerCbQuery('').catch(()=>{});
+      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
+    }
+
+    // toggle حماية
+    if (data.startsWith('gpro_tog_')) {
+      const raw    = data.replace('gpro_tog_', '');
+      const cid    = raw.split('_').pop();
+      const key    = raw.slice(0, -(cid.length+1));
+      const newVal = await gp.toggleSetting(cid, key);
+      await ctx.answerCbQuery((newVal ? '✅ تم التفعيل' : '❌ تم الإيقاف')).catch(()=>{});
+      const { txt, kb } = await gp.buildProtectPanel(cid);
+      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
+    }
+
+    // السجلات
+    if (data.startsWith('gpro_logs_clear_')) {
+      const cid = data.replace('gpro_logs_clear_', '');
+      await require('../database/db').run('DELETE FROM grp_logs WHERE chat_id=$1', [cid]).catch(()=>{});
+      await ctx.answerCbQuery('✅ تم المسح').catch(()=>{});
+      const { txt, kb } = await gp.buildLogsPanel(ctx, cid, 0);
+      return ctx.editMessageText(txt, { parse_mode:'Markdown', disable_web_page_preview:true, reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
+    }
+    if (data.startsWith('gpro_logs_')) {
+      const parts = data.replace('gpro_logs_','').split('_');
+      const cid   = parts[0];
+      const page  = parseInt(parts[1]) || 0;
+      await ctx.answerCbQuery('').catch(()=>{});
+      const { txt, kb } = await gp.buildLogsPanel(ctx, cid, page);
+      return ctx.editMessageText(txt, { parse_mode:'Markdown', disable_web_page_preview:true, reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
+    }
+
+    // الإحصائيات
+    if (data.startsWith('gpro_stats_')) {
+      const cid = data.replace('gpro_stats_','');
+      await ctx.answerCbQuery('').catch(()=>{});
+      const { txt, kb } = await gp.buildStatsPanel(cid);
+      return ctx.editMessageText(txt, { parse_mode:'Markdown', disable_web_page_preview:true, reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
+    }
+
+    // الكلمات المحظورة
+    if (data.startsWith('gpro_bl_del_')) {
+      const parts = data.replace('gpro_bl_del_','').split('_');
+      const rowId = parts[0];
+      const cid   = parts[1];
+      await require('../database/db').run('DELETE FROM grp_blacklist WHERE id=$1', [rowId]).catch(()=>{});
+      await ctx.answerCbQuery('✅ حُذفت').catch(()=>{});
+      const { txt, kb } = await gp.buildBlacklistPanel(cid);
+      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
+    }
+    if (data.startsWith('gpro_bl_')) {
+      const cid = data.replace('gpro_bl_','');
+      await ctx.answerCbQuery('').catch(()=>{});
+      const { txt, kb } = await gp.buildBlacklistPanel(cid);
+      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
+    }
+
+    await ctx.answerCbQuery('').catch(()=>{});
+    return;
+  }
   });
 };

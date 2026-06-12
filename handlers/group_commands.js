@@ -1071,4 +1071,16 @@ function _reply(ctx, text, delay=10000) {
 
 }
 
+
+  // ══ /panel — لوحة الإدارة الرئيسية ══
+  bot.command(['panel','لوحة'], async ctx => {
+    if (!isGroup(ctx)) return;
+    if (!await isTgAdmin(ctx)) return;
+    delCmd(ctx);
+    const { showMainPanel } = require('./group_pro');
+    const { txt, kb } = await showMainPanel(ctx, ctx.chat.id);
+    const m = await ctx.reply(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>null);
+    if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(()=>{}), 300000);
+  });
+
 module.exports = { setupGroupCommands, showGamesMenu, handleSettingsCallback, showGroupSettings };
