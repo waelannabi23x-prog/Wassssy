@@ -234,7 +234,7 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
   bot.command(['bank','حسابي','بنكي'], ctx => require('../handlers/bank').showBalance(ctx).catch(()=>{}));
 
   // ── لوحة الإدارة ──
-  bot.command(['adminpanel','لوحة'], async ctx => {
+  bot.command(['adminpanel'], async ctx => {
     if (!ctx.isOwner && !ctx.isAdmin) return;
     const rows = [
       [{ text:'📁 المحتوى', callback_data:'manage' }, { text:'👥 المستخدمون', callback_data:'manage_users_0' }],
