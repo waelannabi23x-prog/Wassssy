@@ -482,79 +482,85 @@ function setupGroupCommands(bot) {
   bot.command("info", async ctx => {
     if (!isGroup(ctx)) return;
     delCmd(ctx);
-    const target   = ctx.message.reply_to_message?.from || ctx.from;
-    const isReqAdm = await isTgAdmin(ctx);
-    const { get: dbGet, all: dbAll } = require("../database/db");
     const chatId = ctx.chat.id;
+
+    // دعم: رد على رسالة أو @username أو ID
+    let target = ctx.message.reply_to_message?.from || null;
+    if (!target) {
+      const args = ctx.message.text.split(' ').slice(1);
+      const arg  = args[0];
+      if (arg) {
+        const un = arg.replace('@','');
+        const m  = await ctx.telegram.getChatMember(chatId, isNaN(un) ? '@'+un : parseInt(un)).catch(() => null);
+        if (m?.user) target = m.user;
+      }
+    }
+    if (!target) target = ctx.from;
+
+    const isReqAdm = await isTgAdmin(ctx);
+    const { get: dbGet } = require("../database/db");
 
     const [member, warnsRow, userRow] = await Promise.all([
       ctx.telegram.getChatMember(chatId, target.id).catch(() => null),
-      dbGet("SELECT COUNT(*) as c FROM group_warns WHERE chat_id=$1 AND user_id=$2", [chatId, target.id]).catch(() => ({ c:0 })),
+      dbGet("SELECT COUNT(*) as c FROM group_warns WHERE chat_id=$1 AND user_id=$2", [chatId, target.id]).catch(() => ({c:0})),
       dbGet("SELECT xp, level, balance, created_at FROM users WHERE id=$1", [target.id]).catch(() => null),
     ]);
 
-    const statusMap = {
-      member:"عضو 👤", administrator:"مشرف 🛡️", creator:"مؤسس 👑",
-      restricted:"مقيّد 🔒", left:"غادر 🚪", kicked:"محظور 🚫"
-    };
-    const name    = [target.first_name, target.last_name].filter(Boolean).join(" ");
-    const isOwner = member?.status === "creator";
-    const isAdmTarget = ["administrator","creator"].includes(member?.status);
-    const warnCnt = parseInt(warnsRow?.c || 0);
+    const statusMap = { member:"عضو", administrator:"مشرف", creator:"مؤسس", restricted:"مقيّد", left:"غادر", kicked:"محظور" };
+    const name      = [target.first_name, target.last_name].filter(Boolean).join(" ");
+    const isAdmTgt  = ["administrator","creator"].includes(member?.status);
+    const isOwnerTgt = member?.status === "creator";
+    const warnCnt   = parseInt(warnsRow?.c || 0);
 
-    // تاريخ الانضمام
     let joinDate = "";
-    if (member?.status === "restricted" && member?.until_date) {
-      joinDate = new Date(member.until_date * 1000).toLocaleDateString("ar");
-    } else if (userRow?.created_at) {
-      joinDate = new Date(userRow.created_at).toLocaleDateString("ar-DZ");
-    }
+    if (userRow?.created_at) joinDate = new Date(userRow.created_at).toLocaleDateString("ar-DZ");
 
-    // الدور
-    let role = isOwner ? "👑 صاحب القروب" : isAdmTarget ? "🛡️ مشرف" : "👤 عضو";
-
-    let txt = "👤 *معلومات العضو*\n━━━━━━━━━━━━━━━\n\n";
-    txt += "🪪 الاسم: [" + name + "](tg://user?id=" + target.id + ")\n";
-    if (target.username) txt += "🔗 يوزر: @" + target.username + "\n";
-    txt += "🆔 الرقم التعريفي: `" + target.id + "`\n";
-    txt += "🎭 الدور: " + role + "\n";
-    txt += "👁 الحالة: " + (statusMap[member?.status] || "غير معروف") + "\n";
-    if (joinDate) txt += "📅 الانضمام: " + joinDate + "\n";
-    txt += "\n📊 *الإحصائيات:*\n";
-    txt += "⚠️ الإنذارات: *" + warnCnt + "/3*\n";
-    if (userRow) {
-      if (userRow.balance != null) txt += "💰 الرصيد: *" + Number(userRow.balance).toLocaleString() + "* $\n";
-      if (userRow.xp != null) txt += "🏆 XP: *" + userRow.xp + "* | المستوى: *" + (userRow.level||0) + "*\n";
-    }
+    let txt = "👤 *" + name + "*";
+    if (target.username) txt += "  @" + target.username;
+    txt += "\n`" + target.id + "`\n\n";
+    txt += "الدور: " + (isOwnerTgt ? "👑 مؤسس" : isAdmTgt ? "🛡 مشرف" : "👤 عضو") + "\n";
+    txt += "الحالة: " + (statusMap[member?.status] || "؟") + "\n";
+    if (joinDate) txt += "انضم: " + joinDate + "\n";
+    txt += "\nالإنذارات: *" + warnCnt + "/3*";
+    if (userRow?.balance != null) txt += "  |  💰 *" + Number(userRow.balance).toLocaleString() + "*";
+    if (userRow?.xp != null)      txt += "\nXP: *" + userRow.xp + "*  المستوى: *" + (userRow.level||0) + "*";
 
     const kb = [];
-    if (isReqAdm && !isAdmTarget && target.id !== ctx.from.id) {
-      kb.push([
-        { text: "⚠️ ! الإنذارات", callback_data: "grp_warns_show_" + target.id + "_" + chatId },
-        { text: "🎛 الصلاحيات",    callback_data: "grp_perms_" + target.id + "_" + chatId },
-      ]);
-      kb.push([
-        { text: "✅ الغاء الكتم",   callback_data: "grp_unmute_" + target.id },
-        { text: "🚫 حظر",           callback_data: "grp_ban_confirm_" + target.id },
-      ]);
-      kb.push([
-        { text: "🔇 كتم 🔔",        callback_data: "grp_mute_menu_" + target.id },
-        { text: "🔰 أذونات ↗",      callback_data: "grp_perms_" + target.id + "_" + chatId },
-      ]);
-    } else if (isReqAdm && isAdmTarget && !isOwner && target.id !== ctx.from.id) {
-      kb.push([
-        { text: "⚠️ الإنذارات",     callback_data: "grp_warns_show_" + target.id + "_" + chatId },
-        { text: "🔰 أذونات ↗",      callback_data: "grp_perms_" + target.id + "_" + chatId },
-      ]);
+    if (isReqAdm && !isOwnerTgt && target.id !== ctx.from.id) {
+      if (!isAdmTgt) {
+        kb.push([
+          { text: "⚠️ إنذار +",     callback_data: "grp_wadd_"        + target.id + "_" + chatId },
+          { text: "⚠️ إنذار −",     callback_data: "grp_wdel_"        + target.id + "_" + chatId },
+          { text: "📋 السجل",       callback_data: "grp_warns_show_"   + target.id + "_" + chatId },
+        ]);
+        kb.push([
+          { text: "🔇 كتم",         callback_data: "grp_mute_menu_"    + target.id },
+          { text: "🔊 رفع الكتم",   callback_data: "grp_unmute_"       + target.id },
+          { text: "🚫 حظر",         callback_data: "grp_ban_confirm_"  + target.id },
+        ]);
+        kb.push([
+          { text: "🎛 الأذونات",    callback_data: "grp_perms_"        + target.id + "_" + chatId },
+          { text: "🦵 طرد",         callback_data: "grp_kick_"         + target.id },
+        ]);
+      } else {
+        kb.push([
+          { text: "📋 الإنذارات",   callback_data: "grp_warns_show_"   + target.id + "_" + chatId },
+          { text: "🎛 الأذونات",    callback_data: "grp_perms_"        + target.id + "_" + chatId },
+        ]);
+      }
     }
 
-    ctx.reply(txt, {
+    const m = await ctx.reply(txt, {
       parse_mode: "Markdown",
       reply_to_message_id: ctx.message?.reply_to_message?.message_id,
       reply_markup: kb.length ? { inline_keyboard: kb } : undefined,
       disable_web_page_preview: true,
-    }).catch(() => {});
+    }).catch(() => null);
+
+    // تختفي بعد 3 دقائق
+    if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(() => {}), 180000);
   });
+
 
 
   // ══ /cmds ══
