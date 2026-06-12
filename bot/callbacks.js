@@ -1279,5 +1279,47 @@ module.exports.registerCallbacks = function(bot, deps) {
   }
 
 
+  // ── toggle إعدادات الحماية ──
+  if (data.startsWith('gp_pro_tog_')) {
+    const raw    = data.replace('gp_pro_tog_', '');
+    const chatId = raw.split('_').pop();
+    const key    = raw.replace('_' + chatId, '');
+    const { getSettings, updateSetting } = require('../handlers/group_pro');
+    const s   = await getSettings(chatId);
+    const cur = s[key] || false;
+    await updateSetting(chatId, key, !cur);
+    const newS = await getSettings(chatId);
+    const txt =
+      '🛡 *إعدادات الحماية*\n━━━━━━━━━━━━━\n\n' +
+      (newS.anti_flood   ? '✅' : '❌') + ' مكافحة الفلود\n' +
+      (newS.anti_link    ? '✅' : '❌') + ' مكافحة الروابط\n' +
+      (newS.anti_forward ? '✅' : '❌') + ' مكافحة الفوروارد\n';
+    const kb = [
+      [{ text: (newS.anti_flood   ? '🔴 إيقاف' : '🟢 تفعيل') + ' الفلود',     callback_data: 'gp_pro_tog_anti_flood_'  + chatId }],
+      [{ text: (newS.anti_link    ? '🔴 إيقاف' : '🟢 تفعيل') + ' الروابط',    callback_data: 'gp_pro_tog_anti_link_'   + chatId }],
+      [{ text: (newS.anti_forward ? '🔴 إيقاف' : '🟢 تفعيل') + ' الفوروارد',  callback_data: 'gp_pro_tog_anti_forward_'+ chatId }],
+    ];
+    await ctx.answerCbQuery('✅').catch(() => {});
+    return ctx.editMessageText(txt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: kb } }).catch(() => {});
+  }
+
+  // ── صفحات السجلات ──
+  if (data.startsWith('grp_logs_clear_')) {
+    const chatId = data.replace('grp_logs_clear_', '');
+    await require('../database/db').run('DELETE FROM grp_logs WHERE chat_id=$1', [chatId]).catch(() => {});
+    await ctx.answerCbQuery('✅ تم مسح السجلات').catch(() => {});
+    return ctx.deleteMessage().catch(() => {});
+  }
+  if (data.startsWith('grp_logs_')) {
+    const parts  = data.replace('grp_logs_', '').split('_');
+    const chatId = parts[0];
+    const page   = parseInt(parts[1]) || 0;
+    const { showLogs } = require('../handlers/group_pro');
+    await ctx.answerCbQuery('').catch(() => {});
+    await ctx.deleteMessage().catch(() => {});
+    return showLogs(ctx, chatId, page);
+  }
+
+
   });
 };

@@ -1010,6 +1010,65 @@ function _reply(ctx, text, delay=10000) {
   ctx.reply(text, { parse_mode: 'Markdown' })
     .then(m => { if (m && delay) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), delay); })
     .catch(() => {});
+
+
+  // ══ /logs ══
+  bot.command(['logs','سجل'], async ctx => {
+    if (!isGroup(ctx)) return;
+    if (!await isTgAdmin(ctx)) return;
+    delCmd(ctx);
+    const { showLogs } = require('./group_pro');
+    showLogs(ctx, ctx.chat.id, 0);
+  });
+
+  // ══ /blacklist ══
+  bot.command(['blacklist','محظور'], async ctx => {
+    if (!isGroup(ctx)) return;
+    if (!await isTgAdmin(ctx)) return;
+    delCmd(ctx);
+    const { all: dbAll, run: dbRun } = require('../database/db');
+    const word = ctx.message.text.split(' ').slice(1).join(' ').trim();
+    if (!word) {
+      const list = await dbAll('SELECT word FROM grp_blacklist WHERE chat_id=$1', [ctx.chat.id]).catch(() => []);
+      const txt = list.length ? '🚫 *الكلمات المحظورة:*\n' + list.map(r => '• ' + r.word).join('\n') : '✅ لا توجد كلمات محظورة';
+      return _reply(ctx, txt, 15000);
+    }
+    await dbRun('INSERT INTO grp_blacklist(chat_id,word) VALUES($1,$2) ON CONFLICT DO NOTHING', [ctx.chat.id, word]).catch(() => {});
+    _reply(ctx, '✅ أُضيفت: ' + word, 5000);
+  });
+
+  // ══ /unblacklist ══
+  bot.command(['unblacklist','رفع_حظر_كلمة'], async ctx => {
+    if (!isGroup(ctx)) return;
+    if (!await isTgAdmin(ctx)) return;
+    delCmd(ctx);
+    const word = ctx.message.text.split(' ').slice(1).join(' ').trim();
+    if (!word) return _reply(ctx, '⚠️ اكتب الكلمة بعد الأمر', 5000);
+    await require('../database/db').run('DELETE FROM grp_blacklist WHERE chat_id=$1 AND word=$2', [ctx.chat.id, word]).catch(() => {});
+    _reply(ctx, '✅ حُذفت: ' + word, 5000);
+  });
+
+  // ══ /protect ══
+  bot.command(['protect','حماية'], async ctx => {
+    if (!isGroup(ctx)) return;
+    if (!await isTgAdmin(ctx)) return;
+    delCmd(ctx);
+    const { getSettings } = require('./group_pro');
+    const s = await getSettings(ctx.chat.id);
+    const txt =
+      '🛡 *إعدادات الحماية*\n━━━━━━━━━━━━━\n\n' +
+      (s.anti_flood   ? '✅' : '❌') + ' مكافحة الفلود\n' +
+      (s.anti_link    ? '✅' : '❌') + ' مكافحة الروابط\n' +
+      (s.anti_forward ? '✅' : '❌') + ' مكافحة الفوروارد\n';
+    const kb = [
+      [{ text: (s.anti_flood   ? '🔴 إيقاف' : '🟢 تفعيل') + ' الفلود',     callback_data: 'gp_pro_tog_anti_flood_'  + ctx.chat.id }],
+      [{ text: (s.anti_link    ? '🔴 إيقاف' : '🟢 تفعيل') + ' الروابط',    callback_data: 'gp_pro_tog_anti_link_'   + ctx.chat.id }],
+      [{ text: (s.anti_forward ? '🔴 إيقاف' : '🟢 تفعيل') + ' الفوروارد',  callback_data: 'gp_pro_tog_anti_forward_'+ ctx.chat.id }],
+    ];
+    const m = await ctx.reply(txt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: kb } }).catch(() => null);
+    if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 60000);
+  });
+
 }
 
 module.exports = { setupGroupCommands, showGamesMenu, handleSettingsCallback, showGroupSettings };

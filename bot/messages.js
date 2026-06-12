@@ -37,6 +37,14 @@ module.exports.registerMessages = function(bot, deps) {
   setInterval(() => { const cut=Date.now()-10000; for(const[k,v] of _spamMap) if(v.last<cut) _spamMap.delete(k); }, 10000).unref();
 
   // ── Message (group) ──
+  // ── حماية القروب التلقائية ──
+  const groupPro = require('../handlers/group_pro');
+  bot.use(async (ctx, next) => {
+    if (!ctx.message) return next();
+    if (!['group','supergroup'].includes(ctx.chat?.type)) return next();
+    return groupPro.protect(bot, ctx, next);
+  });
+
   bot.on('message', async (ctx, next) => {
     const _mid = ctx.message?.message_id + '_' + (ctx.from?.id || '');
     if (isDupMsg(_mid)) return;
