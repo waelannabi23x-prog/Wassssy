@@ -39,11 +39,12 @@ module.exports.registerMessages = function(bot, deps) {
   // ── Message (group) ──
   // ── حماية القروب التلقائية ──
   const groupPro = require('../handlers/group_pro');
-  bot.use(async (ctx, next) => {
-    if (!ctx.message) return next();
-    if (!['group','supergroup'].includes(ctx.chat?.type)) return next();
-    return groupPro.protect(bot, ctx, next);
-  });
+  // ⛔ معطّل مؤقتاً للتشخيص
+  // bot.use(async (ctx, next) => {
+  //   if (!ctx.message) return next();
+  //   if (!['group','supergroup'].includes(ctx.chat?.type)) return next();
+  //   return groupPro.protect(bot, ctx, next);
+  // });
 
   bot.on('message', async (ctx, next) => {
     const _mid = ctx.message?.message_id + '_' + (ctx.from?.id || '');
