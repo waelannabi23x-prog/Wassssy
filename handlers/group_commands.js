@@ -1072,15 +1072,28 @@ function _reply(ctx, text, delay=10000) {
 
 
   // ══ /panel — لوحة الإدارة الرئيسية ══
-  bot.command(['panel','لوحة'], async ctx => {
+  bot.command(['panel','لوحة','p'], async ctx => {
     if (!isGroup(ctx)) return;
-    if (!await isTgAdmin(ctx)) return;
     delCmd(ctx);
-    const { showMainPanel } = require('./group_pro');
-    const { txt, kb } = await showMainPanel(ctx, ctx.chat.id);
-    const m = await ctx.reply(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>null);
-    if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(()=>{}), 300000);
+    try {
+      // تحقق من الصلاحيات مباشرة
+      const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id).catch(() => null);
+      const isAdm = ctx.isOwner || ctx.isAdmin ||
+        ['administrator','creator'].includes(member?.status);
+      if (!isAdm) return;
+
+      const { showMainPanel } = require('./group_pro');
+      const { txt, kb } = await showMainPanel(ctx, ctx.chat.id);
+      const m = await ctx.reply(txt, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: kb }
+      }).catch(() => null);
+      if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 300000);
+    } catch(e) {
+      ctx.reply('❌ خطأ: ' + e.message).catch(() => {});
+    }
   });
+
 
 }
 
