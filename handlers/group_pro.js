@@ -46,6 +46,25 @@ const logger = require('../utils/logger');
 // ══════════════════════════════════════════════════
 // FLOOD TRACKER
 // ══════════════════════════════════════════════════
+// كاش لقائمة أدمنية القروب — يُحدَّث كل 5 دقائق فقط (بدل استدعاء API لكل رسالة)
+const _adminCache = new Map(); // chatId -> { ids:Set, ts: number }
+async function isGroupAdmin(ctx, chatId, userId) {
+  const now = Date.now();
+  let entry = _adminCache.get(chatId);
+  if (!entry || now - entry.ts > 300000) { // 5 دقائق
+    try {
+      const admins = await ctx.telegram.getChatAdministrators(chatId);
+      entry = { ids: new Set(admins.map(a => a.user.id)), ts: now };
+      _adminCache.set(chatId, entry);
+    } catch(e) {
+      // إذا فشل الطلب، استخدم القديم إن وجد، وإلا اعتبره غير أدمن
+      if (entry) return entry.ids.has(userId);
+      return false;
+    }
+  }
+  return entry.ids.has(userId);
+}
+
 const _flood = new Map();
 setInterval(() => {
   const now = Date.now();
@@ -171,13 +190,12 @@ async function warnUser(bot, chatId, userId, byId, reason, firstName) {
 // ══════════════════════════════════════════════════
 async function protect(bot, ctx, next) {
   try {
-    logger.info('[PROTECT_DEBUG] enter chat=' + ctx.chat?.id + ' type=' + ctx.chat?.type + ' from=' + ctx.from?.id);
     if (!['group','supergroup'].includes(ctx.chat?.type)) return next();
     const from = ctx.from;
     if (!from || from.is_bot) return next();
 
-    const member = await ctx.telegram.getChatMember(ctx.chat.id, from.id).catch(() => null);
-    if (['administrator','creator'].includes(member?.status)) return next();
+    const isAdm = await isGroupAdmin(ctx, ctx.chat.id, from.id).catch(() => false);
+    if (isAdm) return next();
 
     const s = await getSettings(ctx.chat.id);
     const msg = ctx.message;
