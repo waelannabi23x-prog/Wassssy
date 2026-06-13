@@ -61,7 +61,7 @@ async function handleGroupSetupCallback(ctx, data) {
   }
   if (data.startsWith('gs_setwelcome_')) {
     await require('../utils/stateManager').setState(uid, { type: 'gs_set_welcome', chatId });
-    return ctx.reply('✏️ أرسل رسالة الترحيب:\nالمتغيرات: {name} الاسم | {count} الأعضاء\n_(/cancel للإلغاء)_', { parse_mode: 'Markdown' }).catch(() => {});
+    return ctx.reply('✏️ أرسل رسالة الترحيب:\n\n📝 *المتغيرات المتاحة:*\n`{name}` الاسم | `{mention}` منشن\n`{id}` المعرف | `{spec}` التخصص\n`{date}` التاريخ | `{time}` الوقت\n`{count}` عدد الأعضاء | `{group}` اسم القروب\n\n_(/cancel للإلغاء)_', { parse_mode: 'Markdown' }).catch(() => {});
   }
   if (data.startsWith('gs_setwphoto_')) {
     await require('../utils/stateManager').setState(uid, { type: 'gs_set_wphoto', chatId });

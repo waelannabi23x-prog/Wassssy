@@ -194,7 +194,7 @@ async function handleCallback(ctx, data) {
   if (data.startsWith('gp_setwelcome_')) {
     const chatId = data.replace('gp_setwelcome_', '');
     await require('../utils/stateManager').setState(uid, { type: 'gp_set_welcome', chatId });
-    return ctx.reply('✏️ ارسل نص رسالة الترحيب:\n\nالمتغيرات: {name} اسم العضو | {id} معرفه | {date} التاريخ\n\n_(او /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
+    return ctx.reply('✏️ ارسل نص رسالة الترحيب:\n\n📝 *المتغيرات المتاحة:*\n`{name}` الاسم | `{mention}` منشن\n`{id}` المعرف | `{spec}` التخصص\n`{date}` التاريخ | `{time}` الوقت\n`{count}` عدد الأعضاء | `{group}` اسم القروب\n\n_(او /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
   }
 
   if (data.startsWith('gp_setwphoto_')) {
@@ -241,7 +241,7 @@ async function handleText(ctx, text, state) {
       [state.chatId, text]
     ).catch(() => {});
     await require('../utils/stateManager').delState(ctx.uid);
-    await ctx.reply('✅ تم حفظ رسالة الترحيب!\n\n📝 المتغيرات:\n`{name}` الاسم | `{id}` المعرف\n`{spec}` التخصص | `{date}` التاريخ\n`{count}` عدد الأعضاء | `{group}` اسم القروب', { parse_mode: 'Markdown' }).catch(() => {});
+    await ctx.reply('✅ تم حفظ رسالة الترحيب!\n\n📝 *المتغيرات المتاحة:*\n`{name}` الاسم | `{mention}` منشن\n`{id}` المعرف | `{spec}` التخصص\n`{date}` التاريخ | `{time}` الوقت\n`{count}` عدد الأعضاء | `{group}` اسم القروب', { parse_mode: 'Markdown' }).catch(() => {});
     return showGroupDetail(ctx, state.chatId);
   }
   if (state.type === 'gp_broadcast_msg') {
