@@ -143,6 +143,7 @@ const botAdminCheck = async (ctx, next) => {
   if (!ctx.message?.text?.startsWith('/')) return next();
   try {
     const me = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);
+    logger.info('[BOTADMIN_DEBUG] status=' + me.status + ' chat=' + ctx.chat.id + ' txt=' + ctx.message?.text);
     if (me.status === 'administrator' || me.status === 'creator') return next();
     const botUn = ctx.botInfo?.username || '';
     await ctx.reply(
