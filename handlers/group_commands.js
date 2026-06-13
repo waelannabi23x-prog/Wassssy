@@ -896,12 +896,7 @@ function setupGroupCommands(bot) {
   });
 
   // ══ /panel — لوحة الإدارة الرئيسية ══
-  bot.command('panel2', async ctx => {
-    return ctx.reply('✅ panel2 يعمل!').catch(e => console.log('ERR panel2:', e.message));
-  });
-
   bot.command(['panel','لوحة','p'], async ctx => {
-    require('../utils/logger').info('[PANEL_DEBUG] command received, chat=' + ctx.chat?.id + ' isGroup=' + isGroup(ctx) + ' isAdmin=' + ctx.isAdmin + ' isOwner=' + ctx.isOwner);
     if (!isGroup(ctx)) return;
     delCmd(ctx);
     try {
@@ -1100,7 +1095,6 @@ function _reply(ctx, text, delay=10000) {
 
 
   bot.command(['panel','لوحة','p'], async ctx => {
-    require('../utils/logger').info('[PANEL_DEBUG] command received, chat=' + ctx.chat?.id + ' isGroup=' + isGroup(ctx) + ' isAdmin=' + ctx.isAdmin + ' isOwner=' + ctx.isOwner);
     if (!isGroup(ctx)) return;
     delCmd(ctx);
     try {
