@@ -502,6 +502,87 @@ async function buildStatsPanel(chatId) {
 }
 
 // ══════════════════════════════════════════════════
+// PUNISHMENT SETTINGS PANEL
+// ══════════════════════════════════════════════════
+async function buildPunishPanel(chatId) {
+  const s = await getSettings(chatId);
+  const txt =
+    '⚠️ *نظام العقوبات*\n━━━━━━━━━━━━━\n\n' +
+    'التصعيد التلقائي حسب عدد المخالفات:\n\n' +
+    '1️⃣ المخالفة الأولى → ⚠️ إنذار\n' +
+    '2️⃣ المخالفة الثانية → 🔇 كتم 10 دقائق\n' +
+    '3️⃣ المخالفة الثالثة → 🔇 كتم ساعة\n' +
+    '4️⃣ المخالفة الرابعة → 🚫 حظر تلقائي\n\n' +
+    'الحد الأقصى للإنذارات: *' + (s.max_warns || 3) + '*';
+  const kb = [
+    [{ text: '◀️ رجوع', callback_data: 'gpro_main_' + chatId }],
+  ];
+  return { txt, kb };
+}
+
+// ══════════════════════════════════════════════════
+// MEMBERS PANEL — الأعضاء الأكثر مخالفة/نشاطاً
+// ══════════════════════════════════════════════════
+async function buildMembersPanel(chatId) {
+  const topActive = await all(
+    'SELECT user_id, msg_count, violations FROM grp_member_stats WHERE chat_id=$1 ORDER BY msg_count DESC LIMIT 5',
+    [chatId]
+  ).catch(() => []);
+
+  const topViolators = await all(
+    'SELECT user_id, violations, warn_count, mute_count, ban_count FROM grp_member_stats WHERE chat_id=$1 AND violations > 0 ORDER BY violations DESC LIMIT 5',
+    [chatId]
+  ).catch(() => []);
+
+  let txt = '👥 *إدارة الأعضاء*\n━━━━━━━━━━━━━\n\n';
+
+  if (topActive.length) {
+    txt += '🏆 *الأكثر نشاطاً:*\n';
+    topActive.forEach((r, i) => {
+      txt += `${i+1}. [${r.user_id}](tg://user?id=${r.user_id}) — ${r.msg_count} رسالة\n`;
+    });
+    txt += '\n';
+  }
+
+  if (topViolators.length) {
+    txt += '⚠️ *الأكثر مخالفة:*\n';
+    topViolators.forEach((r, i) => {
+      txt += `${i+1}. [${r.user_id}](tg://user?id=${r.user_id}) — ${r.violations} مخالفة (إنذار:${r.warn_count} كتم:${r.mute_count} حظر:${r.ban_count})\n`;
+    });
+  }
+
+  if (!topActive.length && !topViolators.length) {
+    txt += '_لا توجد بيانات أعضاء بعد._';
+  }
+
+  txt += '\n💡 رد على رسالة أي عضو واكتب *ادارة* لإدارته مباشرة.';
+
+  const kb = [
+    [{ text: '◀️ رجوع', callback_data: 'gpro_main_' + chatId }],
+  ];
+  return { txt, kb };
+}
+
+// ══════════════════════════════════════════════════
+// CONFIG PANEL — الإعدادات العامة
+// ══════════════════════════════════════════════════
+async function buildConfigPanel(chatId) {
+  const s = await getSettings(chatId);
+  const txt =
+    '⚙️ *الإعدادات العامة*\n━━━━━━━━━━━━━\n\n' +
+    '🌊 حد رسائل الفلود: *' + (s.flood_limit || 5) + '* رسائل / *' + (s.flood_window || 5) + '* ثواني\n' +
+    '📏 الحد الأقصى لطول الرسالة: *' + (s.max_msg_length || 4000) + '* حرف\n' +
+    '🔁 حد التكرار: *' + (s.repeat_limit || 3) + '* مرات\n' +
+    '📢 حد المنشن الجماعي: *' + (s.max_mentions || 5) + '* منشن\n' +
+    '⚠️ الحد الأقصى للإنذارات: *' + (s.max_warns || 3) + '*\n\n' +
+    '💡 لتعديل هذه القيم، استخدم لوحة الإعدادات من الخاص عبر /mygroups';
+  const kb = [
+    [{ text: '◀️ رجوع', callback_data: 'gpro_main_' + chatId }],
+  ];
+  return { txt, kb };
+}
+
+// ══════════════════════════════════════════════════
 // BLACKLIST PANEL
 // ══════════════════════════════════════════════════
 async function buildBlacklistPanel(chatId) {
@@ -706,6 +787,7 @@ module.exports = {
   getSettings, toggleSetting, setSetting, log,
   warnUser, showMainPanel, buildProtectPanel, buildLogsPanel,
   buildStatsPanel, buildBlacklistPanel, incStat,
+  buildPunishPanel, buildMembersPanel, buildConfigPanel,
   ROLES_DEFINITIONS, getRole, setRole, removeRole, hasPermission, listRoles,
   buildQuickPanel, buildRoleSelectPanel, buildUserLogPanel,
 };

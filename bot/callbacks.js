@@ -1491,6 +1491,30 @@ module.exports.registerCallbacks = function(bot, deps) {
       return ctx.editMessageText(txt, { parse_mode:'Markdown', disable_web_page_preview:true, reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
     }
 
+    // العقوبات
+    if (data.startsWith('gpro_punish_')) {
+      const cid = data.replace('gpro_punish_','');
+      await ctx.answerCbQuery('').catch(()=>{});
+      const { txt, kb } = await gp.buildPunishPanel(cid);
+      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
+    }
+
+    // الأعضاء
+    if (data.startsWith('gpro_members_')) {
+      const cid = data.replace('gpro_members_','');
+      await ctx.answerCbQuery('').catch(()=>{});
+      const { txt, kb } = await gp.buildMembersPanel(cid);
+      return ctx.editMessageText(txt, { parse_mode:'Markdown', disable_web_page_preview:true, reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
+    }
+
+    // الإعدادات
+    if (data.startsWith('gpro_cfg_')) {
+      const cid = data.replace('gpro_cfg_','');
+      await ctx.answerCbQuery('').catch(()=>{});
+      const { txt, kb } = await gp.buildConfigPanel(cid);
+      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
+    }
+
     // الإحصائيات
     if (data.startsWith('gpro_stats_')) {
       const cid = data.replace('gpro_stats_','');
