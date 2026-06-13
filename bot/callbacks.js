@@ -1329,12 +1329,16 @@ module.exports.registerCallbacks = function(bot, deps) {
     const parts = data.split('_');
     const action = parts[1];
 
-    // gpq_setrole_chatId_targetId_roleKey
+    // gpq_setrole_chatId_targetId_roleKey (roleKey قد يحتوي underscore، نأخذه كآخر جزء معروف)
     if (action === 'setrole') {
-      const [, , chatId, targetId, roleKey] = parts;
-      const allowed = await gp.hasPermission(ctx, chatId, ctx.from.id, 'manage_roles').catch(()=>false);
+      const chatId2   = parts[2];
+      const targetId2 = parts[3];
+      const roleKey   = parts.slice(4).join('_'); // يدعم super_mod, protect_mod, content_mod
+      const allowed = await gp.hasPermission(ctx, chatId2, ctx.from.id, 'manage_roles').catch(()=>false);
       if (!allowed && !ctx.isOwner && !ctx.isAdmin) return ctx.answerCbQuery('❌ لا تملك صلاحية').catch(()=>{});
-      await gp.setRole(chatId, targetId, roleKey, ctx.from.id);
+      if (!gp.ROLES_DEFINITIONS[roleKey]) return ctx.answerCbQuery('❌ رتبة غير صحيحة: ' + roleKey, {show_alert:true}).catch(()=>{});
+      await gp.setRole(chatId2, targetId2, roleKey, ctx.from.id);
+      const chatId = chatId2, targetId = targetId2;
       await gp.log(chatId, 'role_grant', targetId, ctx.from.id, roleKey);
       await ctx.answerCbQuery('✅ تم منح الرتبة').catch(()=>{});
       const targetUser = { id: targetId, first_name: 'العضو' };
@@ -1361,30 +1365,42 @@ module.exports.registerCallbacks = function(bot, deps) {
     }
 
     if (action === 'ban') {
-      await bot.telegram.banChatMember(chatId, targetId).catch(()=>{});
-      await db.run('UPDATE grp_member_stats SET ban_count=ban_count+1 WHERE chat_id=$1 AND user_id=$2',[chatId,targetId]).catch(()=>{});
-      await gp.log(chatId, 'ban', targetId, ctx.from.id, 'حظر يدوي');
-      await ctx.answerCbQuery('🚫 تم الحظر').catch(()=>{});
-      return ctx.editMessageText('🚫 تم حظر العضو بنجاح.', { parse_mode:'Markdown' }).catch(()=>{});
+      try {
+        await bot.telegram.banChatMember(Number(chatId), Number(targetId));
+        await db.run('UPDATE grp_member_stats SET ban_count=ban_count+1 WHERE chat_id=$1 AND user_id=$2',[chatId,targetId]).catch(()=>{});
+        await gp.log(chatId, 'ban', targetId, ctx.from.id, 'حظر يدوي');
+        await ctx.answerCbQuery('🚫 تم الحظر').catch(()=>{});
+        return ctx.editMessageText('🚫 تم حظر العضو بنجاح.', { parse_mode:'Markdown' }).catch(()=>{});
+      } catch(e) {
+        return ctx.answerCbQuery('❌ فشل الحظر: ' + e.message, {show_alert:true}).catch(()=>{});
+      }
     }
 
     if (action === 'kick') {
-      await bot.telegram.banChatMember(chatId, targetId).catch(()=>{});
-      await bot.telegram.unbanChatMember(chatId, targetId).catch(()=>{});
-      await gp.log(chatId, 'kick', targetId, ctx.from.id, 'طرد يدوي');
-      await ctx.answerCbQuery('🦵 تم الطرد').catch(()=>{});
-      return ctx.editMessageText('🦵 تم طرد العضو بنجاح.', { parse_mode:'Markdown' }).catch(()=>{});
+      try {
+        await bot.telegram.banChatMember(Number(chatId), Number(targetId));
+        await bot.telegram.unbanChatMember(Number(chatId), Number(targetId));
+        await gp.log(chatId, 'kick', targetId, ctx.from.id, 'طرد يدوي');
+        await ctx.answerCbQuery('🦵 تم الطرد').catch(()=>{});
+        return ctx.editMessageText('🦵 تم طرد العضو بنجاح.', { parse_mode:'Markdown' }).catch(()=>{});
+      } catch(e) {
+        return ctx.answerCbQuery('❌ فشل الطرد: ' + e.message, {show_alert:true}).catch(()=>{});
+      }
     }
 
     if (action === 'mute') {
-      const until = Math.floor(Date.now()/1000) + 3600; // ساعة
-      await bot.telegram.restrictChatMember(chatId, targetId, {
-        permissions: { can_send_messages: false }, until_date: until,
-      }).catch(()=>{});
-      await db.run('UPDATE grp_member_stats SET mute_count=mute_count+1 WHERE chat_id=$1 AND user_id=$2',[chatId,targetId]).catch(()=>{});
-      await gp.log(chatId, 'mute', targetId, ctx.from.id, 'كتم يدوي (ساعة)');
-      await ctx.answerCbQuery('🔇 تم الكتم لمدة ساعة').catch(()=>{});
-      return ctx.editMessageText('🔇 تم كتم العضو لمدة ساعة.', { parse_mode:'Markdown' }).catch(()=>{});
+      try {
+        const until = Math.floor(Date.now()/1000) + 3600; // ساعة
+        await bot.telegram.restrictChatMember(Number(chatId), Number(targetId), {
+          permissions: { can_send_messages: false }, until_date: until,
+        });
+        await db.run('UPDATE grp_member_stats SET mute_count=mute_count+1 WHERE chat_id=$1 AND user_id=$2',[chatId,targetId]).catch(()=>{});
+        await gp.log(chatId, 'mute', targetId, ctx.from.id, 'كتم يدوي (ساعة)');
+        await ctx.answerCbQuery('🔇 تم الكتم لمدة ساعة').catch(()=>{});
+        return ctx.editMessageText('🔇 تم كتم العضو لمدة ساعة.', { parse_mode:'Markdown' }).catch(()=>{});
+      } catch(e) {
+        return ctx.answerCbQuery('❌ فشل الكتم: ' + e.message, {show_alert:true}).catch(()=>{});
+      }
     }
 
     if (action === 'warn') {
