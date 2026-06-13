@@ -37,15 +37,6 @@ module.exports.registerMessages = function(bot, deps) {
   setInterval(() => { const cut=Date.now()-10000; for(const[k,v] of _spamMap) if(v.last<cut) _spamMap.delete(k); }, 10000).unref();
 
   // ── Message (group) ──
-  // ── حماية القروب التلقائية ──
-  const groupPro = require('../handlers/group_pro');
-  // ⛔ معطّل مؤقتاً للتشخيص
-  // bot.use(async (ctx, next) => {
-  //   if (!ctx.message) return next();
-  //   if (!['group','supergroup'].includes(ctx.chat?.type)) return next();
-  //   return groupPro.protect(bot, ctx, next);
-  // });
-
   bot.on('message', async (ctx, next) => {
     const _mid = ctx.message?.message_id + '_' + (ctx.from?.id || '');
     if (isDupMsg(_mid)) return;
@@ -59,6 +50,8 @@ module.exports.registerMessages = function(bot, deps) {
 
       // ── Welcome message ──
       if (ctx.message?.new_chat_members?.length) {
+        // 🤖 مكافحة البوتات غير المصرّحة (anti_bot)
+        try { await require('../handlers/group_protection').checkNewChatMembers(ctx); } catch (_) {}
         // handled by chat_member event to avoid duplicates
         return;
       }
@@ -284,6 +277,10 @@ module.exports.registerMessages = function(bot, deps) {
       }
       if ((s?.type || '').startsWith('mg_') && (ctx.isAdmin || ctx.isOwner)) return manage.handleText(ctx, s);
       if ((s?.type || '').startsWith('gp_')) return groupPanel.handleText(ctx, txt, s);
+      if ((s?.type || '').startsWith('gpx_')) {
+        const handled = await require('../handlers/group_pro_panel').handleText(ctx, txt, s).catch(() => false);
+        if (handled !== false) return;
+      }
       if (s?.type === 'million_add_q' || s?.type === 'million_del_q') {
         const gamesPanel = require('../handlers/games_panel');
         return gamesPanel.handleText(ctx, txt, s);
@@ -337,8 +334,13 @@ module.exports.registerMessages = function(bot, deps) {
       const isIn   = ["member","restricted","administrator","creator"].includes(member?.status);
       const isOut  = ["left","kicked"].includes(member?.status);
       if (wasOut && isIn) {
-        const { handleNewMember } = require('../handlers/group_admin');
-        handleNewMember(bot, chat.id, member.user.id, member.user.first_name).catch(() => {});
+        const settings = await require('../handlers/group_protection').getSettings(chat.id).catch(() => null);
+        if (settings?.verify_enabled) {
+          require('../handlers/group_verify').startVerification(bot, chat.id, member.user).catch(() => {});
+        } else {
+          const { handleNewMember } = require('../handlers/group_admin');
+          handleNewMember(bot, chat.id, member.user.id, member.user.first_name).catch(() => {});
+        }
       }
       if (!wasOut && isOut) {
         const { handleMemberLeft } = require('../handlers/group_admin');

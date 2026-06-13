@@ -482,85 +482,79 @@ function setupGroupCommands(bot) {
   bot.command("info", async ctx => {
     if (!isGroup(ctx)) return;
     delCmd(ctx);
-    const chatId = ctx.chat.id;
-
-    // دعم: رد على رسالة أو @username أو ID
-    let target = ctx.message.reply_to_message?.from || null;
-    if (!target) {
-      const args = ctx.message.text.split(' ').slice(1);
-      const arg  = args[0];
-      if (arg) {
-        const un = arg.replace('@','');
-        const m  = await ctx.telegram.getChatMember(chatId, isNaN(un) ? '@'+un : parseInt(un)).catch(() => null);
-        if (m?.user) target = m.user;
-      }
-    }
-    if (!target) target = ctx.from;
-
+    const target   = ctx.message.reply_to_message?.from || ctx.from;
     const isReqAdm = await isTgAdmin(ctx);
-    const { get: dbGet } = require("../database/db");
+    const { get: dbGet, all: dbAll } = require("../database/db");
+    const chatId = ctx.chat.id;
 
     const [member, warnsRow, userRow] = await Promise.all([
       ctx.telegram.getChatMember(chatId, target.id).catch(() => null),
-      dbGet("SELECT COUNT(*) as c FROM group_warns WHERE chat_id=$1 AND user_id=$2", [chatId, target.id]).catch(() => ({c:0})),
+      dbGet("SELECT COUNT(*) as c FROM group_warns WHERE chat_id=$1 AND user_id=$2", [chatId, target.id]).catch(() => ({ c:0 })),
       dbGet("SELECT xp, level, balance, created_at FROM users WHERE id=$1", [target.id]).catch(() => null),
     ]);
 
-    const statusMap = { member:"عضو", administrator:"مشرف", creator:"مؤسس", restricted:"مقيّد", left:"غادر", kicked:"محظور" };
-    const name      = [target.first_name, target.last_name].filter(Boolean).join(" ");
-    const isAdmTgt  = ["administrator","creator"].includes(member?.status);
-    const isOwnerTgt = member?.status === "creator";
-    const warnCnt   = parseInt(warnsRow?.c || 0);
+    const statusMap = {
+      member:"عضو 👤", administrator:"مشرف 🛡️", creator:"مؤسس 👑",
+      restricted:"مقيّد 🔒", left:"غادر 🚪", kicked:"محظور 🚫"
+    };
+    const name    = [target.first_name, target.last_name].filter(Boolean).join(" ");
+    const isOwner = member?.status === "creator";
+    const isAdmTarget = ["administrator","creator"].includes(member?.status);
+    const warnCnt = parseInt(warnsRow?.c || 0);
 
+    // تاريخ الانضمام
     let joinDate = "";
-    if (userRow?.created_at) joinDate = new Date(userRow.created_at).toLocaleDateString("ar-DZ");
-
-    let txt = "👤 *" + name + "*";
-    if (target.username) txt += "  @" + target.username;
-    txt += "\n`" + target.id + "`\n\n";
-    txt += "الدور: " + (isOwnerTgt ? "👑 مؤسس" : isAdmTgt ? "🛡 مشرف" : "👤 عضو") + "\n";
-    txt += "الحالة: " + (statusMap[member?.status] || "؟") + "\n";
-    if (joinDate) txt += "انضم: " + joinDate + "\n";
-    txt += "\nالإنذارات: *" + warnCnt + "/3*";
-    if (userRow?.balance != null) txt += "  |  💰 *" + Number(userRow.balance).toLocaleString() + "*";
-    if (userRow?.xp != null)      txt += "\nXP: *" + userRow.xp + "*  المستوى: *" + (userRow.level||0) + "*";
-
-    const kb = [];
-    if (isReqAdm && !isOwnerTgt && target.id !== ctx.from.id) {
-      if (!isAdmTgt) {
-        kb.push([
-          { text: "⚠️ إنذار +",     callback_data: "grp_wadd_"        + target.id + "_" + chatId },
-          { text: "⚠️ إنذار −",     callback_data: "grp_wdel_"        + target.id + "_" + chatId },
-          { text: "📋 السجل",       callback_data: "grp_warns_show_"   + target.id + "_" + chatId },
-        ]);
-        kb.push([
-          { text: "🔇 كتم",         callback_data: "grp_mute_menu_"    + target.id },
-          { text: "🔊 رفع الكتم",   callback_data: "grp_unmute_"       + target.id },
-          { text: "🚫 حظر",         callback_data: "grp_ban_confirm_"  + target.id },
-        ]);
-        kb.push([
-          { text: "🎛 الأذونات",    callback_data: "grp_perms_"        + target.id + "_" + chatId },
-          { text: "🦵 طرد",         callback_data: "grp_kick_"         + target.id },
-        ]);
-      } else {
-        kb.push([
-          { text: "📋 الإنذارات",   callback_data: "grp_warns_show_"   + target.id + "_" + chatId },
-          { text: "🎛 الأذونات",    callback_data: "grp_perms_"        + target.id + "_" + chatId },
-        ]);
-      }
+    if (member?.status === "restricted" && member?.until_date) {
+      joinDate = new Date(member.until_date * 1000).toLocaleDateString("ar");
+    } else if (userRow?.created_at) {
+      joinDate = new Date(userRow.created_at).toLocaleDateString("ar-DZ");
     }
 
-    const m = await ctx.reply(txt, {
+    // الدور
+    let role = isOwner ? "👑 صاحب القروب" : isAdmTarget ? "🛡️ مشرف" : "👤 عضو";
+
+    let txt = "👤 *معلومات العضو*\n━━━━━━━━━━━━━━━\n\n";
+    txt += "🪪 الاسم: [" + name + "](tg://user?id=" + target.id + ")\n";
+    if (target.username) txt += "🔗 يوزر: @" + target.username + "\n";
+    txt += "🆔 الرقم التعريفي: `" + target.id + "`\n";
+    txt += "🎭 الدور: " + role + "\n";
+    txt += "👁 الحالة: " + (statusMap[member?.status] || "غير معروف") + "\n";
+    if (joinDate) txt += "📅 الانضمام: " + joinDate + "\n";
+    txt += "\n📊 *الإحصائيات:*\n";
+    txt += "⚠️ الإنذارات: *" + warnCnt + "/3*\n";
+    if (userRow) {
+      if (userRow.balance != null) txt += "💰 الرصيد: *" + Number(userRow.balance).toLocaleString() + "* $\n";
+      if (userRow.xp != null) txt += "🏆 XP: *" + userRow.xp + "* | المستوى: *" + (userRow.level||0) + "*\n";
+    }
+
+    const kb = [];
+    if (isReqAdm && !isAdmTarget && target.id !== ctx.from.id) {
+      kb.push([
+        { text: "⚠️ ! الإنذارات", callback_data: "grp_warns_show_" + target.id + "_" + chatId },
+        { text: "🎛 الصلاحيات",    callback_data: "grp_perms_" + target.id + "_" + chatId },
+      ]);
+      kb.push([
+        { text: "✅ الغاء الكتم",   callback_data: "grp_unmute_" + target.id },
+        { text: "🚫 حظر",           callback_data: "grp_ban_confirm_" + target.id },
+      ]);
+      kb.push([
+        { text: "🔇 كتم 🔔",        callback_data: "grp_mute_menu_" + target.id },
+        { text: "🔰 أذونات ↗",      callback_data: "grp_perms_" + target.id + "_" + chatId },
+      ]);
+    } else if (isReqAdm && isAdmTarget && !isOwner && target.id !== ctx.from.id) {
+      kb.push([
+        { text: "⚠️ الإنذارات",     callback_data: "grp_warns_show_" + target.id + "_" + chatId },
+        { text: "🔰 أذونات ↗",      callback_data: "grp_perms_" + target.id + "_" + chatId },
+      ]);
+    }
+
+    ctx.reply(txt, {
       parse_mode: "Markdown",
       reply_to_message_id: ctx.message?.reply_to_message?.message_id,
       reply_markup: kb.length ? { inline_keyboard: kb } : undefined,
       disable_web_page_preview: true,
-    }).catch(() => null);
-
-    // تختفي بعد 3 دقائق
-    if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(() => {}), 180000);
+    }).catch(() => {});
   });
-
 
 
   // ══ /cmds ══
@@ -895,60 +889,44 @@ function setupGroupCommands(bot) {
     ).catch(() => {});
   });
 
-  // ══ /panel — لوحة الإدارة الرئيسية ══
-  bot.command(['panel','لوحة','p'], async ctx => {
-    if (!isGroup(ctx)) return;
-    delCmd(ctx);
-    try {
-      const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id).catch(() => null);
-      const isAdm = ctx.isOwner || ctx.isAdmin ||
-        ['administrator','creator'].includes(member?.status);
-      if (!isAdm) return;
-
-      const { showMainPanel } = require('./group_pro');
-      const { txt, kb } = await showMainPanel(ctx, ctx.chat.id);
-      const m = await ctx.reply(txt, {
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: kb }
-      }).catch(() => null);
-      if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 300000);
-    } catch(e) {
-      ctx.reply('❌ خطأ: ' + e.message).catch(() => {});
-    }
-  });
-
 }
 
 // ══════════════════════════════════════════
 // ⚙️ لوحة إعدادات القروب الشاملة
 // ══════════════════════════════════════════
 async function showGroupSettings(bot, ctx, chatId) {
-  const grp = await get(
-    'SELECT welcome_enabled, goodbye_enabled, notify_new_files, anti_spam, anti_link, anti_flood FROM group_chats WHERE chat_id=$1',
-    [chatId]
-  ).catch(() => null);
+  const [grp, protSettings] = await Promise.all([
+    get(
+      'SELECT welcome_enabled, goodbye_enabled, notify_new_files FROM group_chats WHERE chat_id=$1',
+      [chatId]
+    ).catch(() => null),
+    require('./group_protection').getSettings(chatId).catch(() => null),
+  ]);
 
   const on  = '✅';
   const off = '❌';
   const g = grp || {};
+
+  let protLine = '';
+  if (protSettings) {
+    const antiKeys = Object.keys(protSettings).filter(k => k.startsWith('anti_'));
+    const protCount = antiKeys.filter(k => protSettings[k]).length;
+    protLine = '\n🛡 الحماية الاحترافية: *' + protCount + '/' + antiKeys.length + '* مفعّلة';
+  }
 
   const text =
     '⚙️ *إعدادات القروب*\n' +
     '━━━━━━━━━━━━━━━\n\n' +
     '🎉 الترحيب: '        + (g.welcome_enabled  ? on : off) + '\n' +
     '👋 الوداع: '         + (g.goodbye_enabled  ? on : off) + '\n' +
-    '🔔 إشعار ملفات: '   + (g.notify_new_files ? on : off) + '\n' +
-    '🛡 مكافحة سبام: '   + (g.anti_spam        ? on : off) + '\n' +
-    '🔗 حجب الروابط: '   + (g.anti_link        ? on : off) + '\n' +
-    '🌊 مكافحة فلود: '   + (g.anti_flood       ? on : off);
+    '🔔 إشعار ملفات: '   + (g.notify_new_files ? on : off) +
+    protLine;
 
   const rows = [
     [{ text: (g.welcome_enabled  ? '🔴 إيقاف الترحيب'       : '🟢 تفعيل الترحيب'),       callback_data: 'gs_toggle_welcome_'    + chatId }],
     [{ text: (g.goodbye_enabled  ? '🔴 إيقاف الوداع'        : '🟢 تفعيل الوداع'),         callback_data: 'gs_toggle_goodbye_'    + chatId }],
     [{ text: (g.notify_new_files ? '🔕 إيقاف إشعار الملفات' : '🔔 تفعيل إشعار الملفات'), callback_data: 'gs_toggle_notify_'     + chatId }],
-    [{ text: (g.anti_spam        ? '🔴 إيقاف مكافحة السبام' : '🟢 تفعيل مكافحة السبام'), callback_data: 'gs_toggle_antispam_'   + chatId }],
-    [{ text: (g.anti_link        ? '🔴 السماح بالروابط'     : '🔗 حجب الروابط'),          callback_data: 'gs_toggle_antilink_'   + chatId }],
-    [{ text: (g.anti_flood       ? '🔴 إيقاف مكافحة الفلود' : '🌊 تفعيل مكافحة الفلود'), callback_data: 'gs_toggle_antiflood_'  + chatId }],
+    [{ text: '🛡 لوحة الحماية الاحترافية', callback_data: 'gpx_home_' + chatId }],
     [{ text: '✏️ تعديل رسالة الترحيب', callback_data: 'gp_setwelcome_' + chatId }],
     [{ text: '📜 تعديل القواعد',        callback_data: 'gs_setrules_'   + chatId }],
   ];
@@ -967,9 +945,6 @@ async function handleSettingsCallback(ctx, data) {
     'gs_toggle_welcome_':   'welcome_enabled',
     'gs_toggle_goodbye_':   'goodbye_enabled',
     'gs_toggle_notify_':    'notify_new_files',
-    'gs_toggle_antispam_':  'anti_spam',
-    'gs_toggle_antilink_':  'anti_link',
-    'gs_toggle_antiflood_': 'anti_flood',
   };
 
   for (const [prefix, col] of Object.entries(toggleMap)) {
@@ -1032,91 +1007,6 @@ function _reply(ctx, text, delay=10000) {
   ctx.reply(text, { parse_mode: 'Markdown' })
     .then(m => { if (m && delay) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), delay); })
     .catch(() => {});
-
-
-  // ══ /logs ══
-  bot.command(['logs','سجل'], async ctx => {
-    if (!isGroup(ctx)) return;
-    if (!await isTgAdmin(ctx)) return;
-    delCmd(ctx);
-    const { showLogs } = require('./group_pro');
-    showLogs(ctx, ctx.chat.id, 0);
-  });
-
-  // ══ /blacklist ══
-  bot.command(['blacklist','محظور'], async ctx => {
-    if (!isGroup(ctx)) return;
-    if (!await isTgAdmin(ctx)) return;
-    delCmd(ctx);
-    const { all: dbAll, run: dbRun } = require('../database/db');
-    const word = ctx.message.text.split(' ').slice(1).join(' ').trim();
-    if (!word) {
-      const list = await dbAll('SELECT word FROM grp_blacklist WHERE chat_id=$1', [ctx.chat.id]).catch(() => []);
-      const txt = list.length ? '🚫 *الكلمات المحظورة:*\n' + list.map(r => '• ' + r.word).join('\n') : '✅ لا توجد كلمات محظورة';
-      return _reply(ctx, txt, 15000);
-    }
-    await dbRun('INSERT INTO grp_blacklist(chat_id,word) VALUES($1,$2) ON CONFLICT DO NOTHING', [ctx.chat.id, word]).catch(() => {});
-    _reply(ctx, '✅ أُضيفت: ' + word, 5000);
-  });
-
-  // ══ /unblacklist ══
-  bot.command(['unblacklist','رفع_حظر_كلمة'], async ctx => {
-    if (!isGroup(ctx)) return;
-    if (!await isTgAdmin(ctx)) return;
-    delCmd(ctx);
-    const word = ctx.message.text.split(' ').slice(1).join(' ').trim();
-    if (!word) return _reply(ctx, '⚠️ اكتب الكلمة بعد الأمر', 5000);
-    await require('../database/db').run('DELETE FROM grp_blacklist WHERE chat_id=$1 AND word=$2', [ctx.chat.id, word]).catch(() => {});
-    _reply(ctx, '✅ حُذفت: ' + word, 5000);
-  });
-
-  // ══ /protect ══
-  bot.command(['protect','حماية'], async ctx => {
-    if (!isGroup(ctx)) return;
-    if (!await isTgAdmin(ctx)) return;
-    delCmd(ctx);
-    const { getSettings } = require('./group_pro');
-    const s = await getSettings(ctx.chat.id);
-    const txt =
-      '🛡 *إعدادات الحماية*\n━━━━━━━━━━━━━\n\n' +
-      (s.anti_flood   ? '✅' : '❌') + ' مكافحة الفلود\n' +
-      (s.anti_link    ? '✅' : '❌') + ' مكافحة الروابط\n' +
-      (s.anti_forward ? '✅' : '❌') + ' مكافحة الفوروارد\n';
-    const kb = [
-      [{ text: (s.anti_flood   ? '🔴 إيقاف' : '🟢 تفعيل') + ' الفلود',     callback_data: 'gp_pro_tog_anti_flood_'  + ctx.chat.id }],
-      [{ text: (s.anti_link    ? '🔴 إيقاف' : '🟢 تفعيل') + ' الروابط',    callback_data: 'gp_pro_tog_anti_link_'   + ctx.chat.id }],
-      [{ text: (s.anti_forward ? '🔴 إيقاف' : '🟢 تفعيل') + ' الفوروارد',  callback_data: 'gp_pro_tog_anti_forward_'+ ctx.chat.id }],
-    ];
-    const m = await ctx.reply(txt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: kb } }).catch(() => null);
-    if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 60000);
-  });
-
-
-
-
-  bot.command(['panel','لوحة','p'], async ctx => {
-    if (!isGroup(ctx)) return;
-    delCmd(ctx);
-    try {
-      // تحقق من الصلاحيات مباشرة
-      const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id).catch(() => null);
-      const isAdm = ctx.isOwner || ctx.isAdmin ||
-        ['administrator','creator'].includes(member?.status);
-      if (!isAdm) return;
-
-      const { showMainPanel } = require('./group_pro');
-      const { txt, kb } = await showMainPanel(ctx, ctx.chat.id);
-      const m = await ctx.reply(txt, {
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: kb }
-      }).catch(() => null);
-      if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 300000);
-    } catch(e) {
-      ctx.reply('❌ خطأ: ' + e.message).catch(() => {});
-    }
-  });
-
-
 }
 
 module.exports = { setupGroupCommands, showGamesMenu, handleSettingsCallback, showGroupSettings };

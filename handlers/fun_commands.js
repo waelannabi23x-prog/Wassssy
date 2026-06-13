@@ -4,6 +4,14 @@ const logger = require('../utils/logger');
 
 function isGroup(ctx) { return ['group','supergroup'].includes(ctx.chat?.type); }
 
+async function isChatAdmin(ctx) {
+  if (ctx.isOwner || ctx.isAdmin) return true;
+  try {
+    const m = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+    return ['administrator','creator'].includes(m?.status);
+  } catch(_) { return false; }
+}
+
 // ══════════════════════════════════════
 // 🌙 AFK
 // ══════════════════════════════════════
@@ -56,7 +64,7 @@ async function checkAfkOnMessage(ctx) {
 // ══════════════════════════════════════
 async function saveNote(ctx) {
   if (!isGroup(ctx)) return;
-  if (!ctx.isAdmin && !ctx.isOwner) return ctx.reply('🚫 للأدمن فقط').catch(()=>{});
+  if (!(await isChatAdmin(ctx))) return ctx.reply('🚫 للمشرفين فقط').catch(()=>{});
   const args = (ctx.message?.text||'').split(' ');
   const name = args[1]?.toLowerCase();
   const rep = ctx.message?.reply_to_message;
@@ -93,7 +101,7 @@ async function listNotes(ctx) {
 
 async function delNote(ctx) {
   if (!isGroup(ctx)) return;
-  if (!ctx.isAdmin && !ctx.isOwner) return ctx.reply('🚫 للأدمن فقط').catch(()=>{});
+  if (!(await isChatAdmin(ctx))) return ctx.reply('🚫 للمشرفين فقط').catch(()=>{});
   const name = (ctx.message?.text||'').split(' ')[1]?.toLowerCase();
   if (!name) return ctx.reply('❌ /delnote [اسم]', { reply_to_message_id: ctx.message?.message_id }).catch(()=>{});
   await run('DELETE FROM notes WHERE chat_id=$1 AND name=$2',[ctx.chat?.id, name]).catch(()=>{});

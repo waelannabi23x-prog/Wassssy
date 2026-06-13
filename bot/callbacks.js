@@ -217,6 +217,7 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'grp_main_',   fn: (ctx, d) => { const chatId = d.replace('grp_main_',''); const { showAllMembers } = require('../handlers/group_admin'); return showAllMembers(ctx, chatId); } },
     { p: 'grp_main',    fn: (ctx, d) => { const uid = ctx.uid || ctx.from?.id; const isOwner = uid === parseInt(process.env.OWNER_ID); return isOwner ? groupPanel.showMainMenu(ctx) : groupPanel.showMyGroups(ctx); } },
     { p: 'gp_',         fn: (ctx, d) => groupPanel.handleCallback(ctx, d) },
+    { p: 'gpx_',        fn: (ctx, d) => require('../handlers/group_pro_panel').handleCallback(ctx, d) },
     { p: 'grp_sp_',     fn: hGrpSp },
     { p: 'grp_dl_',     fn: hGrpDl },
 
@@ -1083,16 +1084,14 @@ module.exports.registerCallbacks = function(bot, deps) {
           || data.startsWith('unmute_all_') || data.startsWith('tag_all_')
           || data.startsWith('close_list_') || data.startsWith('close_stats_')
           || data.startsWith('grp_stats_') || data === 'rules_ok'
-          || data.startsWith('ml_') || data.startsWith('gp_')
+          || data.startsWith('ml_') || data.startsWith('gp_') || data.startsWith('gpx_')
           || data.startsWith('grp_register_') || data.startsWith('grp_reg_btn_')
           || data === 'mb_panel' || data.startsWith('gp_million') || data.startsWith('gp_guess')
           || data.startsWith('mlr_') || data.startsWith('mar_')
           || data.startsWith('grp_mute_1h_') || data.startsWith('grp_ban_')
           || data.startsWith('grp_warns_') || data.startsWith('grp_perms_')
           || data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_')
-          || data.startsWith('games_')
-          || data.startsWith('gpro_') || data.startsWith('gpq_')
-          || data.startsWith('grp_logs_') || data.startsWith('grp_main_');
+          || data.startsWith('games_');
         if (!_grpOk)
           return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }
@@ -1280,268 +1279,6 @@ module.exports.registerCallbacks = function(bot, deps) {
     if (game === 'bank')    return ctx.reply('💰 استخدم /daily للمكافأة اليومية', { parse_mode: 'Markdown' }).catch(() => {});
   }
 
-  // __ old protect removed
-  if (false && data.startsWith('_old_pro_tog_')) {
-    const raw    = data.replace('gp_pro_tog_', '');
-    const chatId = raw.split('_').pop();
-    const key    = raw.replace('_' + chatId, '');
-    const { getSettings, updateSetting } = require('../handlers/group_pro');
-    const s   = await getSettings(chatId);
-    const cur = s[key] || false;
-    await updateSetting(chatId, key, !cur);
-    const newS = await getSettings(chatId);
-    const txt =
-      '🛡 *إعدادات الحماية*\n━━━━━━━━━━━━━\n\n' +
-      (newS.anti_flood   ? '✅' : '❌') + ' مكافحة الفلود\n' +
-      (newS.anti_link    ? '✅' : '❌') + ' مكافحة الروابط\n' +
-      (newS.anti_forward ? '✅' : '❌') + ' مكافحة الفوروارد\n';
-    const kb = [
-      [{ text: (newS.anti_flood   ? '🔴 إيقاف' : '🟢 تفعيل') + ' الفلود',     callback_data: 'gp_pro_tog_anti_flood_'  + chatId }],
-      [{ text: (newS.anti_link    ? '🔴 إيقاف' : '🟢 تفعيل') + ' الروابط',    callback_data: 'gp_pro_tog_anti_link_'   + chatId }],
-      [{ text: (newS.anti_forward ? '🔴 إيقاف' : '🟢 تفعيل') + ' الفوروارد',  callback_data: 'gp_pro_tog_anti_forward_'+ chatId }],
-    ];
-    await ctx.answerCbQuery('✅').catch(() => {});
-    return ctx.editMessageText(txt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: kb } }).catch(() => {});
-  }
 
-  // ── صفحات السجلات ──
-  if (data.startsWith('grp_logs_clear_')) {
-    const chatId = data.replace('grp_logs_clear_', '');
-    await require('../database/db').run('DELETE FROM grp_logs WHERE chat_id=$1', [chatId]).catch(() => {});
-    await ctx.answerCbQuery('✅ تم مسح السجلات').catch(() => {});
-    return ctx.deleteMessage().catch(() => {});
-  }
-  if (data.startsWith('grp_logs_')) {
-    const parts  = data.replace('grp_logs_', '').split('_');
-    const chatId = parts[0];
-    const page   = parseInt(parts[1]) || 0;
-    const { showLogs } = require('../handlers/group_pro');
-    await ctx.answerCbQuery('').catch(() => {});
-    await ctx.deleteMessage().catch(() => {});
-    return showLogs(ctx, chatId, page);
-  }
-
-
-  // ══ QUICK ADMIN PANEL CALLBACKS (gpq_) ══
-  if (data.startsWith('gpq_')) {
-    const gp = require('../handlers/group_pro');
-    const db = require('../database/db');
-    const parts = data.split('_');
-    const action = parts[1];
-
-    // gpq_setrole_chatId_targetId_roleKey (roleKey قد يحتوي underscore، نأخذه كآخر جزء معروف)
-    if (action === 'setrole') {
-      const chatId2   = parts[2];
-      const targetId2 = parts[3];
-      const roleKey   = parts.slice(4).join('_'); // يدعم super_mod, protect_mod, content_mod
-      const allowed = await gp.hasPermission(ctx, chatId2, ctx.from.id, 'manage_roles').catch(()=>false);
-      if (!allowed && !ctx.isOwner && !ctx.isAdmin) return ctx.answerCbQuery('❌ لا تملك صلاحية').catch(()=>{});
-      if (!gp.ROLES_DEFINITIONS[roleKey]) return ctx.answerCbQuery('❌ رتبة غير صحيحة: ' + roleKey, {show_alert:true}).catch(()=>{});
-      await gp.setRole(chatId2, targetId2, roleKey, ctx.from.id);
-      const chatId = chatId2, targetId = targetId2;
-      await gp.log(chatId, 'role_grant', targetId, ctx.from.id, roleKey);
-      await ctx.answerCbQuery('✅ تم منح الرتبة').catch(()=>{});
-      const targetUser = { id: targetId, first_name: 'العضو' };
-      const { txt, kb } = await gp.buildQuickPanel(ctx, targetUser);
-      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
-    }
-
-    const chatId   = parts[2];
-    const targetId = parts[3];
-
-    if (action === 'cancel' || action === 'back') {
-      const targetUser = { id: targetId, first_name: 'العضو' };
-      const { txt, kb } = await gp.buildQuickPanel(ctx, targetUser);
-      await ctx.answerCbQuery('').catch(()=>{});
-      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
-    }
-
-    // صلاحيات
-    const permMap = { ban:'ban', kick:'kick', mute:'mute', warn:'warn', reset:'manage_protection', grole:'manage_roles', rrole:'manage_roles', log:'manage_logs' };
-    const requiredPerm = permMap[action];
-    if (requiredPerm) {
-      const allowed = await gp.hasPermission(ctx, chatId, ctx.from.id, requiredPerm).catch(()=>false);
-      if (!allowed && !ctx.isOwner && !ctx.isAdmin) return ctx.answerCbQuery('❌ لا تملك صلاحية لهذا الإجراء').catch(()=>{});
-    }
-
-    if (action === 'ban') {
-      try {
-        await bot.telegram.banChatMember(Number(chatId), Number(targetId));
-        await db.run('UPDATE grp_member_stats SET ban_count=ban_count+1 WHERE chat_id=$1 AND user_id=$2',[chatId,targetId]).catch(()=>{});
-        await gp.log(chatId, 'ban', targetId, ctx.from.id, 'حظر يدوي');
-        await ctx.answerCbQuery('🚫 تم الحظر').catch(()=>{});
-        return ctx.editMessageText('🚫 تم حظر العضو بنجاح.', { parse_mode:'Markdown' }).catch(()=>{});
-      } catch(e) {
-        return ctx.answerCbQuery('❌ فشل الحظر: ' + e.message, {show_alert:true}).catch(()=>{});
-      }
-    }
-
-    if (action === 'kick') {
-      try {
-        await bot.telegram.banChatMember(Number(chatId), Number(targetId));
-        await bot.telegram.unbanChatMember(Number(chatId), Number(targetId));
-        await gp.log(chatId, 'kick', targetId, ctx.from.id, 'طرد يدوي');
-        await ctx.answerCbQuery('🦵 تم الطرد').catch(()=>{});
-        return ctx.editMessageText('🦵 تم طرد العضو بنجاح.', { parse_mode:'Markdown' }).catch(()=>{});
-      } catch(e) {
-        return ctx.answerCbQuery('❌ فشل الطرد: ' + e.message, {show_alert:true}).catch(()=>{});
-      }
-    }
-
-    if (action === 'mute') {
-      try {
-        const until = Math.floor(Date.now()/1000) + 3600; // ساعة
-        await bot.telegram.restrictChatMember(Number(chatId), Number(targetId), {
-          permissions: { can_send_messages: false }, until_date: until,
-        });
-        await db.run('UPDATE grp_member_stats SET mute_count=mute_count+1 WHERE chat_id=$1 AND user_id=$2',[chatId,targetId]).catch(()=>{});
-        await gp.log(chatId, 'mute', targetId, ctx.from.id, 'كتم يدوي (ساعة)');
-        await ctx.answerCbQuery('🔇 تم الكتم لمدة ساعة').catch(()=>{});
-        return ctx.editMessageText('🔇 تم كتم العضو لمدة ساعة.', { parse_mode:'Markdown' }).catch(()=>{});
-      } catch(e) {
-        return ctx.answerCbQuery('❌ فشل الكتم: ' + e.message, {show_alert:true}).catch(()=>{});
-      }
-    }
-
-    if (action === 'warn') {
-      const targetUser = { id: targetId, first_name: 'العضو' };
-      const r = await gp.warnUser(bot, chatId, targetId, ctx.from.id, 'إنذار يدوي', targetUser.first_name);
-      await ctx.answerCbQuery('⚠️ تم الإنذار').catch(()=>{});
-      return ctx.editMessageText(r.text, { parse_mode:'Markdown' }).catch(()=>{});
-    }
-
-    if (action === 'reset') {
-      await db.run('UPDATE grp_member_stats SET violations=0, warn_count=0 WHERE chat_id=$1 AND user_id=$2',[chatId,targetId]).catch(()=>{});
-      await db.run('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2',[chatId,targetId]).catch(()=>{});
-      await gp.log(chatId, 'reset_violations', targetId, ctx.from.id, 'تصفير المخالفات');
-      await ctx.answerCbQuery('🔄 تم تصفير المخالفات').catch(()=>{});
-      return ctx.editMessageText('🔄 تم تصفير مخالفات العضو.', { parse_mode:'Markdown' }).catch(()=>{});
-    }
-
-    if (action === 'log') {
-      const { txt, kb } = await gp.buildUserLogPanel(chatId, targetId);
-      await ctx.answerCbQuery('').catch(()=>{});
-      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
-    }
-
-    if (action === 'grole') {
-      const { txt, kb } = await gp.buildRoleSelectPanel(chatId, targetId);
-      await ctx.answerCbQuery('').catch(()=>{});
-      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
-    }
-
-    if (action === 'rrole') {
-      await gp.removeRole(chatId, targetId);
-      await gp.log(chatId, 'role_revoke', targetId, ctx.from.id, 'سحب رتبة');
-      await ctx.answerCbQuery('✅ تم سحب الرتبة').catch(()=>{});
-      const targetUser = { id: targetId, first_name: 'العضو' };
-      const { txt, kb } = await gp.buildQuickPanel(ctx, targetUser);
-      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
-    }
-
-    await ctx.answerCbQuery('').catch(()=>{});
-    return;
-  }
-
-  // ══ GROUP PRO CALLBACKS ══
-  if (data.startsWith('gpro_')) {
-    const gp = require('../handlers/group_pro');
-    const chatIdStr = data.split('_').slice(-1)[0].replace(/\D/g,'');
-    const chatId = chatIdStr ? (parseInt(chatIdStr) || ctx.chat?.id) : ctx.chat?.id;
-
-    // الرئيسية
-    if (data.startsWith('gpro_main_')) {
-      const { txt, kb } = await gp.showMainPanel(ctx, chatId);
-      await ctx.answerCbQuery('').catch(()=>{});
-      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
-    }
-
-    // الحماية
-    if (data.startsWith('gpro_protect_')) {
-      const { txt, kb } = await gp.buildProtectPanel(chatId);
-      await ctx.answerCbQuery('').catch(()=>{});
-      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
-    }
-
-    // toggle حماية
-    if (data.startsWith('gpro_tog_')) {
-      const raw    = data.replace('gpro_tog_', '');
-      const cid    = raw.split('_').pop();
-      const key    = raw.slice(0, -(cid.length+1));
-      const newVal = await gp.toggleSetting(cid, key);
-      await ctx.answerCbQuery((newVal ? '✅ تم التفعيل' : '❌ تم الإيقاف')).catch(()=>{});
-      const { txt, kb } = await gp.buildProtectPanel(cid);
-      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
-    }
-
-    // السجلات
-    if (data.startsWith('gpro_logs_clear_')) {
-      const cid = data.replace('gpro_logs_clear_', '');
-      await require('../database/db').run('DELETE FROM grp_logs WHERE chat_id=$1', [cid]).catch(()=>{});
-      await ctx.answerCbQuery('✅ تم المسح').catch(()=>{});
-      const { txt, kb } = await gp.buildLogsPanel(ctx, cid, 0);
-      return ctx.editMessageText(txt, { parse_mode:'Markdown', disable_web_page_preview:true, reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
-    }
-    if (data.startsWith('gpro_logs_')) {
-      const parts = data.replace('gpro_logs_','').split('_');
-      const cid   = parts[0];
-      const page  = parseInt(parts[1]) || 0;
-      await ctx.answerCbQuery('').catch(()=>{});
-      const { txt, kb } = await gp.buildLogsPanel(ctx, cid, page);
-      return ctx.editMessageText(txt, { parse_mode:'Markdown', disable_web_page_preview:true, reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
-    }
-
-    // العقوبات
-    if (data.startsWith('gpro_punish_')) {
-      const cid = data.replace('gpro_punish_','');
-      await ctx.answerCbQuery('').catch(()=>{});
-      const { txt, kb } = await gp.buildPunishPanel(cid);
-      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
-    }
-
-    // الأعضاء
-    if (data.startsWith('gpro_members_')) {
-      const cid = data.replace('gpro_members_','');
-      await ctx.answerCbQuery('').catch(()=>{});
-      const { txt, kb } = await gp.buildMembersPanel(cid);
-      return ctx.editMessageText(txt, { parse_mode:'Markdown', disable_web_page_preview:true, reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
-    }
-
-    // الإعدادات
-    if (data.startsWith('gpro_cfg_')) {
-      const cid = data.replace('gpro_cfg_','');
-      await ctx.answerCbQuery('').catch(()=>{});
-      const { txt, kb } = await gp.buildConfigPanel(cid);
-      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
-    }
-
-    // الإحصائيات
-    if (data.startsWith('gpro_stats_')) {
-      const cid = data.replace('gpro_stats_','');
-      await ctx.answerCbQuery('').catch(()=>{});
-      const { txt, kb } = await gp.buildStatsPanel(cid);
-      return ctx.editMessageText(txt, { parse_mode:'Markdown', disable_web_page_preview:true, reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
-    }
-
-    // الكلمات المحظورة
-    if (data.startsWith('gpro_bl_del_')) {
-      const parts = data.replace('gpro_bl_del_','').split('_');
-      const rowId = parts[0];
-      const cid   = parts[1];
-      await require('../database/db').run('DELETE FROM grp_blacklist_words WHERE id=$1', [rowId]).catch(()=>{});
-      await ctx.answerCbQuery('✅ حُذفت').catch(()=>{});
-      const { txt, kb } = await gp.buildBlacklistPanel(cid);
-      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
-    }
-    if (data.startsWith('gpro_bl_')) {
-      const cid = data.replace('gpro_bl_','');
-      await ctx.answerCbQuery('').catch(()=>{});
-      const { txt, kb } = await gp.buildBlacklistPanel(cid);
-      return ctx.editMessageText(txt, { parse_mode:'Markdown', reply_markup:{ inline_keyboard:kb } }).catch(()=>{});
-    }
-
-    await ctx.answerCbQuery('').catch(()=>{});
-    return;
-  }
   });
 };

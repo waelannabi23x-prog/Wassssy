@@ -77,12 +77,13 @@ async function showGroupDetail(ctx, chatId) {
     }
   }
 
-  const [g, spec, mc, warns, bans] = await Promise.all([
+  const [g, spec, mc, warns, bans, protSettings] = await Promise.all([
     get('SELECT * FROM group_chats WHERE chat_id=$1', [chatId]),
     get('SELECT s.name FROM specialties s JOIN group_chats g ON g.specialty_id=s.id WHERE g.chat_id=$1', [chatId]).catch(() => null),
     get('SELECT COUNT(*) AS cnt FROM group_members WHERE chat_id=$1', [chatId]).catch(() => ({ cnt: 0 })),
     get('SELECT COUNT(*) AS cnt FROM group_warns WHERE chat_id=$1', [chatId]).catch(() => ({ cnt: 0 })),
     get('SELECT COUNT(*) AS cnt FROM group_bans WHERE chat_id=$1', [chatId]).catch(() => ({ cnt: 0 })),
+    require('./group_protection').getSettings(chatId).catch(() => null),
   ]);
   if (!g) return ctx.answerCbQuery('غير موجود', { show_alert: true }).catch(() => {});
 
@@ -100,9 +101,11 @@ async function showGroupDetail(ctx, chatId) {
   text += (g.welcome_enabled  ? on : off) + ' رسالة الترحيب\n';
   text += (g.goodbye_enabled  ? on : off) + ' رسالة الوداع\n';
   text += (g.notify_new_files ? on : off) + ' إشعار الملفات الجديدة\n';
-  text += (g.anti_spam        ? on : off) + ' مكافحة السبام\n';
-  text += (g.anti_link        ? on : off) + ' حجب الروابط\n';
-  text += (g.anti_flood       ? on : off) + ' مكافحة الفلود\n';
+  if (protSettings) {
+    const antiKeys = Object.keys(protSettings).filter(k => k.startsWith('anti_'));
+    const protCount = antiKeys.filter(k => protSettings[k]).length;
+    text += '🛡 الحماية الاحترافية: *' + protCount + '/' + antiKeys.length + '* مفعّلة\n';
+  }
 
   const rows = [
     // ── الترحيب ──
@@ -114,10 +117,8 @@ async function showGroupDetail(ctx, chatId) {
      kbBtn(g.goodbye_enabled  ? '🔴 إيقاف الوداع'   : '🟢 تفعيل الوداع',   'gp_togglebye_'    + chatId)],
     [kbBtn(g.notify_new_files ? '🔕 إيقاف الإشعار'  : '🔔 تفعيل الإشعار',  'gp_togglenotify_' + chatId),
      kbBtn('🎓 تغيير التخصص',                                                'gp_setspec_'      + chatId)],
-    // ── الحماية ──
-    [kbBtn(g.anti_spam  ? '🔴 إيقاف Anti-Spam'  : '🛡 تفعيل Anti-Spam',  'gp_togglespam_'  + chatId),
-     kbBtn(g.anti_link  ? '🔴 السماح بالروابط'   : '🔗 حجب الروابط',      'gp_togglelink_'  + chatId)],
-    [kbBtn(g.anti_flood ? '🔴 إيقاف Anti-Flood' : '🌊 تفعيل Anti-Flood', 'gp_toggleflood_' + chatId)],
+    // ── الحماية الاحترافية ──
+    [kbBtn('🛡 لوحة الحماية الاحترافية', 'gpx_home_' + chatId)],
     // ── إجراءات ──
     [kbBtn('📢 راسل هذا القروب', 'gp_msgone_'  + chatId),
      kbBtn('📊 إحصائيات',        'grp_stats_'  + chatId)],
@@ -140,22 +141,6 @@ async function handleCallback(ctx, data) {
   const uid = ctx.uid;
   if (data === 'gp_panel') { const uid = ctx.uid || ctx.from?.id; const isOwner = uid === parseInt(process.env.OWNER_ID); return isOwner ? showGroupPanel(ctx) : showMyGroups(ctx); }
 
-  // ── تبديل anti-spam/link/flood ──
-  const gpToggles = {
-    'gp_togglespam_':  'anti_spam',
-    'gp_togglelink_':  'anti_link',
-    'gp_toggleflood_': 'anti_flood',
-  };
-  for (const [prefix, col] of Object.entries(gpToggles)) {
-    if (data.startsWith(prefix)) {
-      const cid = data.replace(prefix, '');
-      const cur = await get('SELECT ' + col + ' FROM group_chats WHERE chat_id=$1', [cid]).catch(() => null);
-      const newVal = cur?.[col] ? 0 : 1;
-      await run('UPDATE group_chats SET ' + col + '=$1 WHERE chat_id=$2', [newVal, cid]).catch(() => {});
-      ctx.answerCbQuery(newVal ? '✅ تم التفعيل' : '❌ تم الإيقاف').catch(() => {});
-      return showGroupDetail(ctx, cid);
-    }
-  }
   if (data === 'gp_broadcast_sp') return showBroadcastSpecPicker(ctx);
 
   // ── تعديل قواعد القروب ──

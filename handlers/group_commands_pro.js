@@ -1,0 +1,302 @@
+'use strict';
+/**
+ * ⌨️ handlers/group_commands_pro.js — الأوامر الاحترافية الجديدة
+ * ──────────────────────────────────────────────────────────────
+ * أوامر عربية وإنجليزية قصيرة لكل ميزات النظام الاحترافي + شرح مدمج.
+ */
+
+const db = require('../database/group_pro_db');
+const protection = require('./group_protection');
+const proPanel = require('./group_pro_panel');
+const roles = require('./group_roles');
+const logsMod = require('./group_logs');
+const aiAdmin = require('./group_ai_admin');
+const funCmds = require('./fun_commands');
+const { build: kbBuild, btn: kbBtn } = require('../utils/keyboard');
+
+// ── مساعدات ──────────────────────────────────────────────
+function isGroup(ctx) { return ['group', 'supergroup'].includes(ctx.chat?.type); }
+
+async function isTgAdmin(ctx) {
+  if (ctx.isOwner || ctx.isAdmin) return true;
+  try {
+    const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id);
+    return ['administrator', 'creator'].includes(member?.status);
+  } catch (_) { return false; }
+}
+
+async function canAccessPanel(ctx, chatId) {
+  if (await isTgAdmin(ctx)) return true;
+  const role = await roles.getEffectiveRole(ctx, chatId, ctx.from.id);
+  return !!role;
+}
+
+function delCmd(ctx) { setTimeout(() => ctx.deleteMessage().catch(() => {}), 1500); }
+
+function tempReply(ctx, text, opts = {}, delay = 8000) {
+  ctx.reply(text, { parse_mode: 'Markdown', ...opts })
+    .then(m => { if (m && delay) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), delay); })
+    .catch(() => {});
+}
+
+async function getTextArg(ctx) {
+  const args = (ctx.message.text || '').split(' ').slice(1).join(' ').trim();
+  if (args) return args;
+  const rep = ctx.message.reply_to_message;
+  return (rep?.text || rep?.caption || '').trim();
+}
+
+// ── أقفال: أسماء عربية/إنجليزية ──────────────────────────
+const LOCK_ALIASES = {
+  sticker: ['sticker', 'stickers', 'ملصق', 'ملصقات', 'استيكر'],
+  gif:     ['gif', 'gifs', 'animation', 'متحركة', 'صور متحركة', 'جيف'],
+  link:    ['link', 'links', 'رابط', 'روابط'],
+  forward: ['forward', 'forwards', 'توجيه', 'تحويل', 'إعادة توجيه'],
+  photo:   ['photo', 'photos', 'صورة', 'صور'],
+  video:   ['video', 'videos', 'فيديو', 'فيديوهات'],
+  voice:   ['voice', 'audio', 'صوت', 'صوتي', 'صوتيات'],
+  poll:    ['poll', 'polls', 'استطلاع', 'استطلاعات', 'تصويت'],
+};
+function resolveLockType(arg) {
+  arg = (arg || '').toLowerCase().trim();
+  for (const [type, aliases] of Object.entries(LOCK_ALIASES)) {
+    if (aliases.some(a => a.toLowerCase() === arg)) return type;
+  }
+  return null;
+}
+
+// ══════════════════════════════════════════════════════════
+// 📜 نص المساعدة
+// ══════════════════════════════════════════════════════════
+const HELP_TEXT =
+`🛡 *النظام الاحترافي لإدارة القروب*
+━━━━━━━━━━━━━━━━━━
+
+*🖥 اللوحة الشاملة*
+\`/protection\` أو «الحماية» — فتح لوحة الإدارة الكاملة
+
+*🚷 الكلمات المحظورة*
+\`/setword كلمة\` أو «حظر كلمة ...» — إضافة
+\`/delword كلمة\` أو «حذف كلمة ...» — إزالة
+\`/words\` أو «الكلمات المحظورة» — عرض القائمة
+
+*🔒 الأقفال السريعة*
+\`/lock نوع\` و \`/unlock نوع\`
+الأنواع: sticker, gif, link, forward, photo, video, voice, poll
+بالعربي: «قفل روابط»، «فتح صور»…
+
+*🎭 الرتب*
+رُد على عضو واكتب: \`/setrole [رتبة]\`
+الرتب: manager, super_admin, protection_admin, content_admin, assistant
+\`/removerole\` (رد على عضو) — إزالة الرتبة
+\`/roles\` أو «الرتب» — عرض الرتب الحالية
+
+*📋 السجلات والمخالفات*
+\`/logs\` أو «السجلات» — سجلات القروب
+\`/violations\` (رد على عضو) — سجل مخالفاته
+\`/resetviolations\` (رد على عضو) — تصفير عدّاد مخالفاته
+
+*✅ التحقق من الأعضاء*
+\`/verify\` أو «التحقق» — إعدادات التحقق من الأعضاء الجدد
+
+*🤖 تحليل ذكي*
+\`/summary\` أو «تحليل» — تحليل نشاط القروب بالذكاء الاصطناعي
+
+*🗒 أدوات يومية*
+\`/afk [سبب]\` — وضع غياب
+\`/save اسم محتوى\` (أو رد) — حفظ ملاحظة
+\`#اسم\` — استدعاء الملاحظة
+\`/notes\` — كل الملاحظات
+\`/delnote اسم\` — حذف ملاحظة`;
+
+// ══════════════════════════════════════════════════════════
+// 🚀 التسجيل
+// ══════════════════════════════════════════════════════════
+function setupProCommands(bot) {
+  // ── 🖥 اللوحة الشاملة ──
+  const openPanel = async ctx => {
+    if (!isGroup(ctx)) return;
+    if (!(await canAccessPanel(ctx, ctx.chat.id))) {
+      return tempReply(ctx, '🚫 هذا الأمر للمشرفين فقط.');
+    }
+    return proPanel.showHome(ctx, ctx.chat.id);
+  };
+  bot.command(['protection', 'proadmin'], openPanel);
+  bot.hears('الحماية', openPanel);
+
+  // ── 📜 المساعدة ──
+  const showHelp = ctx => ctx.reply(HELP_TEXT, { parse_mode: 'Markdown' }).catch(() => {});
+  bot.command('prohelp', showHelp);
+  bot.hears('مساعدة الحماية', showHelp);
+
+  // ── 🚷 الكلمات المحظورة ──
+  const addWordHandler = async ctx => {
+    if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
+    const word = await getTextArg(ctx);
+    if (!word) return tempReply(ctx, '⚠️ استخدم: `/setword كلمة` أو رد على رسالة تحتوي الكلمة.', {});
+    if (word.length > 50) return tempReply(ctx, '⚠️ الكلمة طويلة جداً (الحد 50 حرفاً).');
+    await db.addWord(ctx.chat.id, word, ctx.from.id);
+    protection.clearWordsCache(ctx.chat.id);
+    logsMod.logAction({ telegram: ctx.telegram }, ctx.chat.id, 'word_change', {
+      actorId: ctx.from.id, actorName: ctx.from.first_name || '', details: '➕ إضافة كلمة محظورة: ' + word,
+    }).catch(() => {});
+    tempReply(ctx, '✅ تمت إضافة «' + word + '» إلى الكلمات المحظورة.');
+    delCmd(ctx);
+  };
+  bot.command('setword', addWordHandler);
+  bot.hears(/^حظر\s+كلمة\s+(.+)$/i, addWordHandler);
+
+  const delWordHandler = async ctx => {
+    if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
+    const word = await getTextArg(ctx);
+    if (!word) return tempReply(ctx, '⚠️ استخدم: `/delword كلمة`');
+    await db.removeWord(ctx.chat.id, word.toLowerCase());
+    protection.clearWordsCache(ctx.chat.id);
+    logsMod.logAction({ telegram: ctx.telegram }, ctx.chat.id, 'word_change', {
+      actorId: ctx.from.id, actorName: ctx.from.first_name || '', details: '🗑 حذف كلمة محظورة: ' + word,
+    }).catch(() => {});
+    tempReply(ctx, '🗑 تم حذف «' + word + '» من الكلمات المحظورة (إن وُجدت).');
+    delCmd(ctx);
+  };
+  bot.command('delword', delWordHandler);
+  bot.hears(/^حذف\s+كلمة\s+(.+)$/i, delWordHandler);
+
+  const showWordsHandler = async ctx => {
+    if (!isGroup(ctx)) return;
+    return proPanel.showWords(ctx, ctx.chat.id);
+  };
+  bot.command('words', showWordsHandler);
+  bot.hears('الكلمات المحظورة', showWordsHandler);
+
+  // ── 🔒 الأقفال السريعة ──
+  const lockHandler = (unlock) => async ctx => {
+    if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
+    const arg = (ctx.message.text || '').split(/\s+/).slice(1).join(' ');
+    const type = resolveLockType(arg);
+    if (!type) {
+      return tempReply(ctx, '❌ نوع غير معروف.\nالأنواع: sticker, gif, link, forward, photo, video, voice, poll', {}, 10000);
+    }
+    await db.setLock(ctx.chat.id, type, !unlock);
+    protection.clearLocksCache(ctx.chat.id);
+    logsMod.logAction({ telegram: ctx.telegram }, ctx.chat.id, 'lock_change', {
+      actorId: ctx.from.id, actorName: ctx.from.first_name || '',
+      details: (unlock ? '🔓 فتح ' : '🔒 قفل ') + (proPanel.LOCK_LABELS[type] || type),
+    }).catch(() => {});
+    tempReply(ctx, (unlock ? '🔓 تم فتح: ' : '🔒 تم قفل: ') + (proPanel.LOCK_LABELS[type] || type));
+    delCmd(ctx);
+  };
+  bot.command('lock', lockHandler(false));
+  bot.command('unlock', lockHandler(true));
+  bot.hears(/^قفل\s+(.+)$/i, lockHandler(false));
+  bot.hears(/^فتح\s+(.+)$/i, lockHandler(true));
+
+  // ── 🎭 الرتب ──
+  bot.command('setrole', async ctx => {
+    if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
+    return roles.handleSetRoleCommand(ctx);
+  });
+  bot.command('removerole', async ctx => {
+    if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
+    return roles.handleRemoveRoleCommand(ctx);
+  });
+  const showRolesHandler = async ctx => {
+    if (!isGroup(ctx)) return;
+    return roles.showRolesMenu(ctx, ctx.chat.id);
+  };
+  bot.command('roles', showRolesHandler);
+  bot.hears('الرتب', showRolesHandler);
+
+  // ── 📋 السجلات ──
+  const showLogsHandler = async ctx => {
+    if (!isGroup(ctx) || !(await canAccessPanel(ctx, ctx.chat.id))) return;
+    return logsMod.showLogsMenu(ctx, ctx.chat.id);
+  };
+  bot.command('logs', showLogsHandler);
+  bot.hears('السجلات', showLogsHandler);
+
+  // ── ⚠️ مخالفات عضو ──
+  const showViolationsHandler = async ctx => {
+    if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
+    const target = ctx.message.reply_to_message?.from;
+    if (!target) return tempReply(ctx, '⚠️ رُد على رسالة العضو بهذا الأمر.');
+    const settings = await protection.getSettings(ctx.chat.id);
+    const count = await db.getViolationCount(ctx.chat.id, target.id, settings.violation_window_hours || 24);
+    const history = await db.getViolationHistory(ctx.chat.id, target.id, 10);
+    let text = '🛡 *سجل مخالفات* [' + (target.first_name || 'العضو') + '](tg://user?id=' + target.id + ')\n━━━━━━━━━━━━━━━━━━\n\n';
+    text += '🔢 العدد الحالي (' + (settings.violation_window_hours || 24) + 'س): *' + count + '*\n\n';
+    if (!history.length) text += '_لا توجد مخالفات مسجّلة._';
+    else {
+      text += '*آخر المخالفات:*\n';
+      for (const h of history) {
+        const time = new Date(h.created_at).toLocaleString('ar-DZ', { hour12: false, day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' });
+        text += '• ' + protection.violationLabel(h.type) + ' — _' + time + '_\n';
+      }
+    }
+    const rows = [[kbBtn('♻️ تصفير المخالفات', 'gpx_resetviol_' + target.id + '_' + ctx.chat.id)]];
+    return ctx.reply(text, { parse_mode: 'Markdown', reply_to_message_id: ctx.message.message_id, ...kbBuild(rows) }).catch(() => {});
+  };
+  bot.command('violations', showViolationsHandler);
+  bot.hears(/^(مخالفاته|المخالفات)$/, showViolationsHandler);
+
+  bot.command('resetviolations', async ctx => {
+    if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
+    const target = ctx.message.reply_to_message?.from;
+    if (!target) return tempReply(ctx, '⚠️ رُد على رسالة العضو بهذا الأمر.');
+    await db.resetViolations(ctx.chat.id, target.id);
+    tempReply(ctx, '♻️ تم تصفير عدّاد مخالفات [' + (target.first_name || 'العضو') + '](tg://user?id=' + target.id + ')', {});
+    delCmd(ctx);
+  });
+
+  // ── ✅ التحقق من الأعضاء ──
+  const showVerifyHandler = async ctx => {
+    if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
+    return proPanel.showVerifyConfig(ctx, ctx.chat.id);
+  };
+  bot.command('verify', showVerifyHandler);
+  bot.hears('التحقق', showVerifyHandler);
+
+  // ── 🤖 تحليل ذكي ──
+  const showSummaryHandler = async ctx => {
+    if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
+    return aiAdmin.showSummary(ctx, ctx.chat.id);
+  };
+  bot.command('summary', showSummaryHandler);
+  bot.hears('تحليل', showSummaryHandler);
+
+  // ── 🌙 AFK ──
+  bot.command('afk', ctx => { if (isGroup(ctx)) return funCmds.handleAfk(ctx); });
+
+  // ── 📝 الملاحظات ──
+  bot.command(['save', 'note'], ctx => funCmds.saveNote(ctx));
+  bot.command('notes', ctx => funCmds.listNotes(ctx));
+  bot.command('delnote', ctx => funCmds.delNote(ctx));
+  bot.hears(/^#([\w\u0600-\u06FF]{1,32})$/, ctx => {
+    if (!isGroup(ctx)) return;
+    return funCmds.getNote(ctx, ctx.match[1]);
+  });
+}
+
+// ══════════════════════════════════════════════════════════
+// 🔁 Callback: تصفير المخالفات من زر /violations
+// ══════════════════════════════════════════════════════════
+async function handleResetViolationCallback(ctx, data) {
+  // gpx_resetviol_<uid>_<chatId>
+  const rest = data.replace('gpx_resetviol_', '');
+  const m = rest.match(/^(\d+)_(-?\d+)$/);
+  if (!m) return false;
+  const targetUid = parseInt(m[1]);
+  const chatId = parseInt(m[2]);
+  if (!(await isTgAdmin(ctx))) {
+    return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(() => {});
+  }
+  await db.resetViolations(chatId, targetUid);
+  await ctx.answerCbQuery('♻️ تم التصفير').catch(() => {});
+  return ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
+}
+
+module.exports = {
+  setupProCommands,
+  handleResetViolationCallback,
+  canAccessPanel, isTgAdmin,
+  HELP_TEXT,
+};

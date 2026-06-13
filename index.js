@@ -27,7 +27,6 @@ const millionaire   = require('./handlers/millionaire');
 const guessGame     = require('./handlers/guess_game');
 const tools         = require('./handlers/owner_tools');
 const bank          = require('./handlers/bank');
-const groupPro      = require('./handlers/group_pro');
 const bankPro       = require('./handlers/bank_pro');
 const ownerH        = require('./handlers/owner');
 const contentDb     = require('./database/content');
@@ -138,36 +137,14 @@ const rateLimit = (ctx, next) => {
 // FIX 1: تحقق هل البوت أدمن — middleware مستقل على المستوى الأعلى
 // (كان متداخل داخل bot.use آخر = memory leak + double processing)
 // ══════════════════════════════════════════
-// كاش لحالة عضوية البوت في القروب — يُحدَّث كل 10 دقائق فقط
-const _botMemberCache = new Map(); // chatId -> { status, ts }
 const botAdminCheck = async (ctx, next) => {
   if (!['group', 'supergroup'].includes(ctx.chat?.type)) return next();
   if (!ctx.message?.text?.startsWith('/')) return next();
-
-  const chatId = ctx.chat.id;
-  const now = Date.now();
-  let entry = _botMemberCache.get(chatId);
-
-  if (!entry || now - entry.ts > 600000) { // 10 دقائق
-    try {
-      const me = await ctx.telegram.getChatMember(chatId, ctx.botInfo.id);
-      entry = { status: me.status, ts: now };
-      _botMemberCache.set(chatId, entry);
-    } catch(_) {
-      // فشل الطلب — لا تحجب الأمر، فقط تابع
-      return next();
-    }
-  }
-
-  if (entry.status === 'administrator' || entry.status === 'creator') return next();
-
-  // البوت ليس أدمن فعلاً — أرسل تنبيهاً مرة واحدة كل 10 دقائق فقط، وتابع next() دائماً
-  const warnKey = 'warn_' + chatId;
-  const lastWarn = _botMemberCache.get(warnKey) || 0;
-  if (now - lastWarn > 600000) {
-    _botMemberCache.set(warnKey, now);
+  try {
+    const me = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);
+    if (me.status === 'administrator' || me.status === 'creator') return next();
     const botUn = ctx.botInfo?.username || '';
-    ctx.reply(
+    await ctx.reply(
       '⚠️ أنا لست مشرفاً في هذا القروب!\n\nلكي تعمل الأوامر بشكل صحيح، يرجى إضافتي كمشرف 👇',
       {
         reply_to_message_id: ctx.message?.message_id,
@@ -176,8 +153,8 @@ const botAdminCheck = async (ctx, next) => {
         ]]},
       }
     ).catch(() => {});
-  }
-  return next();
+    return;
+  } catch(_) { return next(); }
 };
 
 // ── Spam/Flood state ──
@@ -246,46 +223,18 @@ const groupProtectionMiddleware = async (ctx, next) => {
     }
   }
 
-  // حماية الأدمنز من الفلتر
+  // 🌙 فحص AFK (لا يحظر التدفّق — fire & forget، يشمل الأدمنز أيضاً)
+  try { require('./handlers/fun_commands').checkAfkOnMessage(ctx).catch(() => {}); } catch (_) {}
+
+  // حماية الأدمنز من فلاتر الحماية
   if (ctx.isAdmin || ctx.isOwner) return next();
 
-  // إعدادات القروب
-  const sk = 'grp_s_' + cid;
-  let gs = _cGet(sk);
-  if (!gs) {
-    gs = await _dbGet('SELECT anti_spam,anti_link,anti_flood FROM group_chats WHERE chat_id=$1', [cid]).catch(() => null) || {};
-    _cSet(sk, gs, 60000);
-  }
-
-  // Anti-Flood
-  if (gs.anti_flood) {
-    const key = uid + '_' + cid;
-    const sp  = _spamProtect.get(key) || { c: 0, t: now };
-    if (now - sp.t < 3000) sp.c++; else { sp.c = 1; sp.t = now; }
-    _spamProtect.set(key, sp);
-    if (sp.c > 5) {
-      ctx.deleteMessage().catch(() => {});
-      if (sp.c === 6) require('./handlers/group_admin').warnMember(ctx, cid, uid, 'فلود').catch(() => {});
-      return;
-    }
-  }
-
-  // Anti-Link
-  if (gs.anti_link && txt && !txt.startsWith('/')) {
-    if (/https?:\/\/|t\.me\/|telegram\.me\//i.test(txt)) {
-      ctx.deleteMessage().catch(() => {});
-      const m = await ctx.reply('🔗 ' + (ctx.from.first_name || '') + ' الروابط ممنوعة!').catch(() => null);
-      if (m) setTimeout(() => ctx.telegram.deleteMessage(cid, m.message_id).catch(() => {}), 5000);
-      return;
-    }
-  }
-
-  // Anti-Spam
-  if (gs.anti_spam && txt && txt.length > 5 && !txt.startsWith('/')) {
-    const sk2 = 'sp_' + uid + '_' + cid;
-    if (_cGet(sk2) === txt) { ctx.deleteMessage().catch(() => {}); return; }
-    _cSet(sk2, txt, 10000);
-  }
+  // 🛡️ نظام الحماية الاحترافي — يدير anti_spam/link/flood/forward/mention/
+  // words/caps/duplicate + أقفال الوسائط + سلّم العقوبات الذكي
+  try {
+    const handled = await require('./handlers/group_protection').runProtection(ctx);
+    if (handled) return;
+  } catch (e) { logger.error('[Protection] ' + e.message); }
 
   return next();
 };
@@ -318,19 +267,6 @@ const gameAndBankMiddleware = async (ctx, next) => {
     // البنك
     // bank.js القديم محذوف — استخدم bank_pro.js
 
-    // gpq_quick_panel_trigger — لوحة الإدارة السريعة (رد على عضو + "ادارة")
-    if (/^(ادارة|إدارة)$/i.test(txt) && ctx.message?.reply_to_message) {
-      const target = ctx.message.reply_to_message.from;
-      if (target && !target.is_bot) {
-        const allowed = await groupPro.hasPermission(ctx, ctx.chat.id, ctx.from.id, 'manage_protection')
-          .catch(() => false);
-        if (allowed || ctx.isAdmin || ctx.isOwner) {
-          const { txt: pTxt, kb: pKb } = await groupPro.buildQuickPanel(ctx, target);
-          return ctx.reply(pTxt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: pKb } }).catch(() => next());
-        }
-      }
-    }
-
     // 🏦 Taline Bank
     if (/^بنك$/i.test(txt))                       return bankPro.openAccount(ctx).catch(() => next());
     if (/^محفظتي$/i.test(txt))                    return bankPro.showWallet(ctx).catch(() => next());
@@ -362,22 +298,6 @@ const gameAndBankMiddleware = async (ctx, next) => {
 // ── تسجيل middleware بالترتيب الصحيح ──
 bot.use(rateLimit);
 bot.use(gameAndBankMiddleware);   // الألعاب والبنك قبل auth
-
-// 🛡️ نظام الحماية الاحترافي (group_pro) — مسجّل بالفعل في bot/messages.js، لا تكرار هنا
-
-// 🛡️ مكافحة التعديل
-bot.on('edited_message', async (ctx, next) => {
-  if (!['group','supergroup'].includes(ctx.chat?.type)) return next();
-  return groupPro.protectEdit(bot, ctx, next);
-});
-
-// 🛡️ فحص الأعضاء الجدد (بوتات/حسابات جديدة)
-bot.use(async (ctx, next) => {
-  if (ctx.message?.new_chat_members) {
-    return groupPro.checkNewMember(bot, ctx, next);
-  }
-  return next();
-});
 bot.use(authMiddleware);
 bot.use(botAdminCheck);           // FIX: مستوى أعلى — لا nested
 bot.use(groupProtectionMiddleware); // auto-reply + flood/spam/link
@@ -408,12 +328,21 @@ registerCallbacks(bot, {
 
 // ── Messages ──
 setupGroupCommands(bot);
+require('./handlers/group_commands_pro').setupProCommands(bot);
 
 const { registerMessages } = require('./bot/messages');
 registerMessages(bot, {
   ownerH, GrpBuf, GrpMsgs, handleAiChat, handleOwnerAI,
   manage, browse, userH, bundlesDb, filesDb, adminsDb,
   logger, OWNER_ID, safeInt,
+});
+
+// ✏️ مكافحة تعديل الرسائل لتصبح مخالفة (anti_edit)
+bot.on('edited_message', async ctx => {
+  try {
+    const msg = ctx.update?.edited_message;
+    if (msg) await require('./handlers/group_protection').checkEdited(ctx, msg);
+  } catch (e) { logger.error('[EditedMsg] ' + e.message); }
 });
 
 // ── deep link: /start file_{fileId} ──
@@ -454,8 +383,7 @@ async function launch() {
   try {
     await initSchema();
     await migrateGroupTables().catch(() => {});
-    const { migrateGroupPro } = require('./database/db');
-    await migrateGroupPro().catch(() => {});
+    await require('./database/group_pro_db').migrate().catch(() => {});
     require('./utils/cache').clearAllSubCache();
     await require('./handlers/group_panel').migrateGroupPanel().catch(() => {});
     await require('./database/db').initBankTables().catch(() => {});
@@ -480,6 +408,7 @@ async function launch() {
 
     startScheduler(bot, [OWNER_ID]);
     GrpBuf.start();
+    require('./handlers/group_verify').startVerifyWatcher(bot);
     logger.info('✅ Services started');
 
     app.use(bot.webhookCallback('/webhook/' + TOKEN, { secretToken: WEBHOOK_SECRET || undefined }));
@@ -624,7 +553,7 @@ async function launch() {
 
     if (WEBHOOK_URL) {
       await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, {
-        allowed_updates: ['message', 'callback_query', 'my_chat_member', 'chat_member', 'inline_query'],
+        allowed_updates: ['message', 'edited_message', 'callback_query', 'my_chat_member', 'chat_member', 'inline_query'],
         drop_pending_updates: true,
         max_connections: 40,
         ...(WEBHOOK_SECRET && { secret_token: WEBHOOK_SECRET }),
