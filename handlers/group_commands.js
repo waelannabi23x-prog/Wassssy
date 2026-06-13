@@ -895,6 +895,33 @@ function setupGroupCommands(bot) {
     ).catch(() => {});
   });
 
+  // ══ /panel — لوحة الإدارة الرئيسية ══
+  bot.command('panel2', async ctx => {
+    return ctx.reply('✅ panel2 يعمل!').catch(e => console.log('ERR panel2:', e.message));
+  });
+
+  bot.command(['panel','لوحة','p'], async ctx => {
+    require('../utils/logger').info('[PANEL_DEBUG] command received, chat=' + ctx.chat?.id + ' isGroup=' + isGroup(ctx) + ' isAdmin=' + ctx.isAdmin + ' isOwner=' + ctx.isOwner);
+    if (!isGroup(ctx)) return;
+    delCmd(ctx);
+    try {
+      const member = await ctx.telegram.getChatMember(ctx.chat.id, ctx.from.id).catch(() => null);
+      const isAdm = ctx.isOwner || ctx.isAdmin ||
+        ['administrator','creator'].includes(member?.status);
+      if (!isAdm) return;
+
+      const { showMainPanel } = require('./group_pro');
+      const { txt, kb } = await showMainPanel(ctx, ctx.chat.id);
+      const m = await ctx.reply(txt, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: kb }
+      }).catch(() => null);
+      if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 300000);
+    } catch(e) {
+      ctx.reply('❌ خطأ: ' + e.message).catch(() => {});
+    }
+  });
+
 }
 
 // ══════════════════════════════════════════
@@ -1071,10 +1098,6 @@ function _reply(ctx, text, delay=10000) {
 
 
 
-  // ══ /panel — لوحة الإدارة الرئيسية ══
-  bot.command('panel2', async ctx => {
-    return ctx.reply('✅ panel2 يعمل!').catch(e => console.log('ERR panel2:', e.message));
-  });
 
   bot.command(['panel','لوحة','p'], async ctx => {
     require('../utils/logger').info('[PANEL_DEBUG] command received, chat=' + ctx.chat?.id + ' isGroup=' + isGroup(ctx) + ' isAdmin=' + ctx.isAdmin + ' isOwner=' + ctx.isOwner);
