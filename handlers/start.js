@@ -17,11 +17,13 @@ async function startHandler(ctx) {
   // ── تحقق من الاشتراك + رسالة الترحيب بالتوازي ──
   const { getSetting } = require('../database/db');
   const guard = require('../utils/channelGuard');
-  const [_guardRes, welcomeText] = await Promise.all([
+  const [_guardRes, welcomeText, welcomeMediaId, welcomeMediaType] = await Promise.all([
     (!ctx.isOwner && !ctx.isAdmin && ctx.chat?.type === 'private')
       ? guard.checkAllChannels({ telegram: ctx.telegram }, uid)
       : Promise.resolve({ ok: true }),
     getSetting('start_welcome_text').catch(() => null),
+    getSetting('start_welcome_media_id').catch(() => null),
+    getSetting('start_welcome_media_type').catch(() => null),
   ]);
   if (!_guardRes.ok) {
     const { text, buttons } = guard.buildSubscribeMessage(_guardRes.missing, name);
@@ -45,11 +47,21 @@ async function startHandler(ctx) {
       [btn('📚 تصفح المحتوى', 'browse')],
       [{ text: '➕ أضف البوت لمجموعتك', url: 'https://t.me/' + BOT_UN + '?startgroup=true' }]
     ];
-    await ctx.reply(_wt, {
+    const replyOpts = {
       parse_mode: 'Markdown',
-      disable_web_page_preview: false,
       reply_markup: { inline_keyboard: rows }
-    }).catch(() => {});
+    };
+    if (welcomeMediaId && welcomeMediaType === 'photo') {
+      await ctx.replyWithPhoto(welcomeMediaId, { caption: _wt, ...replyOpts }).catch(() => {
+        ctx.reply(_wt, { ...replyOpts, disable_web_page_preview: false }).catch(() => {});
+      });
+    } else if (welcomeMediaId && welcomeMediaType === 'video') {
+      await ctx.replyWithVideo(welcomeMediaId, { caption: _wt, ...replyOpts }).catch(() => {
+        ctx.reply(_wt, { ...replyOpts, disable_web_page_preview: false }).catch(() => {});
+      });
+    } else {
+      await ctx.reply(_wt, { ...replyOpts, disable_web_page_preview: false }).catch(() => {});
+    }
     return;
   }
   const rawText = ctx.message?.text || '';

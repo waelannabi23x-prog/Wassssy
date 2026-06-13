@@ -367,7 +367,7 @@ async function handleText(ctx,state){
   const done=(msg,cb)=>{clearState(uid);ctx.reply(msg,{parse_mode:'Markdown',...build([[btn('◀️ رجوع',cb)]])});};
   
   // احفظ الوسائط في الـ state
-  if(state.type==='mg_notify_groups_msg'||state.type==='mg_msg_user_content'){
+  if(state.type==='mg_notify_groups_msg'||state.type==='mg_msg_user_content'||state.type==='mg_set_welcome'){
     const msg=ctx.message;
     if(msg.photo){state.mediaFileId=msg.photo[msg.photo.length-1].file_id;state.mediaType="photo";if(msg.caption)state.mediaCaption=msg.caption;}
     else if(msg.video){state.mediaFileId=msg.video.file_id;state.mediaType="video";if(msg.caption)state.mediaCaption=msg.caption;}
@@ -398,12 +398,21 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
       case 'mg_rn_fl':await filesDb.rename(state.id,text);done('✅ تمت التسمية!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_'));break;
       case 'mg_desc_fl':await filesDb.updateDesc(state.id,text);done('✅ تم التحديث!','mg_fls_'+[state.spId,state.yrId,state.smId,state.sbId,state.catId].join('_'));break;
       case 'mg_admin_search':{clearState(uid);const [fr,ur]=await Promise.all([filesDb.search(text),usersDb.searchUsers(text)]);let resp='🔍 *بحث: "'+escMd(text)+'"*\n\n';if(fr.length){resp+='📄 *ملفات ('+fr.length+'):*\n';fr.slice(0,5).forEach(f=>{resp+='• '+escMd(f.title)+' ('+escMd(f.sub_name)+')\n';});}if(ur.length){resp+='\n👥 *مستخدمون ('+ur.length+'):*\n';ur.slice(0,5).forEach(u=>{resp+='• '+escMd(u.first_name||'ID:'+u.id)+(u.username?' @'+escMd(u.username):'')+'\n';});}if(!fr.length&&!ur.length) resp+='_لا نتائج._';ctx.reply(resp,{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
-      case 'mg_set_welcome':
+      case 'mg_set_welcome': {
         clearState(uid);
         if(text==='/cancel')return ctx.reply('❌ تم الإلغاء').catch(()=>{});
-        await require('../database/db').run("INSERT INTO settings(key,value) VALUES('start_welcome_text',$1) ON CONFLICT(key) DO UPDATE SET value=$1",[text]).catch(()=>{});
-        ctx.reply('✅ تم حفظ رسالة /start!',{parse_mode:'Markdown'}).catch(()=>{});
+        const db_ = require('../database/db');
+        const finalText = state.mediaCaption || text || '';
+        await db_.run("INSERT INTO settings(key,value) VALUES('start_welcome_text',$1) ON CONFLICT(key) DO UPDATE SET value=$1",[finalText]).catch(()=>{});
+        if (state.mediaFileId) {
+          await db_.run("INSERT INTO settings(key,value) VALUES('start_welcome_media_id',$1) ON CONFLICT(key) DO UPDATE SET value=$1",[state.mediaFileId]).catch(()=>{});
+          await db_.run("INSERT INTO settings(key,value) VALUES('start_welcome_media_type',$1) ON CONFLICT(key) DO UPDATE SET value=$1",[state.mediaType]).catch(()=>{});
+        } else {
+          await db_.run("DELETE FROM settings WHERE key IN ('start_welcome_media_id','start_welcome_media_type')").catch(()=>{});
+        }
+        ctx.reply('✅ تم حفظ رسالة /start!'+(state.mediaFileId ? ' (مع '+(state.mediaType==='photo'?'صورة':'فيديو')+')' : ''),{parse_mode:'Markdown'}).catch(()=>{});
         return handleCallback(ctx,'mg_bot_settings');
+      }
       case 'mg_broadcast':{clearState(uid);const ids=await usersDb.allIds();const total_bc=ids.length;const sm=await ctx.reply('📢 *جاري الإرسال...*\n`[░░░░░░░░░░] 0%`\n✅ 0 | ❌ 0 | ⏳ '+total_bc,{parse_mode:'Markdown'});const bcRes=await concurrentBroadcast(ctx.telegram,ctx.chat.id,sm.message_id,ids,'📢 *إعلان*\n\n'+text,{parse_mode:'Markdown'});ctx.telegram.editMessageText(ctx.chat.id,sm.message_id,null,'✅ *اكتمل!*\n`[██████████] 100%`\n✅ '+bcRes.sent+' | ❌ '+bcRes.failed,{...build([back('mg_menu')]),parse_mode:'Markdown'}).catch(err => { require('../utils/logger').debug("[silent]", err.message); });break;}
       case 'mg_msg_user_id':{setState(uid,{...state,type:'mg_msg_user_content',targetId:text.replace('@','')});ctx.reply('📝 ارسل الرسالة (نص، صورة، فيديو، sticker، voice):',{parse_mode:'Markdown'});break;}
       case 'mg_msg_user_content':{
@@ -1162,9 +1171,26 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
     r2.push(back('mg_menu'));
     return eos(ctx,'⚙️ *إعدادات البوت*'+String.fromCharCode(10)+'━━━━━━━━━━━━━━━'+String.fromCharCode(10)+'📝 *رسالة /start:*'+String.fromCharCode(10)+preview,{parse_mode:'Markdown',...build(r2)});}
 
-  if(data==='mg_edit_welcome'){setState(uid,{type:'mg_set_welcome'});return ctx.reply('✏️ أرسل رسالة /start الجديدة:'+String.fromCharCode(10)+'_(أو /cancel)_',{parse_mode:'Markdown'}).catch(()=>{});}
+  if(data==='mg_edit_welcome'){
+    setState(uid,{type:'mg_set_welcome'});
+    const VARS = '📝 *المتغيرات المتاحة:*\n'+
+      '`{name}` الاسم | `{username}` يوزر\n'+
+      '`{mention}` منشن | `{id}` المعرف\n'+
+      '`{spec}` التخصص | `{date}` التاريخ\n'+
+      '`{time}` الوقت';
+    return ctx.reply(
+      '✏️ *أرسل رسالة /start الجديدة:*\n\n'+
+      'يمكنك إرسال:\n'+
+      '• نص فقط\n'+
+      '• 🖼 صورة مع نص (caption)\n'+
+      '• 🎬 فيديو مع نص (caption)\n\n'+
+      VARS+'\n\n'+
+      '_(أو /cancel)_',
+      {parse_mode:'Markdown'}
+    ).catch(()=>{});
+  }
 
-  if(data==='mg_del_welcome'){await require('../database/db').run("DELETE FROM settings WHERE key='start_welcome_text'").catch(()=>{});ctx.answerCbQuery('✅ تم الحذف').catch(()=>{});return handleCallback(ctx,'mg_bot_settings');}
+  if(data==='mg_del_welcome'){await require('../database/db').run("DELETE FROM settings WHERE key IN ('start_welcome_text','start_welcome_media_id','start_welcome_media_type')").catch(()=>{});ctx.answerCbQuery('✅ تم الحذف').catch(()=>{});return handleCallback(ctx,'mg_bot_settings');}
 
   if(data==='mg_restore'){setState(uid,{type:'mg_awaiting_restore'});return eos(ctx,'♻️ *استعادة قاعدة البيانات*\n\n⚠️ سيتم استبدال البيانات!\n\nأرسل ملف `.db`:',{parse_mode:'Markdown',...build([back('mg_menu')])});}
   if(data==='mg_broadcast'){setState(uid,{type:'mg_broadcast'});return ctx.reply('📢 رسالة البث:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
