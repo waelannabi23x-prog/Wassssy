@@ -138,15 +138,36 @@ const rateLimit = (ctx, next) => {
 // FIX 1: تحقق هل البوت أدمن — middleware مستقل على المستوى الأعلى
 // (كان متداخل داخل bot.use آخر = memory leak + double processing)
 // ══════════════════════════════════════════
+// كاش لحالة عضوية البوت في القروب — يُحدَّث كل 10 دقائق فقط
+const _botMemberCache = new Map(); // chatId -> { status, ts }
 const botAdminCheck = async (ctx, next) => {
   if (!['group', 'supergroup'].includes(ctx.chat?.type)) return next();
   if (!ctx.message?.text?.startsWith('/')) return next();
-  try {
-    const me = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo.id);
-    logger.info('[BOTADMIN_DEBUG] status=' + me.status + ' chat=' + ctx.chat.id + ' txt=' + ctx.message?.text);
-    if (me.status === 'administrator' || me.status === 'creator') return next();
+
+  const chatId = ctx.chat.id;
+  const now = Date.now();
+  let entry = _botMemberCache.get(chatId);
+
+  if (!entry || now - entry.ts > 600000) { // 10 دقائق
+    try {
+      const me = await ctx.telegram.getChatMember(chatId, ctx.botInfo.id);
+      entry = { status: me.status, ts: now };
+      _botMemberCache.set(chatId, entry);
+    } catch(_) {
+      // فشل الطلب — لا تحجب الأمر، فقط تابع
+      return next();
+    }
+  }
+
+  if (entry.status === 'administrator' || entry.status === 'creator') return next();
+
+  // البوت ليس أدمن فعلاً — أرسل تنبيهاً مرة واحدة كل 10 دقائق فقط، وتابع next() دائماً
+  const warnKey = 'warn_' + chatId;
+  const lastWarn = _botMemberCache.get(warnKey) || 0;
+  if (now - lastWarn > 600000) {
+    _botMemberCache.set(warnKey, now);
     const botUn = ctx.botInfo?.username || '';
-    await ctx.reply(
+    ctx.reply(
       '⚠️ أنا لست مشرفاً في هذا القروب!\n\nلكي تعمل الأوامر بشكل صحيح، يرجى إضافتي كمشرف 👇',
       {
         reply_to_message_id: ctx.message?.message_id,
@@ -155,8 +176,8 @@ const botAdminCheck = async (ctx, next) => {
         ]]},
       }
     ).catch(() => {});
-    return;
-  } catch(_) { return next(); }
+  }
+  return next();
 };
 
 // ── Spam/Flood state ──
