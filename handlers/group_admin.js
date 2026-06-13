@@ -107,7 +107,6 @@ async function handleNewMember(bot, chatId, userId, firstName) {
     // أزرار الترحيب
     const welcomeKb = {
       inline_keyboard: [[
-        { text: '📋 القواعد', callback_data: 'grp_rules_' + chatId },
         { text: '👤 ملفّي', url: 'tg://user?id=' + userId },
       ],[
         { text: '📢 قناتنا', url: 'https://t.me/lwx23' },
