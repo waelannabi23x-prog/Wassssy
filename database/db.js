@@ -557,6 +557,48 @@ async function initBankTables() {
     await pg.query(`CREATE TABLE IF NOT EXISTS pro_bank_investments (id SERIAL PRIMARY KEY, user_id BIGINT NOT NULL, amount NUMERIC NOT NULL, daily_rate NUMERIC NOT NULL, tier TEXT DEFAULT 'أساسي', active INTEGER DEFAULT 1, profit_earned NUMERIC DEFAULT 0, created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP)`);
     console.log('[BankPro] ✅ Tables ready');
     console.log('[Bank] ✅ Tables ready');
+
+    // ── Group Pro tables (احتياط مضمون التنفيذ) ──
+    await pg.query(`CREATE TABLE IF NOT EXISTS grp_settings (
+      chat_id BIGINT PRIMARY KEY,
+      anti_spam BOOLEAN DEFAULT false, anti_link BOOLEAN DEFAULT false,
+      anti_flood BOOLEAN DEFAULT false, anti_forward BOOLEAN DEFAULT false,
+      anti_short_link BOOLEAN DEFAULT false, anti_invite BOOLEAN DEFAULT false,
+      anti_new_account BOOLEAN DEFAULT false, anti_bot BOOLEAN DEFAULT false,
+      anti_mention BOOLEAN DEFAULT false, anti_media BOOLEAN DEFAULT false,
+      anti_file BOOLEAN DEFAULT false, anti_arabic_repeat BOOLEAN DEFAULT false,
+      anti_edit BOOLEAN DEFAULT false, anti_repeat BOOLEAN DEFAULT false,
+      max_warns INTEGER DEFAULT 3, flood_limit INTEGER DEFAULT 5,
+      flood_window INTEGER DEFAULT 5, max_msg_length INTEGER DEFAULT 4000,
+      repeat_limit INTEGER DEFAULT 3, max_mentions INTEGER DEFAULT 5,
+      min_account_age_days INTEGER DEFAULT 0,
+      warn_action TEXT DEFAULT 'mute', escalation TEXT DEFAULT 'warn,mute10,mute60,ban',
+      auto_reset_days INTEGER DEFAULT 30, updated_at TIMESTAMP DEFAULT NOW()
+    )`);
+    await pg.query(`CREATE TABLE IF NOT EXISTS grp_logs (
+      id SERIAL PRIMARY KEY, chat_id BIGINT NOT NULL, action TEXT NOT NULL,
+      target_id BIGINT, by_id BIGINT, reason TEXT, extra TEXT,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`);
+    await pg.query('CREATE INDEX IF NOT EXISTS idx_grp_logs_chat ON grp_logs(chat_id, created_at DESC)');
+    await pg.query(`CREATE TABLE IF NOT EXISTS grp_member_stats (
+      chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL,
+      msg_count INTEGER DEFAULT 0, warn_count INTEGER DEFAULT 0,
+      mute_count INTEGER DEFAULT 0, ban_count INTEGER DEFAULT 0,
+      violations INTEGER DEFAULT 0,
+      joined_at TIMESTAMP DEFAULT NOW(), last_active TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY (chat_id, user_id)
+    )`);
+    await pg.query(`CREATE TABLE IF NOT EXISTS grp_roles (
+      id SERIAL PRIMARY KEY, chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL,
+      role TEXT NOT NULL, permissions TEXT DEFAULT '', assigned_by BIGINT,
+      created_at TIMESTAMP DEFAULT NOW(), UNIQUE(chat_id, user_id)
+    )`);
+    await pg.query(`CREATE TABLE IF NOT EXISTS grp_blacklist_words (
+      id SERIAL PRIMARY KEY, chat_id BIGINT NOT NULL, word TEXT NOT NULL,
+      created_at TIMESTAMP DEFAULT NOW()
+    )`);
+    console.log('[GroupPro] ✅ Tables ready (fallback)');
   } catch(e) { console.error('[Bank]', e.message); }
 }
 module.exports.initBankTables = initBankTables;
