@@ -2,6 +2,33 @@
 const { all, run, get } = require('../database/db');
 const { build: kbBuild, btn: kbBtn } = require('../utils/keyboard');
 const { eos } = require('../utils/helpers');
+const { cacheGet, cacheSet } = require('../utils/cache');
+
+// ══════════════════════════════════════════════════════════
+// 🏆 ترتيب القروبات (Leaderboard) — أدوات مساعدة
+// ══════════════════════════════════════════════════════════
+const RANK_EMOJI = ['🥇', '🥈', '🥉', '4️⃣', '5️⃣', '6️⃣', '7️⃣', '8️⃣', '9️⃣', '🔟'];
+const MEMBER_COUNT_TTL = 10 * 60 * 1000; // 10 دقائق
+
+function fmtNum(n) {
+  return Number(n || 0).toLocaleString('en-US');
+}
+
+// عدد أعضاء القروب الحقيقي من تيليجرام (مع كاش لتجنّب تجاوز حدود الـ API)
+async function getMemberCount(ctx, chatId, force) {
+  const ck = 'grpmc_' + chatId;
+  if (!force) {
+    const cached = cacheGet(ck);
+    if (cached !== null) return cached;
+  }
+  try {
+    const cnt = await ctx.telegram.getChatMembersCount(chatId);
+    cacheSet(ck, cnt, MEMBER_COUNT_TTL);
+    return cnt;
+  } catch (_) {
+    return null;
+  }
+}
 
 async function migrateGroupPanel() {
   const cols = [
@@ -50,6 +77,7 @@ async function showGroupPanel(ctx) {
       const w  = g.welcome_enabled ? '✅' : '❌';
       rows.push([kbBtn(sp + ' ' + (g.title || 'قروب ' + g.chat_id).substring(0,30) + ' ' + w, 'gp_view_' + g.chat_id)]);
     });
+    rows.push([kbBtn('🏆 ترتيب القروبات (الأعضاء)', 'gp_leaderboard')]);
   }
 
   rows.push([
@@ -58,6 +86,61 @@ async function showGroupPanel(ctx) {
   ]);
   rows.push([kbBtn('◀️ رجوع', 'mg_menu')]);
 
+  return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
+}
+
+// ══════════════════════════════════════════════════════════
+// 🏆 ترتيب القروبات — الأكثر أعضاءً
+// ══════════════════════════════════════════════════════════
+async function showGroupsLeaderboard(ctx, opts = {}) {
+  const force = !!opts.refresh;
+
+  if (ctx.callbackQuery) {
+    await ctx.answerCbQuery(force ? '🔄 جاري التحديث...' : '⏳ جاري التحميل...').catch(() => {});
+  }
+
+  const groups = await all('SELECT chat_id, title FROM group_chats WHERE is_active=1').catch(() => []);
+
+  if (!groups.length) {
+    return eos(ctx, '📭 لا توجد قروبات نشطة بعد.', {
+      parse_mode: 'Markdown',
+      ...kbBuild([[kbBtn('◀️ رجوع', 'gp_panel')]]),
+    });
+  }
+
+  const results = await Promise.allSettled(groups.map(g => getMemberCount(ctx, g.chat_id, force)));
+
+  const ranked = groups
+    .map((g, i) => ({ ...g, count: results[i].status === 'fulfilled' ? results[i].value : null }))
+    .filter(g => g.count !== null)
+    .sort((a, b) => b.count - a.count);
+
+  if (!ranked.length) {
+    return eos(ctx, '⚠️ تعذّر جلب بيانات الأعضاء حالياً، حاول لاحقاً.', {
+      parse_mode: 'Markdown',
+      ...kbBuild([[kbBtn('🔄 إعادة المحاولة', 'gp_leaderboard_refresh')], [kbBtn('◀️ رجوع', 'gp_panel')]]),
+    });
+  }
+
+  const totalMembers = ranked.reduce((s, g) => s + g.count, 0);
+
+  let text = '🏆 *ترتيب القروبات*\n━━━━━━━━━━━━━━━━━━\n\n';
+  ranked.forEach((g, i) => {
+    const rank = RANK_EMOJI[i] || (i + 1) + '.';
+    const title = (g.title || 'قروب ' + g.chat_id).substring(0, 30);
+    text += rank + ' ' + title + '\n';
+    text += '👥 ' + fmtNum(g.count) + ' عضو\n\n';
+  });
+  text += '━━━━━━━━━━━━━━━━━━\n';
+  text += '📊 إجمالي الأعضاء عبر *' + ranked.length + '* قروب: *' + fmtNum(totalMembers) + '*';
+  if (ranked.length < groups.length) {
+    text += '\n⚠️ تعذّر جلب ' + (groups.length - ranked.length) + ' قروب (قد يكون البوت أُزيل منها)';
+  }
+
+  const rows = [
+    [kbBtn('🔄 تحديث', 'gp_leaderboard_refresh')],
+    [kbBtn('◀️ رجوع', 'gp_panel')],
+  ];
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
 
@@ -77,13 +160,14 @@ async function showGroupDetail(ctx, chatId) {
     }
   }
 
-  const [g, spec, mc, warns, bans, protSettings] = await Promise.all([
+  const [g, spec, mc, warns, bans, protSettings, tgCount] = await Promise.all([
     get('SELECT * FROM group_chats WHERE chat_id=$1', [chatId]),
     get('SELECT s.name FROM specialties s JOIN group_chats g ON g.specialty_id=s.id WHERE g.chat_id=$1', [chatId]).catch(() => null),
     get('SELECT COUNT(*) AS cnt FROM group_members WHERE chat_id=$1', [chatId]).catch(() => ({ cnt: 0 })),
     get('SELECT COUNT(*) AS cnt FROM group_warns WHERE chat_id=$1', [chatId]).catch(() => ({ cnt: 0 })),
     get('SELECT COUNT(*) AS cnt FROM group_bans WHERE chat_id=$1', [chatId]).catch(() => ({ cnt: 0 })),
     require('./group_protection').getSettings(chatId).catch(() => null),
+    getMemberCount(ctx, chatId),
   ]);
   if (!g) return ctx.answerCbQuery('غير موجود', { show_alert: true }).catch(() => {});
 
@@ -94,6 +178,7 @@ async function showGroupDetail(ctx, chatId) {
   text += '━━━━━━━━━━━━━━━━━━\n\n';
   text += '🆔 `' + chatId + '`\n';
   text += '🎓 التخصص: *' + (spec?.name || 'غير محدد') + '*\n';
+  if (tgCount !== null) text += '👥 إجمالي الأعضاء: *' + fmtNum(tgCount) + '*\n';
   text += '👤 الأعضاء المسجلون: *' + mc.cnt + '*\n';
   text += '⚠️ التحذيرات: *' + warns.cnt + '* | 🚫 المحظورون: *' + bans.cnt + '*\n\n';
   text += '━━━━━━━━━━━━━━━━━━\n';
@@ -142,6 +227,9 @@ async function handleCallback(ctx, data) {
   if (data === 'gp_panel') { const uid = ctx.uid || ctx.from?.id; const isOwner = uid === parseInt(process.env.OWNER_ID); return isOwner ? showGroupPanel(ctx) : showMyGroups(ctx); }
 
   if (data === 'gp_broadcast_sp') return showBroadcastSpecPicker(ctx);
+
+  if (data === 'gp_leaderboard')         return showGroupsLeaderboard(ctx);
+  if (data === 'gp_leaderboard_refresh') return showGroupsLeaderboard(ctx, { refresh: true });
 
   // ── تعديل قواعد القروب ──
   if (data.startsWith('gp_setrules_')) {
@@ -194,7 +282,7 @@ async function handleCallback(ctx, data) {
   if (data.startsWith('gp_setwelcome_')) {
     const chatId = data.replace('gp_setwelcome_', '');
     await require('../utils/stateManager').setState(uid, { type: 'gp_set_welcome', chatId });
-    return ctx.reply('✏️ ارسل نص رسالة الترحيب:\n\n📝 *المتغيرات المتاحة:*\n`{name}` الاسم | `{mention}` منشن\n`{id}` المعرف | `{spec}` التخصص\n`{date}` التاريخ | `{time}` الوقت\n`{count}` عدد الأعضاء | `{group}` اسم القروب\n\n_(او /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
+    return ctx.reply('✏️ ارسل نص رسالة الترحيب:\n\nالمتغيرات: {name} اسم العضو | {id} معرفه | {date} التاريخ\n\n_(او /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
   }
 
   if (data.startsWith('gp_setwphoto_')) {
@@ -241,7 +329,7 @@ async function handleText(ctx, text, state) {
       [state.chatId, text]
     ).catch(() => {});
     await require('../utils/stateManager').delState(ctx.uid);
-    await ctx.reply('✅ تم حفظ رسالة الترحيب!\n\n📝 *المتغيرات المتاحة:*\n`{name}` الاسم | `{mention}` منشن\n`{id}` المعرف | `{spec}` التخصص\n`{date}` التاريخ | `{time}` الوقت\n`{count}` عدد الأعضاء | `{group}` اسم القروب', { parse_mode: 'Markdown' }).catch(() => {});
+    await ctx.reply('✅ تم حفظ رسالة الترحيب!\n\n📝 المتغيرات:\n`{name}` الاسم | `{id}` المعرف\n`{spec}` التخصص | `{date}` التاريخ\n`{count}` عدد الأعضاء | `{group}` اسم القروب', { parse_mode: 'Markdown' }).catch(() => {});
     return showGroupDetail(ctx, state.chatId);
   }
   if (state.type === 'gp_broadcast_msg') {
@@ -436,4 +524,5 @@ async function showMyGroups(ctx) {
 }
 
 module.exports = {
-  showMyGroups, showMainMenu, showGroupPanel, handleCallback, handleText, handleMedia, migrateGroupPanel };
+  showMyGroups, showMainMenu, showGroupPanel, showGroupsLeaderboard,
+  handleCallback, handleText, handleMedia, migrateGroupPanel };

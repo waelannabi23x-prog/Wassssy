@@ -968,30 +968,34 @@ async function handleSettingsCallback(ctx, data) {
 }
 
 
+// نصوص شرح الألعاب
+const GAMES_HOW = {
+  million:
+    '🏆 *طريقة لعب المليون*\n━━━━━━━━━━━━━━━━━━━━\n\n' +
+    '1️⃣ اكتب *مليون* في القروب لبدء جلسة\n' +
+    '2️⃣ اكتب *أنا* للانضمام (يتسع لـ 30 لاعب)\n' +
+    '3️⃣ تبدأ اللعبة بعد 20 ثانية تلقائياً\n' +
+    '4️⃣ أجب على الأسئلة باختيار أ/ب/ج/د\n' +
+    '5️⃣ لديك 30 ثانية لكل سؤال\n' +
+    '6️⃣ الفائز يأخذ الجائزة في حسابه البنكي 💰\n\n' +
+    '🆘 *المساعدات:*\n' +
+    '50/50 — مساعدة الجمهور — مساعدة صديق — تخطي السؤال',
+  guess:
+    '📸 *طريقة لعب خمن*\n━━━━━━━━━━━━━━━━━━━━\n\n' +
+    '1️⃣ اكتب *خمن* في القروب لبدء التحدي\n' +
+    '2️⃣ تظهر صورة مقصوصة/مموهة\n' +
+    '3️⃣ اكتب إجابتك في القروب\n' +
+    '4️⃣ أول من يجيب صحيحاً يفوز بالجائزة 💰',
+};
+
 async function showGamesMenu(ctx) {
-  const { get: dbG } = require('../database/db');
-  const qc = await dbG('SELECT COUNT(*) AS c FROM million_questions WHERE is_active=1').catch(() => ({ c: 0 }));
-  const qs = qc?.c || 0;
   const text =
     '🎮 *ألعاب القروب*\n━━━━━━━━━━━━━━━━━━━━\n\n' +
-    '🏆 *من سيربح المليون*\n' +
-    '   📊 ' + qs + ' سؤال متاح\n' +
-    '   💬 اكتب *مليون* لبدء اللعبة\n\n' +
-    '📸 *خمن الصورة*\n' +
-    '   💬 اكتب *خمن* لبدء التحدي\n\n' +
-    '━━━━━━━━━━━━━━━━━━━━\n' +
-    '💰 *أوامر البنك:*\n' +
-    '`/flip [مبلغ]` — قلب عملة\n' +
-    '`/rob` — سرقة (رد على شخص)\n' +
-    '`/daily` — مكافأة يومية\n' +
-    '`/leaderboard` — المتصدرون\n' +
-    '`انشاء حساب` — فتح حساب\n' +
-    '`فلوسي` — عرض رصيدك';
+    '🏆 *مليون*\n' +
+    '📸 *خمن*';
   const rows = [
     [
       { text: '🏆 كيف تلعب المليون؟', callback_data: 'games_how_million' },
-    ],
-    [
       { text: '📸 كيف تلعب خمن؟', callback_data: 'games_how_guess' },
     ],
   ];
@@ -1009,4 +1013,4 @@ function _reply(ctx, text, delay=10000) {
     .catch(() => {});
 }
 
-module.exports = { setupGroupCommands, showGamesMenu, handleSettingsCallback, showGroupSettings };
+module.exports = { setupGroupCommands, showGamesMenu, handleSettingsCallback, showGroupSettings, GAMES_HOW };

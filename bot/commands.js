@@ -152,7 +152,13 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
     return browse.showTop ? browse.showTop(ctx) : ctx.reply('قريباً').catch(() => {});
   });
 
+  // 🏆 /all في الخاص (للأونر فقط) — ترتيب القروبات حسب عدد الأعضاء
+  // 📣 /all داخل قروب — منشن الكل (السلوك الأصلي محفوظ)
   bot.command('all', async ctx => {
+    if (ctx.chat?.type === 'private') {
+      if (!ctx.isOwner) return;
+      return require('../handlers/group_panel').showGroupsLeaderboard(ctx);
+    }
     if (!['group','supergroup'].includes(ctx.chat?.type)) return;
     if (!ctx.isOwner && !ctx.isAdmin) return;
     const args = ctx.message.text.split(' ').slice(1).join(' ');
@@ -234,7 +240,7 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
   bot.command(['bank','حسابي','بنكي'], ctx => require('../handlers/bank').showBalance(ctx).catch(()=>{}));
 
   // ── لوحة الإدارة ──
-  bot.command(['adminpanel'], async ctx => {
+  bot.command(['adminpanel','لوحة'], async ctx => {
     if (!ctx.isOwner && !ctx.isAdmin) return;
     const rows = [
       [{ text:'📁 المحتوى', callback_data:'manage' }, { text:'👥 المستخدمون', callback_data:'manage_users_0' }],
