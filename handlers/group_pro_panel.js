@@ -113,7 +113,6 @@ async function showHome(ctx, chatId) {
     [kbBtn('✅ التحقق من الأعضاء', 'gpx_verifycfg_' + chatId), kbBtn('🎭 الرتب والصلاحيات', 'gpx_roles_' + chatId)],
     [kbBtn('📋 السجلات', 'gpx_logs_' + chatId), kbBtn('📊 الإحصائيات', 'gpx_stats_' + chatId)],
     [kbBtn('🤖 تحليل ذكي (AI)', 'gpx_aisummary_' + chatId)],
-    [kbBtn('◀️ رجوع للوحة القروب', 'gp_view_' + chatId)],
   ];
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
