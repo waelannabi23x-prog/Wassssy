@@ -337,16 +337,17 @@ async function registerMembers(ctx, chatId) {
 
 async function tagAll(ctx, chatId, customMessage) {
   try {
-    ctx.answerCbQuery('⏳ جاري المنشن…').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    // انتبه: answerCbQuery تشتغل فقط من callback_query
+    if (ctx.callbackQuery) ctx.answerCbQuery('⏳ جاري المنشن…').catch(() => {});
 
     const members = await all(
-      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 LIMIT 100',
+      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1',
       [chatId]
     ).catch(() => []);
 
     if (!members.length) {
-      return ctx.answerCbQuery('📭 لا يوجد أعضاء مسجلون', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+      if (ctx.callbackQuery) return ctx.answerCbQuery('📭 لا يوجد أعضاء مسجلون', { show_alert: true }).catch(() => {});
+      return ctx.reply('\ud83d\udce2 \u0644\u0627 \u064a\u0648\u062c\u062f \u0623\u0639\u0636\u0627\u0621 \u0645\u0633\u062c\u0644\u0648\u0646. \u0627\u0633\u062a\u062e\u062f\u0645 /register \u0623\u0648\u0644\u0627\u064b').catch(() => {});
     }
 
     const header = customMessage

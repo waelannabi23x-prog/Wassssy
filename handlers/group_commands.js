@@ -600,6 +600,38 @@ function setupGroupCommands(bot) {
   });
 
   // ══════════════════════════════════════════
+  // 🗑 /del100 و /del200 — حذف آخر N رسالة
+  // ══════════════════════════════════════════
+  async function deleteLast(ctx, count) {
+    if (!isGroup(ctx)) return;
+    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    delCmd(ctx);
+    const lastId = ctx.message.message_id;
+    const m = await ctx.reply('🗑 جاري حذف ' + count + ' رسالة...').catch(() => null);
+    let deleted = 0;
+    for (let i = lastId - 1; i >= lastId - count && i > 0; i--) {
+      try { await ctx.telegram.deleteMessage(ctx.chat.id, i); deleted++; } catch(_) {}
+      if (deleted % 15 === 0) await new Promise(r => setTimeout(r, 300));
+    }
+    if (m) ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {});
+    const done = await ctx.reply('✅ تم حذف ' + deleted + ' رسالة').catch(() => null);
+    if (done) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, done.message_id).catch(() => {}), 4000);
+  }
+
+  bot.command(['del100', 'مسح100', 'clear100'], ctx => deleteLast(ctx, 100));
+  bot.command(['del200', 'مسح200', 'clear200'], ctx => deleteLast(ctx, 200));
+  bot.command(['del50',  'مسح50',  'clear50'],  ctx => deleteLast(ctx, 50));
+
+  // /purge N — حذف عدد محدد (بدون reply)
+  bot.command(['clear', 'cls'], async ctx => {
+    if (!isGroup(ctx)) return;
+    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
+    const n = parseInt(ctx.message.text.split(' ')[1]) || 50;
+    if (n > 200) return ctx.reply('⚠️ الحد الأقصى 200 رسالة').catch(() => {});
+    await deleteLast(ctx, Math.min(n, 200));
+  });
+
+  // ══════════════════════════════════════════
   // 🗑 /del — حذف رسالة واحدة (رد عليها)
   // ══════════════════════════════════════════
   bot.command(["del", "حذف"], async ctx => {
