@@ -600,58 +600,6 @@ function setupGroupCommands(bot) {
   });
 
   // ══════════════════════════════════════════
-  // 🗑 /del100 و /del200 — حذف آخر N رسالة
-  // ══════════════════════════════════════════
-  async function deleteLast(ctx, count) {
-    if (!isGroup(ctx)) return;
-    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
-
-    // تحقق أن البوت أدمن مع صلاحية حذف
-    const botMember = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo?.id).catch(() => null);
-    if (!botMember || botMember.status !== 'administrator' || !botMember.can_delete_messages) {
-      return ctx.reply('⚠️ البوت يحتاج صلاحية *حذف الرسائل* كمشرف!', { parse_mode: 'Markdown' }).catch(() => {});
-    }
-
-    const lastId = ctx.message.message_id;
-    delCmd(ctx);
-    const m = await ctx.reply('🗑 جاري حذف ' + count + ' رسالة...').catch(() => null);
-    let deleted = 0, failed = 0;
-
-    // حذف بالـ batch (deleteMessages يدعم حتى 100 ID دفعة واحدة)
-    const ids = [];
-    for (let i = lastId - 1; i >= Math.max(1, lastId - count); i--) ids.push(i);
-
-    for (let i = 0; i < ids.length; i += 50) {
-      const batch = ids.slice(i, i + 50);
-      const results = await Promise.allSettled(
-        batch.map(id => ctx.telegram.deleteMessage(ctx.chat.id, id))
-      );
-      results.forEach(r => r.status === 'fulfilled' ? deleted++ : failed++);
-      if (i + 50 < ids.length) await new Promise(r => setTimeout(r, 500));
-      if (m) ctx.telegram.editMessageText(ctx.chat.id, m.message_id, null,
-        '🗑 جاري الحذف... ' + (deleted + failed) + '/' + ids.length
-      ).catch(() => {});
-    }
-
-    if (m) ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {});
-    const done = await ctx.reply('✅ تم حذف *' + deleted + '* رسالة' + (failed ? ' (فشل ' + failed + ')' : ''), { parse_mode: 'Markdown' }).catch(() => null);
-    if (done) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, done.message_id).catch(() => {}), 5000);
-  }
-
-  bot.command(['del100', 'مسح100', 'clear100'], ctx => deleteLast(ctx, 100));
-  bot.command(['del200', 'مسح200', 'clear200'], ctx => deleteLast(ctx, 200));
-  bot.command(['del50',  'مسح50',  'clear50'],  ctx => deleteLast(ctx, 50));
-
-  // /purge N — حذف عدد محدد (بدون reply)
-  bot.command(['clear', 'cls'], async ctx => {
-    if (!isGroup(ctx)) return;
-    if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
-    const n = parseInt(ctx.message.text.split(' ')[1]) || 50;
-    if (n > 200) return ctx.reply('⚠️ الحد الأقصى 200 رسالة').catch(() => {});
-    await deleteLast(ctx, Math.min(n, 200));
-  });
-
-  // ══════════════════════════════════════════
   // 🗑 /del — حذف رسالة واحدة (رد عليها)
   // ══════════════════════════════════════════
   bot.command(["del", "حذف"], async ctx => {
@@ -1020,34 +968,30 @@ async function handleSettingsCallback(ctx, data) {
 }
 
 
-// نصوص شرح الألعاب
-const GAMES_HOW = {
-  million:
-    '🏆 *طريقة لعب المليون*\n━━━━━━━━━━━━━━━━━━━━\n\n' +
-    '1️⃣ اكتب *مليون* في القروب لبدء جلسة\n' +
-    '2️⃣ اكتب *أنا* للانضمام (يتسع لـ 30 لاعب)\n' +
-    '3️⃣ تبدأ اللعبة بعد 20 ثانية تلقائياً\n' +
-    '4️⃣ أجب على الأسئلة باختيار أ/ب/ج/د\n' +
-    '5️⃣ لديك 30 ثانية لكل سؤال\n' +
-    '6️⃣ الفائز يأخذ الجائزة في حسابه البنكي 💰\n\n' +
-    '🆘 *المساعدات:*\n' +
-    '50/50 — مساعدة الجمهور — مساعدة صديق — تخطي السؤال',
-  guess:
-    '📸 *طريقة لعب خمن*\n━━━━━━━━━━━━━━━━━━━━\n\n' +
-    '1️⃣ اكتب *خمن* في القروب لبدء التحدي\n' +
-    '2️⃣ تظهر صورة مقصوصة/مموهة\n' +
-    '3️⃣ اكتب إجابتك في القروب\n' +
-    '4️⃣ أول من يجيب صحيحاً يفوز بالجائزة 💰',
-};
-
 async function showGamesMenu(ctx) {
+  const { get: dbG } = require('../database/db');
+  const qc = await dbG('SELECT COUNT(*) AS c FROM million_questions WHERE is_active=1').catch(() => ({ c: 0 }));
+  const qs = qc?.c || 0;
   const text =
     '🎮 *ألعاب القروب*\n━━━━━━━━━━━━━━━━━━━━\n\n' +
-    '🏆 *مليون*\n' +
-    '📸 *خمن*';
+    '🏆 *من سيربح المليون*\n' +
+    '   📊 ' + qs + ' سؤال متاح\n' +
+    '   💬 اكتب *مليون* لبدء اللعبة\n\n' +
+    '📸 *خمن الصورة*\n' +
+    '   💬 اكتب *خمن* لبدء التحدي\n\n' +
+    '━━━━━━━━━━━━━━━━━━━━\n' +
+    '💰 *أوامر البنك:*\n' +
+    '`/flip [مبلغ]` — قلب عملة\n' +
+    '`/rob` — سرقة (رد على شخص)\n' +
+    '`/daily` — مكافأة يومية\n' +
+    '`/leaderboard` — المتصدرون\n' +
+    '`انشاء حساب` — فتح حساب\n' +
+    '`فلوسي` — عرض رصيدك';
   const rows = [
     [
       { text: '🏆 كيف تلعب المليون؟', callback_data: 'games_how_million' },
+    ],
+    [
       { text: '📸 كيف تلعب خمن؟', callback_data: 'games_how_guess' },
     ],
   ];
@@ -1065,4 +1009,7 @@ function _reply(ctx, text, delay=10000) {
     .catch(() => {});
 }
 
-module.exports = { setupGroupCommands, showGamesMenu, handleSettingsCallback, showGroupSettings, GAMES_HOW };
+module.exports = {
+  setupGroupCommands, showGamesMenu, handleSettingsCallback, showGroupSettings,
+  getTarget, parseDuration, isTgAdmin, _reply, delCmd,
+};

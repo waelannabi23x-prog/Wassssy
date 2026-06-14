@@ -329,6 +329,7 @@ registerCallbacks(bot, {
 // ── Messages ──
 setupGroupCommands(bot);
 require('./handlers/group_commands_pro').setupProCommands(bot);
+require('./handlers/group_commands_ar').setupArabicModCommands(bot);
 
 const { registerMessages } = require('./bot/messages');
 registerMessages(bot, {
