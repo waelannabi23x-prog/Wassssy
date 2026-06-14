@@ -337,7 +337,6 @@ async function registerMembers(ctx, chatId) {
 
 async function tagAll(ctx, chatId, customMessage) {
   try {
-    // انتبه: answerCbQuery تشتغل فقط من callback_query
     if (ctx.callbackQuery) ctx.answerCbQuery('⏳ جاري المنشن…').catch(() => {});
 
     const members = await all(
@@ -347,30 +346,73 @@ async function tagAll(ctx, chatId, customMessage) {
 
     if (!members.length) {
       if (ctx.callbackQuery) return ctx.answerCbQuery('📭 لا يوجد أعضاء مسجلون', { show_alert: true }).catch(() => {});
-      return ctx.reply('\ud83d\udce2 \u0644\u0627 \u064a\u0648\u062c\u062f \u0623\u0639\u0636\u0627\u0621 \u0645\u0633\u062c\u0644\u0648\u0646. \u0627\u0633\u062a\u062e\u062f\u0645 /register \u0623\u0648\u0644\u0627\u064b').catch(() => {});
+      return ctx.reply('📢 لا يوجد أعضاء مسجلون. استخدم /register أولاً').catch(() => {});
     }
 
-    const header = customMessage
-      ? `📢 *${customMessage}*\n\n`
-      : '👋 *تنبيه لجميع الأعضاء*\n\n';
+    const total = members.length;
+    const CHUNK = 20; // 20 mention per message to stay safe
 
-    // كل chunk = 25 عضو للبقاء ضمن حد الرسالة (~1024 حرف)
-    const CHUNK = 25;
-    let first = true;
+    // رسالة البداية مع العدد
+    const header = customMessage ? '\ud83d\udce2 *' + customMessage + '*\n\n' : '';
+    const startMsg = await ctx.reply(
+      (header || '\ud83d\udc4b *\u0645\u0646\u0634\u0646 \u0627\u0644\u0643\u0644*\n\n') + '\u23f3 \u062c\u0627\u0631\u064a \u0645\u0646\u0634\u0646 *' + total + '* \u0639\u0636\u0648...',
+      { parse_mode: 'Markdown' }
+    ).catch(() => null);
+
+    let sent = 0;
+    let retries = 0;
+
     for (let i = 0; i < members.length; i += CHUNK) {
-      const chunk    = members.slice(i, i + CHUNK);
+      const chunk = members.slice(i, i + CHUNK);
       const mentions = chunk
-        .map(m => `[${(m.first_name || '👤').substring(0, 15)}](tg://user?id=${m.user_id})`)
+        .map(m => '[' + (m.first_name || '👤').replace(/[[\]()]/g, '').substring(0, 12) + '](tg://user?id=' + m.user_id + ')')
         .join(' ');
 
-      await ctx.reply((first ? header : '') + mentions, {
-        parse_mode:               'Markdown',
-        disable_web_page_preview: true,
-      }).catch(() => null);
+      let ok = false;
+      while (!ok && retries < 3) {
+        try {
+          await ctx.reply(mentions, {
+            parse_mode: 'Markdown',
+            disable_web_page_preview: true,
+          });
+          ok = true;
+          sent += chunk.length;
+          retries = 0;
+        } catch(e) {
+          if (e.message?.includes('429') || e.message?.includes('Too Many')) {
+            // استخرج وقت الانتظار من الخطأ
+            const wait = parseInt(e.message.match(/retry after (\d+)/i)?.[1] || '5');
+            await sleep((wait + 1) * 1000);
+            retries++;
+          } else {
+            ok = true; // خطأ آخر — تجاوز
+          }
+        }
+      }
 
-      first = false;
-      if (i + CHUNK < members.length) await sleep(1200); // Telegram flood wait
+      // تحديث رسالة الحالة كل 5 chunks
+      if (startMsg && i % (CHUNK * 5) === 0 && sent < total) {
+        ctx.telegram.editMessageText(
+          chatId, startMsg.message_id, null,
+          (header || '\ud83d\udc4b *\u0645\u0646\u0634\u0646 \u0627\u0644\u0643\u0644*\n\n') + '\u23f3 *' + sent + '/' + total + '* \u0639\u0636\u0648 \u062a\u0645 \u0645\u0646\u0634\u0646\u0647\u0645...',
+          { parse_mode: 'Markdown' }
+        ).catch(() => {});
+      }
+
+      // انتظر 1.5 ثانية بين كل رسالة لتجنب الـ flood
+      if (i + CHUNK < members.length) await sleep(1500);
     }
+
+    // تحديث نهائي
+    if (startMsg) {
+      ctx.telegram.editMessageText(
+        chatId, startMsg.message_id, null,
+        (header || '') + '\u2705 \u062a\u0645 \u0645\u0646\u0634\u0646 *' + sent + '* \u0639\u0636\u0648',
+        { parse_mode: 'Markdown' }
+      ).catch(() => {});
+      setTimeout(() => ctx.telegram.deleteMessage(chatId, startMsg.message_id).catch(() => {}), 10000);
+    }
+
   } catch (e) {
     console.error('[tagAll]', e.message);
   }
