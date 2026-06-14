@@ -76,7 +76,10 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
     return manage.handleCallback(ctx, 'mg_done');
   });
 
-  bot.command('mygroups', ctx => require('../handlers/group_panel').showMyGroups(ctx));
+  bot.command('mygroups', ctx => {
+    if (ctx.chat?.type !== 'private') return ctx.deleteMessage().catch(()=>{});
+    return require('../handlers/group_panel').showMyGroups(ctx);
+  });
 
   bot.command('syncgroups', async ctx => {
     if (!ctx.isOwner) return;
