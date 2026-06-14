@@ -196,7 +196,15 @@ function setupProCommands(bot) {
       actorId: ctx.from.id, actorName: ctx.from.first_name || '',
       details: (unlock ? '🔓 فتح ' : '🔒 قفل ') + (proPanel.LOCK_LABELS[type] || type),
     }).catch(() => {});
-    tempReply(ctx, (unlock ? '🔓 تم فتح: ' : '🔒 تم قفل: ') + (proPanel.LOCK_LABELS[type] || type));
+
+    let msg = (unlock ? '🔓 تم فتح: ' : '🔒 تم قفل: ') + (proPanel.LOCK_LABELS[type] || type);
+    if (protection.PERMISSION_LOCK_MAP[type]) {
+      const res = await protection.applyLockPermissions(ctx, ctx.chat.id);
+      msg += res.ok
+        ? (unlock ? '\n✅ فُتح على مستوى تيليجرام' : '\n✅ قُفل على مستوى تيليجرام')
+        : '\n⚠️ تم في البوت فقط — أعط البوت صلاحية "تقييد الأعضاء" لتطبيق ذلك على تيليجرام مباشرة.';
+    }
+    tempReply(ctx, msg, {}, 8000);
     delCmd(ctx);
   };
   bot.command('lock', lockHandler(false));

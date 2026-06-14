@@ -244,12 +244,81 @@ function checkLocks(msg, locks) {
   if (locks.sticker && msg.sticker) return 'lock_sticker';
   if (locks.gif && msg.animation) return 'lock_gif';
   if (locks.photo && msg.photo) return 'lock_photo';
-  if (locks.video && msg.video) return 'lock_video';
+  if (locks.video && (msg.video || msg.video_note)) return 'lock_video';
   if (locks.voice && (msg.voice || msg.audio)) return 'lock_voice';
   if (locks.poll && msg.poll) return 'lock_poll';
   if (locks.forward && (msg.forward_date || msg.forward_from)) return 'lock_forward';
   if (locks.link && msg.text && /https?:\/\/|t\.me\/|@\w{4,}/i.test(msg.text)) return 'lock_link';
   return null;
+}
+
+// ══════════════════════════════════════════════════════════
+// 🔐 ربط الأقفال بصلاحيات تيليجرام الفعلية (setChatPermissions)
+// ──────────────────────────────────────────────────────────
+// عند تفعيل قفل (مثل 🖼 الصور)، يُمنع الأعضاء من إرسالها على
+// مستوى تيليجرام نفسه — وليس فقط حذفها بعد الإرسال.
+// ⚠️ ملاحظة من تيليجرام: الملصقات والصور المتحركة يتشاركان
+// نفس الصلاحية (can_send_other_messages)، والروابط/التوجيه
+// ليس لهما صلاحية مباشرة في تيليجرام (يبقيان حذفاً فورياً من البوت).
+// ══════════════════════════════════════════════════════════
+const PERMISSION_LOCK_MAP = {
+  photo:   ['can_send_photos'],
+  video:   ['can_send_videos', 'can_send_video_notes'],
+  voice:   ['can_send_voice_notes', 'can_send_audios'],
+  poll:    ['can_send_polls'],
+  sticker: ['can_send_other_messages'],
+  gif:     ['can_send_other_messages'],
+};
+
+const PERMISSION_FIELDS = [
+  'can_send_messages', 'can_send_audios', 'can_send_documents', 'can_send_photos',
+  'can_send_videos', 'can_send_video_notes', 'can_send_voice_notes', 'can_send_polls',
+  'can_send_other_messages', 'can_add_web_page_previews', 'can_change_info',
+  'can_invite_users', 'can_pin_messages', 'can_manage_topics',
+];
+
+const MEDIA_FALLBACK_FIELDS = ['can_send_audios', 'can_send_documents', 'can_send_photos', 'can_send_videos', 'can_send_video_notes', 'can_send_voice_notes'];
+
+// يحوّل permissions القادمة من getChat إلى مجموعة حقول حديثة موحّدة
+function pickPermissions(perm) {
+  const out = {};
+  for (const f of PERMISSION_FIELDS) {
+    if (perm && typeof perm[f] === 'boolean') { out[f] = perm[f]; continue; }
+    if (perm && typeof perm.can_send_media_messages === 'boolean' && MEDIA_FALLBACK_FIELDS.includes(f)) { out[f] = perm.can_send_media_messages; continue; }
+    out[f] = true; // افتراضي مسموح
+  }
+  return out;
+}
+
+// يطبّق الأقفال الحالية للقروب كصلاحيات فعلية على تيليجرام
+async function applyLockPermissions(ctx, chatId) {
+  const locks = await db.getLocks(chatId);
+  let chat;
+  try { chat = await ctx.telegram.getChat(chatId); }
+  catch (e) { return { ok: false, error: e.message }; }
+
+  const merged = pickPermissions(chat.permissions);
+
+  // 1) أي قفل مفعّل → أقفل صلاحياته
+  for (const [lockType, permKeys] of Object.entries(PERMISSION_LOCK_MAP)) {
+    if (!locks[lockType]) continue;
+    for (const pk of permKeys) merged[pk] = false;
+  }
+  // 2) أي قفل معطّل → أعد فتح صلاحياته فقط إن لم يشاركه قفل آخر مفعّل
+  for (const [lockType, permKeys] of Object.entries(PERMISSION_LOCK_MAP)) {
+    if (locks[lockType]) continue;
+    for (const pk of permKeys) {
+      const sharers = Object.entries(PERMISSION_LOCK_MAP).filter(([, pks]) => pks.includes(pk)).map(([lt]) => lt);
+      if (!sharers.some(lt => locks[lt])) merged[pk] = true;
+    }
+  }
+
+  try {
+    await ctx.telegram.setChatPermissions(chatId, merged);
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, error: e.message };
+  }
 }
 
 function anyProtectionEnabled(s) {
@@ -361,6 +430,19 @@ async function handleViolation(ctx, chatId, uid, type, settings) {
 }
 
 // ══════════════════════════════════════════════════════════
+// 🔒 محتوى مقفول — حذف فوري وصامت (بدون إنذار أو سلّم عقوبات)
+// ══════════════════════════════════════════════════════════
+async function handleLockDelete(ctx, chatId, uid, type) {
+  await ctx.deleteMessage().catch(() => {});
+  try {
+    await require('./group_logs').logAction({ telegram: ctx.telegram }, chatId, 'lock_delete', {
+      targetId: uid, targetName: ctx.from?.first_name || '',
+      details: '🔒 ' + violationLabel(type) + ' — حذف تلقائي',
+    });
+  } catch (_) {}
+}
+
+// ══════════════════════════════════════════════════════════
 // 🚀 الفحص الرئيسي — رسائل عادية
 // ══════════════════════════════════════════════════════════
 async function runProtection(ctx) {
@@ -380,9 +462,16 @@ async function runProtection(ctx) {
   const now = Date.now();
   const key = chatId + '_' + uid;
 
-  let violation = null;
-  if (anyLock) violation = checkLocks(ctx.message, locks);
-  if (!violation) violation = checkFlood(key, now, settings);
+  // 🔒 الأقفال أولاً — حذف فوري وصامت، لا تُحسب كمخالفة ولا تدخل سلّم العقوبات
+  if (anyLock) {
+    const lockHit = checkLocks(ctx.message, locks);
+    if (lockHit) {
+      await handleLockDelete(ctx, chatId, uid, lockHit);
+      return true;
+    }
+  }
+
+  let violation = checkFlood(key, now, settings);
   if (!violation) violation = checkDuplicate(key, txt, now, settings);
   if (!violation) violation = checkCrossSpam(chatId, uid, txt, now, settings);
   if (!violation) violation = checkSpamPattern(txt, settings);
@@ -507,4 +596,5 @@ module.exports = {
   runProtection, checkEdited, checkNewChatMembers,
   resolveAction, actionLabel, violationLabel,
   VIOLATION_LABELS, SPAM_PATTERNS,
+  PERMISSION_LOCK_MAP, applyLockPermissions, handleLockDelete,
 };

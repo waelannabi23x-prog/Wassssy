@@ -113,6 +113,7 @@ async function showHome(ctx, chatId) {
     [kbBtn('✅ التحقق من الأعضاء', 'gpx_verifycfg_' + chatId), kbBtn('🎭 الرتب والصلاحيات', 'gpx_roles_' + chatId)],
     [kbBtn('📋 السجلات', 'gpx_logs_' + chatId), kbBtn('📊 الإحصائيات', 'gpx_stats_' + chatId)],
     [kbBtn('🤖 تحليل ذكي (AI)', 'gpx_aisummary_' + chatId)],
+    [kbBtn('◀️ رجوع للوحة القروب', 'gp_view_' + chatId)],
   ];
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
@@ -183,7 +184,10 @@ async function promptAdv(ctx, chatId, field) {
 // ══════════════════════════════════════════════════════════
 async function showLocks(ctx, chatId) {
   const locks = await protection.getLocksCached(chatId);
-  let text = '🔒 *أقفال الوسائط*\n━━━━━━━━━━━━━━━━━━\n\n_عند التفعيل، يُحذف هذا النوع من المحتوى فوراً من غير المشرفين._';
+  let text = '🔒 *أقفال الوسائط*\n━━━━━━━━━━━━━━━━━━\n\n';
+  text += '_عند التفعيل، يُمنع الأعضاء (غير المشرفين) من إرسال هذا النوع نهائياً._\n\n';
+  text += '⚠️ الملصقات 🎭 والصور المتحركة 🎞 يتشاركان نفس قفل تيليجرام (قفل أحدهما يقفل الآخر تلقائياً).\n';
+  text += '⚠️ الروابط 🔗 وإعادة التوجيه ↪️: تيليجرام لا يوفّر قفلاً مباشراً لهما، فيُحذف المحتوى فوراً بواسطة البوت.';
   const rows = db.LOCK_TYPES.map(t => [kbBtn((locks[t] ? '🔒 ' : '🔓 ') + LOCK_LABELS[t], 'gpx_locktog_' + t + '_' + chatId)]);
   rows.push([kbBtn('◀️ رجوع', 'gpx_home_' + chatId)]);
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
@@ -201,7 +205,21 @@ async function toggleLock(ctx, chatId, type) {
     details: (newVal ? '🔒 قفل ' : '🔓 فتح ') + (LOCK_LABELS[type] || type),
   }).catch(() => {});
 
-  ctx.answerCbQuery(newVal ? '🔒 تم القفل' : '🔓 تم الفتح').catch(() => {});
+  let toast = newVal ? '🔒 تم القفل' : '🔓 تم الفتح';
+  let alertMode = false;
+  if (protection.PERMISSION_LOCK_MAP[type]) {
+    const res = await protection.applyLockPermissions(ctx, chatId);
+    if (res.ok) {
+      toast = newVal ? '🔒 قُفل على مستوى تيليجرام' : '🔓 فُتح على مستوى تيليجرام';
+    } else {
+      alertMode = true;
+      toast = newVal
+        ? '🔒 تم تفعيل القفل في البوت (حذف فوري).\nلتطبيق القفل الكامل من تيليجرام: أعط البوت صلاحية "تقييد الأعضاء".'
+        : '🔓 تم تعطيل القفل في البوت.\nلتطبيق الفتح على مستوى تيليجرام: أعط البوت صلاحية "تقييد الأعضاء".';
+    }
+  }
+
+  ctx.answerCbQuery(toast, alertMode ? { show_alert: true } : undefined).catch(() => {});
   return showLocks(ctx, chatId);
 }
 

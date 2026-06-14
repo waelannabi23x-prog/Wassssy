@@ -16,6 +16,10 @@
  *   تثبيت                 — تثبيت الرسالة المردود عليها
  *   فك تثبيت / إلغاء تثبيت  — إلغاء تثبيت كل الرسائل
  *
+ *   رتبة + / رتبة -        — ترقية/تخفيض رتبة العضو درجة واحدة
+ *                            (في سلسلة: مدير ⇄ مشرف عام ⇄ مشرف حماية
+ *                             ⇄ مشرف محتوى ⇄ مساعد إداري ⇄ بلا رتبة)
+ *
  * كل أمر يتحقق من صلاحية الرتبة عبر group_roles (hasPerm) —
  * يشمل: مدير، مشرف عام، مشرف حماية، مشرف محتوى، مساعد إداري —
  * بالإضافة لمشرفي تيليجرام والمالك تلقائياً.
@@ -24,8 +28,9 @@
  */
 
 const { warnMember, showWarns, clearWarns, banMember, unbanMember, muteMember, unmuteMember } = require('./group_admin');
-const { getTarget, parseDuration, _reply, delCmd } = require('./group_commands');
+const { getTarget, parseDuration, isTgAdmin, _reply, delCmd } = require('./group_commands');
 const roles = require('./group_roles');
+const rolesDb = require('../database/group_pro_db');
 const logsMod = require('./group_logs');
 
 function isGroup(ctx) { return ['group', 'supergroup'].includes(ctx.chat?.type); }
@@ -223,6 +228,58 @@ function setupArabicModCommands(bot) {
       _reply(ctx, '✅ تم إلغاء تثبيت كل الرسائل.', 5000);
       log(ctx, 'unpin', null, '');
     } catch (e) { _reply(ctx, '❌ ' + e.message, 5000); }
+  });
+
+  // ══════════════════════════════════════════
+  // ⬆️ رتبة + — ترقية درجة واحدة
+  // ══════════════════════════════════════════
+  bot.hears(/^رتب[ةه]\s*\+$/, async ctx => {
+    if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
+    const target = await getTarget(ctx);
+    delCmd(ctx);
+    if (!target) return _reply(ctx, '⚠️ رُد على رسالة العضو ثم اكتب «رتبة +».', 6000);
+
+    const chain = roles.ROLE_ORDER; // [manager, super_admin, protection_admin, content_admin, assistant]
+    const current = await rolesDb.getRole(ctx.chat.id, target.id);
+    const idx = current ? chain.indexOf(current) : chain.length;
+
+    if (idx <= 0) {
+      return _reply(ctx, '⚠️ *' + target.name + '* في أعلى رتبة بالفعل (' + roles.roleLabel(current) + ').', 6000);
+    }
+
+    const newRole = chain[idx - 1];
+    await rolesDb.setRole(ctx.chat.id, target.id, newRole, ctx.from.id);
+    roles.clearRoleCache(ctx.chat.id, target.id);
+    log(ctx, 'role_change', target, '⬆️ ترقية إلى ' + roles.roleLabel(newRole));
+    _reply(ctx, '⬆️ تمت ترقية *' + target.name + '* إلى *' + roles.roleLabel(newRole) + '*', 8000);
+  });
+
+  // ══════════════════════════════════════════
+  // ⬇️ رتبة - — تخفيض درجة واحدة
+  // ══════════════════════════════════════════
+  bot.hears(/^رتب[ةه]\s*-$/, async ctx => {
+    if (!isGroup(ctx) || !(await isTgAdmin(ctx))) return;
+    const target = await getTarget(ctx);
+    delCmd(ctx);
+    if (!target) return _reply(ctx, '⚠️ رُد على رسالة العضو ثم اكتب «رتبة -».', 6000);
+
+    const chain = roles.ROLE_ORDER;
+    const current = await rolesDb.getRole(ctx.chat.id, target.id);
+    if (!current) return _reply(ctx, '⚠️ *' + target.name + '* لا يملك رتبة لتُخفّض.', 6000);
+
+    const idx = chain.indexOf(current);
+    if (idx === chain.length - 1) {
+      await rolesDb.removeRole(ctx.chat.id, target.id);
+      roles.clearRoleCache(ctx.chat.id, target.id);
+      log(ctx, 'role_change', target, '⬇️ إزالة الرتبة (' + roles.roleLabel(current) + ')');
+      return _reply(ctx, '⬇️ تمت إزالة رتبة *' + target.name + '* (' + roles.roleLabel(current) + ').', 8000);
+    }
+
+    const newRole = chain[idx + 1];
+    await rolesDb.setRole(ctx.chat.id, target.id, newRole, ctx.from.id);
+    roles.clearRoleCache(ctx.chat.id, target.id);
+    log(ctx, 'role_change', target, '⬇️ تخفيض إلى ' + roles.roleLabel(newRole));
+    _reply(ctx, '⬇️ تم تخفيض *' + target.name + '* إلى *' + roles.roleLabel(newRole) + '*', 8000);
   });
 }
 
