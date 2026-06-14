@@ -605,17 +605,37 @@ function setupGroupCommands(bot) {
   async function deleteLast(ctx, count) {
     if (!isGroup(ctx)) return;
     if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
-    delCmd(ctx);
-    const lastId = ctx.message.message_id;
-    const m = await ctx.reply('🗑 جاري حذف ' + count + ' رسالة...').catch(() => null);
-    let deleted = 0;
-    for (let i = lastId - 1; i >= lastId - count && i > 0; i--) {
-      try { await ctx.telegram.deleteMessage(ctx.chat.id, i); deleted++; } catch(_) {}
-      if (deleted % 15 === 0) await new Promise(r => setTimeout(r, 300));
+
+    // تحقق أن البوت أدمن مع صلاحية حذف
+    const botMember = await ctx.telegram.getChatMember(ctx.chat.id, ctx.botInfo?.id).catch(() => null);
+    if (!botMember || botMember.status !== 'administrator' || !botMember.can_delete_messages) {
+      return ctx.reply('⚠️ البوت يحتاج صلاحية *حذف الرسائل* كمشرف!', { parse_mode: 'Markdown' }).catch(() => {});
     }
+
+    const lastId = ctx.message.message_id;
+    delCmd(ctx);
+    const m = await ctx.reply('🗑 جاري حذف ' + count + ' رسالة...').catch(() => null);
+    let deleted = 0, failed = 0;
+
+    // حذف بالـ batch (deleteMessages يدعم حتى 100 ID دفعة واحدة)
+    const ids = [];
+    for (let i = lastId - 1; i >= Math.max(1, lastId - count); i--) ids.push(i);
+
+    for (let i = 0; i < ids.length; i += 50) {
+      const batch = ids.slice(i, i + 50);
+      const results = await Promise.allSettled(
+        batch.map(id => ctx.telegram.deleteMessage(ctx.chat.id, id))
+      );
+      results.forEach(r => r.status === 'fulfilled' ? deleted++ : failed++);
+      if (i + 50 < ids.length) await new Promise(r => setTimeout(r, 500));
+      if (m) ctx.telegram.editMessageText(ctx.chat.id, m.message_id, null,
+        '🗑 جاري الحذف... ' + (deleted + failed) + '/' + ids.length
+      ).catch(() => {});
+    }
+
     if (m) ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {});
-    const done = await ctx.reply('✅ تم حذف ' + deleted + ' رسالة').catch(() => null);
-    if (done) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, done.message_id).catch(() => {}), 4000);
+    const done = await ctx.reply('✅ تم حذف *' + deleted + '* رسالة' + (failed ? ' (فشل ' + failed + ')' : ''), { parse_mode: 'Markdown' }).catch(() => null);
+    if (done) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, done.message_id).catch(() => {}), 5000);
   }
 
   bot.command(['del100', 'مسح100', 'clear100'], ctx => deleteLast(ctx, 100));

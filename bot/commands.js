@@ -41,9 +41,23 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
   bot.command('start', async ctx => {
     if (['group','supergroup'].includes(ctx.chat?.type)) {
       const un = ctx.botInfo?.username || '';
-      return ctx.reply('👋 مرحباً! للوصول للميزات:', {
-        reply_markup: { inline_keyboard: [[{ text: '🎓 فتح البوت', url: 'https://t.me/' + un }]] }
-      }).catch(() => {});
+      const name = ctx.from?.first_name || '';
+      ctx.deleteMessage().catch(()=>{});
+      const m = await ctx.reply(
+        '👋 أهلاً *' + name + '*!\n\n' +
+        '🎓 أنا *Taline AI* — منصة الطلاب الجزائريين\n' +
+        '📚 ملفات دراسية | 🤖 ذكاء اصطناعي | 🎮 ألعاب | 🏦 بنك\n\n' +
+        '👇 افتحني في الخاص للوصول لكل الميزات:',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: [[
+            { text: '🚀 فتح البوت', url: 'https://t.me/' + un },
+            { text: '⚙️ إدارة قروبي', url: 'https://t.me/' + un + '?start=mygroups' }
+          ]]}
+        }
+      ).catch(()=>null);
+      if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(()=>{}), 30000);
+      return;
     }
     return startHandler(ctx);
   });
@@ -76,8 +90,20 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
     return manage.handleCallback(ctx, 'mg_done');
   });
 
-  bot.command('mygroups', ctx => {
-    if (ctx.chat?.type !== 'private') return ctx.deleteMessage().catch(()=>{});
+  bot.command('mygroups', async ctx => {
+    if (['group','supergroup'].includes(ctx.chat?.type)) {
+      const un = ctx.botInfo?.username || '';
+      const cid = ctx.chat.id;
+      ctx.deleteMessage().catch(()=>{});
+      const m = await ctx.reply(
+        '⚙️ لإدارة هذا القروب افتح البوت في الخاص:',
+        { reply_markup: { inline_keyboard: [[
+          { text: '⚙️ إدارة القروب', url: 'https://t.me/' + un + '?start=mg_' + Math.abs(cid) }
+        ]]}}
+      ).catch(()=>null);
+      if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(()=>{}), 15000);
+      return;
+    }
     return require('../handlers/group_panel').showMyGroups(ctx);
   });
 
@@ -284,6 +310,33 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
 
   // ── /help ──
   const { handleHelp } = require('../handlers/help');
-  bot.command(['help', 'مساعدة', 'اوامر', 'cmds'], handleHelp);
+  bot.command(['help', 'مساعدة', 'اوامر', 'cmds'], async ctx => {
+    if (['group','supergroup'].includes(ctx.chat?.type)) {
+      const un = ctx.botInfo?.username || '';
+      ctx.deleteMessage().catch(()=>{});
+      const m = await ctx.reply(
+        '📋 *الأوامر المتاحة في القروب:*\n\n' +
+        '`/all` — منشن جميع الأعضاء\n' +
+        '`/warn` — تحذير عضو (رد عليه)\n' +
+        '`/mute` — كتم عضو\n' +
+        '`/ban` — حظر عضو\n' +
+        '`/del` — حذف رسالة (رد عليها)\n' +
+        '`/del50` `/del100` `/del200` — حذف رسائل\n' +
+        '`/purge` — حذف من رسالة لآخر\n' +
+        '`/stats` — إحصائيات القروب\n' +
+        '`/rules` — قواعد القروب\n\n' +
+        '👇 لمزيد من الأوامر:',
+        {
+          parse_mode: 'Markdown',
+          reply_markup: { inline_keyboard: [[
+            { text: '📖 كل الأوامر', url: 'https://t.me/' + un }
+          ]]}
+        }
+      ).catch(()=>null);
+      if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(()=>{}), 30000);
+      return;
+    }
+    return handleHelp(ctx);
+  });
 
 };
