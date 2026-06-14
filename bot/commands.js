@@ -51,8 +51,7 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
         {
           parse_mode: 'Markdown',
           reply_markup: { inline_keyboard: [[
-            { text: '🚀 فتح البوت', url: 'https://t.me/' + un },
-            { text: '⚙️ إدارة قروبي', url: 'https://t.me/' + un + '?start=mygroups' }
+            { text: '🚀 فتح البوت', url: 'https://t.me/' + un }
           ]]}
         }
       ).catch(()=>null);
@@ -98,7 +97,7 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
       const m = await ctx.reply(
         '⚙️ لإدارة هذا القروب افتح البوت في الخاص:',
         { reply_markup: { inline_keyboard: [[
-          { text: '⚙️ إدارة القروب', url: 'https://t.me/' + un + '?start=mg_' + Math.abs(cid) }
+          { text: '⚙️ إدارة القروب', url: 'https://t.me/' + un + '?start=mygroups' }
         ]]}}
       ).catch(()=>null);
       if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(()=>{}), 15000);
