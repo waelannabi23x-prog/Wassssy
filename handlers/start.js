@@ -67,6 +67,11 @@ async function startHandler(ctx) {
   const rawText = ctx.message?.text || '';
   const payload = rawText.includes(' ') ? rawText.split(' ')[1] : ctx.startPayload || null;
 
+  // ── deep link: mygroups ──
+  if (payload === 'mygroups') {
+    return require('./group_panel').showMyGroups(ctx);
+  }
+
   // ── deep link لملف مباشر ──
   if (payload?.startsWith('file_')) {
     const fid = safeInt(payload.replace('file_', ''));
