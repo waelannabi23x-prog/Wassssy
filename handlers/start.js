@@ -11,6 +11,10 @@ const { escMd: escMdCommon } = require('../utils/common');
 const safeInt = v => { const n = parseInt(v); return isNaN(n) ? 0 : n; };
 
 async function startHandler(ctx) {
+  // ── FIRST: deep link shortcuts ──
+  const _sp = ctx.startPayload || ((ctx.message?.text || '').split(' ')[1]) || '';
+  if (_sp === 'mygroups') return require('./group_panel').showMyGroups(ctx);
+
   const uid  = ctx.uid;
   const name = ctx.from?.first_name || 'طالب';
 
@@ -28,13 +32,6 @@ async function startHandler(ctx) {
   if (!_guardRes.ok) {
     const { text, buttons } = guard.buildSubscribeMessage(_guardRes.missing, name);
     return ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(() => {});
-  }
-
-  // ── deep links — أولوية قبل welcome text ──
-  const _rawText = ctx.message?.text || '';
-  const _payload = _rawText.includes(' ') ? _rawText.split(' ')[1] : ctx.startPayload || null;
-  if (_payload === 'mygroups') {
-    return require('./group_panel').showMyGroups(ctx);
   }
 
   if (welcomeText && !ctx.startPayload) {
