@@ -28,15 +28,6 @@ function algeriaTime() {
 // ══════════════════════════════════════════════════════════
 // 🎉 ترحيب احترافي بالأعضاء الجدد
 // ══════════════════════════════════════════════════════════
-async function registerMember(chatId, userId, username, firstName) {
-  await run(
-    `INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at)
-     VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)
-     ON CONFLICT(chat_id,user_id) DO UPDATE SET first_name=$4,username=$3,updated_at=CURRENT_TIMESTAMP`,
-    [chatId, userId, username || '', firstName || '']
-  ).catch(() => {});
-}
-
 async function handleNewMember(bot, chatId, userId, firstName) {
   try {
     if (_isWelcomeDupe(chatId, userId)) return;
@@ -116,9 +107,8 @@ async function handleNewMember(bot, chatId, userId, firstName) {
     // أزرار الترحيب
     const welcomeKb = {
       inline_keyboard: [[
+        { text: '📋 القواعد', callback_data: 'grp_rules_' + chatId },
         { text: '👤 ملفّي', url: 'tg://user?id=' + userId },
-      ],[
-        { text: '📢 قناتنا', url: 'https://t.me/lwx23' },
       ]]
     };
 
@@ -346,82 +336,39 @@ async function registerMembers(ctx, chatId) {
 
 async function tagAll(ctx, chatId, customMessage) {
   try {
-    if (ctx.callbackQuery) ctx.answerCbQuery('⏳ جاري المنشن…').catch(() => {});
+    ctx.answerCbQuery('⏳ جاري المنشن…').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
     const members = await all(
-      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1',
+      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 LIMIT 100',
       [chatId]
     ).catch(() => []);
 
     if (!members.length) {
-      if (ctx.callbackQuery) return ctx.answerCbQuery('📭 لا يوجد أعضاء مسجلون', { show_alert: true }).catch(() => {});
-      return ctx.reply('📢 لا يوجد أعضاء مسجلون. استخدم /register أولاً').catch(() => {});
+      return ctx.answerCbQuery('📭 لا يوجد أعضاء مسجلون', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
     }
 
-    const total = members.length;
-    const CHUNK = 20; // 20 mention per message to stay safe
+    const header = customMessage
+      ? `📢 *${customMessage}*\n\n`
+      : '👋 *تنبيه لجميع الأعضاء*\n\n';
 
-    // رسالة البداية مع العدد
-    const header = customMessage ? '\ud83d\udce2 *' + customMessage + '*\n\n' : '';
-    const startMsg = await ctx.reply(
-      (header || '\ud83d\udc4b *\u0645\u0646\u0634\u0646 \u0627\u0644\u0643\u0644*\n\n') + '\u23f3 \u062c\u0627\u0631\u064a \u0645\u0646\u0634\u0646 *' + total + '* \u0639\u0636\u0648...',
-      { parse_mode: 'Markdown' }
-    ).catch(() => null);
-
-    let sent = 0;
-    let retries = 0;
-
+    // كل chunk = 25 عضو للبقاء ضمن حد الرسالة (~1024 حرف)
+    const CHUNK = 25;
+    let first = true;
     for (let i = 0; i < members.length; i += CHUNK) {
-      const chunk = members.slice(i, i + CHUNK);
+      const chunk    = members.slice(i, i + CHUNK);
       const mentions = chunk
-        .map(m => '[' + (m.first_name || '👤').replace(/[[\]()]/g, '').substring(0, 12) + '](tg://user?id=' + m.user_id + ')')
+        .map(m => `[${(m.first_name || '👤').substring(0, 15)}](tg://user?id=${m.user_id})`)
         .join(' ');
 
-      let ok = false;
-      while (!ok && retries < 3) {
-        try {
-          await ctx.reply(mentions, {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          });
-          ok = true;
-          sent += chunk.length;
-          retries = 0;
-        } catch(e) {
-          if (e.message?.includes('429') || e.message?.includes('Too Many')) {
-            // استخرج وقت الانتظار من الخطأ
-            const wait = parseInt(e.message.match(/retry after (\d+)/i)?.[1] || '5');
-            await sleep((wait + 1) * 1000);
-            retries++;
-          } else {
-            ok = true; // خطأ آخر — تجاوز
-          }
-        }
-      }
+      await ctx.reply((first ? header : '') + mentions, {
+        parse_mode:               'Markdown',
+        disable_web_page_preview: true,
+      }).catch(() => null);
 
-      // تحديث رسالة الحالة كل 5 chunks
-      if (startMsg && i % (CHUNK * 5) === 0 && sent < total) {
-        ctx.telegram.editMessageText(
-          chatId, startMsg.message_id, null,
-          (header || '\ud83d\udc4b *\u0645\u0646\u0634\u0646 \u0627\u0644\u0643\u0644*\n\n') + '\u23f3 *' + sent + '/' + total + '* \u0639\u0636\u0648 \u062a\u0645 \u0645\u0646\u0634\u0646\u0647\u0645...',
-          { parse_mode: 'Markdown' }
-        ).catch(() => {});
-      }
-
-      // انتظر 1.5 ثانية بين كل رسالة لتجنب الـ flood
-      if (i + CHUNK < members.length) await sleep(1500);
+      first = false;
+      if (i + CHUNK < members.length) await sleep(1200); // Telegram flood wait
     }
-
-    // تحديث نهائي
-    if (startMsg) {
-      ctx.telegram.editMessageText(
-        chatId, startMsg.message_id, null,
-        (header || '') + '\u2705 \u062a\u0645 \u0645\u0646\u0634\u0646 *' + sent + '* \u0639\u0636\u0648',
-        { parse_mode: 'Markdown' }
-      ).catch(() => {});
-      setTimeout(() => ctx.telegram.deleteMessage(chatId, startMsg.message_id).catch(() => {}), 10000);
-    }
-
   } catch (e) {
     console.error('[tagAll]', e.message);
   }
@@ -436,7 +383,7 @@ async function muteAll(ctx, chatId) {
     ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); }); // مرة واحدة فقط ← BUG FIX
 
     const members = await all(
-      'SELECT user_id FROM group_members WHERE chat_id=$1',
+      'SELECT user_id FROM group_members WHERE chat_id=$1 LIMIT 100',
       [chatId]
     ).catch(() => []);
 
@@ -473,10 +420,10 @@ async function muteAll(ctx, chatId) {
         parse_mode: 'Markdown',
         reply_to_message_id: ctx.message?.reply_to_message?.message_id,
         reply_markup: { inline_keyboard: [
-          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + member.user.id },
-           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + member.user.id }],
-          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + member.user.id },
-           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + member.user.id }],
+          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + targetUserId },
+           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + targetUserId }],
+          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + targetUserId },
+           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + targetUserId }],
         ]}
       }
     ).catch(() => null);
@@ -496,7 +443,7 @@ async function unmuteAll(ctx, chatId) {
     ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); }); // مرة واحدة فقط ← BUG FIX
 
     const members = await all(
-      'SELECT user_id FROM group_members WHERE chat_id=$1',
+      'SELECT user_id FROM group_members WHERE chat_id=$1 LIMIT 100',
       [chatId]
     ).catch(() => []);
 
@@ -533,10 +480,10 @@ async function unmuteAll(ctx, chatId) {
         parse_mode: 'Markdown',
         reply_to_message_id: ctx.message?.reply_to_message?.message_id,
         reply_markup: { inline_keyboard: [
-          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + member.user.id },
-           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + member.user.id }],
-          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + member.user.id },
-           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + member.user.id }],
+          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + targetUserId },
+           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + targetUserId }],
+          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + targetUserId },
+           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + targetUserId }],
         ]}
       }
     ).catch(() => null);
@@ -634,19 +581,19 @@ async function setGroupRules(ctx, chatId, rules) {
 // ══════════════════════════════════════════════════════════
 // 🛡 نظام التحذيرات (Warn System)
 // ══════════════════════════════════════════════════════════
-async function warnMember(ctx, chatId, userId, reason) {
+async function warnMember(ctx, chatId, targetUserId, reason) {
   try {
     // أضف تحذير
     await run(
       `INSERT INTO group_warns(chat_id, user_id, warned_by, reason, created_at)
        VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)`,
-      [chatId, member.user.id, ctx.from.id, reason || 'مخالفة القواعد']
+      [chatId, targetUserId, ctx.from.id, reason || 'مخالفة القواعد']
     ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
     // احسب مجموع التحذيرات
     const warnCount = await get(
       'SELECT COUNT(*) AS cnt FROM group_warns WHERE chat_id=$1 AND user_id=$2',
-      [chatId, member.user.id]
+      [chatId, targetUserId]
     ).catch(() => ({ cnt: 0 }));
 
     const count = parseInt(warnCount?.cnt || 0);
@@ -656,10 +603,10 @@ async function warnMember(ctx, chatId, userId, reason) {
     if (count >= MAX_WARNS) {
       // حظر تلقائي بعد 3 تحذيرات
       try {
-        await ctx.telegram.banChatMember(chatId, member.user.id);
+        await ctx.telegram.banChatMember(chatId, targetUserId);
         actionText = `\n🚫 *تم الحظر تلقائياً* بعد ${MAX_WARNS} تحذيرات!`;
         // إعادة ضبط التحذيرات
-        await run('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, member.user.id]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+        await run('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, targetUserId]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       } catch (_) {
         actionText = `\n⚠️ *تعذّر الحظر* — يرجى المراجعة يدوياً`;
       }
@@ -668,17 +615,17 @@ async function warnMember(ctx, chatId, userId, reason) {
     }
 
     const _warnKb = count < MAX_WARNS ? [
-      [{ text: '❗ الإنذارات', callback_data: 'grp_warns_' + member.user.id },
-       { text: '🔇 كتم 🪃',   callback_data: 'grp_mute_1h_' + member.user.id }],
-      [{ text: '🚫 حظر 🏹',   callback_data: 'grp_ban_' + member.user.id },
-       { text: '🎛 أذونات 📡', callback_data: 'grp_perms_' + member.user.id }],
+      [{ text: '❗ الإنذارات', callback_data: 'grp_warns_' + targetUserId },
+       { text: '🔇 كتم 🪃',   callback_data: 'grp_mute_1h_' + targetUserId }],
+      [{ text: '🚫 حظر 🏹',   callback_data: 'grp_ban_' + targetUserId },
+       { text: '🎛 أذونات 📡', callback_data: 'grp_perms_' + targetUserId }],
     ] : [
-      [{ text: '🔓 رفع الحظر', callback_data: 'grp_unban_' + member.user.id }],
+      [{ text: '🔓 رفع الحظر', callback_data: 'grp_unban_' + targetUserId }],
     ];
     const msg = await ctx.reply(
       `⚠️ *تحذير رسمي*\n` +
       `━━━━━━━━━━━━━━━━━━\n` +
-      `👤 المستخدم: [user](tg://user?id=${member.user.id})\n` +
+      `👤 المستخدم: [user](tg://user?id=${targetUserId})\n` +
       `📝 السبب: ${(reason || 'مخالفة القواعد')}\n` +
       `🔢 التحذير رقم: *${count}/${MAX_WARNS}*` +
       actionText,
@@ -691,11 +638,11 @@ async function warnMember(ctx, chatId, userId, reason) {
   }
 }
 
-async function showWarns(ctx, chatId, userId) {
+async function showWarns(ctx, chatId, targetUserId) {
   try {
     const warns = await all(
       'SELECT reason, created_at FROM group_warns WHERE chat_id=$1 AND user_id=$2 ORDER BY created_at DESC LIMIT 10',
-      [chatId, member.user.id]
+      [chatId, targetUserId]
     ).catch(() => []);
 
     if (!warns.length) {
@@ -714,17 +661,17 @@ async function showWarns(ctx, chatId, userId) {
   }
 }
 
-async function clearWarns(ctx, chatId, userId) {
-  await run('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, member.user.id]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+async function clearWarns(ctx, chatId, targetUserId) {
+  await run('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, targetUserId]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   return ctx.reply('✅ تم مسح تحذيرات العضو').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 }
 
 // ══════════════════════════════════════════════════════════
 // 🚫 حظر / رفع الحظر
 // ══════════════════════════════════════════════════════════
-async function banMember(ctx, chatId, userId, reason, deleteMessages) {
+async function banMember(ctx, chatId, targetUserId, reason, deleteMessages) {
   try {
-    await ctx.telegram.banChatMember(chatId, member.user.id, {
+    await ctx.telegram.banChatMember(chatId, targetUserId, {
       revoke_messages: deleteMessages || false,
     });
 
@@ -733,22 +680,22 @@ async function banMember(ctx, chatId, userId, reason, deleteMessages) {
       `INSERT INTO group_bans(chat_id, user_id, banned_by, reason, created_at)
        VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)
        ON CONFLICT(chat_id, user_id) DO UPDATE SET reason=$4, updated_at=CURRENT_TIMESTAMP`,
-      [chatId, member.user.id, ctx.from.id, reason || 'لا سبب']
+      [chatId, targetUserId, ctx.from.id, reason || 'لا سبب']
     ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
     const msg = await ctx.reply(
       `🚫 *تم الحظر*\n` +
       `━━━━━━━━━━━━━━━━━━\n` +
-      `👤 [العضو](tg://user?id=${member.user.id})\n` +
+      `👤 [العضو](tg://user?id=${targetUserId})\n` +
       `📝 السبب: ${reason || 'غير محدد'}`,
       {
         parse_mode: 'Markdown',
         reply_to_message_id: ctx.message?.reply_to_message?.message_id,
         reply_markup: { inline_keyboard: [
-          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + member.user.id },
-           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + member.user.id }],
-          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + member.user.id },
-           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + member.user.id }],
+          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + targetUserId },
+           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + targetUserId }],
+          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + targetUserId },
+           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + targetUserId }],
         ]}
       }
     ).catch(() => null);
@@ -759,11 +706,11 @@ async function banMember(ctx, chatId, userId, reason, deleteMessages) {
   }
 }
 
-async function unbanMember(ctx, chatId, userId) {
+async function unbanMember(ctx, chatId, targetUserId) {
   try {
-    await ctx.telegram.unbanChatMember(chatId, member.user.id);
-    await run('DELETE FROM group_bans WHERE chat_id=$1 AND user_id=$2', [chatId, member.user.id]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    const msg = await ctx.reply(`✅ تم رفع الحظر عن [العضو](tg://user?id=${member.user.id})`, {
+    await ctx.telegram.unbanChatMember(chatId, targetUserId);
+    await run('DELETE FROM group_bans WHERE chat_id=$1 AND user_id=$2', [chatId, targetUserId]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    const msg = await ctx.reply(`✅ تم رفع الحظر عن [العضو](tg://user?id=${targetUserId})`, {
       parse_mode: 'Markdown',
     }).catch(() => null);
     if (msg) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); }), 8000);
@@ -775,13 +722,13 @@ async function unbanMember(ctx, chatId, userId) {
 // ══════════════════════════════════════════════════════════
 // 🔕 إسكات / تفعيل عضو واحد
 // ══════════════════════════════════════════════════════════
-async function muteMember(ctx, chatId, userId, durationMinutes) {
+async function muteMember(ctx, chatId, targetUserId, durationMinutes) {
   try {
     const until = durationMinutes
       ? Math.floor(Date.now() / 1000) + durationMinutes * 60
       : 0; // 0 = إلى الأبد
 
-    await ctx.telegram.restrictChatMember(chatId, member.user.id, {
+    await ctx.telegram.restrictChatMember(chatId, targetUserId, {
       permissions: {
         can_send_messages:       false,
         can_send_media_messages: false,
@@ -794,16 +741,16 @@ async function muteMember(ctx, chatId, userId, durationMinutes) {
     const durText = durationMinutes ? `${durationMinutes} دقيقة` : 'حتى يتم التفعيل يدوياً';
     const msg = await ctx.reply(
       `🔇 *تم إسكات العضو*\n` +
-      `👤 [العضو](tg://user?id=${member.user.id})\n` +
+      `👤 [العضو](tg://user?id=${targetUserId})\n` +
       `⏱ المدة: ${durText}`,
       {
         parse_mode: 'Markdown',
         reply_to_message_id: ctx.message?.reply_to_message?.message_id,
         reply_markup: { inline_keyboard: [
-          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + member.user.id },
-           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + member.user.id }],
-          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + member.user.id },
-           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + member.user.id }],
+          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + targetUserId },
+           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + targetUserId }],
+          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + targetUserId },
+           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + targetUserId }],
         ]}
       }
     ).catch(() => null);
@@ -813,9 +760,9 @@ async function muteMember(ctx, chatId, userId, durationMinutes) {
   }
 }
 
-async function unmuteMember(ctx, chatId, userId) {
+async function unmuteMember(ctx, chatId, targetUserId) {
   try {
-    await ctx.telegram.restrictChatMember(chatId, member.user.id, {
+    await ctx.telegram.restrictChatMember(chatId, targetUserId, {
       permissions: {
         can_send_messages:         true,
         can_send_media_messages:   true,
@@ -829,15 +776,15 @@ async function unmuteMember(ctx, chatId, userId) {
     });
 
     const msg = await ctx.reply(
-      `🔊 *تم تفعيل العضو*\n👤 [العضو](tg://user?id=${member.user.id})`,
+      `🔊 *تم تفعيل العضو*\n👤 [العضو](tg://user?id=${targetUserId})`,
       {
         parse_mode: 'Markdown',
         reply_to_message_id: ctx.message?.reply_to_message?.message_id,
         reply_markup: { inline_keyboard: [
-          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + member.user.id },
-           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + member.user.id }],
-          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + member.user.id },
-           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + member.user.id }],
+          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + targetUserId },
+           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + targetUserId }],
+          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + targetUserId },
+           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + targetUserId }],
         ]}
       }
     ).catch(() => null);
@@ -848,34 +795,6 @@ async function unmuteMember(ctx, chatId, userId) {
 }
 
 // ══════════════════════════════════════════════════════════
-// 🤖 مكافحة السبام (Anti-Spam)
-// ══════════════════════════════════════════════════════════
-const _spamMap = new Map(); // userId → { count, last }
-
-function checkAntiSpam(userId, maxMsg = 5, windowMs = 5000) {
-  const now  = Date.now();
-  const data = _spamMap.get(userId) || { count: 0, last: now };
-
-  if (now - data.last > windowMs) {
-    _spamMap.set(userId, { count: 1, last: now });
-    return false; // لا سبام
-  }
-
-  data.count++;
-  data.last = now;
-  _spamMap.set(userId, data);
-  return data.count > maxMsg; // سبام!
-}
-
-// تنظيف خريطة السبام كل دقيقة
-setInterval(() => {
-  const cutoff = Date.now() - 60000;
-  for (const [k, v] of _spamMap.entries()) {
-    if (v.last < cutoff) _spamMap.delete(k);
-  }
-}, 60000).unref();
-
-// ══════════════════════════════════════════════════════════
 // 🔗 Helper
 // ══════════════════════════════════════════════════════════
 function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
@@ -884,7 +803,6 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 // Exports
 // ══════════════════════════════════════════════════════════
 module.exports = {
-  registerMember,
   handleNewMember,
   handleMemberLeft,
   showAllMembers,
@@ -905,5 +823,4 @@ module.exports = {
   setWelcomeImage,
   setWelcomeMessage,
   clearWelcome,
-  checkAntiSpam,
 };

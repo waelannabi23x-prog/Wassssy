@@ -32,10 +32,6 @@ module.exports.registerMessages = function(bot, deps) {
   };
   setInterval(() => { for (const k of MGColl._g.keys()) MGColl._g.delete(k); }, 30000).unref();
 
-  // ── Anti-Spam Map ──
-  const _spamMap = new Map();
-  setInterval(() => { const cut=Date.now()-10000; for(const[k,v] of _spamMap) if(v.last<cut) _spamMap.delete(k); }, 10000).unref();
-
   // ── Message (group) ──
   bot.on('message', async (ctx, next) => {
     const _mid = ctx.message?.message_id + '_' + (ctx.from?.id || '');

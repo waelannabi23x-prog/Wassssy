@@ -138,11 +138,6 @@ async function toggleProtection(ctx, chatId, key) {
   const newVal = !settings[key];
   await protection.updateSettings(chatId, { [key]: newVal });
 
-  // مزامنة مع الأعمدة القديمة (للتوافق فقط)
-  if (['anti_spam', 'anti_link', 'anti_flood'].includes(key)) {
-    require('../database/db').run('UPDATE group_chats SET ' + key + '=$1 WHERE chat_id=$2', [newVal ? 1 : 0, chatId]).catch(() => {});
-  }
-
   logsMod.logAction({ telegram: ctx.telegram }, chatId, 'settings', {
     actorId: ctx.from.id, actorName: ctx.from.first_name || '',
     details: (newVal ? '✅ تفعيل ' : '⬜ تعطيل ') + meta.label,

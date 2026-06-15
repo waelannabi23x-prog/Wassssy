@@ -39,7 +39,7 @@ const filesDb       = require('./database/files');
 const { handleAiChat, resetChat } = require('./handlers/ai_chat');
 const { handleOwnerAI }           = require('./handlers/ai_owner');
 const { smartSearch }             = require('./handlers/group');
-const { handleNewMember, handleMemberLeft, showAllMembers, tagAll, muteAll, unmuteAll, showGroupStats, warnMember, banMember, unbanMember, muteMember, unmuteMember, checkAntiSpam } = require('./handlers/group_admin');
+const { handleNewMember, handleMemberLeft, showAllMembers, tagAll, muteAll, unmuteAll, showGroupStats, warnMember, banMember, unbanMember, muteMember, unmuteMember } = require('./handlers/group_admin');
 const { setupGroupCommands, handleSettingsCallback } = require('./handlers/group_commands');
 const { migrateGroupTables } = require('./database/group_db');
 const groupBroadcast = require('./utils/groupBroadcast');
@@ -157,14 +157,7 @@ const botAdminCheck = async (ctx, next) => {
   } catch(_) { return next(); }
 };
 
-// ── Spam/Flood state ──
-const _spamProtect = new Map();
-setInterval(() => {
-  const cut = Date.now() - 10000;
-  for (const [k, v] of _spamProtect) if (v.last < cut) _spamProtect.delete(k);
-}, 10000).unref();
-
-const { all: _dbAll, get: _dbGet } = require('./database/db');
+const { all: _dbAll } = require('./database/db');
 const { cacheGet: _cGet, cacheSet: _cSet } = require('./utils/cache');
 
 // ══════════════════════════════════════════
@@ -318,17 +311,6 @@ require('./bot/commands')(bot, {
 });
 
 // ── Callbacks ──
-// ── تسجيل عضو عند أي callback في القروب ──
-bot.on('callback_query', async (ctx, next) => {
-  const chat = ctx.chat || ctx.callbackQuery?.message?.chat;
-  const from = ctx.from;
-  if (chat && ['group','supergroup'].includes(chat.type) && from && !from.is_bot) {
-    const { registerMember } = require('./handlers/group_admin');
-    registerMember(chat.id, from.id, from.username||'', from.first_name||'').catch(()=>{});
-  }
-  return next();
-});
-
 const { registerCallbacks } = require('./bot/callbacks');
 registerCallbacks(bot, {
   CBDedup, cbRes, startHandler, manage, browse, userH,
@@ -543,7 +525,7 @@ async function launch() {
             dbRun(
               `INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at)
                VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)
-               ON CONFLICT(chat_id,user_id) DO UPDATE SET first_name=$4, username=$3, updated_at=CURRENT_TIMESTAMP`,
+               ON CONFLICT(chat_id,user_id) DO UPDATE SET updated_at=CURRENT_TIMESTAMP`,
               [chat.id, u.id, u.username || '', u.first_name || '']
             ).catch(() => {});
           }

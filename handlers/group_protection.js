@@ -39,11 +39,6 @@ async function updateSettings(chatId, patch) {
   return merged;
 }
 
-// ── توافق مع الأزرار القديمة (anti_spam/anti_link/anti_flood) ──
-async function setBasicToggle(chatId, key, value) {
-  return updateSettings(chatId, { [key]: !!value });
-}
-
 // ══════════════════════════════════════════════════════════
 // 🔒 أقفال الوسائط (مع كاش)
 // ══════════════════════════════════════════════════════════
@@ -589,7 +584,7 @@ async function checkNewChatMembers(ctx) {
 
 module.exports = {
   DEFAULT_SETTINGS: db.DEFAULT_SETTINGS,
-  getSettings, clearSettingsCache, updateSettings, setBasicToggle,
+  getSettings, clearSettingsCache, updateSettings,
   getLocksCached, clearLocksCache,
   getBannedWordsCached, clearWordsCache,
   isTelegramAdmin, clearAdminCache,
