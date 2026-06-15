@@ -29,6 +29,14 @@ async function startHandler(ctx) {
     const { text, buttons } = guard.buildSubscribeMessage(_guardRes.missing, name);
     return ctx.reply(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: buttons } }).catch(() => {});
   }
+
+  // ── deep links — أولوية قبل welcome text ──
+  const _rawText = ctx.message?.text || '';
+  const _payload = _rawText.includes(' ') ? _rawText.split(' ')[1] : ctx.startPayload || null;
+  if (_payload === 'mygroups') {
+    return require('./group_panel').showMyGroups(ctx);
+  }
+
   if (welcomeText && !ctx.startPayload) {
     const _now = new Date(Date.now() + 3600000);
     const _date = _now.toLocaleDateString('ar-DZ', { day: '2-digit', month: '2-digit', year: 'numeric' });
