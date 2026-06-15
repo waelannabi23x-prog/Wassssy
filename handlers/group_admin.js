@@ -28,6 +28,15 @@ function algeriaTime() {
 // ══════════════════════════════════════════════════════════
 // 🎉 ترحيب احترافي بالأعضاء الجدد
 // ══════════════════════════════════════════════════════════
+async function registerMember(chatId, userId, username, firstName) {
+  await run(
+    `INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at)
+     VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)
+     ON CONFLICT(chat_id,user_id) DO UPDATE SET first_name=$4,username=$3,updated_at=CURRENT_TIMESTAMP`,
+    [chatId, userId, username || '', firstName || '']
+  ).catch(() => {});
+}
+
 async function handleNewMember(bot, chatId, userId, firstName) {
   try {
     if (_isWelcomeDupe(chatId, userId)) return;
