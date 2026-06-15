@@ -614,6 +614,9 @@ async function warnMember(ctx, chatId, targetUserId, reason) {
       actionText = `\n⚠️ *تحذير أخير!* — تحذير آخر = حظر فوري`;
     }
 
+    // عند الاستدعاء من زر (callback): المستدعي يعرض toast ويحدّث اللوحة بنفسه
+    if (ctx.callbackQuery) return;
+
     const _warnKb = count < MAX_WARNS ? [
       [{ text: '❗ الإنذارات', callback_data: 'grp_warns_' + targetUserId },
        { text: '🔇 كتم 🪃',   callback_data: 'grp_mute_1h_' + targetUserId }],
@@ -683,6 +686,9 @@ async function banMember(ctx, chatId, targetUserId, reason, deleteMessages) {
       [chatId, targetUserId, ctx.from.id, reason || 'لا سبب']
     ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
+    // عند الاستدعاء من زر (callback): المستدعي يعرض toast ويحدّث اللوحة بنفسه
+    if (ctx.callbackQuery) return;
+
     const msg = await ctx.reply(
       `🚫 *تم الحظر*\n` +
       `━━━━━━━━━━━━━━━━━━\n` +
@@ -710,6 +716,10 @@ async function unbanMember(ctx, chatId, targetUserId) {
   try {
     await ctx.telegram.unbanChatMember(chatId, targetUserId);
     await run('DELETE FROM group_bans WHERE chat_id=$1 AND user_id=$2', [chatId, targetUserId]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+
+    // عند الاستدعاء من زر (callback): المستدعي يعرض toast ويحدّث اللوحة بنفسه
+    if (ctx.callbackQuery) return;
+
     const msg = await ctx.reply(`✅ تم رفع الحظر عن [العضو](tg://user?id=${targetUserId})`, {
       parse_mode: 'Markdown',
     }).catch(() => null);
@@ -737,6 +747,10 @@ async function muteMember(ctx, chatId, targetUserId, durationMinutes) {
       },
       until_date: until || undefined,
     });
+
+    // عند الاستدعاء من زر (callback مثل /info ← كتم): المستدعي يعرض toast
+    // ويحدّث اللوحة بنفسه — لا حاجة لرسالة منفصلة تظهر وتُحذف
+    if (ctx.callbackQuery) return;
 
     const durText = durationMinutes ? `${durationMinutes} دقيقة` : 'حتى يتم التفعيل يدوياً';
     const msg = await ctx.reply(
@@ -774,6 +788,9 @@ async function unmuteMember(ctx, chatId, targetUserId) {
         can_pin_messages:          false,
       },
     });
+
+    // عند الاستدعاء من زر (callback): المستدعي يعرض toast ويحدّث اللوحة بنفسه
+    if (ctx.callbackQuery) return;
 
     const msg = await ctx.reply(
       `🔊 *تم تفعيل العضو*\n👤 [العضو](tg://user?id=${targetUserId})`,

@@ -539,12 +539,12 @@ function setupGroupCommands(bot) {
       ]);
       kb.push([
         { text: "🔇 كتم 🔔",        callback_data: "grp_mute_menu_" + target.id },
-        { text: "🔰 أذونات ↗",      callback_data: "grp_perms_" + target.id + "_" + chatId },
+        { text: "🛡 مخالفات الحماية", callback_data: "grp_violations_" + target.id + "_" + chatId },
       ]);
     } else if (isReqAdm && isAdmTarget && !isOwner && target.id !== ctx.from.id) {
       kb.push([
         { text: "⚠️ الإنذارات",     callback_data: "grp_warns_show_" + target.id + "_" + chatId },
-        { text: "🔰 أذونات ↗",      callback_data: "grp_perms_" + target.id + "_" + chatId },
+        { text: "🎛 الصلاحيات",     callback_data: "grp_perms_" + target.id + "_" + chatId },
       ]);
     }
 
