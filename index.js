@@ -318,6 +318,17 @@ require('./bot/commands')(bot, {
 });
 
 // ── Callbacks ──
+// ── تسجيل عضو عند أي callback في القروب ──
+bot.on('callback_query', async (ctx, next) => {
+  const chat = ctx.chat || ctx.callbackQuery?.message?.chat;
+  const from = ctx.from;
+  if (chat && ['group','supergroup'].includes(chat.type) && from && !from.is_bot) {
+    const { registerMember } = require('./handlers/group_admin');
+    registerMember(chat.id, from.id, from.username||'', from.first_name||'').catch(()=>{});
+  }
+  return next();
+});
+
 const { registerCallbacks } = require('./bot/callbacks');
 registerCallbacks(bot, {
   CBDedup, cbRes, startHandler, manage, browse, userH,
@@ -532,7 +543,7 @@ async function launch() {
             dbRun(
               `INSERT INTO group_members(chat_id,user_id,username,first_name,updated_at)
                VALUES($1,$2,$3,$4,CURRENT_TIMESTAMP)
-               ON CONFLICT(chat_id,user_id) DO UPDATE SET updated_at=CURRENT_TIMESTAMP`,
+               ON CONFLICT(chat_id,user_id) DO UPDATE SET first_name=$4, username=$3, updated_at=CURRENT_TIMESTAMP`,
               [chat.id, u.id, u.username || '', u.first_name || '']
             ).catch(() => {});
           }

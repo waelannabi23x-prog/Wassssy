@@ -427,7 +427,7 @@ async function muteAll(ctx, chatId) {
     ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); }); // مرة واحدة فقط ← BUG FIX
 
     const members = await all(
-      'SELECT user_id FROM group_members WHERE chat_id=$1 LIMIT 100',
+      'SELECT user_id FROM group_members WHERE chat_id=$1',
       [chatId]
     ).catch(() => []);
 
@@ -487,7 +487,7 @@ async function unmuteAll(ctx, chatId) {
     ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); }); // مرة واحدة فقط ← BUG FIX
 
     const members = await all(
-      'SELECT user_id FROM group_members WHERE chat_id=$1 LIMIT 100',
+      'SELECT user_id FROM group_members WHERE chat_id=$1',
       [chatId]
     ).catch(() => []);
 
@@ -875,6 +875,7 @@ function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
 // Exports
 // ══════════════════════════════════════════════════════════
 module.exports = {
+  registerMember,
   handleNewMember,
   handleMemberLeft,
   showAllMembers,
