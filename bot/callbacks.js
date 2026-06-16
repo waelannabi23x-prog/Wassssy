@@ -216,11 +216,8 @@ module.exports.registerCallbacks = function(bot, deps) {
     // Group
     { p: 'grp_main_',   fn: (ctx, d) => { const chatId = d.replace('grp_main_',''); const { showAllMembers } = require('../handlers/group_admin'); return showAllMembers(ctx, chatId); } },
     { p: 'grp_main',    fn: (ctx, d) => { const uid = ctx.uid || ctx.from?.id; const isOwner = uid === parseInt(process.env.OWNER_ID); return isOwner ? groupPanel.showMainMenu(ctx) : groupPanel.showMyGroups(ctx); } },
-    { p: 'gp_',  fn: (ctx, d) => groupPanel.handleCallback(ctx, d) },
-    { p: 'gpx_', fn: (ctx, d) => require('../handlers/group_pro_panel').handleCallback(ctx, d) },
-    { p: 'gpq_', fn: (ctx, d) => require('../handlers/group_schedule').handleQuickCallback(ctx, d) },
-    { p: 'sch_', fn: (ctx, d) => require('../handlers/group_schedule').handleQuickCallback(ctx, d) },
-    { p: 'gf_',         fn: (ctx, d) => require('../handlers/group_filters').handleFilterCallback(ctx, d) },
+    { p: 'gp_',         fn: (ctx, d) => groupPanel.handleCallback(ctx, d) },
+    { p: 'gpx_',        fn: (ctx, d) => require('../handlers/group_pro_panel').handleCallback(ctx, d) },
     { p: 'grp_sp_',     fn: hGrpSp },
     { p: 'grp_dl_',     fn: hGrpDl },
 
@@ -313,6 +310,9 @@ module.exports.registerCallbacks = function(bot, deps) {
     if (!ctx.from) return;
     const _raw = ctx.callbackQuery?.data, cbId = ctx.callbackQuery?.id;
     if (!_raw || CBDedup.isDupe(cbId)) return;
+
+    // 🐺 FIX: تمرير callbacks لوب غارو للمعالج المختص في werewolf/index.js
+    if (_raw.startsWith('ww:') || _raw.startsWith('wwx:')) return;
 
     const data = cbRes(_raw);
 
@@ -640,10 +640,7 @@ module.exports.registerCallbacks = function(bot, deps) {
             data.startsWith('grp_clearwarn_') || data.startsWith('grp_pall_') ||
             data.startsWith('grp_pnone_') || data.startsWith('grp_aptog_') ||
             data.startsWith('grp_apsave_') || data.startsWith('grp_demote_') ||
-            data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_') ||
-            data.startsWith('grp_violations_') || data.startsWith('grp_warn_quick_') ||
-            data.startsWith('gf_setaction_')   ||
-            data.startsWith('gpq_')            || data.startsWith('sch_')) {
+            data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_')) {
           const chatIdCheck = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
           const callerMember = await ctx.telegram.getChatMember(chatIdCheck, ctx.from.id).catch(() => null);
           const isCallerAdm  = ctx.isAdmin || ctx.isOwner || ['administrator','creator'].includes(callerMember?.status);
@@ -684,49 +681,13 @@ module.exports.registerCallbacks = function(bot, deps) {
               { text: '🎛 الصلاحيات',               callback_data: 'grp_perms_'    + uid2 + '_' + chatId2 },
             ],
             [
-              { text: '✅ الغاء الكتم', callback_data: 'grp_unmute_'      + uid2 },
-              { text: '🚫 حظر',         callback_data: 'grp_ban_confirm_' + uid2 },
+              { text: '🔇 كتم', callback_data: 'grp_mute_menu_'   + uid2 },
+              { text: '🚫 حظر', callback_data: 'grp_ban_confirm_' + uid2 },
             ],
             [
-              { text: '🔇 كتم 🔔',          callback_data: 'grp_mute_menu_'  + uid2 },
-              { text: '🛡 مخالفات الحماية', callback_data: 'grp_violations_' + uid2 + '_' + chatId2 },
+              { text: '🎛 أذونات ↗', callback_data: 'grp_perms_' + uid2 + '_' + chatId2 },
             ],
           ]}).catch(() => ctx.answerCbQuery('').catch(() => {}));
-        }
-
-        // ── 🛡 مخالفات الحماية (popup) ──
-        if (data.startsWith('grp_violations_')) {
-          const parts3  = data.replace('grp_violations_', '').split('_');
-          const uid3    = parseInt(parts3[0]);
-          const chatId3 = parseInt(parts3[1]);
-          try {
-            const proDb = require('../database/group_pro_db');
-            const { getSettings, violationLabel } = require('../handlers/group_protection');
-            const settings = await getSettings(chatId3);
-            const hrs = settings.violation_window_hours || 24;
-            const count = await proDb.getViolationCount(chatId3, uid3, hrs);
-            const hist = await proDb.getViolationHistory(chatId3, uid3, 5);
-            let txt = '🛡 مخالفات (' + hrs + 'س): ' + count;
-            if (hist.length) txt += '\n' + hist.map(h => '• ' + violationLabel(h.type)).join('\n');
-            else txt += '\nلا توجد مخالفات';
-            return ctx.answerCbQuery(txt, { show_alert: true }).catch(() => {});
-          } catch (e) {
-            return ctx.answerCbQuery('❌ خطأ في جلب البيانات').catch(() => {});
-          }
-        }
-
-        // ── ⚠️ تحذير سريع من بلاغ ──
-        if (data.startsWith('grp_warn_quick_')) {
-          const parts4 = data.replace('grp_warn_quick_', '').split('_');
-          const uid4   = parseInt(parts4[0]);
-          const cid4   = parseInt(parts4[1]);
-          try {
-            const ctx2 = { ...ctx, chat: { id: cid4, type: 'supergroup' }, telegram: ctx.telegram, from: ctx.from };
-            await warnMember(ctx2, cid4, uid4, 'بلاغ من عضو').catch(() => {});
-            return ctx.answerCbQuery('✅ تم تحذير العضو').catch(() => {});
-          } catch (e) {
-            return ctx.answerCbQuery('❌ ' + e.message).catch(() => {});
-          }
         }
 
         // ── +1 تحذير ──
@@ -1127,7 +1088,6 @@ module.exports.registerCallbacks = function(bot, deps) {
           || data.startsWith('close_list_') || data.startsWith('close_stats_')
           || data.startsWith('grp_stats_') || data === 'rules_ok'
           || data.startsWith('ml_') || data.startsWith('gp_') || data.startsWith('gpx_')
-          || data.startsWith('gpq_') || data.startsWith('sch_')
           || data.startsWith('grp_register_') || data.startsWith('grp_reg_btn_')
           || data === 'mb_panel' || data.startsWith('gp_million') || data.startsWith('gp_guess')
           || data.startsWith('mlr_') || data.startsWith('mar_')
