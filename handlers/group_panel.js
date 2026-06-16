@@ -520,7 +520,13 @@ async function showMyGroups(ctx) {
   const text = '👥 *قروباتك (' + myGroups.length + ')*\n━━━━━━━━━━━━\n\nاختر قروب لإدارته:';
   const rows = myGroups.map(g => [b('⚙️ ' + String(g.title || g.chat_id).substring(0,25), 'gp_view_' + g.chat_id)]);
   rows.push([{ text: '➕ أضف البوت لقروب جديد', url: 'https://t.me/' + BOT_UN + '?startgroup=true' }]);
-  return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
+  // استخدم reply دائماً من showMyGroups (مش edit)
+  if (ctx.callbackQuery) {
+    return ctx.editMessageText(text, { parse_mode: 'Markdown', ...kbBuild(rows) }).catch(() =>
+      ctx.reply(text, { parse_mode: 'Markdown', ...kbBuild(rows) }).catch(() => {})
+    );
+  }
+  return ctx.reply(text, { parse_mode: 'Markdown', ...kbBuild(rows) }).catch(() => {});
 }
 
 module.exports = {
