@@ -146,7 +146,7 @@ async function showGroupsLeaderboard(ctx, opts = {}) {
 
 async function showGroupDetail(ctx, chatId) {
   const uid = ctx.uid || ctx.from?.id;
-  const isOwner = String(uid) === String(process.env.OWNER_ID) || ctx.isOwner === true;
+  const isOwner = uid === parseInt(process.env.OWNER_ID);
 
   // تحقق من صلاحيات المستخدم
   if (!isOwner) {
@@ -506,11 +506,6 @@ async function showMyGroups(ctx) {
     });
   }
 
-  // إذا ما لقى قروبات عبر Telegram API — جرب DB مباشرة للـ owner
-  if (!myGroups.length && (ctx.isOwner || String(uid) === String(process.env.OWNER_ID))) {
-    allGroups.forEach(g => myGroups.push(g));
-  }
-
   if (!myGroups.length) {
     return ctx.reply(
       '📭 أنت لست ادمين في أي قروب يحتوي البوت.\n\nأضف البوت لقروبك:',
@@ -525,13 +520,7 @@ async function showMyGroups(ctx) {
   const text = '👥 *قروباتك (' + myGroups.length + ')*\n━━━━━━━━━━━━\n\nاختر قروب لإدارته:';
   const rows = myGroups.map(g => [b('⚙️ ' + String(g.title || g.chat_id).substring(0,25), 'gp_view_' + g.chat_id)]);
   rows.push([{ text: '➕ أضف البوت لقروب جديد', url: 'https://t.me/' + BOT_UN + '?startgroup=true' }]);
-  // استخدم reply دائماً من showMyGroups (مش edit)
-  if (ctx.callbackQuery) {
-    return ctx.editMessageText(text, { parse_mode: 'Markdown', ...kbBuild(rows) }).catch(() =>
-      ctx.reply(text, { parse_mode: 'Markdown', ...kbBuild(rows) }).catch(() => {})
-    );
-  }
-  return ctx.reply(text, { parse_mode: 'Markdown', ...kbBuild(rows) }).catch(() => {});
+  return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
 
 module.exports = {

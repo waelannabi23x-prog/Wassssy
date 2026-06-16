@@ -218,6 +218,7 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'grp_main',    fn: (ctx, d) => { const uid = ctx.uid || ctx.from?.id; const isOwner = uid === parseInt(process.env.OWNER_ID); return isOwner ? groupPanel.showMainMenu(ctx) : groupPanel.showMyGroups(ctx); } },
     { p: 'gp_',         fn: (ctx, d) => groupPanel.handleCallback(ctx, d) },
     { p: 'gpx_',        fn: (ctx, d) => require('../handlers/group_pro_panel').handleCallback(ctx, d) },
+    { p: 'gf_',         fn: (ctx, d) => require('../handlers/group_filters').handleFilterCallback(ctx, d) },
     { p: 'grp_sp_',     fn: hGrpSp },
     { p: 'grp_dl_',     fn: hGrpDl },
 
@@ -638,7 +639,7 @@ module.exports.registerCallbacks = function(bot, deps) {
             data.startsWith('grp_pnone_') || data.startsWith('grp_aptog_') ||
             data.startsWith('grp_apsave_') || data.startsWith('grp_demote_') ||
             data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_') ||
-            data.startsWith('grp_violations_')) {
+            data.startsWith('grp_violations_') || data.startsWith('grp_warn_quick_')) {
           const chatIdCheck = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
           const callerMember = await ctx.telegram.getChatMember(chatIdCheck, ctx.from.id).catch(() => null);
           const isCallerAdm  = ctx.isAdmin || ctx.isOwner || ['administrator','creator'].includes(callerMember?.status);
@@ -707,6 +708,20 @@ module.exports.registerCallbacks = function(bot, deps) {
             return ctx.answerCbQuery(txt, { show_alert: true }).catch(() => {});
           } catch (e) {
             return ctx.answerCbQuery('❌ خطأ في جلب البيانات').catch(() => {});
+          }
+        }
+
+        // ── ⚠️ تحذير سريع من بلاغ ──
+        if (data.startsWith('grp_warn_quick_')) {
+          const parts4 = data.replace('grp_warn_quick_', '').split('_');
+          const uid4   = parseInt(parts4[0]);
+          const cid4   = parseInt(parts4[1]);
+          try {
+            const ctx2 = { ...ctx, chat: { id: cid4, type: 'supergroup' }, telegram: ctx.telegram, from: ctx.from };
+            await warnMember(ctx2, cid4, uid4, 'بلاغ من عضو').catch(() => {});
+            return ctx.answerCbQuery('✅ تم تحذير العضو').catch(() => {});
+          } catch (e) {
+            return ctx.answerCbQuery('❌ ' + e.message).catch(() => {});
           }
         }
 

@@ -66,6 +66,7 @@ const PROT_TOGGLES = [
   { key: 'anti_caps',      label: '🔠 مكافحة الحروف الكبيرة' },
   { key: 'anti_edit',      label: '✏️ مكافحة تعديل المخالفات' },
   { key: 'anti_bot',       label: '🤖 مكافحة البوتات غير المصرّحة' },
+  { key: 'anti_raid',      label: '🌊 مكافحة الانضمام الجماعي (Raid)' },
 ];
 
 const ADV_FIELDS = [

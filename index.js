@@ -219,15 +219,25 @@ const groupProtectionMiddleware = async (ctx, next) => {
   // 🌙 فحص AFK (لا يحظر التدفّق — fire & forget، يشمل الأدمنز أيضاً)
   try { require('./handlers/fun_commands').checkAfkOnMessage(ctx).catch(() => {}); } catch (_) {}
 
+  // 📊 تسجيل نشاط الرسائل (للإحصائيات)
+  if (ctx.from?.id && ctx.chat?.id) {
+    require('./handlers/group_extras').trackMessageActivity(ctx.chat.id, ctx.from.id).catch(() => {});
+  }
+
   // حماية الأدمنز من فلاتر الحماية
   if (ctx.isAdmin || ctx.isOwner) return next();
 
-  // 🛡️ نظام الحماية الاحترافي — يدير anti_spam/link/flood/forward/mention/
-  // words/caps/duplicate + أقفال الوسائط + سلّم العقوبات الذكي
+  // 🛡️ نظام الحماية الاحترافي
   try {
     const handled = await require('./handlers/group_protection').runProtection(ctx);
     if (handled) return;
   } catch (e) { logger.error('[Protection] ' + e.message); }
+
+  // 🎯 فلاتر ذكية (يعمل بعد الحماية فقط)
+  try {
+    const filtered = await require('./handlers/group_filters').checkFilters(ctx);
+    if (filtered) return;
+  } catch (e) { logger.error('[Filters] ' + e.message); }
 
   return next();
 };
@@ -323,6 +333,8 @@ registerCallbacks(bot, {
 setupGroupCommands(bot);
 require('./handlers/group_commands_pro').setupProCommands(bot);
 require('./handlers/group_commands_ar').setupArabicModCommands(bot);
+require('./handlers/group_filters').setupFilters(bot);
+require('./handlers/group_extras').setupExtras(bot);
 
 const { registerMessages } = require('./bot/messages');
 registerMessages(bot, {

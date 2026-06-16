@@ -330,6 +330,8 @@ module.exports.registerMessages = function(bot, deps) {
       const isIn   = ["member","restricted","administrator","creator"].includes(member?.status);
       const isOut  = ["left","kicked"].includes(member?.status);
       if (wasOut && isIn) {
+        // 🌊 Anti-Raid
+        require('../handlers/group_extras').checkAntiRaid(bot, chat.id, member.user.id).catch(() => {});
         const settings = await require('../handlers/group_protection').getSettings(chat.id).catch(() => null);
         if (settings?.verify_enabled) {
           require('../handlers/group_verify').startVerification(bot, chat.id, member.user).catch(() => {});

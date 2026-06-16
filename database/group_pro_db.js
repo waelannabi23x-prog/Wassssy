@@ -32,6 +32,7 @@ const DEFAULT_SETTINGS = Object.freeze({
   anti_words:      false,
   anti_caps:       false,
   anti_duplicate:  false,
+  anti_raid:       false,
 
   // ── عتبات (Thresholds) ──
   flood_limit:     5,    // عدد الرسائل
