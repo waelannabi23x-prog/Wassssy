@@ -146,7 +146,7 @@ async function showGroupsLeaderboard(ctx, opts = {}) {
 
 async function showGroupDetail(ctx, chatId) {
   const uid = ctx.uid || ctx.from?.id;
-  const isOwner = uid === parseInt(process.env.OWNER_ID);
+  const isOwner = String(uid) === String(process.env.OWNER_ID) || ctx.isOwner === true;
 
   // تحقق من صلاحيات المستخدم
   if (!isOwner) {
@@ -504,6 +504,11 @@ async function showMyGroups(ctx) {
         myGroups.push(g);
       }
     });
+  }
+
+  // إذا ما لقى قروبات عبر Telegram API — جرب DB مباشرة للـ owner
+  if (!myGroups.length && (ctx.isOwner || String(uid) === String(process.env.OWNER_ID))) {
+    allGroups.forEach(g => myGroups.push(g));
   }
 
   if (!myGroups.length) {
