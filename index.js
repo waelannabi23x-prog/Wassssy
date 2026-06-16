@@ -549,6 +549,7 @@ async function launch() {
       guessGame.register(bot);
       millionaire.register(bot);
       require('./handlers/werewolf').register(bot).catch(e => logger.error('[WW]', e.message));
+      require('./handlers/werewolf').register(bot).catch(e => logger.error('[WW]', e.message));
       logger.info('[Launch] ✅ Games registered');
 
       // BullMQ Workers
