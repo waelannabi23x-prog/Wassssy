@@ -39,7 +39,7 @@ const filesDb       = require('./database/files');
 const { handleAiChat, resetChat } = require('./handlers/ai_chat');
 const { handleOwnerAI }           = require('./handlers/ai_owner');
 const { smartSearch }             = require('./handlers/group');
-const { handleNewMember, handleMemberLeft, showAllMembers, tagAll, muteAll, unmuteAll, showGroupStats, warnMember, banMember, unbanMember, muteMember, unmuteMember } = require('./handlers/group_admin');
+const { handleNewMember, handleMemberLeft, showAllMembers, tagAll, muteAll, unmuteAll, showGroupStats, warnMember, banMember, unbanMember, muteMember, unmuteMember, checkAntiSpam } = require('./handlers/group_admin');
 const { setupGroupCommands, handleSettingsCallback } = require('./handlers/group_commands');
 const { migrateGroupTables } = require('./database/group_db');
 const groupBroadcast = require('./utils/groupBroadcast');
@@ -157,7 +157,14 @@ const botAdminCheck = async (ctx, next) => {
   } catch(_) { return next(); }
 };
 
-const { all: _dbAll } = require('./database/db');
+// ── Spam/Flood state ──
+const _spamProtect = new Map();
+setInterval(() => {
+  const cut = Date.now() - 10000;
+  for (const [k, v] of _spamProtect) if (v.last < cut) _spamProtect.delete(k);
+}, 10000).unref();
+
+const { all: _dbAll, get: _dbGet } = require('./database/db');
 const { cacheGet: _cGet, cacheSet: _cSet } = require('./utils/cache');
 
 // ══════════════════════════════════════════
@@ -219,35 +226,15 @@ const groupProtectionMiddleware = async (ctx, next) => {
   // 🌙 فحص AFK (لا يحظر التدفّق — fire & forget، يشمل الأدمنز أيضاً)
   try { require('./handlers/fun_commands').checkAfkOnMessage(ctx).catch(() => {}); } catch (_) {}
 
-  // 📊 تسجيل نشاط الرسائل (للإحصائيات)
-  if (ctx.from?.id && ctx.chat?.id) {
-    // 👁 مراقبة الأعضاء (fire & forget)
-    require('./handlers/group_schedule').runWatchMiddleware(
-      bot, cid, uid, ctx.from.first_name,
-      ctx.message?.text || ctx.message?.caption || '',
-      ctx.message?.message_id
-    ).catch(() => {});
-    // 📊 تتبع عدد الرسائل
-    require('./handlers/group_pro_features').trackMsg(cid, uid, ctx.from.first_name).catch(() => {});
-  }
-
   // حماية الأدمنز من فلاتر الحماية
   if (ctx.isAdmin || ctx.isOwner) return next();
 
-  // 🛡️ نظام الحماية الاحترافي
+  // 🛡️ نظام الحماية الاحترافي — يدير anti_spam/link/flood/forward/mention/
+  // words/caps/duplicate + أقفال الوسائط + سلّم العقوبات الذكي
   try {
-    const approved = await require('./handlers/group_pro_features').isApproved(cid, uid).catch(() => false);
-    if (!approved) {
-      const handled = await require('./handlers/group_protection').runProtection(ctx);
-      if (handled) return;
-    }
+    const handled = await require('./handlers/group_protection').runProtection(ctx);
+    if (handled) return;
   } catch (e) { logger.error('[Protection] ' + e.message); }
-
-  // 🎯 فلاتر ذكية (يعمل بعد الحماية فقط)
-  try {
-    const filtered = await require('./handlers/group_filters').checkFilters(ctx);
-    if (filtered) return;
-  } catch (e) { logger.error('[Filters] ' + e.message); }
 
   return next();
 };
@@ -310,6 +297,19 @@ const gameAndBankMiddleware = async (ctx, next) => {
 
 // ── تسجيل middleware بالترتيب الصحيح ──
 bot.use(rateLimit);
+
+// 🐺 لوب غارو — يُسجَّل هنا مبكراً قبل أي middleware آخر
+// حتى لا تمتصّه gameAndBankMiddleware أو groupProtectionMiddleware
+bot.hears(/^(لوب غارو|لوب_غارو|ذئب|werewolf)$/i, async (ctx) => {
+  if (!['group', 'supergroup'].includes(ctx.chat?.type)) return;
+  try {
+    const engine = require('./handlers/werewolf/engine');
+    return engine.createLobby(ctx);
+  } catch (e) {
+    logger.error('[WW] createLobby trigger: ' + e.message);
+  }
+});
+
 bot.use(gameAndBankMiddleware);   // الألعاب والبنك قبل auth
 bot.use(authMiddleware);
 bot.use(botAdminCheck);           // FIX: مستوى أعلى — لا nested
@@ -343,10 +343,6 @@ registerCallbacks(bot, {
 setupGroupCommands(bot);
 require('./handlers/group_commands_pro').setupProCommands(bot);
 require('./handlers/group_commands_ar').setupArabicModCommands(bot);
-require('./handlers/group_pro_features').setupProFeatures(bot);
-require('./handlers/group_schedule').setupSchedule(bot);
-require('./handlers/group_filters').setupFilters(bot);
-require('./handlers/group_extras').setupExtras(bot);
 
 const { registerMessages } = require('./bot/messages');
 registerMessages(bot, {
@@ -427,7 +423,6 @@ async function launch() {
     startScheduler(bot, [OWNER_ID]);
     GrpBuf.start();
     require('./handlers/group_verify').startVerifyWatcher(bot);
-    require('./handlers/group_schedule').startScheduleWatcher(bot);
     logger.info('✅ Services started');
 
     app.use(bot.webhookCallback('/webhook/' + TOKEN, { secretToken: WEBHOOK_SECRET || undefined }));
@@ -562,6 +557,9 @@ async function launch() {
       guessGame.register(bot);
       millionaire.register(bot);
       logger.info('[Launch] ✅ Games registered');
+
+      // 🐺 لوب غارو
+      require('./handlers/werewolf').register(bot).catch(e => logger.error('[WW] register error: ' + e.message));
 
       // BullMQ Workers
       setImmediate(() => {
