@@ -39,11 +39,9 @@ const filesDb       = require('./database/files');
 const { handleAiChat, resetChat } = require('./handlers/ai_chat');
 const { handleOwnerAI }           = require('./handlers/ai_owner');
 const { smartSearch }             = require('./handlers/group');
-const { handleNewMember, handleMemberLeft, showAllMembers, tagAll, muteAll, unmuteAll, showGroupStats, warnMember, banMember, unbanMember, muteMember, unmuteMember } = require('./handlers/group_admin');
+const { handleNewMember, handleMemberLeft, showAllMembers, tagAll, muteAll, unmuteAll, showGroupStats, warnMember, banMember, unbanMember, muteMember, unmuteMember, checkAntiSpam } = require('./handlers/group_admin');
 const { setupGroupCommands, handleSettingsCallback } = require('./handlers/group_commands');
-const { setupAdvancedCommands, checkAntiRaid, checkGlobalBan,
-        runWatchMiddleware, startScheduleWatcher,
-        handleHashNote } = require('./handlers/group_advanced');
+const { setupAdvancedCommands, startScheduleWatcher } = require('./handlers/group_advanced');
 const { migrateGroupTables } = require('./database/group_db');
 const groupBroadcast = require('./utils/groupBroadcast');
 const { btn: kbBtn, build: kbBuild } = require('./utils/keyboard');
@@ -160,7 +158,14 @@ const botAdminCheck = async (ctx, next) => {
   } catch(_) { return next(); }
 };
 
-const { all: _dbAll } = require('./database/db');
+// ── Spam/Flood state ──
+const _spamProtect = new Map();
+setInterval(() => {
+  const cut = Date.now() - 10000;
+  for (const [k, v] of _spamProtect) if (v.last < cut) _spamProtect.delete(k);
+}, 10000).unref();
+
+const { all: _dbAll, get: _dbGet } = require('./database/db');
 const { cacheGet: _cGet, cacheSet: _cSet } = require('./utils/cache');
 
 // ══════════════════════════════════════════
@@ -225,15 +230,6 @@ const groupProtectionMiddleware = async (ctx, next) => {
   // حماية الأدمنز من فلاتر الحماية
   if (ctx.isAdmin || ctx.isOwner) return next();
 
-  // 👁 مراقبة الأعضاء — fire & forget
-  runWatchMiddleware(bot, ctx).catch(() => {});
-
-  // 📝 #ملاحظة trigger
-  try {
-    const isHashNote = await handleHashNote(ctx);
-    if (isHashNote) return;
-  } catch(_) {}
-
   // 🛡️ نظام الحماية الاحترافي — يدير anti_spam/link/flood/forward/mention/
   // words/caps/duplicate + أقفال الوسائط + سلّم العقوبات الذكي
   try {
@@ -284,6 +280,11 @@ const gameAndBankMiddleware = async (ctx, next) => {
     if (/^استثمار(\s+\d.*)?$/i.test(txt))        return bankPro.invest(ctx).catch(() => next());
     if (/^سحب استثمار$/i.test(txt))               return bankPro.withdrawInvest(ctx).catch(() => next());
     if (/^(الاثرياء|أثرياء|اثرياء)$/i.test(txt)) return bankPro.richList(ctx).catch(() => next());
+
+      return require('./handlers/werewolf').register.length === 0
+        ? ctx.reply('⚠️ لوب غارو غير جاهز.').catch(() => {})
+        : (() => { try { const ww = require('./handlers/werewolf/engine'); return ww.createLobby(ctx).catch(() => next()); } catch(_) { return next(); } })();
+    }
   }
 
   // PV لعبة خمن
@@ -415,8 +416,6 @@ async function launch() {
     startScheduler(bot, [OWNER_ID]);
     GrpBuf.start();
     require('./handlers/group_verify').startVerifyWatcher(bot);
-    setupAdvancedCommands(bot);
-    startScheduleWatcher(bot);
     logger.info('✅ Services started');
 
     app.use(bot.webhookCallback('/webhook/' + TOKEN, { secretToken: WEBHOOK_SECRET || undefined }));
@@ -551,7 +550,10 @@ async function launch() {
       guessGame.register(bot);
       millionaire.register(bot);
       require('./handlers/werewolf').register(bot).catch(e => logger.error('[WW]', e.message));
+      setupAdvancedCommands(bot);
+      startScheduleWatcher(bot);
       logger.info('[Launch] ✅ Games registered');
+
 
       // BullMQ Workers
       setImmediate(() => {
