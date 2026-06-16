@@ -281,10 +281,6 @@ const gameAndBankMiddleware = async (ctx, next) => {
     if (/^سحب استثمار$/i.test(txt))               return bankPro.withdrawInvest(ctx).catch(() => next());
     if (/^(الاثرياء|أثرياء|اثرياء)$/i.test(txt)) return bankPro.richList(ctx).catch(() => next());
 
-      return require('./handlers/werewolf').register.length === 0
-        ? ctx.reply('⚠️ لوب غارو غير جاهز.').catch(() => {})
-        : (() => { try { const ww = require('./handlers/werewolf/engine'); return ww.createLobby(ctx).catch(() => next()); } catch(_) { return next(); } })();
-    }
   }
 
   // PV لعبة خمن
