@@ -314,6 +314,12 @@ module.exports.registerCallbacks = function(bot, deps) {
 
     const data = cbRes(_raw);
 
+    // 🐺 Werewolf callbacks
+    if (data.startsWith('ww:') || data.startsWith('wwx:')) {
+      try { return await require('./handlers/werewolf/index').handleCb(ctx, data); }
+      catch(e) { return ctx.answerCbQuery('⚠️ خطأ').catch(()=>{}); }
+    }
+
     try {
       // ── ألعاب ──
       if (data === 'mb_panel' || data.startsWith('gp_million') || data.startsWith('gp_guess') || data.startsWith('gp_slot')) {
