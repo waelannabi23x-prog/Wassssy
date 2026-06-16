@@ -311,8 +311,39 @@ module.exports.registerCallbacks = function(bot, deps) {
     const _raw = ctx.callbackQuery?.data, cbId = ctx.callbackQuery?.id;
     if (!_raw || CBDedup.isDupe(cbId)) return;
 
-    // 🐺 FIX: تمرير callbacks لوب غارو للمعالج المختص في werewolf/index.js
-    if (_raw.startsWith('ww:') || _raw.startsWith('wwx:')) return;
+    // 🐺 لوب غارو — معالجة مباشرة داخل نفس الـ handler (لأن handler بدون next)
+    if (_raw.startsWith('ww:') || _raw.startsWith('wwx:')) {
+      try {
+        const { parseCb, parseCbx } = require('../handlers/werewolf/codec');
+        const wwState = require('../handlers/werewolf/state');
+
+        if (_raw.startsWith('ww:')) {
+          const parsed = parseCb(_raw);
+          if (!parsed) return ctx.answerCbQuery('❌ بيانات غير صالحة.').catch(() => {});
+          const game = wwState.getGameById(parsed.gameId);
+          if (!game) return ctx.answerCbQuery('⌛ انتهت اللعبة أو تم إلغاؤها.', { show_alert: true }).catch(() => {});
+          if (parsed.epoch !== game.epoch) {
+            return ctx.answerCbQuery('🚫 هذا الزر لم يعد صالحاً.', { show_alert: true }).catch(() => {});
+          }
+          const engine  = require('../handlers/werewolf/engine');
+          const actions = require('../handlers/werewolf/actions');
+          if (['j','lv','st','cn'].includes(parsed.verb)) {
+            return engine.handleLobbyAction(ctx, game, parsed);
+          }
+          return actions.handle(ctx, game, parsed);
+        }
+
+        if (_raw.startsWith('wwx:')) {
+          const parsed = parseCbx(_raw);
+          if (!parsed) return ctx.answerCbQuery().catch(() => {});
+          return require('../handlers/werewolf/engine').handleMenuAction(ctx, parsed);
+        }
+      } catch(e) {
+        require('../utils/logger').error('[WW CB] ' + e.message);
+        return ctx.answerCbQuery('⚠️ خطأ مؤقت.').catch(() => {});
+      }
+      return;
+    }
 
     const data = cbRes(_raw);
 
