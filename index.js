@@ -282,6 +282,7 @@ const gameAndBankMiddleware = async (ctx, next) => {
     if (/^استثمار(\s+\d.*)?$/i.test(txt))        return bankPro.invest(ctx).catch(() => next());
     if (/^سحب استثمار$/i.test(txt))               return bankPro.withdrawInvest(ctx).catch(() => next());
     if (/^(الاثرياء|أثرياء|اثرياء)$/i.test(txt)) return bankPro.richList(ctx).catch(() => next());
+    if (/^(لوب غارو|لوب_غارو|ذئب|werewolf)$/i.test(txt)) { try { const ww = require('./handlers/werewolf/engine'); return ww.createLobby(ctx).catch(() => next()); } catch(_) { return next(); } }
   }
 
   // PV لعبة خمن
