@@ -61,7 +61,10 @@ async function createLobby(ctx) {
   const creator = { id: uid, first_name: ctx.from.first_name, username: ctx.from.username };
   const game = state.createGame(ctx.chat.id, ctx.chat.title, creator);
   await prepareChat(BOT, game);
-  const msg = await ctx.reply(texts.lobbyText(game), { parse_mode: 'Markdown', reply_markup: kb.lobbyKeyboard(game) });
+  // reply_to_message_id: رد على رسالة "لوب غارو" مباشرةً
+  const replyOpts = { parse_mode: 'Markdown', reply_markup: kb.lobbyKeyboard(game) };
+  if (ctx.message?.message_id) replyOpts.reply_to_message_id = ctx.message.message_id;
+  const msg = await ctx.reply(texts.lobbyText(game), replyOpts);
   game.lobbyMsgId = msg.message_id;
   scheduleLobbyTimeout(game);
 }
@@ -638,13 +641,14 @@ async function handlePlayerLeft(chatId, userId) {
 // ══════════════════ أوامر القائمة العامة (wwx:) ══════════════════
 async function handleMenuAction(ctx, parsed) {
   switch (parsed.action) {
-    case 'status':  return cmdStatus(ctx, true);
-    case 'log':     return cmdLog(ctx, true);
-    case 'rules':   return cmdRules(ctx, true);
-    case 'mystats': return cmdStats(ctx, true);
-    case 'ach':     return cmdAchievements(ctx, true);
-    case 'season':  return cmdSeason(ctx, true);
-    default:        return ctx.answerCbQuery();
+    case 'status':     return cmdStatus(ctx, true);
+    case 'log':        return cmdLog(ctx, true);
+    case 'rules':      return cmdRules(ctx, true);
+    case 'mystats':    return cmdStats(ctx, true);
+    case 'ach':        return cmdAchievements(ctx, true);
+    case 'season':     return cmdSeason(ctx, true);
+    case 'back_lobby': return cmdBackLobby(ctx);
+    default:           return ctx.answerCbQuery();
   }
 }
 
@@ -663,8 +667,26 @@ async function cmdLog(ctx, isCb) {
 }
 
 async function cmdRules(ctx, isCb) {
-  if (isCb) await ctx.answerCbQuery();
+  const backBtn = { inline_keyboard: [[{ text: '🔙 رجوع للوبي', callback_data: require('./codec').cbx('back_lobby') }]] };
+  if (isCb) {
+    await ctx.answerCbQuery();
+    // تعديل الرسالة الحالية بدل إرسال رسالة جديدة
+    return ctx.editMessageText(texts.rulesText(), { parse_mode: 'Markdown', reply_markup: backBtn })
+      .catch(() => ctx.reply(texts.rulesText(), { parse_mode: 'Markdown' }).catch(() => {}));
+  }
   return ctx.reply(texts.rulesText(), { parse_mode: 'Markdown' }).catch(() => {});
+}
+
+// رجوع من صفحة القوانين إلى لوبي اللعبة
+async function cmdBackLobby(ctx) {
+  await ctx.answerCbQuery();
+  const game = state.getGameByChat(ctx.chat.id);
+  if (!game || game.status !== 'lobby') {
+    return ctx.editMessageText('ℹ️ لا توجد غرفة انتظار نشطة حالياً.\nاكتب *لوب غارو* لإنشاء غرفة جديدة.', { parse_mode: 'Markdown' })
+      .catch(() => {});
+  }
+  return ctx.editMessageText(texts.lobbyText(game), { parse_mode: 'Markdown', reply_markup: kb.lobbyKeyboard(game) })
+    .catch(() => {});
 }
 
 async function cmdStats(ctx, isCb) {
@@ -694,5 +716,5 @@ async function cmdMenu(ctx) {
 
 module.exports = {
   init, createLobby, handleLobbyAction, handleMenuAction, handlePlayerLeft,
-  cmdStatus, cmdLog, cmdRules, cmdStats, cmdAchievements, cmdSeason, cmdMenu,
+  cmdStatus, cmdLog, cmdRules, cmdStats, cmdAchievements, cmdSeason, cmdMenu, cmdBackLobby,
 };
