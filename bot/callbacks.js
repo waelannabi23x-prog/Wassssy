@@ -314,12 +314,6 @@ module.exports.registerCallbacks = function(bot, deps) {
 
     const data = cbRes(_raw);
 
-    // 🐺 Werewolf callbacks
-    if (data.startsWith('ww:') || data.startsWith('wwx:')) {
-      try { return await require('./handlers/werewolf/index').handleCb(ctx, data); }
-      catch(e) { return ctx.answerCbQuery('⚠️ خطأ').catch(()=>{}); }
-    }
-
     try {
       // ── ألعاب ──
       if (data === 'mb_panel' || data.startsWith('gp_million') || data.startsWith('gp_guess') || data.startsWith('gp_slot')) {
@@ -645,7 +639,8 @@ module.exports.registerCallbacks = function(bot, deps) {
             data.startsWith('grp_pnone_') || data.startsWith('grp_aptog_') ||
             data.startsWith('grp_apsave_') || data.startsWith('grp_demote_') ||
             data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_') ||
-            data.startsWith('grp_violations_') || data.startsWith('grp_warn_quick_')) {
+            data.startsWith('grp_violations_') || data.startsWith('grp_warn_quick_') ||
+            data.startsWith('gf_setaction_')) {
           const chatIdCheck = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
           const callerMember = await ctx.telegram.getChatMember(chatIdCheck, ctx.from.id).catch(() => null);
           const isCallerAdm  = ctx.isAdmin || ctx.isOwner || ['administrator','creator'].includes(callerMember?.status);

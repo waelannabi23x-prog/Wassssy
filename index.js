@@ -221,7 +221,7 @@ const groupProtectionMiddleware = async (ctx, next) => {
 
   // 📊 تسجيل نشاط الرسائل (للإحصائيات)
   if (ctx.from?.id && ctx.chat?.id) {
-    require('./handlers/group_extras').trackMessageActivity(ctx.chat.id, ctx.from.id).catch(() => {});
+    require('./handlers/group_pro_features').trackMsg(ctx.chat.id, ctx.from.id, ctx.from.first_name).catch(() => {});
   }
 
   // حماية الأدمنز من فلاتر الحماية
@@ -229,8 +229,11 @@ const groupProtectionMiddleware = async (ctx, next) => {
 
   // 🛡️ نظام الحماية الاحترافي
   try {
-    const handled = await require('./handlers/group_protection').runProtection(ctx);
-    if (handled) return;
+    const approved = await require('./handlers/group_pro_features').isApproved(cid, uid).catch(() => false);
+    if (!approved) {
+      const handled = await require('./handlers/group_protection').runProtection(ctx);
+      if (handled) return;
+    }
   } catch (e) { logger.error('[Protection] ' + e.message); }
 
   // 🎯 فلاتر ذكية (يعمل بعد الحماية فقط)
@@ -282,7 +285,6 @@ const gameAndBankMiddleware = async (ctx, next) => {
     if (/^استثمار(\s+\d.*)?$/i.test(txt))        return bankPro.invest(ctx).catch(() => next());
     if (/^سحب استثمار$/i.test(txt))               return bankPro.withdrawInvest(ctx).catch(() => next());
     if (/^(الاثرياء|أثرياء|اثرياء)$/i.test(txt)) return bankPro.richList(ctx).catch(() => next());
-    if (/^(لوب غارو|لوب_غارو|ذئب|werewolf)$/i.test(txt)) { try { const ww = require('./handlers/werewolf/engine'); return ww.createLobby(ctx).catch(() => next()); } catch(_) { return next(); } }
   }
 
   // PV لعبة خمن
@@ -334,6 +336,7 @@ registerCallbacks(bot, {
 setupGroupCommands(bot);
 require('./handlers/group_commands_pro').setupProCommands(bot);
 require('./handlers/group_commands_ar').setupArabicModCommands(bot);
+require('./handlers/group_pro_features').setupProFeatures(bot);
 require('./handlers/group_filters').setupFilters(bot);
 require('./handlers/group_extras').setupExtras(bot);
 
@@ -549,8 +552,6 @@ async function launch() {
       // Games — register مرة واحدة
       guessGame.register(bot);
       millionaire.register(bot);
-      require('./handlers/werewolf').register(bot).catch(e => logger.error('[WW]', e.message));
-      require('./handlers/werewolf').register(bot).catch(e => logger.error('[WW]', e.message));
       logger.info('[Launch] ✅ Games registered');
 
       // BullMQ Workers

@@ -147,7 +147,7 @@ async function checkAntiRaid(bot, chatId, userId) {
   if (joins.length < RAID_THRESHOLD) return false;
 
   // تحقق Cooldown للإشعار (لا نرسل تنبيهاً كل ثانية)
-  const lastRaid = _RAID_COOLDOWN?.get?.(chatId) || 0;
+  const lastRaid = RAID_COOLDOWN?.get?.(chatId) || 0;
   const alerted = now - lastRaid < 60000;
   RAID_COOLDOWN.set(chatId, now);
   _joinTrack.delete(chatId);
@@ -229,41 +229,19 @@ async function handleTopActive(ctx) {
 }
 
 // ══════════════════════════════════════════════════════════
-// 5. تسجيل نشاط الرسائل (لـ topactive)
-// ══════════════════════════════════════════════════════════
-async function trackMessageActivity(chatId, userId) {
-  // نحدّث last_active في group_members
-  run('UPDATE group_members SET last_active=NOW() WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => {});
-}
-
-// ══════════════════════════════════════════════════════════
 // 🔁 تسجيل الأوامر
 // ══════════════════════════════════════════════════════════
 function setupExtras(bot) {
-  // 🐌 Slowmode
-  bot.command(['slowmode', 'وضع_بطيء', 'slow'], handleSlowmode);
-  bot.hears(/^وضع بطيء (\d+)$/, async ctx => {
-    ctx.message.text = '/slowmode ' + ctx.match[1];
-    return handleSlowmode(ctx);
-  });
-
   // 🚨 Report
   bot.command(['report', 'بلاغ'], handleReport);
   bot.hears(/^بلاغ(?:\s+(.+))?$/, async ctx => {
     ctx.message.text = '/report ' + (ctx.match[1] || '');
     return handleReport(ctx);
   });
-
-  // 📊 Top active
-  bot.command(['topactive', 'الأنشط', 'نشاط'], handleTopActive);
-  bot.hears('الأنشط', handleTopActive);
 }
 
 module.exports = {
   setupExtras,
-  handleSlowmode,
   handleReport,
   checkAntiRaid,
-  handleTopActive,
-  trackMessageActivity,
 };

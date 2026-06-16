@@ -597,7 +597,8 @@ async function warnMember(ctx, chatId, targetUserId, reason) {
     ).catch(() => ({ cnt: 0 }));
 
     const count = parseInt(warnCount?.cnt || 0);
-    const MAX_WARNS = 3;
+    const settingsRow = await require('../database/group_pro_db').getRawSettings(chatId).catch(() => null);
+    const MAX_WARNS = parseInt(settingsRow?.warn_limit) || 3;
 
     let actionText = '';
     if (count >= MAX_WARNS) {
@@ -618,10 +619,10 @@ async function warnMember(ctx, chatId, targetUserId, reason) {
     if (ctx.callbackQuery) return;
 
     const _warnKb = count < MAX_WARNS ? [
-      [{ text: '❗ الإنذارات', callback_data: 'grp_warns_' + targetUserId },
-       { text: '🔇 كتم 🪃',   callback_data: 'grp_mute_1h_' + targetUserId }],
-      [{ text: '🚫 حظر 🏹',   callback_data: 'grp_ban_' + targetUserId },
-       { text: '🎛 أذونات 📡', callback_data: 'grp_perms_' + targetUserId }],
+      [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + targetUserId },
+       { text: '🔇 كتم 10د',   callback_data: 'grp_mute_menu_' + targetUserId }],
+      [{ text: '🚫 حظر',        callback_data: 'grp_ban_confirm_' + targetUserId },
+       { text: '🎛 الصلاحيات',  callback_data: 'grp_perms_' + targetUserId }],
     ] : [
       [{ text: '🔓 رفع الحظر', callback_data: 'grp_unban_' + targetUserId }],
     ];

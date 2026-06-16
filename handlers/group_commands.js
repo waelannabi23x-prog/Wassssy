@@ -557,17 +557,11 @@ function setupGroupCommands(bot) {
   });
 
 
-  // ══ /cmds ══
+  // ══ /cmds — يوجّه للقائمة الشاملة في group_pro_features ══
   bot.command(["cmds", "اوامر"], async ctx => {
     if (!isGroup(ctx)) return;
     delCmd(ctx);
-    const isAdm = await isTgAdmin(ctx);
-    let txt = "📋 *أوامر البوت*\n\n👥 *للجميع:*\n`/info` معلومات عضو\n`/rules` القواعد\n`مليون` لعبة المليون\n`خمن` لعبة التخمين\n";
-    if (isAdm) {
-      txt += "\n🛡️ *للمشرفين:*\n`/ban` `/unban` `/kick`\n`/mute 10m` `/unmute`\n`/warn` `/warns` `/unwarn`\n`/pin` `/unpin`\n`/promote` `/demote`\n`/info` `/clean 20`\n`/mstop` `/mstats`\n`/tagall` `/stats`\n";
-    }
-    const m = await ctx.reply(txt, { parse_mode: "Markdown" }).catch(() => null);
-    if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 30000);
+    return ctx.reply(require('./group_pro_features').CMDS_TEXT, { parse_mode: 'Markdown' }).catch(() => {});
   });
 
 

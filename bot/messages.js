@@ -332,6 +332,9 @@ module.exports.registerMessages = function(bot, deps) {
       if (wasOut && isIn) {
         // 🌊 Anti-Raid
         require('../handlers/group_extras').checkAntiRaid(bot, chat.id, member.user.id).catch(() => {});
+        // 🛑 فحص الحظر العالمي
+        const gbanned = await require('../handlers/group_pro_features').checkGban(bot, chat.id, member.user.id).catch(() => false);
+        if (gbanned) return;
         const settings = await require('../handlers/group_protection').getSettings(chat.id).catch(() => null);
         if (settings?.verify_enabled) {
           require('../handlers/group_verify').startVerification(bot, chat.id, member.user).catch(() => {});
