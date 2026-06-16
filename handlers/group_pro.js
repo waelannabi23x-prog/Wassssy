@@ -635,6 +635,17 @@ async function checkNewMember(bot, ctx, next) {
     const newMembers = ctx.message?.new_chat_members;
     if (!newMembers || !newMembers.length) return next();
 
+    // 🌍 حظر عالمي + 🛡 Anti-Raid
+    const { checkGlobalBan, checkAntiRaid } = require('./group_advanced');
+    for (const member of newMembers) {
+      if (member.is_bot) continue;
+      try {
+        const gbanned = await checkGlobalBan(bot, ctx.chat.id, member.id);
+        if (gbanned) continue;
+        await checkAntiRaid(bot, ctx.chat.id, member.id);
+      } catch(_) {}
+    }
+
     const s = await getSettings(ctx.chat.id);
     if (!s.anti_new_account || !s.min_account_age_days) return next();
 
