@@ -216,8 +216,10 @@ module.exports.registerCallbacks = function(bot, deps) {
     // Group
     { p: 'grp_main_',   fn: (ctx, d) => { const chatId = d.replace('grp_main_',''); const { showAllMembers } = require('../handlers/group_admin'); return showAllMembers(ctx, chatId); } },
     { p: 'grp_main',    fn: (ctx, d) => { const uid = ctx.uid || ctx.from?.id; const isOwner = uid === parseInt(process.env.OWNER_ID); return isOwner ? groupPanel.showMainMenu(ctx) : groupPanel.showMyGroups(ctx); } },
-    { p: 'gp_',         fn: (ctx, d) => groupPanel.handleCallback(ctx, d) },
-    { p: 'gpx_',        fn: (ctx, d) => require('../handlers/group_pro_panel').handleCallback(ctx, d) },
+    { p: 'gp_',  fn: (ctx, d) => groupPanel.handleCallback(ctx, d) },
+    { p: 'gpx_', fn: (ctx, d) => require('../handlers/group_pro_panel').handleCallback(ctx, d) },
+    { p: 'gpq_', fn: (ctx, d) => require('../handlers/group_schedule').handleQuickCallback(ctx, d) },
+    { p: 'sch_', fn: (ctx, d) => require('../handlers/group_schedule').handleQuickCallback(ctx, d) },
     { p: 'gf_',         fn: (ctx, d) => require('../handlers/group_filters').handleFilterCallback(ctx, d) },
     { p: 'grp_sp_',     fn: hGrpSp },
     { p: 'grp_dl_',     fn: hGrpDl },
@@ -640,7 +642,8 @@ module.exports.registerCallbacks = function(bot, deps) {
             data.startsWith('grp_apsave_') || data.startsWith('grp_demote_') ||
             data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_') ||
             data.startsWith('grp_violations_') || data.startsWith('grp_warn_quick_') ||
-            data.startsWith('gf_setaction_')) {
+            data.startsWith('gf_setaction_')   ||
+            data.startsWith('gpq_')            || data.startsWith('sch_')) {
           const chatIdCheck = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
           const callerMember = await ctx.telegram.getChatMember(chatIdCheck, ctx.from.id).catch(() => null);
           const isCallerAdm  = ctx.isAdmin || ctx.isOwner || ['administrator','creator'].includes(callerMember?.status);
@@ -1124,6 +1127,7 @@ module.exports.registerCallbacks = function(bot, deps) {
           || data.startsWith('close_list_') || data.startsWith('close_stats_')
           || data.startsWith('grp_stats_') || data === 'rules_ok'
           || data.startsWith('ml_') || data.startsWith('gp_') || data.startsWith('gpx_')
+          || data.startsWith('gpq_') || data.startsWith('sch_')
           || data.startsWith('grp_register_') || data.startsWith('grp_reg_btn_')
           || data === 'mb_panel' || data.startsWith('gp_million') || data.startsWith('gp_guess')
           || data.startsWith('mlr_') || data.startsWith('mar_')

@@ -66,6 +66,11 @@ const PROT_TOGGLES = [
   { key: 'anti_caps',      label: '🔠 مكافحة الحروف الكبيرة' },
   { key: 'anti_edit',      label: '✏️ مكافحة تعديل المخالفات' },
   { key: 'anti_bot',       label: '🤖 مكافحة البوتات غير المصرّحة' },
+  // ── حماية متقدمة ──
+  { key: 'anti_short_link', label: '🔗 مكافحة الروابط المختصرة' },
+  { key: 'anti_invite',     label: '📨 مكافحة روابط الدعوة' },
+  { key: 'anti_media',      label: '🖼 مكافحة الصور والفيديوهات' },
+  { key: 'anti_file',       label: '📁 مكافحة الملفات والمستندات' },
   { key: 'anti_raid',      label: '🌊 مكافحة الانضمام الجماعي (Raid)' },
 ];
 

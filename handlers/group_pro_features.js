@@ -456,6 +456,10 @@ const CMDS_TEXT =
 \`/admins\` • \`/topactive\` • \`/stats\`
 \`/slowmode [ثواني]\` • \`/purgeto\` • \`/purge [n]\`
 \`/whois\` (رد) • \`/setjoin\` — رسالة ترحيب
+\`/tempban @user 1h [سبب]\` — حظر مؤقت
+\`/schedule HH:MM رسالة\` — جدولة رسالة
+\`/watching @user\` • \`/unwatch @user\` — مراقبة عضو
+\`ادارة\` (رد على عضو) — لوحة أدمن سريعة
 \`/report\` (رد) — بلاغ للمشرفين
 \`/all [رسالة]\` — منشن الكل
 \`/summary\` — تحليل AI للقروب`;

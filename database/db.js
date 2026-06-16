@@ -34,7 +34,7 @@ function getPg() {
       if (!pgPool) { clearInterval(_kpTimer); return; }
       pgPool.query('SELECT 1').catch(e => {
         // لا نحذف الـ pool — هو يعيد الاتصال تلقائياً
-        require('../utils/logger').warn('[DB] keepalive failed (auto-recovering):', e.message);
+        require('./logger').warn('[DB] keepalive failed (auto-recovering):', e.message);
       });
     }, 25000);
     _kpTimer.unref();

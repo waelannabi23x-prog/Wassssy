@@ -21,7 +21,7 @@ const logger = require('../utils/logger');
 // ⚙️ الإعدادات الافتراضية لنظام الحماية
 // ══════════════════════════════════════════════════════════
 const DEFAULT_SETTINGS = Object.freeze({
-  // ── الحماية ──
+  // ── الحماية الأساسية ──
   anti_spam:       false,
   anti_link:       false,
   anti_flood:      false,
@@ -33,6 +33,12 @@ const DEFAULT_SETTINGS = Object.freeze({
   anti_caps:       false,
   anti_duplicate:  false,
   anti_raid:       false,
+
+  // ── حماية متقدمة (جديد) ──
+  anti_short_link: false,  // روابط مختصرة (bit.ly/tinyurl/etc)
+  anti_invite:     false,  // روابط دعوة تيليجرام (t.me/+...)
+  anti_media:      false,  // الصور والفيديوهات
+  anti_file:       false,  // الملفات والمستندات
 
   // ── عتبات (Thresholds) ──
   flood_limit:     5,    // عدد الرسائل

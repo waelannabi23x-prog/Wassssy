@@ -129,7 +129,11 @@ const VIOLATION_LABELS = {
   mention:   'منشن جماعي مفرط',
   caps:      'إكثار في الحروف الكبيرة',
   length:    'رسالة طويلة جداً',
-  forward:   'محتوى موجَّه (Forward)',
+  forward:     'محتوى موجَّه (Forward)',
+  short_link:  'رابط مختصر ممنوع',
+  invite_link: 'رابط دعوة تيليجرام',
+  media:       'صورة/فيديو ممنوع',
+  file:        'ملف/مستند ممنوع',
   lock_sticker: 'ملصقات مقفولة',
   lock_gif:     'الصور المتحركة مقفولة',
   lock_photo:   'الصور مقفولة',
@@ -235,6 +239,34 @@ function checkForward(ctx, settings) {
   return (msg.forward_date || msg.forward_from || msg.forward_from_chat || msg.forward_sender_name || msg.forward_origin) ? 'forward' : null;
 }
 
+// ── جديد: روابط مختصرة ──
+const SHORT_LINK_DOMAINS = ['bit.ly','tinyurl.com','t.co','goo.gl','ow.ly','buff.ly','short.link','rb.gy','cutt.ly','is.gd','bl.ink','shorturl.at','tiny.cc','clck.ru','urlshortener.me'];
+function checkShortLink(txt, settings) {
+  if (!settings.anti_short_link || !txt) return null;
+  const lower = txt.toLowerCase();
+  return SHORT_LINK_DOMAINS.some(d => lower.includes(d)) ? 'short_link' : null;
+}
+
+// ── جديد: روابط دعوة تيليجرام ──
+function checkInviteLink(txt, settings) {
+  if (!settings.anti_invite || !txt) return null;
+  return /t\.me\/\+[a-zA-Z0-9_-]{10,}|telegram\.me\/\+/i.test(txt) ? 'invite_link' : null;
+}
+
+// ── جديد: مكافحة الوسائط (صور/فيديو) ──
+function checkMedia(ctx, settings) {
+  if (!settings.anti_media) return null;
+  const msg = ctx.message;
+  return (msg.photo || msg.video || msg.video_note) ? 'media' : null;
+}
+
+// ── جديد: مكافحة الملفات ──
+function checkFile(ctx, settings) {
+  if (!settings.anti_file) return null;
+  const msg = ctx.message;
+  return (msg.document || msg.audio) ? 'file' : null;
+}
+
 function checkLocks(msg, locks) {
   if (locks.sticker && msg.sticker) return 'lock_sticker';
   if (locks.gif && msg.animation) return 'lock_gif';
@@ -319,6 +351,7 @@ async function applyLockPermissions(ctx, chatId) {
 function anyProtectionEnabled(s) {
   return !!(s.anti_spam || s.anti_link || s.anti_flood || s.anti_forward ||
             s.anti_mention || s.anti_words || s.anti_caps || s.anti_duplicate ||
+            s.anti_short_link || s.anti_invite || s.anti_media || s.anti_file ||
             (s.max_msg_len > 0));
 }
 
@@ -476,6 +509,10 @@ async function runProtection(ctx) {
   if (!violation) violation = checkCaps(txt, settings);
   if (!violation) violation = checkLength(txt, settings);
   if (!violation) violation = checkForward(ctx, settings);
+  if (!violation) violation = checkShortLink(txt, settings);
+  if (!violation) violation = checkInviteLink(txt, settings);
+  if (!violation) violation = checkMedia(ctx, settings);
+  if (!violation) violation = checkFile(ctx, settings);
 
   if (!violation) return false;
 

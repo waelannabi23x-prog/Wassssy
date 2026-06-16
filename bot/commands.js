@@ -11,11 +11,8 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
     return ctx.reply(text, { parse_mode: 'Markdown' }).catch(() => {});
   });
 
-  // FIX: ban/unban هنا = حظر المستخدم من البوت بالكامل (أونر فقط، خاص فقط).
-  // داخل القروبات نمرر للأمام (next) ليتولاها /ban و /unban المتخصصان
-  // في handlers/group_commands.js (حظر/رفع حظر من القروب نفسه).
-  bot.command('ban', async (ctx, next) => {
-    if (ctx.chat?.type !== 'private') return next();
+  bot.command('ban', async ctx => {
+    if (ctx.chat?.type !== 'private') return;
     if (!ctx.isOwner) return;
     const id = parseInt((ctx.message.text||'').split(' ')[1]);
     if (!id) return ctx.reply('❌ /ban [ID]').catch(() => {});
@@ -23,8 +20,8 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
     return ctx.reply('✅ تم الحظر: ' + id).catch(() => {});
   });
 
-  bot.command('unban', async (ctx, next) => {
-    if (ctx.chat?.type !== 'private') return next();
+  bot.command('unban', async ctx => {
+    if (ctx.chat?.type !== 'private') return;
     if (!ctx.isOwner) return;
     const id = parseInt((ctx.message.text||'').split(' ')[1]);
     if (!id) return ctx.reply('❌ /unban [ID]').catch(() => {});
@@ -84,12 +81,7 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
   });
 
   bot.command('profile', ctx => userH.showProfile(ctx));
-  // FIX: /stats — في الخاص إحصائيات المستخدم، وفي القروب نمرر next()
-  // ليتولاها /stats الخاص بإحصائيات القروب في group_commands.js
-  bot.command('stats', async (ctx, next) => {
-    if (ctx.chat?.type !== 'private') return next();
-    return userH.showStats(ctx);
-  });
+  bot.command('stats',   ctx => userH.showStats(ctx));
 
   bot.command('done', async ctx => {
     if (ctx.chat?.type !== 'private') return;
@@ -183,6 +175,11 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
     return browse.showNew ? browse.showNew(ctx) : ctx.reply('قريباً').catch(() => {});
   });
 
+  bot.command('top', async ctx => {
+    if (ctx.chat?.type !== 'private') return;
+    return browse.showTop ? browse.showTop(ctx) : ctx.reply('قريباً').catch(() => {});
+  });
+
   // 🏆 /all في الخاص (للأونر فقط) — ترتيب القروبات حسب عدد الأعضاء
   // 📣 /all داخل قروب — منشن الكل (السلوك الأصلي محفوظ)
   bot.command('all', async ctx => {
@@ -203,9 +200,15 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
     return tagAll(ctx, ctx.chat.id, args||null);
   });
 
-  // FIX: /mute و /unmute مُزالان من هنا — كانا يكتمان "الكل" دائماً ويحجبان
-  // /mute @user (إسكات عضو محدد) في handlers/group_commands.js.
-  // النسخة الجديدة هناك تدعم /mute (=الكل), /mute all, و /mute @user [مدة].
+  bot.command('mute', async ctx => {
+    if (!['group','supergroup'].includes(ctx.chat?.type)) return;
+    return muteAll(ctx, ctx.chat.id);
+  });
+
+  bot.command('unmute', async ctx => {
+    if (!['group','supergroup'].includes(ctx.chat?.type)) return;
+    return unmuteAll(ctx, ctx.chat.id);
+  });
 
   bot.command('channels', async ctx => {
     if (!ctx.isOwner && !ctx.isAdmin) return;
@@ -294,8 +297,17 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
     else ctx.reply(txt, {parse_mode:'Markdown'}).catch(()=>{});
   });
 
-  // ── /help ──
+  // أمر مؤقت لحذف كل القنوات
+  bot.command('clearchannels', async ctx => {
+    if (!ctx.isOwner) return;
+    const { run } = require('../database/db');
+    const { cacheClear } = require('../utils/cache');
+    await run('UPDATE required_channels SET is_active=0').catch(e => ctx.reply('❌ ' + e.message));
+    cacheClear('required_channels');
+    return ctx.reply('✅ تم إيقاف كل القنوات');
+  });
 
+  // ── /help ──
   const { handleHelp } = require('../handlers/help');
   bot.command(['help', 'مساعدة', 'اوامر', 'cmds'], async ctx => {
     if (['group','supergroup'].includes(ctx.chat?.type)) {
