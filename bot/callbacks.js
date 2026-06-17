@@ -345,6 +345,17 @@ module.exports.registerCallbacks = function(bot, deps) {
       return;
     }
 
+
+    // 🆘 لوحة المساعدة
+    if (_raw.startsWith('help_')) {
+      try {
+        const { handleHelpCallback } = require('../handlers/group_pro_features');
+        const result = handleHelpCallback(ctx, _raw);
+        if (result !== false) return result;
+      } catch(e) {
+        return ctx.answerCbQuery('⚠️ خطأ').catch(() => {});
+      }
+    }
     const data = cbRes(_raw);
 
     try {
