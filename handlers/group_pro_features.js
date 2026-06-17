@@ -421,48 +421,78 @@ function formatJoinMsg(template, data) {
 // ══════════════════════════════════════════════════════════
 // 🎛 واجهة أوامر الإدارة السريعة /cmds
 // ══════════════════════════════════════════════════════════
-const CMDS_TEXT =
-`🎛 *أوامر إدارة القروب*
-━━━━━━━━━━━━━━━━
+// ══════════════════════════════════════════════════════════
+// 🆘 لوحة المساعدة التفاعلية
+// ══════════════════════════════════════════════════════════
+const HELP_SECTIONS = {
+  mod: {
+    label: '🛡 الأعضاء',
+    text: '🛡 *إدارة الأعضاء*\n━━━━━━━━━━━━━━━━\n_رد على رسالة العضو أو @username_\n\n`/ban [سبب]` أو `حظر` — حظر دائم\n`/unban` أو `فك حظر` — رفع حظر\n`/kick` أو `طرد` — طرد\n`/tempban 1h [سبب]` — حظر مؤقت\n`/mute [1h]` أو `كتم` — كتم\n`/unmute` أو `فك كتم` — رفع كتم\n`/warn [سبب]` أو `تحذير` — إنذار\n`/unwarn` أو `فك تحذير` — مسح إنذارات\n`/warns` أو `تحذيراته` — إنذاراته\n`/setwarnlimit [1-10]` — حد الإنذارات\n`ادارة` (رد) — لوحة أدمن سريعة',
+  },
+  content: {
+    label: '📝 المحتوى',
+    text: '📝 *إدارة المحتوى*\n━━━━━━━━━━━━━━━━\n`/pin` (رد) أو `تثبيت` — تثبيت\n`/unpin` أو `فك تثبيت` — إلغاء تثبيت\n`/del` (رد) أو `حذف` — حذف رسالة\n`/purge [n]` — حذف n رسالة\n`/purgeto` (رد) — حذف من-لحد\n`/save [اسم]` (رد) — حفظ ملاحظة\n`#اسم` — استدعاء ملاحظة\n`/notes` — كل الملاحظات\n`/delnote [اسم]` — حذف ملاحظة\n`/filter [trigger] [رد]` — فلتر تلقائي\n`/filters` — عرض الفلاتر\n`/delfilter [trigger]` — حذف فلتر',
+  },
+  protection: {
+    label: '🔰 الحماية',
+    text: '🔰 *نظام الحماية*\n━━━━━━━━━━━━━━━━\n`/protection` أو `الحماية` — اللوحة الكاملة\n\nأنواع الحماية (من اللوحة):\n• anti_spam • anti_link • anti_flood\n• anti_forward • anti_mention • anti_words\n• anti_caps • anti_duplicate • anti_edit\n• anti_bot • anti_raid\n• anti_short_link • anti_invite\n• anti_media • anti_file\n\n`/lock [نوع]` أو `قفل` — قفل وسائط\n`/unlock [نوع]` أو `فتح` — فتح وسائط\nالأنواع: sticker gif link forward photo video voice poll\n`/setword [كلمة]` — إضافة كلمة محظورة\n`/delword [كلمة]` — حذف كلمة\n`/words` — القائمة',
+  },
+  roles: {
+    label: '🎭 الرتب',
+    text: '🎭 *الرتب والصلاحيات*\n━━━━━━━━━━━━━━━━\n`/setrole [رتبة]` (رد) — تعيين رتبة\n`/removerole` (رد) — إزالة رتبة\n`/roles` — عرض الرتب\n`رتبة +` (رد) — ترقية درجة\n`رتبة -` (رد) — تخفيض درجة\n\nالرتب:\n👑 manager — مدير\n🛡 super_admin — مشرف عام\n🔰 protection_admin — مشرف حماية\n📚 content_admin — مشرف محتوى\n🤝 assistant — مساعد\n\n`/approve` (رد) — استثناء من الحماية\n`/unapprove` (رد) — إلغاء استثناء\n`/approved` — قائمة المستثنين',
+  },
+  stats: {
+    label: '📊 إحصائيات',
+    text: '📊 *الإحصائيات والسجلات*\n━━━━━━━━━━━━━━━━\n`/stats` — إحصائيات القروب\n`/topactive` أو `الأنشط` — أنشط الأعضاء\n`/admins` أو `المشرفون` — قائمة المشرفين\n`/info` (رد) — معلومات عضو\n`/whois` (رد) — معلومات + gban\n`/logs` أو `السجلات` — سجلات القروب\n`/violations` (رد) — مخالفات الحماية\n`/summary` أو `تحليل` — تحليل AI',
+  },
+  tools: {
+    label: '🔧 أدوات',
+    text: '🔧 *الأدوات المتقدمة*\n━━━━━━━━━━━━━━━━\n`/schedule HH:MM رسالة` — جدولة رسالة\n`/watching @user` — مراقبة عضو\n`/unwatch @user` — إيقاف المراقبة\n`/slowmode [ثواني]` — وضع بطيء\n`/setjoin [رسالة]` — ترحيب مخصص\n  متغيرات: {name} {mention} {count} {group}\n`/rules` — قواعد القروب\n`/all [رسالة]` — منشن الكل\n`/verify` أو `التحقق` — التحقق من الأعضاء\n`/report` (رد) — بلاغ للمشرفين',
+  },
+  games: {
+    label: '🎮 الألعاب',
+    text: '🎮 *الألعاب والاقتصاد*\n━━━━━━━━━━━━━━━━\n`مليون` — من سيربح المليون\n`خمن` — لعبة التخمين\n`سلوت` — لعبة السلوت\n`زوج` — زوج اليوم\n`صح / حقيقة` — سؤال الحقيقة\n`جرأة` — تحدي الجرأة\n\n`يومي` أو `/daily` — المكافأة اليومية\n`عملة` أو `/flip` — رمي عملة\n`سرقة @user` — سرقة عضو\n`متصدرين` أو `/lb` — قائمة الأثرياء\n`بنكي` أو `/bank` — رصيد بنكي',
+  },
+};
 
-*🛡 أوامر الإدارة (رد على عضو)*
-\`حظر\` • \`فك حظر\` • \`طرد\`
-\`كتم [1h/1d]\` • \`فك كتم\`
-\`تحذير [سبب]\` • \`فك تحذير\`
-\`حذف\` • \`تثبيت\` • \`فك تثبيت\`
-\`رتبة +\` • \`رتبة -\`
-
-*🎭 الرتب*
-\`/setrole [رتبة]\` • \`/removerole\`
-\`/roles\` • الرتب: manager / super_admin / protection_admin / content_admin / assistant
-
-*✅ الاستثناء من الحماية*
-\`/approve\` (رد) • \`/unapprove\` (رد) • \`/approved\`
-
-*⚠️ التحذيرات*
-\`/warn [سبب]\` • \`/unwarn\` • \`/warns\`
-\`/setwarnlimit [1-10]\` — تحديد الحد
-
-*🔒 الأقفال والحماية*
-\`/lock [type]\` • \`/unlock [type]\`
-الأنواع: sticker gif link forward photo video voice poll
-\`/protection\` — لوحة الحماية الكاملة
-
-*🗒 الفلاتر والملاحظات*
-\`/filter [trigger] [رد]\` • \`/filters\` • \`/delfilter\`
-\`/save [اسم]\` • \`#اسم\` • \`/notes\` • \`/delnote\`
-
-*🛠 أدوات متقدمة*
-\`/admins\` • \`/topactive\` • \`/stats\`
-\`/slowmode [ثواني]\` • \`/purgeto\` • \`/purge [n]\`
-\`/whois\` (رد) • \`/setjoin\` — رسالة ترحيب
-\`/tempban @user 1h [سبب]\` — حظر مؤقت
-\`/schedule HH:MM رسالة\` — جدولة رسالة
-\`/watching @user\` • \`/unwatch @user\` — مراقبة عضو
-\`ادارة\` (رد على عضو) — لوحة أدمن سريعة
-\`/report\` (رد) — بلاغ للمشرفين
-\`/all [رسالة]\` — منشن الكل
-\`/summary\` — تحليل AI للقروب`;
+function buildHelpHomeKb() {
+  return { inline_keyboard: [
+    [{ text: HELP_SECTIONS.mod.label,        callback_data: 'help_mod'        },
+     { text: HELP_SECTIONS.content.label,    callback_data: 'help_content'    }],
+    [{ text: HELP_SECTIONS.protection.label, callback_data: 'help_protection' },
+     { text: HELP_SECTIONS.roles.label,      callback_data: 'help_roles'      }],
+    [{ text: HELP_SECTIONS.stats.label,      callback_data: 'help_stats'      },
+     { text: HELP_SECTIONS.tools.label,      callback_data: 'help_tools'      }],
+    [{ text: HELP_SECTIONS.games.label,      callback_data: 'help_games'      }],
+  ]};
+}
+function buildBackKb() {
+  return { inline_keyboard: [[{ text: '◀️ رجوع', callback_data: 'help_home' }]] };
+}
+async function showHelpHome(ctx) {
+  const isCallback = !!ctx.callbackQuery;
+  const txt = '🤖 *مركز المساعدة*\n━━━━━━━━━━━━━━━━\nاختر القسم:';
+  if (isCallback) {
+    await ctx.editMessageText(txt, { parse_mode: 'Markdown', reply_markup: buildHelpHomeKb() }).catch(() => {});
+    await ctx.answerCbQuery().catch(() => {});
+  } else {
+    if (['group','supergroup'].includes(ctx.chat?.type)) setTimeout(() => ctx.deleteMessage().catch(() => {}), 1000);
+    await ctx.reply(txt, { parse_mode: 'Markdown', reply_markup: buildHelpHomeKb() }).catch(() => {});
+  }
+}
+async function showHelpSection(ctx, key) {
+  const sec = HELP_SECTIONS[key];
+  if (!sec) return;
+  await ctx.editMessageText(sec.text, { parse_mode: 'Markdown', reply_markup: buildBackKb() }).catch(() => {});
+  await ctx.answerCbQuery().catch(() => {});
+}
+function handleHelpCallback(ctx, data) {
+  if (data === 'help_home') return showHelpHome(ctx);
+  const key = data.replace('help_', '');
+  if (HELP_SECTIONS[key]) return showHelpSection(ctx, key);
+  return false;
+}
+const CMDS_TEXT = Object.values(HELP_SECTIONS).map(s => s.text).join('\n\n');
 
 // ══════════════════════════════════════════════════════════
 // 🔁 تسجيل الأوامر
@@ -486,15 +516,15 @@ function setupProFeatures(bot) {
   bot.command(['topactive', 'الأنشط', 'نشاط', 'topusers'], handleTopActive);
   bot.hears(/^(الأنشط|نشاط)$/, handleTopActive);
 
-  // 🐌 وضع بطيء (يستبدل group_extras.js handleSlowmode)
+  // 🐌 وضع بطيء
   bot.command(['slowmode', 'slow', 'بطيء'], handleSlowmode);
   bot.hears(/^وضع بطيء (\d+)$/, async ctx => {
     ctx.message.text = '/slowmode ' + ctx.match[1];
     return handleSlowmode(ctx);
   });
 
-  // 🛑 حظر عالمي (للأونر فقط)
-  bot.command(['gban', 'حظرعالمي'],   handleGban);
+  // 🛑 حظر عالمي
+  bot.command(['gban', 'حظرعالمي'],       handleGban);
   bot.command(['ungban', 'رفع_حظرعالمي'], handleUngban);
 
   // 🔍 معلومات
@@ -506,10 +536,9 @@ function setupProFeatures(bot) {
   // 📣 setjoin
   bot.command(['setjoin', 'رسالة_ترحيب'], handleSetJoin);
 
-  // 🎛 cmds
-  bot.command(['cmds', 'commands', 'اوامر', 'أوامر'], async ctx => {
-    ctx.reply(CMDS_TEXT, { parse_mode: 'Markdown' }).catch(() => {});
-  });
+  // 🆘 help — لوحة تفاعلية بالأزرار
+  bot.command(['help', 'مساعدة', 'cmds', 'commands', 'اوامر', 'أوامر'], showHelpHome);
+  bot.hears(/^(مساعدة|اوامر|الاوامر)$/, showHelpHome);
 }
 
 module.exports = {
@@ -518,5 +547,5 @@ module.exports = {
   handleAdmins, handleApprove, handleUnapprove, handleApprovedList,
   handleSetWarnLimit, getWarnLimit, handleTopActive, handleSlowmode,
   handleGban, handleUngban, handleWhois, handlePurgeTo, handleSetJoin,
-  CMDS_TEXT,
+  showHelpHome, handleHelpCallback, HELP_SECTIONS, CMDS_TEXT,
 };
