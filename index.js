@@ -310,6 +310,12 @@ const gameAndBankMiddleware = async (ctx, next) => {
 
 // ── تسجيل middleware بالترتيب الصحيح ──
 bot.use(rateLimit);
+
+// 🐺 لوب غارو trigger
+bot.hears(/^(لوب غارو|لوب_غارو|ذئب|werewolf)$/i, async (ctx) => {
+  if (!['group','supergroup'].includes(ctx.chat?.type)) return;
+  try { return require('./handlers/werewolf/engine').createLobby(ctx); } catch(e) {}
+});
 bot.use(gameAndBankMiddleware);   // الألعاب والبنك قبل auth
 bot.use(authMiddleware);
 bot.use(botAdminCheck);           // FIX: مستوى أعلى — لا nested
@@ -560,6 +566,7 @@ async function launch() {
 
       // Games — register مرة واحدة
       guessGame.register(bot);
+      require('./handlers/werewolf').register(bot).catch(e => console.error('[WW]',e.message));
       millionaire.register(bot);
       logger.info('[Launch] ✅ Games registered');
 
