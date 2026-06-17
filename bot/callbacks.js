@@ -1129,7 +1129,6 @@ module.exports.registerCallbacks = function(bot, deps) {
           || data.startsWith('grp_stats_') || data === 'rules_ok'
           || data.startsWith('ml_') || data.startsWith('gp_') || data.startsWith('gpx_')
           || data.startsWith('gpq_') || data.startsWith('sch_')
-          || data.startsWith('help_')
           || data.startsWith('grp_register_') || data.startsWith('grp_reg_btn_')
           || data === 'mb_panel' || data.startsWith('gp_million') || data.startsWith('gp_guess')
           || data.startsWith('mlr_') || data.startsWith('mar_')
