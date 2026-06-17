@@ -80,7 +80,10 @@ async function authMiddleware(ctx, next) {
     if (cachedAdmin && cachedBan !== undefined && (cachedSub === true || ctx.chat?.type !== 'private')) {
       ctx.isAdmin    = cachedAdmin.data.isAdmin;
       ctx.adminPerms = cachedAdmin.data.perms;
-      if (!ctx.isAdmin && cachedBan === 1) return ctx.answerCbQuery('🚫 أنت محظور').catch(()=>{});
+      if (!ctx.isAdmin && cachedBan === 1) {
+        if (ctx.callbackQuery) return ctx.answerCbQuery('🚫 أنت محظور').catch(() => {});
+        return; // رسالة عادية — تجاهل بصمت
+      }
       return next();
     }
   }
