@@ -68,7 +68,7 @@ function isPlayerBusy(userId) {
 }
 
 function addPlayer(game, user) {
-  // TEST MODE: if (game.players.has(user.id)) return false;
+  if (game.players.has(user.id)) return false;
   game.players.set(user.id, {
     id: user.id,
     name: (user.first_name || user.name || 'لاعب').slice(0, 40),
