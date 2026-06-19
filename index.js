@@ -567,6 +567,7 @@ async function launch() {
       // Games — register مرة واحدة
       guessGame.register(bot);
       require('./handlers/werewolf').register(bot).catch(e => console.error('[WW]',e.message));
+      require('./handlers/tod').register(bot).catch(e => console.error('[ToD]', e.message));
       millionaire.register(bot);
       logger.info('[Launch] ✅ Games registered');
 
