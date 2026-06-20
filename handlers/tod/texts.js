@@ -39,15 +39,8 @@ function roundAnnounceText(session, asker, answerer) {
 `🎯 *الجولة ${session.round}*
 
 🎤 *السائل:* ${mention(asker)}
-🙋 *المجيب:* ${mention(answerer)}
-
-${mention(asker)}، لديك ${secs(session.settings.asker_prompt || 20000)} ثانية لكتابة:
-*"أكسيو ولا فيريتي؟"*`
+🙋 *المجيب:* ${mention(answerer)}`
   );
-}
-
-function askerTimeoutText(asker) {
-  return `⏰ *${esc(asker.name)}* لم يكتب السؤال في الوقت المحدد — جارٍ اختيار جولة جديدة...`;
 }
 
 function choicePromptText(answerer) {
@@ -65,11 +58,19 @@ function choiceTimeoutText(answerer) {
 
 function submitPromptText(session, asker, answerer, mode) {
   const kind = mode === 'truth' ? 'سؤالاً صادقاً' : 'تحدياً مناسباً';
-  return `${mention(asker)}، اكتب الآن ${kind} لـ ${mention(answerer)}:\n⏳ لديك ${secs(session.settings.submit || 60000)} ثانية.`;
+  return (
+`${mention(asker)}، اكتب الآن ${kind} لـ ${mention(answerer)}.
+
+✍️ اكتب رسالتك بالصيغة التالية:
+*سل* ثم ${kind === 'سؤالاً صادقاً' ? 'سؤالك' : 'تحديك'}
+مثال: \`سل كم عمرك؟\`
+
+⏳ لديك ${secs(session.settings.submit || 60000)} ثانية.`
+  );
 }
 
 function submitTimeoutText(asker) {
-  return `⏰ *${esc(asker.name)}* لم يكتب شيئاً في الوقت المحدد — جارٍ اختيار جولة جديدة...`;
+  return `⏰ *${esc(asker.name)}* لم يكتب السؤال/التحدي بالصيغة الصحيحة (سل ...) في الوقت المحدد — جارٍ اختيار جولة جديدة...`;
 }
 
 function questionPostedText(session, asker, answerer, mode, content) {
@@ -80,7 +81,11 @@ function questionPostedText(session, asker, answerer, mode, content) {
 
 "${esc(content)}"
 
-⏳ ${mention(answerer)} لديك ${secs(session.settings.answer || 30000)} ثانية للرد!`
+✍️ ${mention(answerer)} للإجابة اكتب رسالتك بالصيغة:
+*اجب* ثم إجابتك
+مثال: \`اجب 20 سنة\`
+
+⏳ لديك ${secs(session.settings.answer || 30000)} ثانية للرد!`
   );
 }
 
@@ -134,9 +139,9 @@ function rulesText() {
 
 1️⃣ اكتب *"صحصح"* لإنشاء غرفة، وانضم الآخرون بكتابة *"أنا"*.
 2️⃣ يبدأ المنشئ بكتابة *"ابدأ"* (يلزم حد أدنى من اللاعبين).
-3️⃣ يختار البوت سائلاً ومجيباً بعدالة (الأقل مشاركة له الأولوية).
-4️⃣ يختار المجيب *أكسيو* (تحدي) أو *فيريتي* (سؤال صادق).
-5️⃣ يكتب السائل السؤال/التحدي، وعلى المجيب الرد خلال المهلة.
+3️⃣ يختار البوت سائلاً ومجيباً بعدالة (الأقل مشاركة له الأولوية)، وتظهر أزرار *أكسيو/فيريتي* للمجيب فوراً.
+4️⃣ بعد اختيار المجيب، يكتب السائل سؤاله/تحديه بالصيغة: *سل* ثم النص (مثال: \`سل كم عمرك؟\`).
+5️⃣ يجيب المجيب بالصيغة: *اجب* ثم النص (مثال: \`اجب 20 سنة\`).
 6️⃣ بعد كل جولة تُفتح الدردشة لثوانٍ معدودة للتفاعل.
 7️⃣ أثناء الجولة النشطة، لا يُسمح بالكلام إلا للسائل والمجيب — أي رسالة أخرى تُحذف تلقائياً.
 8️⃣ يكتب المنشئ أو أي مشرف *"إنهاء"* لإيقاف اللعبة في أي وقت.`
@@ -146,7 +151,7 @@ function rulesText() {
 module.exports = {
   esc, mention, secs,
   registrationText, sessionCancelledText, notEnoughPlayersText,
-  roundAnnounceText, askerTimeoutText,
+  roundAnnounceText,
   choicePromptText, choiceMadeText, choiceTimeoutText,
   submitPromptText, submitTimeoutText,
   questionPostedText, answerReceivedText, answerTimeoutText,

@@ -133,17 +133,7 @@ async function runRoundLoop(session) {
 
     await safeSend(session.chatId, texts.roundAnnounceText(session, asker, answerer));
 
-    // ── 1) ننتظر السائل يكتب "أكسيو ولا فيريتي؟" (تأكيد حضور) ──
-    const askerText = await state.waitForMessage(session, 'asker_prompt', asker.id, session.settings.asker_prompt);
-    if (isOver(session)) return;
-    if (askerText === null) {
-      await safeSend(session.chatId, texts.askerTimeoutText(asker));
-      asker.timeouts = (asker.timeouts || 0) + 1;
-      await sleep(2000);
-      continue;
-    }
-
-    // ── 2) المجيب يختار أكسيو أو فيريتي عبر الأزرار ──
+    // ── 1) المجيب يختار أكسيو أو فيريتي عبر الأزرار (فوراً بعد إعلان الجولة) ──
     state.nextEpoch(session);
     const choiceMsg = await safeSend(session.chatId, texts.choicePromptText(answerer), { reply_markup: kb.choiceKeyboard(session) });
     await state.createWaiter(session, 'choice', answerer.id, session.settings.choice);
@@ -157,9 +147,9 @@ async function runRoundLoop(session) {
     }
     if (choiceMsg) await BOT.telegram.editMessageReplyMarkup(session.chatId, choiceMsg.message_id, undefined, { inline_keyboard: [] }).catch(() => {});
 
-    // ── 3) السائل يكتب السؤال/التحدي ──
+    // ── 2) السائل يكتب السؤال/التحدي بصيغة "سل ..." ──
     await safeSend(session.chatId, texts.submitPromptText(session, asker, answerer, session.mode));
-    const content = await state.waitForMessage(session, 'asker_submit', asker.id, session.settings.submit);
+    const content = await state.waitForMessage(session, 'asker_submit', asker.id, session.settings.submit, state.extractAsk);
     if (isOver(session)) return;
     if (content === null) {
       await safeSend(session.chatId, texts.submitTimeoutText(asker));
@@ -171,8 +161,8 @@ async function runRoundLoop(session) {
     asker.askedCount = (asker.askedCount || 0) + 1;
     await safeSend(session.chatId, texts.questionPostedText(session, asker, answerer, session.mode, content));
 
-    // ── 4) المجيب يجيب ──
-    const answerText = await state.waitForMessage(session, 'answerer_reply', answerer.id, session.settings.answer);
+    // ── 3) المجيب يجيب بصيغة "اجب ..." ──
+    const answerText = await state.waitForMessage(session, 'answerer_reply', answerer.id, session.settings.answer, state.extractAnswer);
     if (isOver(session)) return;
     answerer.answeredCount = (answerer.answeredCount || 0) + 1;
     let timedOut = false;

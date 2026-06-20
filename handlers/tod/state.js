@@ -75,7 +75,8 @@ function nextEpoch(session) {
 }
 
 // ── انتظار رسالة نصية محددة من مستخدم محدد (مهلة زمنية) ──
-function waitForMessage(session, key, expectedUserId, timeoutMs) {
+// validator(text) -> content|null  — إن أعاد null، الرسالة تُتجاهل (لا تُستهلك) ويستمر الانتظار
+function waitForMessage(session, key, expectedUserId, timeoutMs, validator) {
   return new Promise(resolve => {
     let done = false;
     const timer = setTimeout(finish, timeoutMs);
@@ -86,15 +87,21 @@ function waitForMessage(session, key, expectedUserId, timeoutMs) {
       session.pendingCapture = null;
       resolve(text === undefined ? null : text);
     }
-    session.pendingCapture = { key, userId: expectedUserId, resolve: finish };
+    session.pendingCapture = {
+      key, userId: expectedUserId, resolve: finish,
+      validator: validator || (t => t),
+    };
   });
 }
 
 // يُستدعى من middleware الرسائل عند وصول رسالة من لاعب أثناء انتظار
+// يُعيد true فقط إذا طابقت الرسالة شرط الـ validator (واستُهلكت)
 function feedCapture(session, userId, text) {
   if (!session.pendingCapture) return false;
   if (session.pendingCapture.userId !== userId) return false;
-  session.pendingCapture.resolve(text);
+  const content = session.pendingCapture.validator(text);
+  if (content === null || content === undefined) return false; // لا تطابق -> تجاهل، استمر الانتظار
+  session.pendingCapture.resolve(content);
   return true;
 }
 
@@ -119,8 +126,25 @@ function notifyWaiter(session, key, userId) {
   if (w) w.notify(userId);
 }
 
+// ── أنماط التعرّف على السؤال/الإجابة عبر بادئة صريحة ──────────
+// "سل <سؤال>" — يلزم فاصل (مسافة أو نقطتان) بعد الكلمة لتفادي تطابق "سلام" خطأً
+const ASK_PATTERN = /^سل[:\s]+(.+)$/su;
+// "اجب <إجابة>" — نفس المبدأ، يتفادى تطابق "اجبر" ونحوها
+const ANSWER_PATTERN = /^اجب[:\s]+(.+)$/su;
+
+function extractAsk(text) {
+  const m = String(text || '').trim().match(ASK_PATTERN);
+  return m ? m[1].trim() : null;
+}
+
+function extractAnswer(text) {
+  const m = String(text || '').trim().match(ANSWER_PATTERN);
+  return m ? m[1].trim() : null;
+}
+
 module.exports = {
   sessions, createSession, getSession, destroySession,
   addPlayer, removePlayer, getPlayer, nextEpoch,
   waitForMessage, feedCapture, createWaiter, notifyWaiter,
+  extractAsk, extractAnswer,
 };
