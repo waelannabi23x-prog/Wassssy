@@ -12,13 +12,15 @@ async function showGamesPanel(ctx) {
     '━━━━━━━━━━━━━━━━━━━━\n\n' +
     '🎯 *الألعاب المتاحة:*\n\n' +
     '🎰 *من سيربح المليون* — لعبة أسئلة وأجوبة\n' +
-    '📸 *خمن الصورة* — تحدي بين لاعبين\n\n' +
+    '📸 *خمن الصورة* — تحدي بين لاعبين\n' +
+    '🎲 *صحصح (أكسيو أو فيريتي)* — لعبة جماعية تفاعلية\n\n' +
     '⚙️ اختر لعبة لإدارتها:';
 
   const slotStats = await get('SELECT COUNT(*) as games, SUM(CASE WHEN amount>0 THEN 1 ELSE 0 END) as wins FROM bank_transactions WHERE type=$1', ['slot_win']).catch(()=>({games:0,wins:0}));
   const rows = [
     [kbBtn('🎰 إدارة لعبة المليون', 'gp_million_panel')],
     [kbBtn('📸 إدارة لعبة خمن',     'gp_guess_panel')],
+    [kbBtn('🎲 إدارة لعبة صحصح',    'gp_tod_panel')],
     [kbBtn('🎰 إعدادات السلوت',      'gp_slot_panel')],
     [kbBtn('🏪 إدارة المتجر',        'gp_shop_panel')],
     [kbBtn('◀️ رجوع', 'gp_panel')],
@@ -64,6 +66,57 @@ async function showGuessPanel(ctx) {
     [kbBtn('◀️ رجوع', 'mb_panel')],
   ];
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
+}
+
+// ══════════════════════════════════════════
+// لوحة إدارة صحصح (أكسيو أو فيريتي)
+// ══════════════════════════════════════════
+const TOD_STEP = { submit_timeout: 10000, answer_timeout: 5000, banter_timeout: 5000 };
+const TOD_MIN  = { submit_timeout: 10000, answer_timeout: 10000, banter_timeout: 5000 };
+const TOD_MAX  = { submit_timeout: 300000, answer_timeout: 180000, banter_timeout: 60000 };
+const TOD_LABELS = {
+  submit_timeout: '✍️ مدة كتابة السؤال/التحدي (سل)',
+  answer_timeout: '💬 مدة الإجابة (اجب)',
+  banter_timeout: '🗣️ مدة الدردشة بعد الإجابة',
+};
+
+async function showTodPanel(ctx) {
+  const tdb = require('./tod/db');
+  const defaults = await tdb.getGlobalDefaults();
+  const secs = ms => Math.round(ms / 1000);
+
+  const text =
+    '🎲 *إدارة لعبة صحصح (أكسيو أو فيريتي)*\n' +
+    '━━━━━━━━━━━━━━━━━━━━\n\n' +
+    'ℹ️ هذه المدد *افتراضية* لكل قروب جديد يبدأ اللعبة لأول مرة.\n' +
+    'أي قروب يقدر يخصّص مدده الخاصة لاحقاً بأمر `/tod_settings` داخل القروب.\n\n' +
+    '⏱️ *المدد الحالية:*\n' +
+    TOD_LABELS.submit_timeout + ': *' + secs(defaults.submit_timeout) + ' ثانية*\n' +
+    TOD_LABELS.answer_timeout + ': *' + secs(defaults.answer_timeout) + ' ثانية*\n' +
+    TOD_LABELS.banter_timeout + ': *' + secs(defaults.banter_timeout) + ' ثانية*';
+
+  const rows = [
+    [kbBtn('➖ سؤال', 'gp_tod_dec_submit_timeout'), kbBtn('➕ سؤال', 'gp_tod_inc_submit_timeout')],
+    [kbBtn('➖ إجابة', 'gp_tod_dec_answer_timeout'), kbBtn('➕ إجابة', 'gp_tod_inc_answer_timeout')],
+    [kbBtn('➖ دردشة', 'gp_tod_dec_banter_timeout'), kbBtn('➕ دردشة', 'gp_tod_inc_banter_timeout')],
+    [kbBtn('🔄 تحديث', 'gp_tod_panel')],
+    [kbBtn('◀️ رجوع', 'mb_panel')],
+  ];
+  return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
+}
+
+async function handleTodAdjust(ctx, data) {
+  const tdb = require('./tod/db');
+  const m = data.match(/^gp_tod_(inc|dec)_(submit_timeout|answer_timeout|banter_timeout)$/);
+  if (!m) return ctx.answerCbQuery().catch(() => {});
+  const [, dir, field] = m;
+  const defaults = await tdb.getGlobalDefaults();
+  const step = TOD_STEP[field];
+  let val = (defaults[field] || 0) + (dir === 'inc' ? step : -step);
+  val = Math.max(TOD_MIN[field], Math.min(TOD_MAX[field], val));
+  await tdb.updateGlobalDefault(field, val);
+  ctx.answerCbQuery('✅ تم التحديث').catch(() => {});
+  return showTodPanel(ctx);
 }
 
 // ══════════════════════════════════════════
@@ -129,6 +182,8 @@ async function handleCallback(ctx, data) {
     return showMillionPanel(ctx);
   }
   if (data === 'gp_guess_panel') return showGuessPanel(ctx);
+  if (data === 'gp_tod_panel') return showTodPanel(ctx);
+  if (data.startsWith('gp_tod_inc_') || data.startsWith('gp_tod_dec_')) return handleTodAdjust(ctx, data);
   if (data.startsWith('gp_million_list_')) return showMillionQuestions(ctx, data.replace('gp_million_list_', ''));
 
   if (data === 'gp_million_add') {
@@ -392,4 +447,4 @@ async function showShopPanel(ctx) {
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
 
-module.exports = { showGamesPanel, showMillionPanel, showGuessPanel, handleCallback, handleText };
+module.exports = { showGamesPanel, showMillionPanel, showGuessPanel, showTodPanel, handleCallback, handleText };

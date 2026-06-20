@@ -42,6 +42,15 @@ async function migrate() {
       fairness_enabled BOOLEAN DEFAULT TRUE,
       updated_at TIMESTAMP DEFAULT NOW()
     )`,
+    `CREATE TABLE IF NOT EXISTS tod_global_defaults (
+      id INTEGER PRIMARY KEY DEFAULT 1,
+      submit_timeout INTEGER DEFAULT ${CFG.DEFAULT_TIMERS.SUBMIT},
+      answer_timeout INTEGER DEFAULT ${CFG.DEFAULT_TIMERS.ANSWER},
+      banter_timeout INTEGER DEFAULT ${CFG.DEFAULT_TIMERS.BANTER},
+      updated_at TIMESTAMP DEFAULT NOW(),
+      CHECK (id = 1)
+    )`,
+    `INSERT INTO tod_global_defaults(id) VALUES (1) ON CONFLICT(id) DO NOTHING`,
     `CREATE TABLE IF NOT EXISTS tod_sessions (
       chat_id BIGINT PRIMARY KEY,
       owner_id BIGINT NOT NULL,
@@ -56,17 +65,41 @@ async function migrate() {
   logger.info('✅ [ToD] Schema ready');
 }
 
+// ── الإعدادات الافتراضية العامة (يتحكم بها الأونر من لوحة الألعاب) ──
+async function getGlobalDefaults() {
+  const row = await get('SELECT * FROM tod_global_defaults WHERE id=1').catch(() => null);
+  return row || {
+    submit_timeout: CFG.DEFAULT_TIMERS.SUBMIT,
+    answer_timeout: CFG.DEFAULT_TIMERS.ANSWER,
+    banter_timeout: CFG.DEFAULT_TIMERS.BANTER,
+  };
+}
+
+async function updateGlobalDefault(field, value) {
+  const allowed = ['submit_timeout', 'answer_timeout', 'banter_timeout'];
+  if (!allowed.includes(field)) return false;
+  await run(
+    `INSERT INTO tod_global_defaults(id, ${field}) VALUES(1, $1)
+     ON CONFLICT(id) DO UPDATE SET ${field}=$1, updated_at=NOW()`,
+    [value]
+  ).catch(() => {});
+  return true;
+}
+
 // ── إعدادات القروب ─────────────────────────────────────────
 async function getSettings(chatId) {
+  const defaults = await getGlobalDefaults();
   await run(
-    `INSERT INTO tod_settings(chat_id) VALUES($1) ON CONFLICT(chat_id) DO NOTHING`, [chatId]
+    `INSERT INTO tod_settings(chat_id, submit_timeout, answer_timeout, banter_timeout)
+     VALUES($1, $2, $3, $4) ON CONFLICT(chat_id) DO NOTHING`,
+    [chatId, defaults.submit_timeout, defaults.answer_timeout, defaults.banter_timeout]
   ).catch(() => {});
   const row = await get('SELECT * FROM tod_settings WHERE chat_id=$1', [chatId]).catch(() => null);
   if (!row) {
     return {
       reg_timeout: CFG.DEFAULT_TIMERS.REGISTRATION, choice_timeout: CFG.DEFAULT_TIMERS.CHOICE,
-      submit_timeout: CFG.DEFAULT_TIMERS.SUBMIT, answer_timeout: CFG.DEFAULT_TIMERS.ANSWER,
-      banter_timeout: CFG.DEFAULT_TIMERS.BANTER, min_players: CFG.MIN_PLAYERS,
+      submit_timeout: defaults.submit_timeout, answer_timeout: defaults.answer_timeout,
+      banter_timeout: defaults.banter_timeout, min_players: CFG.MIN_PLAYERS,
       delete_offtopic: true, fairness_enabled: true,
     };
   }
@@ -167,7 +200,7 @@ async function loadAllSnapshots() {
 }
 
 module.exports = {
-  migrate, getSettings, updateSetting,
+  migrate, getSettings, updateSetting, getGlobalDefaults, updateGlobalDefault,
   getStatsForUser, applyRoundStats, markGamePlayed, checkNewAchievements,
   saveSessionSnapshot, deleteSessionSnapshot, loadAllSnapshots,
 };
