@@ -11,8 +11,11 @@ const { parseCb } = require('./codec');
 const tdb = require('./db');
 const logger = require('../../utils/logger');
 
-async function register(bot) {
-  await tdb.migrate().catch(e => logger.error('[ToD] migrate: ' + e.message));
+// register بات متزامناً (sync) في تسجيل المعالجات — أي bot.hears/bot.on
+// تُسجَّل فوراً عند الاستدعاء، والعمليات غير المتزامنة (migrate/استعادة)
+// تعمل بالخلفية دون تأخير التسجيل. هذا يضمن أن ترتيب المعالج في خط أنابيب
+// Telegraf يطابق مكان استدعاء register(bot) في index.js (مبكراً = أولوية).
+function register(bot) {
   engine.init(bot);
 
   // ── إنشاء الجلسة ──
@@ -62,7 +65,7 @@ async function register(bot) {
     return next();
   });
 
-  // ── Callbacks (tod: + todadm:) ──
+  // ── Callbacks (tod: + todadm:) — احتياطي؛ المعالجة الأساسية في bot/callbacks.js ──
   bot.on('callback_query', async (ctx, next) => {
     const data = ctx.callbackQuery?.data || '';
     if (data === 'noop') return ctx.answerCbQuery().catch(() => {});
@@ -90,8 +93,10 @@ async function register(bot) {
     return next();
   });
 
-  // ── استعادة الجلسات بعد إعادة التشغيل ──
-  engine.resumeAllSessions().catch(e => logger.error('[ToD] resume: ' + e.message));
+  // ── عمليات الخلفية (لا تؤخر التسجيل) ──
+  tdb.migrate()
+    .then(() => engine.resumeAllSessions())
+    .catch(e => logger.error('[ToD] init background: ' + e.message));
 
   logger.info('✅ [ToD] لعبة أكسيو أو فيريتي مُسجَّلة بنجاح');
 }

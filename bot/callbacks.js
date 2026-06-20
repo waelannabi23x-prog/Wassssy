@@ -345,17 +345,37 @@ module.exports.registerCallbacks = function(bot, deps) {
       return;
     }
 
-
-    // 🆘 لوحة المساعدة
-    if (_raw.startsWith('help_')) {
+    // 🎮 أكسيو أو فيريتي — معالجة مباشرة (نفس سبب عدم استخدام next)
+    if (_raw.startsWith('tod:') || _raw.startsWith('todadm:')) {
       try {
-        const { handleHelpCallback } = require('../handlers/group_pro_features');
-        const result = handleHelpCallback(ctx, _raw);
-        if (result !== false) return result;
-      } catch(e) {
-        return ctx.answerCbQuery('⚠️ خطأ').catch(() => {});
+        if (_raw === 'noop') return ctx.answerCbQuery().catch(() => {});
+
+        if (_raw.startsWith('tod:')) {
+          const { parseCb } = require('../handlers/tod/codec');
+          const todState = require('../handlers/tod/state');
+          const parsed = parseCb(_raw);
+          if (!parsed) return ctx.answerCbQuery('❌ بيانات غير صالحة.').catch(() => {});
+          const session = todState.getSession(parsed.chatId);
+          if (!session) return ctx.answerCbQuery('⌛ انتهت اللعبة.', { show_alert: true }).catch(() => {});
+          if (parsed.epoch !== session.epoch) {
+            return ctx.answerCbQuery('🚫 هذا الزر لم يعد صالحاً.', { show_alert: true }).catch(() => {});
+          }
+          const engine = require('../handlers/tod/engine');
+          if (parsed.verb === 'ch')  return engine.handleChoiceCallback(ctx, session, parsed);
+          if (parsed.verb === 'end') return engine.handleEndCallback(ctx, session);
+          return ctx.answerCbQuery().catch(() => {});
+        }
+
+        if (_raw.startsWith('todadm:')) {
+          return require('../handlers/tod/admin_panel').handleAdminCallback(ctx, _raw);
+        }
+      } catch (e) {
+        require('../utils/logger').error('[ToD CB] ' + e.message);
+        return ctx.answerCbQuery('⚠️ خطأ مؤقت.').catch(() => {});
       }
+      return;
     }
+
     const data = cbRes(_raw);
 
     try {
