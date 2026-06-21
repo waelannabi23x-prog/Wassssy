@@ -30,3 +30,4 @@ data/
 backup.sql
 fix_admin_routes.cjs
 backup.sql
+legacy_patches/

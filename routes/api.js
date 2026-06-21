@@ -241,6 +241,7 @@ router.get('/admin/check', auth, async (req, res) => {
   const uid = parseInt(req.tgUser.id);
   if (!await _checkAdmin(uid)) return res.status(403).json({ error: 'forbidden' });
   const isOwner = _isOwnerUid(uid);
+  const adm = await get('SELECT permissions FROM admins WHERE user_id=$1', [uid]).catch(() => null);
   res.json({ ok: true, isOwner, perms: adm?.permissions || (isOwner ? 'full' : '') });
 });
 
