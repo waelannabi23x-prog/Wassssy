@@ -94,10 +94,8 @@ const GAMES_MENU_TEXT =
   '👇 اضغط على لعبة لمعرفة طريقة اللعب';
 const GAMES_MENU_KB = {
   inline_keyboard: [
-    [{ text: '🏆 كيف تلعب المليون؟', callback_data: 'games_how_million' }],
-    [{ text: '📸 كيف تلعب خمن؟', callback_data: 'games_how_guess' }],
-    [{ text: '🐺 كيف تلعب لوب غارو؟', callback_data: 'games_how_werewolf' }],
-    [{ text: '🎲 كيف تلعب صحصح؟', callback_data: 'games_how_tod' }],
+    [{ text: '🏆 مليون', callback_data: 'games_how_million' }, { text: '🐺 لوب غارو', callback_data: 'games_how_werewolf' }],
+    [{ text: '🎲 اكسيو فيريتي', callback_data: 'games_how_tod' }, { text: '📸 خمن', callback_data: 'games_how_guess' }],
   ],
 };
 const GAMES_BACK_KB = { inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'games_back' }]] };

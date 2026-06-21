@@ -977,10 +977,8 @@ async function showGamesMenu(ctx) {
     '🎲 صحصح\n\n' +
     '👇 اضغط على لعبة لمعرفة طريقة اللعب';
   const rows = [
-    [{ text: '🏆 كيف تلعب المليون؟', callback_data: 'games_how_million' }],
-    [{ text: '📸 كيف تلعب خمن؟', callback_data: 'games_how_guess' }],
-    [{ text: '🐺 كيف تلعب لوب غارو؟', callback_data: 'games_how_werewolf' }],
-    [{ text: '🎲 كيف تلعب صحصح؟', callback_data: 'games_how_tod' }],
+    [{ text: '🏆 مليون', callback_data: 'games_how_million' }, { text: '🐺 لوب غارو', callback_data: 'games_how_werewolf' }],
+    [{ text: '🎲 اكسيو فيريتي', callback_data: 'games_how_tod' }, { text: '📸 خمن', callback_data: 'games_how_guess' }],
   ];
   return ctx.reply(text, {
     parse_mode: 'Markdown',
