@@ -1,0 +1,986 @@
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/bot/callbacks.js
+     4:7    warning  'browse' is assigned a value but never used      no-unused-vars
+     6:7    warning  'groupSetup' is assigned a value but never used  no-unused-vars
+    94:33   error    'tools' is not defined                           no-undef
+    97:19   error    'process' is not defined                         no-undef
+   218:35   warning  'd' is defined but never used                    no-unused-vars
+   218:113  error    'process' is not defined                         no-undef
+   283:38   warning  'd' is defined but never used                    no-unused-vars
+   411:15   warning  'cid3' is assigned a value but never used        no-unused-vars
+   412:15   warning  'uid3' is assigned a value but never used        no-unused-vars
+   905:19   warning  '_' is defined but never used                    no-unused-vars
+  1030:36   warning  'dbRun' is assigned a value but never used       no-unused-vars
+  1312:11   warning  'qc' is assigned a value but never used          no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/bot/commands.js
+    2:9    warning  'addChannel' is assigned a value but never used     no-unused-vars
+    2:21   warning  'removeChannel' is assigned a value but never used  no-unused-vars
+    2:36   warning  'getChannels' is assigned a value but never used    no-unused-vars
+    3:80   warning  'million' is defined but never used                 no-unused-vars
+    3:104  warning  'bank' is defined but never used                    no-unused-vars
+    3:110  warning  'contentDb' is defined but never used               no-unused-vars
+    3:121  warning  'usersDb' is defined but never used                 no-unused-vars
+    3:130  warning  'bundlesDb' is defined but never used               no-unused-vars
+    3:148  warning  'cacheClear' is defined but never used              no-unused-vars
+    3:160  warning  'logger' is defined but never used                  no-unused-vars
+    3:168  warning  'OWNER_ID' is defined but never used                no-unused-vars
+    3:178  warning  'kbBtn' is defined but never used                   no-unused-vars
+    3:185  warning  'kbBuild' is defined but never used                 no-unused-vars
+    3:194  warning  'eos' is defined but never used                     no-unused-vars
+    3:251  warning  'showAllMembers' is defined but never used          no-unused-vars
+   58:14   error    'setTimeout' is not defined                         no-undef
+   95:13   warning  'cid' is assigned a value but never used            no-unused-vars
+  103:14   error    'setTimeout' is not defined                         no-undef
+  116:13   warning  'e' is defined but never used                       no-unused-vars
+  120:30   error    'setTimeout' is not defined                         no-undef
+  226:7    error    'console' is not defined                            no-undef
+  292:13   warning  'e' is defined but never used                       no-unused-vars
+  293:30   error    'setTimeout' is not defined                         no-undef
+  335:14   error    'setTimeout' is not defined                         no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/bot/messages.js
+   11:5    error    'setTimeout' is not defined                            no-undef
+   15:21   warning  'GrpMsgs' is assigned a value but never used           no-unused-vars
+   16:48   warning  'adminsDb' is assigned a value but never used          no-unused-vars
+   17:23   warning  'safeInt' is assigned a value but never used           no-unused-vars
+   21:11   warning  'cacheSet' is assigned a value but never used          no-unused-vars
+   21:33   warning  'cacheClearPrefix' is assigned a value but never used  no-unused-vars
+   33:3    error    'setInterval' is not defined                           no-undef
+   50:96   warning  '_' is defined but never used                          no-unused-vars
+   59:9    error    'setTimeout' is not defined                            no-undef
+   86:98   error    'console' is not defined                               no-undef
+  172:15   warning  'cacheDelete' is assigned a value but never used       no-unused-vars
+  189:81   warning  '_' is defined but never used                          no-unused-vars
+  296:102  warning  '_' is defined but never used                          no-unused-vars
+  350:13   warning  'e' is defined but never used                          no-unused-vars
+  410:13   warning  '_' is defined but never used                          no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/bot/services.js
+  57:23  error  'setInterval' is not defined    no-undef
+  58:26  error  'clearInterval' is not defined  no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/database/db.js
+    2:7    warning  'path' is assigned a value but never used  no-unused-vars
+    5:18   error    'process' is not defined                   no-undef
+   15:36   error    'process' is not defined                   no-undef
+   16:12   error    'process' is not defined                   no-undef
+   33:22   error    'setInterval' is not defined               no-undef
+   34:22   error    'clearInterval' is not defined             no-undef
+   68:10   error    'sGet' is not defined                      no-undef
+   80:10   error    'sAll' is not defined                      no-undef
+  102:3    error    'sRun' is not defined                      no-undef
+  122:79   error    'sRun' is not defined                      no-undef
+  125:44   error    'sRun' is not defined                      no-undef
+  190:50   error    'sRun' is not defined                      no-undef
+  268:16   warning  '_' is defined but never used              no-unused-vars
+  273:16   warning  '_' is defined but never used              no-unused-vars
+  278:16   warning  '_' is defined but never used              no-unused-vars
+  283:16   warning  '_' is defined but never used              no-unused-vars
+  290:16   warning  '_' is defined but never used              no-unused-vars
+  294:118  warning  '_' is defined but never used              no-unused-vars
+  299:11   warning  '_' is defined but never used              no-unused-vars
+  302:11   warning  '_' is defined but never used              no-unused-vars
+  305:11   warning  '_' is defined but never used              no-unused-vars
+  354:7    error    'console' is not defined                   no-undef
+  356:11   warning  '_' is defined but never used              no-unused-vars
+  359:123  warning  '_' is defined but never used              no-unused-vars
+  360:106  warning  '_' is defined but never used              no-unused-vars
+  362:119  warning  '_' is defined but never used              no-unused-vars
+  363:109  warning  '_' is defined but never used              no-unused-vars
+  364:108  warning  '_' is defined but never used              no-unused-vars
+  427:1    error    'setInterval' is not defined               no-undef
+  460:8    error    'pg' is not defined                        no-undef
+  532:11   error    'pg' is not defined                        no-undef
+  533:51   error    'console' is not defined                   no-undef
+  536:3    error    'console' is not defined                   no-undef
+  558:5    error    'console' is not defined                   no-undef
+  559:5    error    'console' is not defined                   no-undef
+  601:5    error    'console' is not defined                   no-undef
+  602:16   error    'console' is not defined                   no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/database/files.js
+  12:20  warning  '_all' is assigned a value but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/database/group_db.js
+  198:9  error  'console' is not defined  no-undef
+  203:3  error  'console' is not defined  no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/database/group_pro_db.js
+  180:12   warning  '_' is defined but never used  no-unused-vars
+  194:12   warning  '_' is defined but never used  no-unused-vars
+  416:107  warning  '_' is defined but never used  no-unused-vars
+  417:101  warning  '_' is defined but never used  no-unused-vars
+  418:124  warning  '_' is defined but never used  no-unused-vars
+  421:23   error    'setInterval' is not defined   no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/database/interactions.js
+  54:164  warning  '_' is defined but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/database/reports.js
+  2:9  warning  'all' is assigned a value but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/add.js
+  20:11   warning  'e' is defined but never used  no-unused-vars
+  32:57   error    'uid' is not defined           no-undef
+  56:22   error    'escMd' is not defined         no-undef
+  56:58   error    'escMd' is not defined         no-undef
+  56:116  error    'escMd' is not defined         no-undef
+  61:57   error    'uid' is not defined           no-undef
+  71:41   error    'escMd' is not defined         no-undef
+  79:35   error    'escMd' is not defined         no-undef
+  79:67   error    'escMd' is not defined         no-undef
+  79:107  error    'escMd' is not defined         no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/ai_chat.js
+    3:29  warning  'aiChat' is assigned a value but never used   no-unused-vars
+   24:1   error    'setInterval' is not defined                  no-undef
+   39:1   error    'setInterval' is not defined                  no-undef
+   52:11  warning  '_' is defined but never used                 no-unused-vars
+   66:29  error    'clearTimeout' is not defined                 no-undef
+  111:57  warning  'e' is defined but never used                 no-unused-vars
+  137:10  warning  '_setRagCache' is defined but never used      no-unused-vars
+  196:9   warning  'history' is assigned a value but never used  no-unused-vars
+  237:29  error    'clearTimeout' is not defined                 no-undef
+  238:24  error    'setTimeout' is not defined                   no-undef
+  255:5   error    'console' is not defined                      no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/ai_owner.js
+  16:11  warning  'e' is defined but never used  no-unused-vars
+  61:13  warning  'e' is defined but never used  no-unused-vars
+  62:26  error    'setTimeout' is not defined    no-undef
+  79:5   error    'setTimeout' is not defined    no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/ai_summarize.js
+  11:35   error    'Buffer' is not defined            no-undef
+  31:9    error    'process' is not defined           no-undef
+  34:16   warning  'e' is defined but never used      no-unused-vars
+  40:18   warning  'e2' is defined but never used     no-unused-vars
+  47:16   warning  'e' is defined but never used      no-unused-vars
+  70:35   warning  'title' is defined but never used  no-unused-vars
+  81:115  error    'process' is not defined           no-undef
+  85:72   error    'Buffer' is not defined            no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/bank.js
+  111:9  warning  'txs' is assigned a value but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/bank_games.js
+   4:7    warning  'logger' is assigned a value but never used  no-unused-vars
+  42:24   error    'setTimeout' is not defined                  no-undef
+  47:122  warning  '_' is defined but never used                no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/bank_pro.js
+  288:12  warning  'nextKey' is assigned a value but never used  no-unused-vars
+  749:11  warning  'e' is defined but never used                 no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/browse.js
+    5:16  warning  '_cached' is defined but never used                    no-unused-vars
+   13:12  warning  'cbReg' is assigned a value but never used             no-unused-vars
+   16:5   warning  'buildPath' is assigned a value but never used         no-unused-vars
+   17:5   warning  'starsDisplay' is assigned a value but never used      no-unused-vars
+   19:27  warning  'cacheClear' is assigned a value but never used        no-unused-vars
+   19:39  warning  'cacheClearPrefix' is assigned a value but never used  no-unused-vars
+  138:7   warning  'sp' is assigned a value but never used                no-unused-vars
+  138:19  warning  'yr' is assigned a value but never used                no-unused-vars
+  138:31  warning  'sm' is assigned a value but never used                no-unused-vars
+  157:7   warning  'sp' is assigned a value but never used                no-unused-vars
+  157:17  warning  'yr' is assigned a value but never used                no-unused-vars
+  157:27  warning  'sm' is assigned a value but never used                no-unused-vars
+  157:37  warning  'sb' is assigned a value but never used                no-unused-vars
+  200:95  warning  'favCnt' is assigned a value but never used            no-unused-vars
+  226:62  warning  '_' is defined but never used                          no-unused-vars
+  288:26  warning  'e' is defined but never used                          no-unused-vars
+  294:91  warning  '_' is defined but never used                          no-unused-vars
+  359:11  warning  'e' is defined but never used                          no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/bundle_admin.js
+  3:14  warning  'get' is assigned a value but never used      no-unused-vars
+  4:21  warning  'back' is assigned a value but never used     no-unused-vars
+  6:7   warning  'filesDb' is assigned a value but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/fun_commands.js
+   3:7   warning  'logger' is assigned a value but never used  no-unused-vars
+  12:11  warning  '_' is defined but never used                no-unused-vars
+  27:12  warning  '_' is defined but never used                no-unused-vars
+  31:1   error    'setInterval' is not defined                 no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/game_guess.js
+   13:19  warning  'all' is assigned a value but never used        no-unused-vars
+   69:28  error    'setTimeout' is not defined                     no-undef
+   76:5   error    'clearTimeout' is not defined                   no-undef
+   92:12  error    'setTimeout' is not defined                     no-undef
+  147:20  error    'setTimeout' is not defined                     no-undef
+  155:14  error    'setTimeout' is not defined                     no-undef
+  214:21  error    'setTimeout' is not defined                     no-undef
+  284:24  error    'setTimeout' is not defined                     no-undef
+  318:10  error    'setTimeout' is not defined                     no-undef
+  410:21  error    'setTimeout' is not defined                     no-undef
+  434:12  error    'setTimeout' is not defined                     no-undef
+  455:7   error    'setTimeout' is not defined                     no-undef
+  500:9   warning  'resultMsg' is assigned a value but never used  no-unused-vars
+  510:26  error    'setTimeout' is not defined                     no-undef
+  521:13  warning  '_' is defined but never used                   no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/games_panel.js
+   19:9   warning  'slotStats' is assigned a value but never used  no-unused-vars
+  209:11  warning  'letterMap' is assigned a value but never used  no-unused-vars
+  374:11  error    'delState' is not defined                       no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group.js
+   5:20  error    'process' is not defined          no-undef
+   6:23  error    'process' is not defined          no-undef
+  12:20  error    'AbortController' is not defined  no-undef
+  13:15  error    'setTimeout' is not defined       no-undef
+  14:21  error    'fetch' is not defined            no-undef
+  15:5   error    'clearTimeout' is not defined     no-undef
+  17:10  warning  '_' is defined but never used     no-unused-vars
+  45:20  error    'fetch' is not defined            no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_admin.js
+    9:3    error    'setTimeout' is not defined                 no-undef
+   18:7    warning  'escV2' is assigned a value but never used  no-unused-vars
+   68:102  warning  '_' is defined but never used               no-unused-vars
+   71:95   warning  '_' is defined but never used               no-unused-vars
+   79:13   warning  '_' is defined but never used               no-unused-vars
+  143:5    error    'console' is not defined                    no-undef
+  161:106  warning  '_' is defined but never used               no-unused-vars
+  172:5    error    'console' is not defined                    no-undef
+  239:16   warning  '_' is defined but never used               no-unused-vars
+  295:7    error    'setTimeout' is not defined                 no-undef
+  299:5    error    'console' is not defined                    no-undef
+  331:14   error    'setTimeout' is not defined                 no-undef
+  333:5    error    'console' is not defined                    no-undef
+  373:5    error    'console' is not defined                    no-undef
+  409:16   warning  '_' is defined but never used               no-unused-vars
+  423:70   error    'targetUserId' is not defined               no-undef
+  424:68   error    'targetUserId' is not defined               no-undef
+  425:69   error    'targetUserId' is not defined               no-undef
+  426:67   error    'targetUserId' is not defined               no-undef
+  431:15   error    'setTimeout' is not defined                 no-undef
+  433:5    error    'console' is not defined                    no-undef
+  470:16   warning  '_' is defined but never used               no-unused-vars
+  483:70   error    'targetUserId' is not defined               no-undef
+  484:68   error    'targetUserId' is not defined               no-undef
+  485:69   error    'targetUserId' is not defined               no-undef
+  486:67   error    'targetUserId' is not defined               no-undef
+  491:15   error    'setTimeout' is not defined                 no-undef
+  493:5    error    'console' is not defined                    no-undef
+  537:15   error    'setTimeout' is not defined                 no-undef
+  539:5    error    'console' is not defined                    no-undef
+  569:5    error    'console' is not defined                    no-undef
+  611:16   warning  '_' is defined but never used               no-unused-vars
+  639:14   error    'setTimeout' is not defined                 no-undef
+  641:5    error    'console' is not defined                    no-undef
+  664:5    error    'console' is not defined                    no-undef
+  710:14   error    'setTimeout' is not defined                 no-undef
+  727:14   error    'setTimeout' is not defined                 no-undef
+  772:14   error    'setTimeout' is not defined                 no-undef
+  809:14   error    'setTimeout' is not defined                 no-undef
+  818:46   error    'setTimeout' is not defined                 no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_admin_poll.js
+   17:16  error  'console' is not defined  no-undef
+   39:16  error  'console' is not defined  no-undef
+   98:16  error  'console' is not defined  no-undef
+  108:31  error  'process' is not defined  no-undef
+  127:16  error  'console' is not defined  no-undef
+  135:16  error  'console' is not defined  no-undef
+  143:46  error  'process' is not defined  no-undef
+  148:16  error  'console' is not defined  no-undef
+  159:16  error  'console' is not defined  no-undef
+  171:16  error  'console' is not defined  no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_advanced.js
+   27:27  error    'process' is not defined       no-undef
+   42:24  error    'setTimeout' is not defined    no-undef
+   46:34  error    'setTimeout' is not defined    no-undef
+  252:7   error    'setTimeout' is not defined    no-undef
+  261:18  warning  '_' is defined but never used  no-unused-vars
+  270:16  warning  '_' is defined but never used  no-unused-vars
+  359:12  error    'setTimeout' is not defined    no-undef
+  495:12  warning  '_' is defined but never used  no-unused-vars
+  546:16  warning  '_' is defined but never used  no-unused-vars
+  602:20  error    'setInterval' is not defined   no-undef
+  677:12  warning  '_' is defined but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_ai_admin.js
+  37:14  warning  '_' is defined but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_commands.js
+     3:9   warning  'showAllMembers' is assigned a value but never used  no-unused-vars
+     4:9   warning  'warnMember' is assigned a value but never used      no-unused-vars
+     4:21  warning  'banMember' is assigned a value but never used       no-unused-vars
+     4:32  warning  'unbanMember' is assigned a value but never used     no-unused-vars
+     8:9   warning  'build' is assigned a value but never used           no-unused-vars
+    14:10  warning  'isAdmin' is defined but never used                  no-unused-vars
+    59:3   error    'setTimeout' is not defined                          no-undef
+    82:14  error    'setTimeout' is not defined                          no-undef
+   132:14  error    'setTimeout' is not defined                          no-undef
+   223:14  error    'setTimeout' is not defined                          no-undef
+   283:16  error    'setTimeout' is not defined                          no-undef
+   362:14  error    'setTimeout' is not defined                          no-undef
+   373:11  warning  'qs' is assigned a value but never used              no-unused-vars
+   397:14  error    'setTimeout' is not defined                          no-undef
+   460:14  error    'setTimeout' is not defined                          no-undef
+   477:14  error    'setTimeout' is not defined                          no-undef
+   487:30  warning  'dbAll' is assigned a value but never used           no-unused-vars
+   588:15  warning  '_' is defined but never used                        no-unused-vars
+   589:54  error    'setTimeout' is not defined                          no-undef
+   593:15  error    'setTimeout' is not defined                          no-undef
+   687:11  warning  'name' is assigned a value but never used            no-unused-vars
+   724:5   error    'setTimeout' is not defined                          no-undef
+   818:11  warning  'ck' is assigned a value but never used              no-unused-vars
+   819:9   warning  'saved' is assigned a value but never used           no-unused-vars
+   866:14  error    'setTimeout' is not defined                          no-undef
+   951:32  error    'bot' is not defined                                 no-undef
+  1002:34  error    'setTimeout' is not defined                          no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_commands_ar.js
+  116:14  error  'setTimeout' is not defined  no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_commands_pro.js
+  25:12  warning  '_' is defined but never used  no-unused-vars
+  34:24  error    'setTimeout' is not defined    no-undef
+  38:34  error    'setTimeout' is not defined    no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_extras.js
+   12:9   warning  'run' is assigned a value but never used         no-unused-vars
+   12:14  warning  'get' is assigned a value but never used         no-unused-vars
+   13:9   warning  'cacheGet' is assigned a value but never used    no-unused-vars
+   13:19  warning  'cacheSet' is assigned a value but never used    no-unused-vars
+   13:29  warning  'cacheClear' is assigned a value but never used  no-unused-vars
+   17:22  error    'setTimeout' is not defined                      no-undef
+   20:24  error    'setTimeout' is not defined                      no-undef
+   29:11  warning  '_' is defined but never used                    no-unused-vars
+   35:16  warning  'handleSlowmode' is defined but never used       no-unused-vars
+  117:13  warning  '_' is defined but never used                    no-unused-vars
+  125:10  error    'setTimeout' is not defined                      no-undef
+  136:43  warning  'userId' is defined but never used               no-unused-vars
+  167:7   error    'setTimeout' is not defined                      no-undef
+  174:17  warning  '_' is defined but never used                    no-unused-vars
+  184:16  warning  'handleTopActive' is defined but never used      no-unused-vars
+  209:73  warning  '_' is defined but never used                    no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_filters.js
+   18:14  warning  'get' is assigned a value but never used  no-unused-vars
+  208:65  error    'Buffer' is not defined                   no-undef
+  244:5   error    'setTimeout' is not defined               no-undef
+  267:96  error    'Buffer' is not defined                   no-undef
+  288:5   error    'setTimeout' is not defined               no-undef
+  293:12  error    'setTimeout' is not defined               no-undef
+  305:5   error    'setTimeout' is not defined               no-undef
+  307:12  error    'setTimeout' is not defined               no-undef
+  315:5   error    'setTimeout' is not defined               no-undef
+  317:12  error    'setTimeout' is not defined               no-undef
+  323:5   error    'setTimeout' is not defined               no-undef
+  343:19  error    'Buffer' is not defined                   no-undef
+  343:92  warning  '_' is defined but never used             no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_logs.js
+   92:36  warning  'chatId' is defined but never used  no-unused-vars
+  195:17  error    'Buffer' is not defined             no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_panel.js
+   28:12   warning  '_' is defined but never used                  no-unused-vars
+   41:3    error    'console' is not defined                       no-undef
+   57:13   warning  '_' is defined but never used                  no-unused-vars
+  149:36   error    'process' is not defined                       no-undef
+  158:13   warning  'e' is defined but never used                  no-unused-vars
+  227:100  error    'process' is not defined                       no-undef
+  342:7    error    'console' is not defined                       no-undef
+  448:59   error    'setTimeout' is not defined                    no-undef
+  464:9    warning  'channels' is assigned a value but never used  no-unused-vars
+  484:36   error    'process' is not defined                       no-undef
+  488:18   error    'process' is not defined                       no-undef
+  516:5    error    Unreachable code                               no-unreachable
+  519:18   warning  'kb' is assigned a value but never used        no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_pro.js
+   59:13  warning  'e' is defined but never used  no-unused-vars
+   69:1   error    'setInterval' is not defined   no-undef
+   76:1   error    'setInterval' is not defined   no-undef
+  226:16  error    'setTimeout' is not defined    no-undef
+  238:16  error    'setTimeout' is not defined    no-undef
+  250:16  error    'setTimeout' is not defined    no-undef
+  259:14  error    'setTimeout' is not defined    no-undef
+  270:16  error    'setTimeout' is not defined    no-undef
+  289:14  error    'setTimeout' is not defined    no-undef
+  297:14  error    'setTimeout' is not defined    no-undef
+  306:14  error    'setTimeout' is not defined    no-undef
+  322:18  error    'setTimeout' is not defined    no-undef
+  338:16  error    'setTimeout' is not defined    no-undef
+  351:18  error    'setTimeout' is not defined    no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_pro_features.js
+   26:22   error    'setTimeout' is not defined                          no-undef
+   29:25   error    'setTimeout' is not defined                          no-undef
+   42:12   warning  '_' is defined but never used                        no-unused-vars
+   53:194  warning  '_' is defined but never used                        no-unused-vars
+  139:7    warning  '_approvedCache' is assigned a value but never used  no-unused-vars
+  231:74   warning  '_' is defined but never used                        no-unused-vars
+  277:14   warning  '_' is defined but never used                        no-unused-vars
+  299:85   warning  '_' is defined but never used                        no-unused-vars
+  321:12   warning  '_' is defined but never used                        no-unused-vars
+  333:66   warning  '_' is defined but never used                        no-unused-vars
+  378:12   warning  '_' is defined but never used                        no-unused-vars
+  380:86   warning  '_' is defined but never used                        no-unused-vars
+  386:10   error    'setTimeout' is not defined                          no-undef
+  479:58   error    'setTimeout' is not defined                          no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_pro_panel.js
+   35:12  warning  '_' is defined but never used  no-unused-vars
+  377:16  warning  '_' is defined but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_protection.js
+   20:27  error    'process' is not defined       no-undef
+   80:12  warning  '_' is defined but never used  no-unused-vars
+   93:1   error    'setInterval' is not defined   no-undef
+  440:10  warning  '_' is defined but never used  no-unused-vars
+  450:12  error    'setTimeout' is not defined    no-undef
+  457:12  warning  '_' is defined but never used  no-unused-vars
+  470:12  warning  '_' is defined but never used  no-unused-vars
+  555:97  warning  '_' is defined but never used  no-unused-vars
+  564:12  error    'setTimeout' is not defined    no-undef
+  607:16  warning  '_' is defined but never used  no-unused-vars
+  612:14  error    'setTimeout' is not defined    no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_roles.js
+   64:29  error    'process' is not defined       no-undef
+   79:14  warning  '_' is defined but never used  no-unused-vars
+  188:10  error    'setTimeout' is not defined    no-undef
+  197:10  error    'setTimeout' is not defined    no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_schedule.js
+   52:24  error    'setTimeout' is not defined    no-undef
+   55:25  error    'setTimeout' is not defined    no-undef
+   63:11  warning  '_' is defined but never used  no-unused-vars
+   76:13  warning  '_' is defined but never used  no-unused-vars
+  136:14  error    'setTimeout' is not defined    no-undef
+  189:17  error    'setInterval' is not defined   no-undef
+  244:11  warning  '_' is defined but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_setup.js
+  18:11  warning  '_' is defined but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/group_verify.js
+   38:12  warning  '_' is defined but never used  no-unused-vars
+  103:12  warning  '_' is defined but never used  no-unused-vars
+  128:14  error    'setTimeout' is not defined    no-undef
+  140:17  error    'setInterval' is not defined   no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/guess_game.js
+   52:12  error    'setTimeout' is not defined                    no-undef
+   71:9   warning  '_botLink' is assigned a value but never used  no-unused-vars
+   92:23  error    'setInterval' is not defined                   no-undef
+   94:41  error    'clearInterval' is not defined                 no-undef
+   97:22  error    'clearInterval' is not defined                 no-undef
+  109:22  error    'setTimeout' is not defined                    no-undef
+  110:5   error    'clearInterval' is not defined                 no-undef
+  119:12  error    'setTimeout' is not defined                    no-undef
+  133:46  error    'setTimeout' is not defined                    no-undef
+  154:11  warning  '_' is defined but never used                  no-unused-vars
+  156:3   error    'clearTimeout' is not defined                  no-undef
+  157:3   error    'clearInterval' is not defined                 no-undef
+  189:3   error    'setTimeout' is not defined                    no-undef
+  198:12  error    'setTimeout' is not defined                    no-undef
+  202:23  error    'setTimeout' is not defined                    no-undef
+  223:15  error    'process' is not defined                       no-undef
+  317:7   error    'clearTimeout' is not defined                  no-undef
+  360:20  error    'setTimeout' is not defined                    no-undef
+  364:46  error    'setTimeout' is not defined                    no-undef
+  367:20  error    'setTimeout' is not defined                    no-undef
+  399:46  error    'setTimeout' is not defined                    no-undef
+  406:3   error    'clearTimeout' is not defined                  no-undef
+  407:3   error    'clearTimeout' is not defined                  no-undef
+  414:9   warning  'r' is assigned a value but never used         no-unused-vars
+  430:11  warning  '_' is defined but never used                  no-unused-vars
+  445:3   error    'clearTimeout' is not defined                  no-undef
+  446:3   error    'clearTimeout' is not defined                  no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/help.js
+  3:27  error  'process' is not defined  no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/manage.js
+     9:23    warning  'backMenu' is assigned a value but never used    no-unused-vars
+    12:7     warning  'bundlesH' is assigned a value but never used    no-unused-vars
+    13:7     warning  'analyticsH' is assigned a value but never used  no-unused-vars
+    18:22    warning  'getSetting' is assigned a value but never used  no-unused-vars
+    23:10    warning  'sanitizeInput' is defined but never used        no-unused-vars
+    37:30    error    'console' is not defined                         no-undef
+    40:251   error    'setTimeout' is not defined                      no-undef
+    79:8     error    'process' is not defined                         no-undef
+   285:16    error    'ALL_PERMS' is not defined                       no-undef
+   355:10    error    'process' is not defined                         no-undef
+   365:36    warning  'dbA' is assigned a value but never used         no-unused-vars
+   382:89    error    Unreachable code                                 no-unreachable
+   459:59    error    'setTimeout' is not defined                      no-undef
+   464:584   warning  '_' is defined but never used                    no-unused-vars
+   759:13    warning  '_' is defined but never used                    no-unused-vars
+   802:11    warning  'insertRes' is assigned a value but never used   no-unused-vars
+   802:29    error    'run' is not defined                             no-undef
+   815:39    error    'showSectionUsers' is not defined                no-undef
+   816:39    error    'showSectionContent' is not defined              no-undef
+   817:39    error    'showSectionNotify' is not defined               no-undef
+   818:39    error    'showSectionAdmin' is not defined                no-undef
+   819:39    error    'showSectionSettings' is not defined             no-undef
+   838:16    error    'console' is not defined                         no-undef
+   940:242   error    'console' is not defined                         no-undef
+  1139:1536  error    'setTimeout' is not defined                      no-undef
+  1153:75    warning  '_' is defined but never used                    no-unused-vars
+  1156:20    error    'Buffer' is not defined                          no-undef
+  1268:13    error    'console' is not defined                         no-undef
+  1408:13    warning  '_' is defined but never used                    no-unused-vars
+  1451:16    warning  'showMillionQPanel' is defined but never used    no-unused-vars
+  1470:16    warning  'showMillionQList' is defined but never used     no-unused-vars
+  1499:16    warning  'startMillionQAdd' is defined but never used     no-unused-vars
+  1508:16    warning  'startMillionQDel' is defined but never used     no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/manage_bundles.js
+  3:7  warning  'content' is assigned a value but never used  no-unused-vars
+  6:7  warning  'filesDb' is assigned a value but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/million.js
+    2:14  warning  'get' is assigned a value but never used  no-unused-vars
+  194:18  error    'clearTimeout' is not defined             no-undef
+  205:13  error    'setTimeout' is not defined               no-undef
+  228:18  error    'clearTimeout' is not defined             no-undef
+  298:20  error    'clearTimeout' is not defined             no-undef
+  319:18  error    'clearTimeout' is not defined             no-undef
+  340:38  error    'setTimeout' is not defined               no-undef
+  384:11  warning  '_' is defined but never used             no-unused-vars
+  428:20  error    'clearTimeout' is not defined             no-undef
+  443:20  error    'clearTimeout' is not defined             no-undef
+  470:18  error    'clearTimeout' is not defined             no-undef
+  480:1   error    'setInterval' is not defined              no-undef
+  483:53  error    'clearTimeout' is not defined             no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/million_battle.js
+   51:56   warning  '_' is defined but never used   no-unused-vars
+   58:34   error    'clearTimeout' is not defined   no-undef
+   59:34   error    'clearInterval' is not defined  no-undef
+  138:64   warning  '_' is defined but never used   no-unused-vars
+  182:12   warning  '_' is defined but never used   no-unused-vars
+  187:17   error    'setInterval' is not defined    no-undef
+  189:43   error    'clearInterval' is not defined  no-undef
+  190:27   error    'clearInterval' is not defined  no-undef
+  192:46   error    'clearInterval' is not defined  no-undef
+  203:13   error    'setTimeout' is not defined     no-undef
+  348:3    error    'setTimeout' is not defined     no-undef
+  362:192  warning  '_' is defined but never used   no-unused-vars
+  371:13   warning  '_' is defined but never used   no-unused-vars
+  383:3    error    'setTimeout' is not defined     no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/millionaire.js
+   10:7   warning  'logger' is assigned a value but never used  no-unused-vars
+  269:20  error    'setTimeout' is not defined                  no-undef
+  309:25  error    'clearTimeout' is not defined                no-undef
+  318:24  error    'clearTimeout' is not defined                no-undef
+  319:24  error    'clearTimeout' is not defined                no-undef
+  346:26  error    'setTimeout' is not defined                  no-undef
+  401:19  error    'clearTimeout' is not defined                no-undef
+  402:16  error    'setTimeout' is not defined                  no-undef
+  428:23  error    'clearTimeout' is not defined                no-undef
+  436:21  error    'clearTimeout' is not defined                no-undef
+  479:26  error    'setTimeout' is not defined                  no-undef
+  491:23  error    'clearTimeout' is not defined                no-undef
+  492:23  error    'clearTimeout' is not defined                no-undef
+  564:23  error    'clearTimeout' is not defined                no-undef
+  579:12  error    'setTimeout' is not defined                  no-undef
+  585:12  error    'setTimeout' is not defined                  no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/owner.js
+   5:9   warning  'build' is assigned a value but never used  no-unused-vars
+   5:16  warning  'btn' is assigned a value but never used    no-unused-vars
+   5:21  warning  'back' is assigned a value but never used   no-unused-vars
+  22:12  error    'process' is not defined                    no-undef
+  30:12  error    'process' is not defined                    no-undef
+  36:16  warning  'syncGroups' is defined but never used      no-unused-vars
+  50:13  warning  '_' is defined but never used               no-unused-vars
+  54:28  error    'setTimeout' is not defined                 no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/owner_tools.js
+   62:36  warning  'data' is defined but never used  no-unused-vars
+   72:83  warning  '_' is defined but never used     no-unused-vars
+   85:22  error    'process' is not defined          no-undef
+   91:38  error    'process' is not defined          no-undef
+  101:17  warning  '_' is defined but never used     no-unused-vars
+  105:20  error    'process' is not defined          no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/profile.js
+  68:33  error  'process' is not defined  no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/share_summary.js
+   2:9   warning  'all' is assigned a value but never used  no-unused-vars
+  43:58  error    'process' is not defined                  no-undef
+  52:34  error    'Buffer' is not defined                   no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/start.js
+   50:20  error    'process' is not defined       no-undef
+  107:18  warning  'e' is defined but never used  no-unused-vars
+  228:11  warning  'e' is defined but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/summarize.js
+   3:33  error    'process' is not defined       no-undef
+  14:35  error    'Buffer' is not defined        no-undef
+  33:13  warning  'e' is defined but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/tod/admin_panel.js
+  31:12  warning  'e' is defined but never used  no-unused-vars
+  54:12  warning  '_' is defined but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/tod/db.js
+  165:58  warning  '_' is defined but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/tod/engine.js
+   17:46  error    'setTimeout' is not defined    no-undef
+   61:24  error    'setTimeout' is not defined    no-undef
+   93:25  error    'clearTimeout' is not defined  no-undef
+  107:25  error    'clearTimeout' is not defined  no-undef
+  269:80  warning  '_' is defined but never used  no-unused-vars
+  292:27  error    'clearTimeout' is not defined  no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/tod/state.js
+   41:19  error    'clearTimeout' is not defined  no-undef
+   42:74  warning  '_' is defined but never used  no-unused-vars
+   43:74  warning  '_' is defined but never used  no-unused-vars
+   82:19  error    'setTimeout' is not defined    no-undef
+   86:7   error    'clearTimeout' is not defined  no-undef
+  112:19  error    'setTimeout' is not defined    no-undef
+  116:7   error    'clearTimeout' is not defined  no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/user.js
+   10:9    warning  't' is assigned a value but never used             no-unused-vars
+   11:29   warning  'cacheClear' is assigned a value but never used    no-unused-vars
+   70:16   warning  '_showFavorites_UNUSED' is defined but never used  no-unused-vars
+   82:323  warning  'e' is defined but never used                      no-unused-vars
+   86:327  warning  'e' is defined but never used                      no-unused-vars
+  189:183  warning  '_' is defined but never used                      no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/werewolf/db.js
+  224:14  warning  '_' is defined but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/werewolf/engine.js
+   18:46  error    'setTimeout' is not defined    no-undef
+   32:12  warning  'e' is defined but never used  no-unused-vars
+   73:3   error    'setTimeout' is not defined    no-undef
+  100:12  warning  '_' is defined but never used  no-unused-vars
+  556:77  warning  '_' is defined but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/werewolf/index.js
+  10:18  warning  'parseCbx' is assigned a value but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/werewolf/permissions.js
+  29:12  warning  '_' is defined but never used  no-unused-vars
+  36:12  warning  '_' is defined but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/werewolf/state.js
+  111:77  warning  '_' is defined but never used  no-unused-vars
+  146:19  error    'setTimeout' is not defined    no-undef
+  150:7   error    'clearTimeout' is not defined  no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/handlers/xp.js
+  7:11  warning  'old_level' is assigned a value but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/import_questions.cjs
+  47:49  error  'process' is not defined  no-undef
+  71:18  error  'console' is not defined  no-undef
+  75:3   error  'console' is not defined  no-undef
+  79:21  error  'console' is not defined  no-undef
+  79:47  error  'process' is not defined  no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/index.js
+   41:9    warning  'smartSearch' is assigned a value but never used             no-unused-vars
+   42:9    warning  'handleNewMember' is assigned a value but never used         no-unused-vars
+   42:26   warning  'handleMemberLeft' is assigned a value but never used        no-unused-vars
+   42:88   warning  'showGroupStats' is assigned a value but never used          no-unused-vars
+   42:104  warning  'warnMember' is assigned a value but never used              no-unused-vars
+   42:116  warning  'banMember' is assigned a value but never used               no-unused-vars
+   42:127  warning  'unbanMember' is assigned a value but never used             no-unused-vars
+   42:140  warning  'muteMember' is assigned a value but never used              no-unused-vars
+   42:152  warning  'unmuteMember' is assigned a value but never used            no-unused-vars
+   43:29   warning  'handleSettingsCallback' is assigned a value but never used  no-unused-vars
+   45:7    warning  'groupBroadcast' is assigned a value but never used          no-unused-vars
+   50:24   error    'process' is not defined                                     no-undef
+   51:57   error    'process' is not defined                                     no-undef
+   52:24   error    'process' is not defined                                     no-undef
+   53:24   error    'process' is not defined                                     no-undef
+   54:33   error    'process' is not defined                                     no-undef
+   59:1    error    'setInterval' is not defined                                 no-undef
+   68:11   warning  '_' is defined but never used                                no-unused-vars
+   97:45   error    '__dirname' is not defined                                   no-undef
+  107:24   error    'process' is not defined                                     no-undef
+  112:1    error    'setInterval' is not defined                                 no-undef
+  157:11   warning  '_' is defined but never used                                no-unused-vars
+  172:9    warning  'now' is assigned a value but never used                     no-unused-vars
+  200:15   warning  '_' is defined but never used                                no-unused-vars
+  220:93   warning  '_' is defined but never used                                no-unused-vars
+  266:92   warning  '_' is defined but never used                                no-unused-vars
+  317:80   warning  'e' is defined but never used                                no-unused-vars
+  393:15   warning  '_' is defined but never used                                no-unused-vars
+  401:81   warning  '_' is defined but never used                                no-unused-vars
+  433:13   warning  '_' is defined but never used                                no-unused-vars
+  445:21   error    'process' is not defined                                     no-undef
+  448:59   warning  '_' is defined but never used                                no-unused-vars
+  451:28   error    'process' is not defined                                     no-undef
+  455:17   error    'process' is not defined                                     no-undef
+  465:29   warning  '_next' is defined but never used                            no-unused-vars
+  494:13   error    'setTimeout' is not defined                                  no-undef
+  518:23   warning  '_' is defined but never used                                no-unused-vars
+  521:17   warning  '_' is defined but never used                                no-unused-vars
+  565:17   warning  '_' is defined but never used                                no-unused-vars
+  571:63   error    'console' is not defined                                     no-undef
+  576:7    error    'setImmediate' is not defined                                no-undef
+  598:5    error    'setTimeout' is not defined                                  no-undef
+  609:5    error    'process' is not defined                                     no-undef
+  610:11   warning  '_' is defined but never used                                no-unused-vars
+  610:16   error    'process' is not defined                                     no-undef
+  613:1    error    'process' is not defined                                     no-undef
+  614:1    error    'process' is not defined                                     no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/middlewares/auth.js
+    3:19   warning  'cacheSet' is assigned a value but never used    no-unused-vars
+    6:9    warning  'getSetting' is assigned a value but never used  no-unused-vars
+    6:26   warning  'dbGet' is assigned a value but never used       no-unused-vars
+   10:27   error    'process' is not defined                         no-undef
+   12:3    error    'console' is not defined                         no-undef
+   13:3    error    'process' is not defined                         no-undef
+   37:12   warning  '_' is defined but never used                    no-unused-vars
+   40:15   error    'setInterval' is not defined                     no-undef
+  145:32   error    'setTimeout' is not defined                      no-undef
+  185:11   warning  '_' is defined but never used                    no-unused-vars
+  198:110  warning  '_' is defined but never used                    no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/routes/api.js
+   35:33   error    'process' is not defined                        no-undef
+   42:7    warning  '_AC' is assigned a value but never used        no-unused-vars
+   53:7    warning  'wrap' is assigned a value but never used       no-unused-vars
+   66:29   warning  'cacheMGet' is assigned a value but never used  no-unused-vars
+  127:29   error    'process' is not defined                        no-undef
+  171:3    error    'setImmediate' is not defined                   no-undef
+  179:83   warning  '_' is defined but never used                   no-unused-vars
+  180:142  warning  '_' is defined but never used                   no-unused-vars
+  181:13   warning  'e' is defined but never used                   no-unused-vars
+  195:11   warning  'e' is defined but never used                   no-unused-vars
+  214:11   warning  'e' is defined but never used                   no-unused-vars
+  222:109  warning  '_' is defined but never used                   no-unused-vars
+  235:108  warning  '_' is defined but never used                   no-unused-vars
+  251:9    warning  'isOwner' is assigned a value but never used    no-unused-vars
+  279:9    warning  'isOwner' is assigned a value but never used    no-unused-vars
+  299:29   error    'process' is not defined                        no-undef
+  311:9    warning  'isOwner' is assigned a value but never used    no-unused-vars
+  319:9    warning  'isOwner' is assigned a value but never used    no-unused-vars
+  327:29   error    'process' is not defined                        no-undef
+  333:11   warning  'e' is defined but never used                   no-unused-vars
+  337:29   error    'process' is not defined                        no-undef
+  359:30   error    'setTimeout' is not defined                     no-undef
+  366:29   error    'process' is not defined                        no-undef
+  374:29   error    'process' is not defined                        no-undef
+  380:11   warning  'e' is defined but never used                   no-unused-vars
+  384:29   error    'process' is not defined                        no-undef
+  392:29   error    'process' is not defined                        no-undef
+  400:29   error    'process' is not defined                        no-undef
+  423:29   error    'process' is not defined                        no-undef
+  428:24   error    'URLSearchParams' is not defined                no-undef
+  431:11   warning  '_' is defined but never used                   no-unused-vars
+  448:18   error    'process' is not defined                        no-undef
+  454:18   error    'process' is not defined                        no-undef
+  474:5    error    'console' is not defined                        no-undef
+  483:29   error    'process' is not defined                        no-undef
+  531:5    error    'console' is not defined                        no-undef
+  556:31   error    'process' is not defined                        no-undef
+  579:31   error    'process' is not defined                        no-undef
+  591:11   warning  'e' is defined but never used                   no-unused-vars
+  618:11   warning  'e' is defined but never used                   no-unused-vars
+  668:11   warning  'e' is defined but never used                   no-unused-vars
+  676:11   warning  'e' is defined but never used                   no-unused-vars
+  684:11   warning  'e' is defined but never used                   no-unused-vars
+  693:94   warning  '_' is defined but never used                   no-unused-vars
+  696:11   warning  'e' is defined but never used                   no-unused-vars
+  715:11   warning  'e' is defined but never used                   no-unused-vars
+  733:11   warning  'e' is defined but never used                   no-unused-vars
+  739:29   error    'process' is not defined                        no-undef
+  765:11   warning  'e' is defined but never used                   no-unused-vars
+  773:11   warning  'e' is defined but never used                   no-unused-vars
+  779:29   error    'process' is not defined                        no-undef
+  791:11   warning  'e' is defined but never used                   no-unused-vars
+  806:29   error    'process' is not defined                        no-undef
+  816:29   error    'process' is not defined                        no-undef
+  841:11   warning  'e' is defined but never used                   no-unused-vars
+  858:11   warning  'e' is defined but never used                   no-unused-vars
+  895:5    error    'setImmediate' is not defined                   no-undef
+  903:19   warning  '_' is defined but never used                   no-unused-vars
+  904:34   error    'setTimeout' is not defined                     no-undef
+  907:15   warning  '_' is defined but never used                   no-unused-vars
+  913:28   warning  'next' is defined but never used                no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/scripts/fix_questions.cjs
+   4:43  error  'process' is not defined  no-undef
+  15:5   error  'console' is not defined  no-undef
+  16:16  error  'console' is not defined  no-undef
+  20:21  error  'console' is not defined  no-undef
+  23:21  error  'console' is not defined  no-undef
+  23:39  error  'process' is not defined  no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/scripts/sync_groups.cjs
+  13:26  error  'process' is not defined     no-undef
+  14:43  error  'process' is not defined     no-undef
+  18:3   error  'console' is not defined     no-undef
+  27:9   error  'console' is not defined     no-undef
+  30:9   error  'console' is not defined     no-undef
+  36:7   error  'console' is not defined     no-undef
+  39:28  error  'setTimeout' is not defined  no-undef
+  42:3   error  'console' is not defined     no-undef
+  43:3   error  'console' is not defined     no-undef
+  44:3   error  'console' is not defined     no-undef
+  46:3   error  'process' is not defined     no-undef
+  49:21  error  'console' is not defined     no-undef
+  49:39  error  'process' is not defined     no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/adminCache.js
+  15:12  warning  '_' is defined but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/ai_knowledge.js
+  40:11  warning  'e' is defined but never used  no-unused-vars
+  62:13  warning  'e' is defined but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/apiRateLimit.js
+  5:1  error  'setInterval' is not defined  no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/cache.js
+  105:11  warning  'CONC' is assigned a value but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/channelGuard.js
+   21:7   error    'console' is not defined       no-undef
+   26:30  error    'setTimeout' is not defined    no-undef
+   30:16  warning  '_' is defined but never used  no-unused-vars
+   35:5   error    'console' is not defined       no-undef
+   73:18  warning  '_' is defined but never used  no-unused-vars
+   77:26  error    'setTimeout' is not defined    no-undef
+  103:3   error    'console' is not defined       no-undef
+  115:3   error    'console' is not defined       no-undef
+  168:12  warning  '_' is defined but never used  no-unused-vars
+  184:57  error    'setTimeout' is not defined    no-undef
+  186:17  error    'console' is not defined       no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/common.js
+  24:12  warning  'e' is defined but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/groq_client.js
+    5:22  error    'process' is not defined       no-undef
+    6:22  error    'process' is not defined       no-undef
+   10:45  error    'setTimeout' is not defined    no-undef
+   30:74  error    'Buffer' is not defined        no-undef
+   77:12  warning  'e' is defined but never used  no-unused-vars
+  156:10  error    'process' is not defined       no-undef
+  159:44  error    'process' is not defined       no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/groupBroadcast.js
+   16:9   warning  'notifyGroupsCustom' is assigned a value but never used  no-unused-vars
+   18:38  error    'setTimeout' is not defined                              no-undef
+  218:12  warning  '_' is defined but never used                            no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/groupNotify.js
+    2:14  warning  'run' is assigned a value but never used       no-unused-vars
+    8:39  error    'setTimeout' is not defined                    no-undef
+   13:72  warning  '_' is defined but never used                  no-unused-vars
+  134:9   error    'console' is not defined                       no-undef
+  138:5   error    'console' is not defined                       no-undef
+  214:5   error    'console' is not defined                       no-undef
+  223:21  error    'process' is not defined                       no-undef
+  256:5   error    'console' is not defined                       no-undef
+  283:13  warning  'cacheGet' is assigned a value but never used  no-unused-vars
+  283:23  warning  'cacheSet' is assigned a value but never used  no-unused-vars
+  315:60  error    'setTimeout' is not defined                    no-undef
+  317:5   error    'console' is not defined                       no-undef
+  319:5   error    'console' is not defined                       no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/helpers.js
+  11:9  warning  '_ack' is assigned a value but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/logger.js
+   5:30  error  '__dirname' is not defined   no-undef
+   6:22  error  'process' is not defined     no-undef
+   6:59  error  'process' is not defined     no-undef
+  41:18  error  'setTimeout' is not defined  no-undef
+  47:22  error  'console' is not defined     no-undef
+  48:22  error  'console' is not defined     no-undef
+  49:22  error  'console' is not defined     no-undef
+  50:26  error  'process' is not defined     no-undef
+  50:47  error  'console' is not defined     no-undef
+  53:1   error  'process' is not defined     no-undef
+  54:1   error  'process' is not defined     no-undef
+  57:3   error  'process' is not defined     no-undef
+  59:1   error  'process' is not defined     no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/queues.js
+   7:7   error  'process' is not defined       no-undef
+   8:17  error  'process' is not defined       no-undef
+   9:19  error  'process' is not defined       no-undef
+  12:7   error  'process' is not defined       no-undef
+  17:7   error  'process' is not defined       no-undef
+  17:32  error  'process' is not defined       no-undef
+  19:17  error  'process' is not defined       no-undef
+  19:46  error  'process' is not defined       no-undef
+  20:26  error  'process' is not defined       no-undef
+  20:51  error  'process' is not defined       no-undef
+  21:17  error  'process' is not defined       no-undef
+  21:46  error  'process' is not defined       no-undef
+  22:17  error  'process' is not defined       no-undef
+  46:5   error  'console' is not defined       no-undef
+  48:5   error  'console' is not defined       no-undef
+  59:3   error  'setImmediate' is not defined  no-undef
+  65:51  error  'setTimeout' is not defined    no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/redisClient.js
+  5:8   error  'process' is not defined  no-undef
+  5:47  error  'process' is not defined  no-undef
+  8:32  error  'process' is not defined  no-undef
+  8:75  error  'process' is not defined  no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/scheduler.js
+   12:15   error    'clearInterval' is not defined  no-undef
+   13:12   error    'setInterval' is not defined    no-undef
+   15:3    error    'setTimeout' is not defined     no-undef
+  123:96   warning  '_' is defined but never used   no-unused-vars
+  140:18   warning  '_' is defined but never used   no-unused-vars
+  144:12   warning  '_' is defined but never used   no-unused-vars
+  180:121  warning  '_' is defined but never used   no-unused-vars
+  181:104  warning  '_' is defined but never used   no-unused-vars
+  182:101  warning  '_' is defined but never used   no-unused-vars
+  183:100  warning  '_' is defined but never used   no-unused-vars
+  184:95   warning  '_' is defined but never used   no-unused-vars
+  188:46   error    'setTimeout' is not defined     no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/smartWarmup.js
+  3:9  warning  'cacheSet' is assigned a value but never used  no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/userNotify.js
+  20:60  error  'setTimeout' is not defined  no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/validateEnv.js
+   5:42  error  'process' is not defined  no-undef
+   7:5   error  'console' is not defined  no-undef
+   8:5   error  'process' is not defined  no-undef
+  10:22  error  'process' is not defined  no-undef
+  11:5   error  'console' is not defined  no-undef
+  12:5   error  'process' is not defined  no-undef
+  14:3   error  'console' is not defined  no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/utils/webapp_auth.js
+   3:15  error    'process' is not defined          no-undef
+   7:24  error    'URLSearchParams' is not defined  no-undef
+  21:11  warning  '_' is defined but never used     no-unused-vars
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/workers/broadcast.worker.js
+   4:3   error    'console' is not defined       no-undef
+  19:15  warning  '_' is defined but never used  no-unused-vars
+  20:54  error    'setTimeout' is not defined    no-undef
+  33:5   error    'console' is not defined       no-undef
+
+/data/data/com.termux/files/home/study-bot-backup-20260407_011636/workers/notify.worker.js
+   4:3   error    'console' is not defined       no-undef
+  21:15  warning  '_' is defined but never used  no-unused-vars
+  22:30  error    'setTimeout' is not defined    no-undef
+
+✖ 799 problems (459 errors, 340 warnings)
+
