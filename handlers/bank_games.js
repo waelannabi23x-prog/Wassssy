@@ -88,12 +88,16 @@ async function handleLeaderboard(ctx) {
 const GAMES_MENU_TEXT =
   '🎮 *ألعاب القروب*\n\n' +
   '🏆 مليون\n' +
-  '📸 خمن\n\n' +
+  '📸 خمن\n' +
+  '🐺 لوب غارو\n' +
+  '🎲 صحصح\n\n' +
   '👇 اضغط على لعبة لمعرفة طريقة اللعب';
 const GAMES_MENU_KB = {
   inline_keyboard: [
     [{ text: '🏆 كيف تلعب المليون؟', callback_data: 'games_how_million' }],
     [{ text: '📸 كيف تلعب خمن؟', callback_data: 'games_how_guess' }],
+    [{ text: '🐺 كيف تلعب لوب غارو؟', callback_data: 'games_how_werewolf' }],
+    [{ text: '🎲 كيف تلعب صحصح؟', callback_data: 'games_how_tod' }],
   ],
 };
 const GAMES_BACK_KB = { inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'games_back' }]] };
@@ -102,6 +106,35 @@ async function handleBankGamesCallback(ctx,data) {
   if(data==='games_back'){
     ctx.answerCbQuery().catch(()=>{});
     return ctx.editMessageText(GAMES_MENU_TEXT, { parse_mode:'Markdown', reply_markup: GAMES_MENU_KB }).catch(()=>{});
+  }
+  if(data==='games_how_werewolf'){
+    ctx.answerCbQuery().catch(()=>{});
+    return ctx.editMessageText(
+      '🐺 *طريقة لعب — لوب غارو*\n━━━━━━━━━━━━━━━\n\n' +
+      '1️⃣ اكتب *لوب غارو* في القروب لإنشاء غرفة\n' +
+      '2️⃣ اضغط ✅ انضمام (6-15 لاعب)\n' +
+      '3️⃣ يضغط المنشئ 🚀 ابدأ اللعبة\n' +
+      '4️⃣ تصلك أدوارك بالخاص — تابع تعليماتها\n' +
+      '5️⃣ ليلاً: تنفّذ القدرات سرّاً (ذئب/عراف/ساحرة...)\n' +
+      '6️⃣ نهاراً: ناقشوا وصوّتوا لإعدام المشتبه به\n\n' +
+      '🏆 القرية تفوز بالقضاء على الذئاب، والذئاب تفوز بالقضاء على القرية\n\n' +
+      '📖 لقوانين كاملة مع كل الأدوار: اكتب `/ww_rules`',
+      { parse_mode:'Markdown', reply_markup: GAMES_BACK_KB }
+    ).catch(()=>{});
+  }
+  if(data==='games_how_tod'){
+    ctx.answerCbQuery().catch(()=>{});
+    return ctx.editMessageText(
+      '🎲 *طريقة لعب — صحصح (أكسيو أو فيريتي)*\n━━━━━━━━━━━━━━━\n\n' +
+      '1️⃣ اكتب *صحصح* في القروب لإنشاء غرفة\n' +
+      '2️⃣ اكتب *أنا* للانضمام\n' +
+      '3️⃣ يكتب المنشئ *ابدأ*\n' +
+      '4️⃣ المجيب يختار 🔥 أكسيو أو 💬 فيريتي\n' +
+      '5️⃣ السائل يكتب: `سل` ثم سؤاله — مثال: `سل كم عمرك؟`\n' +
+      '6️⃣ المجيب يجيب: `اجب` ثم إجابته — مثال: `اجب 20 سنة`\n\n' +
+      '📖 لقوانين كاملة: اكتب `/tod_rules`',
+      { parse_mode:'Markdown', reply_markup: GAMES_BACK_KB }
+    ).catch(()=>{});
   }
   if(data==='games_how_million'){
     ctx.answerCbQuery().catch(()=>{});
