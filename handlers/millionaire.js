@@ -35,6 +35,16 @@ function getDiff(level) {
   if (level < 10) return 2;
   return 3;
 }
+// FIX: عمود difficulty في million_questions من نوع TEXT ويخزّن 'easy'/'medium'/'hard'
+// (راجع manage.js وgames_panel.js)، بينما getDiff() تُعيد أرقاماً (1/2/3) تُستخدم فقط
+// للعرض. استخدام getDiff() مباشرة في استعلام WHERE difficulty=$1 كان لا يطابق أبداً،
+// فيسقط الكود دوماً لاستعلام احتياطي عشوائي بلا فلترة صعوبة — وهذا سبب عدم تدرّج
+// الأسئلة من سهل إلى صعب. هذه الدالة تُستخدم في الاستعلام بدلاً منها.
+function getDiffKey(level) {
+  if (level < 5)  return 'easy';
+  if (level < 10) return 'medium';
+  return 'hard';
+}
 
 /* ══════════════ GAME STATE ══════════════ */
 const _games = new Map();
@@ -297,7 +307,7 @@ async function sendNextQuestion(telegram, chatId) {
   if (alive.length === 0) return endGame(telegram, chatId, 'all_eliminated');
   if (game.currentLevel >= PRIZES.length) return endGame(telegram, chatId, 'complete');
 
-  const q = await getRandomQuestion(game.usedQIds, getDiff(game.currentLevel));
+  const q = await getRandomQuestion(game.usedQIds, getDiffKey(game.currentLevel));
   if (!q) {
     await telegram.sendMessage(chatId, '\u274c \u0646\u0641\u062f\u062a \u0627\u0644\u0623\u0633\u0626\u0644\u0629!').catch(()=>{});
     return endGame(telegram, chatId, 'no_questions');
