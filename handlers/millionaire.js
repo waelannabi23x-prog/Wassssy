@@ -96,7 +96,48 @@ async function initMillionaireSchema() {
     `CREATE INDEX IF NOT EXISTS idx_ms_user   ON million_scores(user_id)`,
   ];
   for (const q of tables) await run(q,[]).catch(()=>{});
+  await ensureDifficultyBalance();
 }
+
+// ── إعادة توزيع تلقائية للأسئلة على 3 مستويات بالتساوي ─────────────
+// تُحل مشكلة "كل الأسئلة عشوائية رغم الإصلاح" عندما تكون أغلب الأسئلة
+// مصنّفة 'medium' افتراضياً (قيمة العمود الافتراضية) ولا يوجد ما يكفي
+// من 'easy'/'hard' فعلياً — فيسقط الاستعلام دائماً للاحتياطي العشوائي.
+// تعمل تلقائياً عند كل تشغيل للبوت، ولا تُعيد التوزيع إن كان متوازناً أصلاً.
+async function ensureDifficultyBalance() {
+  try {
+    const counts = await all(
+      `SELECT difficulty, COUNT(*)::int AS c FROM million_questions WHERE is_active=1 GROUP BY difficulty`
+    ).catch(() => []);
+    const total = counts.reduce((s, r) => s + r.c, 0);
+    if (total < 6) return; // عدد قليل جداً، لا فائدة من إعادة التوزيع
+
+    const map = { easy: 0, medium: 0, hard: 0 };
+    for (const r of counts) if (map[r.difficulty] !== undefined) map[r.difficulty] = r.c;
+
+    // إن كان كل مستوى يملك سؤالاً واحداً على الأقل لكل ~3 أسئلة كحد أدنى، الوضع مقبول
+    const minNeeded = Math.max(1, Math.floor(total / 6));
+    const balanced = map.easy >= minNeeded && map.medium >= minNeeded && map.hard >= minNeeded;
+    if (balanced) return;
+
+    require('../utils/logger').warn(
+      `[Millionaire] توزيع صعوبة غير متوازن (سهل:${map.easy} متوسط:${map.medium} صعب:${map.hard}) — جارٍ إعادة التوزيع تلقائياً...`
+    );
+
+    const ids = await all(`SELECT id FROM million_questions WHERE is_active=1 ORDER BY id ASC`).catch(() => []);
+    const n = ids.length;
+    const third = Math.ceil(n / 3);
+    for (let i = 0; i < n; i++) {
+      const lvl = i < third ? 'easy' : (i < third * 2 ? 'medium' : 'hard');
+      await run('UPDATE million_questions SET difficulty=$1 WHERE id=$2', [lvl, ids[i].id]).catch(() => {});
+    }
+    require('../utils/logger').info(`✅ [Millionaire] أُعيد توزيع ${n} سؤال على 3 مستويات بالتساوي.`);
+  } catch (e) {
+    require('../utils/logger').error('[Millionaire] ensureDifficultyBalance: ' + e.message);
+  }
+}
+
+const DIFF_NEIGHBOR = { easy: 'medium', medium: 'hard', hard: 'medium' };
 
 async function getRandomQuestion(usedIds, diff) {
   const ex = usedIds.length ? `AND id NOT IN (${usedIds.join(',')})` : '';
@@ -105,6 +146,13 @@ async function getRandomQuestion(usedIds, diff) {
     `SELECT * FROM million_questions WHERE is_active=1 AND difficulty=$1 ${ex} ORDER BY random() LIMIT 1`,
     [diff]
   ).catch(()=>null);
+  // fallback: المستوى المجاور (أقرب بصعوبة) قبل العشوائية الكاملة
+  if (!q && DIFF_NEIGHBOR[diff]) {
+    q = await get(
+      `SELECT * FROM million_questions WHERE is_active=1 AND difficulty=$1 ${ex} ORDER BY random() LIMIT 1`,
+      [DIFF_NEIGHBOR[diff]]
+    ).catch(()=>null);
+  }
   // fallback: أي سؤال متاح
   if (!q) q = await get(
     `SELECT * FROM million_questions WHERE is_active=1 ${ex} ORDER BY random() LIMIT 1`, []
