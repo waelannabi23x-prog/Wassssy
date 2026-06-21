@@ -85,10 +85,27 @@ async function handleLeaderboard(ctx) {
   return ctx.reply(txt, { reply_to_message_id: ctx.message?.message_id, parse_mode:'Markdown'}).catch(()=>{});
 }
 
+const GAMES_MENU_TEXT =
+  '🎮 *ألعاب القروب*\n\n' +
+  '🏆 مليون\n' +
+  '📸 خمن\n\n' +
+  '👇 اضغط على لعبة لمعرفة طريقة اللعب';
+const GAMES_MENU_KB = {
+  inline_keyboard: [
+    [{ text: '🏆 كيف تلعب المليون؟', callback_data: 'games_how_million' }],
+    [{ text: '📸 كيف تلعب خمن؟', callback_data: 'games_how_guess' }],
+  ],
+};
+const GAMES_BACK_KB = { inline_keyboard: [[{ text: '🔙 رجوع', callback_data: 'games_back' }]] };
+
 async function handleBankGamesCallback(ctx,data) {
+  if(data==='games_back'){
+    ctx.answerCbQuery().catch(()=>{});
+    return ctx.editMessageText(GAMES_MENU_TEXT, { parse_mode:'Markdown', reply_markup: GAMES_MENU_KB }).catch(()=>{});
+  }
   if(data==='games_how_million'){
     ctx.answerCbQuery().catch(()=>{});
-    return ctx.reply(
+    return ctx.editMessageText(
       '🏆 *طريقة لعب — من سيربح المليون*\n━━━━━━━━━━━━━━━\n\n' +
       '1️⃣ اكتب *مليون* في القروب لبدء جلسة\n' +
       '2️⃣ اكتب *أنا* للانضمام (يتسع لـ 30 لاعب)\n' +
@@ -101,12 +118,12 @@ async function handleBankGamesCallback(ctx,data) {
       '👥 مساعدة الجمهور\n' +
       '📞 مساعدة صديق\n' +
       '⏭️ تخطي السؤال',
-      { parse_mode:'Markdown', reply_to_message_id: ctx.callbackQuery?.message?.message_id }
+      { parse_mode:'Markdown', reply_markup: GAMES_BACK_KB }
     ).catch(()=>{});
   }
   if(data==='games_how_guess'){
     ctx.answerCbQuery().catch(()=>{});
-    return ctx.reply(
+    return ctx.editMessageText(
       '📸 *طريقة لعب — خمن الصورة*\n━━━━━━━━━━━━━━━\n\n' +
       '1️⃣ اكتب *خمن* في القروب لبدء تحدي\n' +
       '2️⃣ اكتب *أنا* للانضمام (لاعبان فقط)\n' +
@@ -114,7 +131,7 @@ async function handleBankGamesCallback(ctx,data) {
       '4️⃣ البوت يعرض الصورتين في القروب\n' +
       '5️⃣ من يخمن صورة منافسه أولاً يفوز\n' +
       '6️⃣ الفائز يربح *500 $* في حسابه البنكي💰',
-      { parse_mode:'Markdown', reply_to_message_id: ctx.callbackQuery?.message?.message_id }
+      { parse_mode:'Markdown', reply_markup: GAMES_BACK_KB }
     ).catch(()=>{});
   }
 

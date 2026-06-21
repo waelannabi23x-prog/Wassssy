@@ -539,12 +539,12 @@ function setupGroupCommands(bot) {
       ]);
       kb.push([
         { text: "🔇 كتم 🔔",        callback_data: "grp_mute_menu_" + target.id },
-        { text: "🛡 مخالفات الحماية", callback_data: "grp_violations_" + target.id + "_" + chatId },
+        { text: "🔰 أذونات ↗",      callback_data: "grp_perms_" + target.id + "_" + chatId },
       ]);
     } else if (isReqAdm && isAdmTarget && !isOwner && target.id !== ctx.from.id) {
       kb.push([
         { text: "⚠️ الإنذارات",     callback_data: "grp_warns_show_" + target.id + "_" + chatId },
-        { text: "🎛 الصلاحيات",     callback_data: "grp_perms_" + target.id + "_" + chatId },
+        { text: "🔰 أذونات ↗",      callback_data: "grp_perms_" + target.id + "_" + chatId },
       ]);
     }
 
@@ -557,11 +557,17 @@ function setupGroupCommands(bot) {
   });
 
 
-  // ══ /cmds — يوجّه للقائمة الشاملة في group_pro_features ══
+  // ══ /cmds ══
   bot.command(["cmds", "اوامر"], async ctx => {
     if (!isGroup(ctx)) return;
     delCmd(ctx);
-    return ctx.reply(require('./group_pro_features').CMDS_TEXT, { parse_mode: 'Markdown' }).catch(() => {});
+    const isAdm = await isTgAdmin(ctx);
+    let txt = "📋 *أوامر البوت*\n\n👥 *للجميع:*\n`/info` معلومات عضو\n`/rules` القواعد\n`مليون` لعبة المليون\n`خمن` لعبة التخمين\n";
+    if (isAdm) {
+      txt += "\n🛡️ *للمشرفين:*\n`/ban` `/unban` `/kick`\n`/mute 10m` `/unmute`\n`/warn` `/warns` `/unwarn`\n`/pin` `/unpin`\n`/promote` `/demote`\n`/info` `/clean 20`\n`/mstop` `/mstats`\n`/tagall` `/stats`\n";
+    }
+    const m = await ctx.reply(txt, { parse_mode: "Markdown" }).catch(() => null);
+    if (m) setTimeout(() => ctx.telegram.deleteMessage(ctx.chat.id, m.message_id).catch(() => {}), 30000);
   });
 
 
@@ -963,31 +969,14 @@ async function handleSettingsCallback(ctx, data) {
 
 
 async function showGamesMenu(ctx) {
-  const { get: dbG } = require('../database/db');
-  const qc = await dbG('SELECT COUNT(*) AS c FROM million_questions WHERE is_active=1').catch(() => ({ c: 0 }));
-  const qs = qc?.c || 0;
   const text =
-    '🎮 *ألعاب القروب*\n━━━━━━━━━━━━━━━━━━━━\n\n' +
-    '🏆 *من سيربح المليون*\n' +
-    '   📊 ' + qs + ' سؤال متاح\n' +
-    '   💬 اكتب *مليون* لبدء اللعبة\n\n' +
-    '📸 *خمن الصورة*\n' +
-    '   💬 اكتب *خمن* لبدء التحدي\n\n' +
-    '━━━━━━━━━━━━━━━━━━━━\n' +
-    '💰 *أوامر البنك:*\n' +
-    '`/flip [مبلغ]` — قلب عملة\n' +
-    '`/rob` — سرقة (رد على شخص)\n' +
-    '`/daily` — مكافأة يومية\n' +
-    '`/leaderboard` — المتصدرون\n' +
-    '`انشاء حساب` — فتح حساب\n' +
-    '`فلوسي` — عرض رصيدك';
+    '🎮 *ألعاب القروب*\n\n' +
+    '🏆 مليون\n' +
+    '📸 خمن\n\n' +
+    '👇 اضغط على لعبة لمعرفة طريقة اللعب';
   const rows = [
-    [
-      { text: '🏆 كيف تلعب المليون؟', callback_data: 'games_how_million' },
-    ],
-    [
-      { text: '📸 كيف تلعب خمن؟', callback_data: 'games_how_guess' },
-    ],
+    [{ text: '🏆 كيف تلعب المليون؟', callback_data: 'games_how_million' }],
+    [{ text: '📸 كيف تلعب خمن؟', callback_data: 'games_how_guess' }],
   ];
   return ctx.reply(text, {
     parse_mode: 'Markdown',
