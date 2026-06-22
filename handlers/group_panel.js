@@ -84,6 +84,7 @@ async function showGroupPanel(ctx) {
     kbBtn('📢 رسالة للكل',    'gp_broadcast_0'),
     kbBtn('🎓 رسالة لتخصص', 'gp_broadcast_sp'),
   ]);
+  rows.push([kbBtn('📨 أضفني لقروب (رابط دعوة)', 'gp_invite_me_list')]);
   rows.push([kbBtn('◀️ رجوع', 'mg_menu')]);
 
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
