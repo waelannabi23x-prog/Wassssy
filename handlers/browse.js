@@ -48,7 +48,12 @@ async function showSpecs(ctx) {
   ctx.answerCbQuery('').catch(function() {});
   var specs = cacheGet('specs_all');
   if (!specs) { specs = await content.getSpecs(); cacheSet('specs_all', specs, 21600000); }
-  var rows = specs.map(function(s){ return [btn('🎓 '+s.name, 'sp_'+s.id)]; });
+  var rows = [];
+  for (var _i = 0; _i < specs.length; _i += 2) {
+    var _r = [btn('🎓 '+specs[_i].name, 'sp_'+specs[_i].id)];
+    if (specs[_i+1]) _r.push(btn('🎓 '+specs[_i+1].name, 'sp_'+specs[_i+1].id));
+    rows.push(_r);
+  }
   rows.push(back('main_menu'));
   return eos(ctx, '🎓 *اختر تخصصك:*', { parse_mode:'Markdown', ...build(rows) });
 }
