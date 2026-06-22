@@ -256,6 +256,9 @@ async function handleCallback(ctx, data) {
     return ctx.reply('📢 ارسل الرسالة لهذا القروب:\n_(او /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
   }
 
+  if (data === 'gp_invite_me_list') return handleInviteMeList(ctx);
+  if (data.startsWith('gp_gen_invite_')) return handleGenInvite(ctx, data.replace('gp_gen_invite_', ''));
+
   if (data.startsWith('gp_view_')) return showGroupDetail(ctx, data.replace('gp_view_', ''));
 
   if (data.startsWith('gp_togglew_')) {
@@ -519,10 +522,55 @@ async function showMyGroups(ctx) {
   const { build: kb, btn: b } = require('../utils/keyboard');
   const text = '👥 *قروباتك (' + myGroups.length + ')*\n━━━━━━━━━━━━\n\nاختر قروب لإدارته:';
   const rows = myGroups.map(g => [b('⚙️ ' + String(g.title || g.chat_id).substring(0,25), 'gp_view_' + g.chat_id)]);
+  if (isOwner) {
+    rows.push([b('📨 أضفني لقروب (رابط دعوة)', 'gp_invite_me_list')]);
+  }
   rows.push([{ text: '➕ أضف البوت لقروب جديد', url: 'https://t.me/' + BOT_UN + '?startgroup=owner&admin=change_info+delete_messages+restrict_members+invite_users+pin_messages+manage_video_chats+manage_chat+manage_topics' }]);
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
 
+// ── Owner: أضفني لقروب ──────────────────────────────────
+async function handleInviteMeList(ctx) {
+  const uid = ctx.uid || ctx.from?.id;
+  if (uid !== parseInt(process.env.OWNER_ID)) return ctx.answerCbQuery('🚫').catch(() => {});
+  ctx.answerCbQuery('').catch(() => {});
+
+  const groups = await all('SELECT chat_id, title FROM group_chats WHERE is_active=1 ORDER BY title').catch(() => []);
+  if (!groups.length) return ctx.reply('لا توجد قروبات مسجلة.').catch(() => {});
+
+  let text = '📨 *اختر قروب لتوليد رابط دعوة لك:*\n\n';
+  const rows = [];
+
+  for (const g of groups.slice(0, 20)) {
+    rows.push([{ text: '🔗 ' + String(g.title || g.chat_id).substring(0, 30), callback_data: 'gp_gen_invite_' + g.chat_id }]);
+  }
+  rows.push([{ text: '◀️ رجوع', callback_data: 'gp_panel' }]);
+
+  return ctx.editMessageText(text + '_اضغط على القروب لتوليد رابط دعوة_', {
+    parse_mode: 'Markdown',
+    reply_markup: { inline_keyboard: rows }
+  }).catch(() => ctx.reply(text, { reply_markup: { inline_keyboard: rows } }).catch(() => {}));
+}
+
+async function handleGenInvite(ctx, chatId) {
+  const uid = ctx.uid || ctx.from?.id;
+  if (uid !== parseInt(process.env.OWNER_ID)) return ctx.answerCbQuery('🚫').catch(() => {});
+
+  try {
+    const link = await ctx.telegram.exportChatInviteLink(chatId);
+    const g = await all('SELECT title FROM group_chats WHERE chat_id=$1', [chatId]).catch(() => []);
+    const title = g[0]?.title || chatId;
+    ctx.answerCbQuery('✅ تم توليد الرابط').catch(() => {});
+    return ctx.reply(
+      '🔗 *رابط دعوة لـ: ' + title + '*\n\n' + link + '\n\n_الرابط صالح للاستخدام مرة واحدة_',
+      { parse_mode: 'Markdown' }
+    ).catch(() => {});
+  } catch(e) {
+    ctx.answerCbQuery('❌ فشل: ' + e.message.slice(0,30), { show_alert: true }).catch(() => {});
+  }
+}
+
 module.exports = {
   showMyGroups, showMainMenu, showGroupPanel, showGroupsLeaderboard,
-  handleCallback, handleText, handleMedia, migrateGroupPanel };
+  handleCallback, handleText, handleMedia, migrateGroupPanel,
+  handleInviteMeList, handleGenInvite };
