@@ -342,6 +342,7 @@ async function tagAll(ctx, chatId, customMessage) {
       'SELECT user_id, first_name FROM group_members WHERE chat_id=$1',
       [chatId]
     ).catch(() => []);
+    if (!members.length) {
       if (ctx.callbackQuery) return ctx.answerCbQuery('لا يوجد اعضاء', { show_alert: true }).catch(() => {});
       return ctx.reply('لا يوجد اعضاء مسجلون').catch(() => {});
     }
@@ -352,22 +353,18 @@ async function tagAll(ctx, chatId, customMessage) {
       const chunk = members.slice(i, i + CHUNK);
       const mentions = chunk.map(m => '[' + (m.first_name || 'user').substring(0,15) + '](tg://user?id=' + m.user_id + ')').join(' ');
       const text = (first ? header : '') + mentions;
-      let sent = false;
-        try {
-          await ctx.telegram.sendMessage(chatId, text, { parse_mode: 'Markdown', disable_web_page_preview: true });
-          sent = true;
-        } catch (e) {
-          const r = e && e.response && e.response.parameters && e.response.parameters.retry_after;
-          if (r) { await sleep((r + 1) * 1000); } else { break; }
-        }
+        let sent = false;
+      try {
+        await ctx.telegram.sendMessage(chatId, text, { parse_mode: 'Markdown', disable_web_page_preview: true });
+        sent = true;
+      } catch (e) {
+        const r = e && e.response && e.response.parameters && e.response.parameters.retry_after;
+        if (r) { await sleep((r + 1) * 1000); } else { break; }
       }
       if (sent) sentChunks++;
       first = false;
       if (i + CHUNK < members.length) await sleep(1200);
     }
-    await ctx.telegram.sendMessage(chatId, 'تم منشن ' + members.length + ' عضو في ' + sentChunks + ' رسالة.').catch(() => {});
-  } catch (e) { console.error('[tagAll]', e.message); }
-}
     await ctx.telegram.sendMessage(chatId, 'تم منشن ' + members.length + ' عضو في ' + sentChunks + ' رسالة.').catch(() => {});
   } catch (e) { console.error('[tagAll]', e.message); }
 }
