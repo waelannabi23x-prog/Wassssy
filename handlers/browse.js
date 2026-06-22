@@ -26,7 +26,7 @@ var interactions     = require('../database/interactions');
 var { build, btn, back, backMenu } = require('../utils/keyboard');
 var { eos }          = require('../utils/helpers');
 var { all } = require('../database/db');
-var PS = 8;
+var PS = 50;
 
 async function getPathData(spId, yrId, smId, sbId, catId) {
   var key = 'path_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId;
@@ -151,7 +151,7 @@ async function showFiles(ctx, spId, yrId, smId, sbId, catId, page) {
   if (!staticData) {
     var r = await Promise.all([getPathData(spId,yrId,smId,sbId,catId), filesDb.getFiles(catId), bundlesDb.getBundles(catId)]);
     staticData = { pathData:r[0], allFiles:r[1], bundles:r[2] };
-    cacheSet(staticKey, staticData, 43200000);
+    cacheSet(staticKey, staticData, 86400000);
   }
   var pd=staticData.pathData, allFiles=staticData.allFiles, bundles=staticData.bundles;
   var sp=pd.sp, yr=pd.yr, sm=pd.sm, sb=pd.sb, cat=pd.cat;

@@ -126,7 +126,14 @@ module.exports.registerCallbacks = function(bot, deps) {
     ['skip_sp',   async ctx => { await usersDb.setSpecialty(ctx.uid, 0); return startHandler.showMainMenu(ctx); }],
     ['change_sp', async ctx => {
       const sp = await contentDb.getSpecs();
-      return eos(ctx, '🎓 *اختر تخصصك:*', { parse_mode: 'Markdown', ...kbBuild(sp.map(s => [kbBtn('🎓 ' + s.name, 'set_sp_' + s.id)])) });
+      // 2×2 grid
+      const rows = [];
+      for (let i = 0; i < sp.length; i += 2) {
+        const row = [kbBtn('🎓 ' + sp[i].name, 'set_sp_' + sp[i].id)];
+        if (sp[i+1]) row.push(kbBtn('🎓 ' + sp[i+1].name, 'set_sp_' + sp[i+1].id));
+        rows.push(row);
+      }
+      return eos(ctx, '🎓 *اختر تخصصك:*', { parse_mode: 'Markdown', ...kbBuild(rows) });
     }],
   ]);
 
