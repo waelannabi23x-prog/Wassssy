@@ -436,7 +436,9 @@ async function launch() {
     GrpBuf.start();
     require('./handlers/group_verify').startVerifyWatcher(bot);
     require('./handlers/group_schedule').startScheduleWatcher(bot);
-    logger.info('✅ Services started');
+    const _me = await bot.telegram.getMe().catch(() => ({}));
+    const BOT_USERNAME = _me.username || process.env.BOT_USERNAME || '';
+    logger.info('✅ Services started — @' + BOT_USERNAME);
 
     app.use(bot.webhookCallback('/webhook/' + TOKEN, { secretToken: WEBHOOK_SECRET || undefined }));
 
@@ -573,7 +575,7 @@ async function launch() {
             },
             reply_markup: {
               inline_keyboard: [[
-                { text: '📥 فتح في البوت', url: 'https://t.me/' + ctx.botInfo.username + '?start=file_' + f.id }
+                { text: '📥 فتح في البوت', url: 'https://t.me/' + (ctx.botInfo?.username || BOT_USERNAME) + '?start=file_' + f.id }
               ]]
             },
             thumb_url: 'https://cdn-icons-png.flaticon.com/512/337/337946.png',
