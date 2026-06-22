@@ -107,8 +107,9 @@ async function handleNewMember(bot, chatId, userId, firstName) {
     // أزرار الترحيب
     const welcomeKb = {
       inline_keyboard: [[
-        { text: '📋 القواعد', callback_data: 'grp_rules_' + chatId },
         { text: '👤 ملفّي', url: 'tg://user?id=' + userId },
+      ],[
+        { text: '📢 قناتنا', url: 'https://t.me/lwx23' },
       ]]
     };
 
@@ -334,94 +335,97 @@ async function registerMembers(ctx, chatId) {
   }
 }
 
+// ── cooldown: دقيقة بين كل استخدام لنفس القروب لمنع إساءة الاستخدام ──
+const _tagAllCooldown = new Map();
+const TAGALL_COOLDOWN_MS = 60000;
+
 async function tagAll(ctx, chatId, customMessage) {
   try {
-    if (ctx.callbackQuery) ctx.answerCbQuery('جاري المنشن...').catch(() => {});
-    ctx.deleteMessage().catch(() => {});
+    const isCb = !!ctx.callbackQuery;
+    if (isCb) ctx.answerCbQuery('⏳ جاري التحضير…').catch(() => {});
 
-    // جيب الأعضاء الحاليين فقط (بدون خارجين) عبر تحقق من تيليجرام
-    const dbMembers = await all(
-      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1',
+    // فحص cooldown
+    const lastUse = _tagAllCooldown.get(chatId) || 0;
+    const remaining = TAGALL_COOLDOWN_MS - (Date.now() - lastUse);
+    if (remaining > 0) {
+      const sec = Math.ceil(remaining / 1000);
+      const warn = await ctx.reply(`⏳ انتظر ${sec} ثانية قبل استخدام منشن الكل مجدداً.`).catch(() => null);
+      if (warn) setTimeout(() => ctx.telegram.deleteMessage(chatId, warn.message_id).catch(() => {}), 6000);
+      return;
+    }
+    _tagAllCooldown.set(chatId, Date.now());
+
+    const members = await all(
+      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 AND is_bot=0 LIMIT 400',
       [chatId]
     ).catch(() => []);
 
-    if (!dbMembers.length) {
-      if (ctx.callbackQuery) return ctx.answerCbQuery('لا يوجد اعضاء', { show_alert: true }).catch(() => {});
-      return ctx.reply('لا يوجد اعضاء مسجلون').catch(() => {});
-    }
-
-    // فلتر الأعضاء الحاليين فقط
-    const members = [];
-    const BATCH = 15;
-    for (let i = 0; i < dbMembers.length; i += BATCH) {
-      const batch = dbMembers.slice(i, i + BATCH);
-      const results = await Promise.all(batch.map(async m => {
-        try {
-          const cm = await ctx.telegram.getChatMember(chatId, m.user_id);
-          if (['member','administrator','creator','restricted'].includes(cm.status) && !cm.user?.is_bot) {
-            return { id: m.user_id, name: m.first_name || 'عضو' };
-          }
-        } catch(_) {}
-        return null;
-      }));
-      members.push(...results.filter(Boolean));
-      if (i + BATCH < dbMembers.length) await sleep(300);
-    }
-
     if (!members.length) {
-      return ctx.reply('لا يوجد أعضاء نشطون حالياً في القروب.').catch(() => {});
+      const msg = '📭 لا يوجد أعضاء مسجلون بعد.';
+      if (isCb) return ctx.answerCbQuery(msg, { show_alert: true }).catch(() => {});
+      const m = await ctx.reply(msg).catch(() => null);
+      if (m) setTimeout(() => ctx.telegram.deleteMessage(chatId, m.message_id).catch(() => {}), 6000);
+      return;
     }
 
-    const header = customMessage
-      ? ('*' + customMessage + '*\n\n')
-      : ('📢 *تنبيه للأعضاء*\n\n');
+    const total = members.length;
+    const header = customMessage ? `📢 *${customMessage}*\n\n` : '👥 *تنبيه لجميع الأعضاء*\n\n';
 
-    // بناء الرسائل حسب حد تيليجرام (4096 حرف)
-    const MAX_LEN = 3800;
-    let first = true, sentChunks = 0;
-    let i = 0;
+    // رسالة تقدّم للأعداد الكبيرة
+    const progressMsg = total > 40
+      ? await ctx.reply(`${header}⏳ جارٍ منشن *${total}* عضو...`, { parse_mode: 'Markdown' }).catch(() => null)
+      : null;
 
-    while (i < members.length) {
-      let text = first ? header : '';
-      let count = 0;
-
-      while (i < members.length) {
-        const mention = '[' + members[i].name.substring(0, 15) + '](tg://user?id=' + members[i].id + ') ';
-        if (text.length + mention.length > MAX_LEN) break;
-        text += mention;
-        count++;
-        i++;
+    // تقسيم ذكي حسب ميزانية الأحرف (يقلل عدد الرسائل)
+    const CHAR_BUDGET = 3600;
+    const batches = [];
+    let cur = [], curLen = header.length;
+    for (const m of members) {
+      const name = (m.first_name || '👤').replace(/[[\]()~`>#+\-=|{}.!]/g, '').slice(0, 15);
+      const mention = `[${name}](tg://user?id=${m.user_id})`;
+      const addLen = mention.length + 1;
+      if (curLen + addLen > CHAR_BUDGET && cur.length) {
+        batches.push(cur); cur = []; curLen = 0;
       }
+      cur.push(mention); curLen += addLen;
+    }
+    if (cur.length) batches.push(cur);
 
-      if (!count) { i++; continue; } // تجنب infinite loop
-
-      let retries = 3;
-      while (retries > 0) {
+    let sentTotal = 0;
+    for (let i = 0; i < batches.length; i++) {
+      const text = (i === 0 ? header : '') + batches[i].join(' ');
+      let retries = 0;
+      while (retries < 3) {
         try {
-          await ctx.telegram.sendMessage(chatId, text.trim(), {
-            parse_mode: 'Markdown',
-            disable_web_page_preview: true,
-          });
-          sentChunks++;
+          await ctx.reply(text, { parse_mode: 'Markdown', disable_web_page_preview: true });
+          sentTotal += batches[i].length;
           break;
         } catch (e) {
-          const retryAfter = e?.response?.parameters?.retry_after;
-          if (retryAfter) { await sleep((retryAfter + 1) * 1000); }
-          else { retries--; await sleep(1000); }
+          const wait = parseInt(e.message?.match(/retry after (\d+)/i)?.[1] || '5');
+          if (e.message?.includes('429') || e.message?.includes('Too Many')) {
+            await sleep((wait + 1) * 1000);
+            retries++;
+          } else { break; }
         }
       }
-
-      first = false;
-      if (i < members.length) await sleep(1500);
+      // تحديث رسالة التقدّم كل 5 دفعات
+      if (progressMsg && (i + 1) % 5 === 0 && sentTotal < total) {
+        ctx.telegram.editMessageText(chatId, progressMsg.message_id, null,
+          `${header}⏳ *${sentTotal}/${total}* عضو تم منشنهم...`, { parse_mode: 'Markdown' }).catch(() => {});
+      }
+      if (i + 1 < batches.length) await sleep(1300);
     }
 
-    await ctx.telegram.sendMessage(
-      chatId,
-      '✅ تم منشن *' + members.length + '* عضو في *' + sentChunks + '* رسالة.',
-      { parse_mode: 'Markdown' }
-    ).catch(() => {});
+    // ملخص نهائي على رسالة التقدّم
+    const summary = `✅ تم منشن *${sentTotal}* عضو`;
+    if (progressMsg) {
+      await ctx.telegram.editMessageText(chatId, progressMsg.message_id, null, summary, { parse_mode: 'Markdown' }).catch(() => {});
+      setTimeout(() => ctx.telegram.deleteMessage(chatId, progressMsg.message_id).catch(() => {}), 10000);
+    }
 
-  } catch (e) { console.error('[tagAll]', e.message); }
+  } catch (e) {
+    console.error('[tagAll]', e.message);
+  }
 }
 
 // ══════════════════════════════════════════════════════════
@@ -647,8 +651,7 @@ async function warnMember(ctx, chatId, targetUserId, reason) {
     ).catch(() => ({ cnt: 0 }));
 
     const count = parseInt(warnCount?.cnt || 0);
-    const settingsRow = await require('../database/group_pro_db').getRawSettings(chatId).catch(() => null);
-    const MAX_WARNS = parseInt(settingsRow?.warn_limit) || 3;
+    const MAX_WARNS = 3;
 
     let actionText = '';
     if (count >= MAX_WARNS) {
@@ -665,14 +668,11 @@ async function warnMember(ctx, chatId, targetUserId, reason) {
       actionText = `\n⚠️ *تحذير أخير!* — تحذير آخر = حظر فوري`;
     }
 
-    // عند الاستدعاء من زر (callback): المستدعي يعرض toast ويحدّث اللوحة بنفسه
-    if (ctx.callbackQuery) return;
-
     const _warnKb = count < MAX_WARNS ? [
-      [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + targetUserId },
-       { text: '🔇 كتم 10د',   callback_data: 'grp_mute_menu_' + targetUserId }],
-      [{ text: '🚫 حظر',        callback_data: 'grp_ban_confirm_' + targetUserId },
-       { text: '🎛 الصلاحيات',  callback_data: 'grp_perms_' + targetUserId }],
+      [{ text: '❗ الإنذارات', callback_data: 'grp_warns_' + targetUserId },
+       { text: '🔇 كتم 🪃',   callback_data: 'grp_mute_1h_' + targetUserId }],
+      [{ text: '🚫 حظر 🏹',   callback_data: 'grp_ban_' + targetUserId },
+       { text: '🎛 أذونات 📡', callback_data: 'grp_perms_' + targetUserId }],
     ] : [
       [{ text: '🔓 رفع الحظر', callback_data: 'grp_unban_' + targetUserId }],
     ];
@@ -737,9 +737,6 @@ async function banMember(ctx, chatId, targetUserId, reason, deleteMessages) {
       [chatId, targetUserId, ctx.from.id, reason || 'لا سبب']
     ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
 
-    // عند الاستدعاء من زر (callback): المستدعي يعرض toast ويحدّث اللوحة بنفسه
-    if (ctx.callbackQuery) return;
-
     const msg = await ctx.reply(
       `🚫 *تم الحظر*\n` +
       `━━━━━━━━━━━━━━━━━━\n` +
@@ -767,10 +764,6 @@ async function unbanMember(ctx, chatId, targetUserId) {
   try {
     await ctx.telegram.unbanChatMember(chatId, targetUserId);
     await run('DELETE FROM group_bans WHERE chat_id=$1 AND user_id=$2', [chatId, targetUserId]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-
-    // عند الاستدعاء من زر (callback): المستدعي يعرض toast ويحدّث اللوحة بنفسه
-    if (ctx.callbackQuery) return;
-
     const msg = await ctx.reply(`✅ تم رفع الحظر عن [العضو](tg://user?id=${targetUserId})`, {
       parse_mode: 'Markdown',
     }).catch(() => null);
@@ -798,10 +791,6 @@ async function muteMember(ctx, chatId, targetUserId, durationMinutes) {
       },
       until_date: until || undefined,
     });
-
-    // عند الاستدعاء من زر (callback مثل /info ← كتم): المستدعي يعرض toast
-    // ويحدّث اللوحة بنفسه — لا حاجة لرسالة منفصلة تظهر وتُحذف
-    if (ctx.callbackQuery) return;
 
     const durText = durationMinutes ? `${durationMinutes} دقيقة` : 'حتى يتم التفعيل يدوياً';
     const msg = await ctx.reply(
@@ -840,9 +829,6 @@ async function unmuteMember(ctx, chatId, targetUserId) {
       },
     });
 
-    // عند الاستدعاء من زر (callback): المستدعي يعرض toast ويحدّث اللوحة بنفسه
-    if (ctx.callbackQuery) return;
-
     const msg = await ctx.reply(
       `🔊 *تم تفعيل العضو*\n👤 [العضو](tg://user?id=${targetUserId})`,
       {
@@ -861,6 +847,34 @@ async function unmuteMember(ctx, chatId, targetUserId) {
     ctx.reply('❌ فشل التفعيل: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
   }
 }
+
+// ══════════════════════════════════════════════════════════
+// 🤖 مكافحة السبام (Anti-Spam)
+// ══════════════════════════════════════════════════════════
+const _spamMap = new Map(); // userId → { count, last }
+
+function checkAntiSpam(userId, maxMsg = 5, windowMs = 5000) {
+  const now  = Date.now();
+  const data = _spamMap.get(userId) || { count: 0, last: now };
+
+  if (now - data.last > windowMs) {
+    _spamMap.set(userId, { count: 1, last: now });
+    return false; // لا سبام
+  }
+
+  data.count++;
+  data.last = now;
+  _spamMap.set(userId, data);
+  return data.count > maxMsg; // سبام!
+}
+
+// تنظيف خريطة السبام كل دقيقة
+setInterval(() => {
+  const cutoff = Date.now() - 60000;
+  for (const [k, v] of _spamMap.entries()) {
+    if (v.last < cutoff) _spamMap.delete(k);
+  }
+}, 60000).unref();
 
 // ══════════════════════════════════════════════════════════
 // 🔗 Helper
@@ -891,4 +905,5 @@ module.exports = {
   setWelcomeImage,
   setWelcomeMessage,
   clearWelcome,
+  checkAntiSpam,
 };
