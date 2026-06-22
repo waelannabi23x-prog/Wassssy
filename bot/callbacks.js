@@ -1163,7 +1163,16 @@ module.exports.registerCallbacks = function(bot, deps) {
           || data.startsWith('grp_mute_1h_') || data.startsWith('grp_ban_')
           || data.startsWith('grp_warns_') || data.startsWith('grp_perms_')
           || data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_')
-          || data.startsWith('games_');
+          || data.startsWith('games_')
+          || data.startsWith('bank_') || data.startsWith('bnk_')
+          || data.startsWith('bankpro:')
+          || data === 'bank_menu' || data === 'bank_wallet'
+          || data.startsWith('inv_') || data.startsWith('loan_')
+          || data.startsWith('transfer_') || data.startsWith('card_')
+          || data.startsWith('tnd_') || data.startsWith('slot_')
+          || data.startsWith('shop_') || data === 'shop_close'
+          || data.startsWith('gsf-') || data.startsWith('games_how_')
+          || data.startsWith('adv_');
         if (!_grpOk)
           return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }
