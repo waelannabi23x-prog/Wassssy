@@ -540,6 +540,51 @@ async function launch() {
         } catch(e) { logger.error('[my_chat_member]', e.message); }
       });
 
+      // ── Inline Query — @bot كلمة بحث ──────────────────────
+      bot.on('inline_query', async ctx => {
+        const query = ctx.inlineQuery?.query?.trim() || '';
+        if (query.length < 2) {
+          return ctx.answerInlineQuery([], {
+            switch_pm_text: '🔍 اكتب اسم الملف للبحث...',
+            switch_pm_parameter: 'search',
+            cache_time: 0,
+          }).catch(() => {});
+        }
+        try {
+          const results = await smartSearch(query, 15);
+          if (!results || !results.length) {
+            return ctx.answerInlineQuery([], {
+              switch_pm_text: '❌ لا نتائج لـ: ' + query,
+              switch_pm_parameter: 'search',
+              cache_time: 10,
+            }).catch(() => {});
+          }
+          const items = results.map(f => ({
+            type: 'article',
+            id: String(f.id),
+            title: '📄 ' + (f.title || 'ملف'),
+            description: (f.sub_name || '') + (f.cat_name ? ' · ' + f.cat_name : ''),
+            input_message_content: {
+              message_text: '📄 *' + (f.title || 'ملف') + '*\n\n' +
+                (f.sub_name ? '📚 ' + f.sub_name + '\n' : '') +
+                (f.cat_name ? '📁 ' + f.cat_name + '\n' : '') +
+                '\n_استخدم البوت للتحميل_',
+              parse_mode: 'Markdown',
+            },
+            reply_markup: {
+              inline_keyboard: [[
+                { text: '📥 فتح في البوت', url: 'https://t.me/' + ctx.botInfo.username + '?start=file_' + f.id }
+              ]]
+            },
+            thumb_url: 'https://cdn-icons-png.flaticon.com/512/337/337946.png',
+          }));
+          return ctx.answerInlineQuery(items, { cache_time: 30 }).catch(() => {});
+        } catch(e) {
+          logger.error('[InlineQuery]', e.message);
+          return ctx.answerInlineQuery([], { cache_time: 5 }).catch(() => {});
+        }
+      });
+
       // تسجيل رسائل القروب + تسجيل الأعضاء
       // FIX: لا يوجد trigger مليون/بنك هنا — موجود في gameAndBankMiddleware فقط
       bot.on('message', async (ctx, next) => {
