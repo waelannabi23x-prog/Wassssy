@@ -510,7 +510,7 @@ async function showMyGroups(ctx) {
     return ctx.reply(
       '📭 أنت لست ادمين في أي قروب يحتوي البوت.\n\nأضف البوت لقروبك:',
       { reply_markup: { inline_keyboard: [[
-        { text: '➕ أضف البوت لقروب', url: 'https://t.me/' + BOT_UN + '?startgroup=true' }
+        { text: '➕ أضف البوت لقروب', url: 'https://t.me/' + BOT_UN + '?startgroup=owner&admin=change_info+delete_messages+restrict_members+invite_users+pin_messages+manage_video_chats+manage_chat+manage_topics' }
       ]]}}
     ).catch(() => {});
     return;
@@ -519,7 +519,7 @@ async function showMyGroups(ctx) {
   const { build: kb, btn: b } = require('../utils/keyboard');
   const text = '👥 *قروباتك (' + myGroups.length + ')*\n━━━━━━━━━━━━\n\nاختر قروب لإدارته:';
   const rows = myGroups.map(g => [b('⚙️ ' + String(g.title || g.chat_id).substring(0,25), 'gp_view_' + g.chat_id)]);
-  rows.push([{ text: '➕ أضف البوت لقروب جديد', url: 'https://t.me/' + BOT_UN + '?startgroup=true' }]);
+  rows.push([{ text: '➕ أضف البوت لقروب جديد', url: 'https://t.me/' + BOT_UN + '?startgroup=owner&admin=change_info+delete_messages+restrict_members+invite_users+pin_messages+manage_video_chats+manage_chat+manage_topics' }]);
   return eos(ctx, text, { parse_mode: 'Markdown', ...kbBuild(rows) });
 }
 
