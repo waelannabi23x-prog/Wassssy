@@ -1,0 +1,51 @@
+./database/db.js:268:  )`); } catch(_) {}
+./database/db.js:273:  )`); } catch(_) {}
+./database/db.js:278:  )`); } catch(_) {}
+./database/db.js:283:  )`); } catch(_) {}
+./database/db.js:290:  )`); } catch(_) {}
+./database/db.js:294:  try { await pg.query("ALTER TABLE million_sessions ADD COLUMN IF NOT EXISTS started_by BIGINT DEFAULT 0"); } catch(_) {}
+./database/db.js:299:  } catch(_) {}
+./database/db.js:302:  } catch(_) {}
+./database/db.js:305:  } catch(_) {}
+./database/db.js:356:  } catch(_) {}
+./database/db.js:359:  try { if(pg) await pg.query("ALTER TABLE auto_replies ADD COLUMN IF NOT EXISTS resp_type TEXT DEFAULT 'text'"); } catch(_) {}
+./database/db.js:360:  try { if(pg) await pg.query("ALTER TABLE auto_replies ADD COLUMN IF NOT EXISTS file_id TEXT"); } catch(_) {}
+./database/db.js:362:  try { if(pg) await pg.query('ALTER TABLE group_members ADD COLUMN IF NOT EXISTS is_bot INTEGER DEFAULT 0'); } catch(_) {}
+./database/db.js:363:  try { if(pg) await pg.query('ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS log_channel TEXT'); } catch(_) {}
+./database/db.js:364:  try { if(pg) await pg.query('ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS added_by BIGINT'); } catch(_) {}
+./workers/notify.worker.js:21:      } catch(_) {}
+./index.js:68:  } catch(_) {}
+./index.js:266:      try { await require('./handlers/group_commands').showGamesMenu(ctx); return; } catch(_) {}
+./index.js:393:      } catch(_) {}
+./index.js:401:  try { maintenanceMode = (await getSetting('maintenance')) === 'true'; } catch(_) {}
+./index.js:433:    } catch(_) {}
+./index.js:448:      try { await dbAll('SELECT 1'); dbOk = true; } catch(_) {}
+./index.js:518:              } catch(_) {}
+./index.js:521:        } catch(_) {}
+./index.js:565:        } catch(_) {}
+./routes/api.js:179:      try { require('../handlers/xp').onDownload(bot, uid).catch(()=>{}); } catch(_) {}
+./routes/api.js:180:      try { if(f.uploaded_by && f.uploaded_by !== uid) require('../handlers/xp').onFileDownloaded(bot, f.uploaded_by).catch(()=>{}); } catch(_) {}
+./routes/api.js:222:    try { require('../handlers/xp').onComment(global.__bot, parseInt(req.tgUser.id)).catch(()=>{}); } catch(_) {}
+./routes/api.js:235:    try { require('../handlers/xp').onRating(global.__bot, parseInt(req.tgUser.id)).catch(()=>{}); } catch(_) {}
+./routes/api.js:431:  } catch(_) {}
+./routes/api.js:693:      try { require('../handlers/xp').onDailyLogin(global.__bot, uid).catch(()=>{}); } catch(_) {}
+./routes/api.js:903:          } catch(_) {}
+./routes/api.js:907:      } catch(_) {}
+./handlers/manage.js:1408:    } catch(_) {}
+./handlers/browse.js:294:  try { require('../database/points').awardPoints(uid, 'download').catch(()=>{}); } catch(_) {}
+./handlers/group_commands.js:588:      } catch(_) {}
+./handlers/owner_tools.js:101:        } catch(_) {}
+./handlers/group_admin.js:68:    try { const c = await bot.telegram.getChatMembersCount(chatId); memberCount = String(c); } catch(_) {}
+./handlers/group_admin.js:71:    try { const gc = await bot.telegram.getChat(chatId); groupTitle = gc.title || ''; } catch(_) {}
+./handlers/group_admin.js:79:    } catch(_) {}
+./handlers/group_admin.js:161:    try { const cnt = await bot.telegram.getChatMembersCount(chatId); memberCount = String(cnt); } catch(_) {}
+./handlers/million_battle.js:371:    } catch(_) {}
+./handlers/guess_game.js:154:  } catch(_) {}
+./handlers/guess_game.js:430:  } catch(_) {}
+./handlers/game_guess.js:521:    } catch(_) {}
+./handlers/group_extras.js:117:    } catch(_) {}
+./handlers/group_extras.js:174:        } catch(_) {}
+./handlers/group_extras.js:209:  try { total = await ctx.telegram.getChatMembersCount(chatId); } catch(_) {}
+./handlers/group_schedule.js:244:  } catch(_) {}
+./middlewares/auth.js:185:  } catch(_) {}
+./bot/messages.js:189:        try { require('../utils/cache').cacheClear('auto_replies_all'); } catch(_) {}

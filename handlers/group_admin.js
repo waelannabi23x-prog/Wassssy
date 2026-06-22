@@ -336,23 +336,16 @@ async function registerMembers(ctx, chatId) {
 
 async function tagAll(ctx, chatId, customMessage) {
   try {
-    if (ctx.callbackQuery) {
-      ctx.answerCbQuery('جاري المنشن...').catch(() => {});
-    }
+    if (ctx.callbackQuery) ctx.answerCbQuery('جاري المنشن...').catch(() => {});
     ctx.deleteMessage().catch(() => {});
     const members = await all(
       'SELECT user_id, first_name FROM group_members WHERE chat_id=$1',
       [chatId]
     ).catch(() => []);
-      const msg = 'لا يوجد اعضاء مسجلون';
-      if (ctx.callbackQuery) return ctx.answerCbQuery(msg, { show_alert: true }).catch(() => {});
-      return ctx.reply(msg).catch(() => {});
+      if (ctx.callbackQuery) return ctx.answerCbQuery('لا يوجد اعضاء', { show_alert: true }).catch(() => {});
+      return ctx.reply('لا يوجد اعضاء مسجلون').catch(() => {});
     }
-    const header = customMessage ? '*' + customMessage + '*
-
-' : '*تنبيه لجميع الاعضاء*
-
-';
+    const header = customMessage ? ('*' + customMessage + '*' + String.fromCharCode(10,10)) : ('*تنبيه للاعضاء*' + String.fromCharCode(10,10));
     const CHUNK = 25;
     let first = true, sentChunks = 0;
     for (let i = 0; i < members.length; i += CHUNK) {
@@ -372,6 +365,9 @@ async function tagAll(ctx, chatId, customMessage) {
       first = false;
       if (i + CHUNK < members.length) await sleep(1200);
     }
+    await ctx.telegram.sendMessage(chatId, 'تم منشن ' + members.length + ' عضو في ' + sentChunks + ' رسالة.').catch(() => {});
+  } catch (e) { console.error('[tagAll]', e.message); }
+}
     await ctx.telegram.sendMessage(chatId, 'تم منشن ' + members.length + ' عضو في ' + sentChunks + ' رسالة.').catch(() => {});
   } catch (e) { console.error('[tagAll]', e.message); }
 }

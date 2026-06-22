@@ -17,7 +17,7 @@ const {broadcastQueue,safeAdd}=require('../utils/queues');
 const messagesDb=require('../database/messages');
 const {all,run:dbRun,getSetting,setSetting}=require('../database/db');
 
-const PS=10;
+const PS=24;
 
 // Sanitize user input — strip dangerous chars, limit length
 function sanitizeInput(str, maxLen = 200) {
