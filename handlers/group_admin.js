@@ -336,42 +336,44 @@ async function registerMembers(ctx, chatId) {
 
 async function tagAll(ctx, chatId, customMessage) {
   try {
-    ctx.answerCbQuery('⏳ جاري المنشن…').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-    ctx.deleteMessage().catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-
+    if (ctx.callbackQuery) {
+      ctx.answerCbQuery('جاري المنشن...').catch(() => {});
+    }
+    ctx.deleteMessage().catch(() => {});
     const members = await all(
-      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 LIMIT 100',
+      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1',
       [chatId]
     ).catch(() => []);
-
-    if (!members.length) {
-      return ctx.answerCbQuery('📭 لا يوجد أعضاء مسجلون', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+      const msg = 'لا يوجد اعضاء مسجلون';
+      if (ctx.callbackQuery) return ctx.answerCbQuery(msg, { show_alert: true }).catch(() => {});
+      return ctx.reply(msg).catch(() => {});
     }
+    const header = customMessage ? '*' + customMessage + '*
 
-    const header = customMessage
-      ? `📢 *${customMessage}*\n\n`
-      : '👋 *تنبيه لجميع الأعضاء*\n\n';
+' : '*تنبيه لجميع الاعضاء*
 
-    // كل chunk = 25 عضو للبقاء ضمن حد الرسالة (~1024 حرف)
+';
     const CHUNK = 25;
-    let first = true;
+    let first = true, sentChunks = 0;
     for (let i = 0; i < members.length; i += CHUNK) {
-      const chunk    = members.slice(i, i + CHUNK);
-      const mentions = chunk
-        .map(m => `[${(m.first_name || '👤').substring(0, 15)}](tg://user?id=${m.user_id})`)
-        .join(' ');
-
-      await ctx.reply((first ? header : '') + mentions, {
-        parse_mode:               'Markdown',
-        disable_web_page_preview: true,
-      }).catch(() => null);
-
+      const chunk = members.slice(i, i + CHUNK);
+      const mentions = chunk.map(m => '[' + (m.first_name || 'user').substring(0,15) + '](tg://user?id=' + m.user_id + ')').join(' ');
+      const text = (first ? header : '') + mentions;
+      let sent = false;
+        try {
+          await ctx.telegram.sendMessage(chatId, text, { parse_mode: 'Markdown', disable_web_page_preview: true });
+          sent = true;
+        } catch (e) {
+          const r = e && e.response && e.response.parameters && e.response.parameters.retry_after;
+          if (r) { await sleep((r + 1) * 1000); } else { break; }
+        }
+      }
+      if (sent) sentChunks++;
       first = false;
-      if (i + CHUNK < members.length) await sleep(1200); // Telegram flood wait
+      if (i + CHUNK < members.length) await sleep(1200);
     }
-  } catch (e) {
-    console.error('[tagAll]', e.message);
-  }
+    await ctx.telegram.sendMessage(chatId, 'تم منشن ' + members.length + ' عضو في ' + sentChunks + ' رسالة.').catch(() => {});
+  } catch (e) { console.error('[tagAll]', e.message); }
 }
 
 // ══════════════════════════════════════════════════════════

@@ -182,23 +182,7 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
 
   // 🏆 /all في الخاص (للأونر فقط) — ترتيب القروبات حسب عدد الأعضاء
   // 📣 /all داخل قروب — منشن الكل (السلوك الأصلي محفوظ)
-  bot.command('all', async ctx => {
-    if (ctx.chat?.type === 'private') {
-      if (!ctx.isOwner) return;
-      return require('../handlers/group_panel').showGroupsLeaderboard(ctx);
-    }
-    if (!['group','supergroup'].includes(ctx.chat?.type)) return;
-    if (!ctx.isOwner && !ctx.isAdmin) return;
-    const args = ctx.message.text.split(' ').slice(1).join(' ');
-    return tagAll(ctx, ctx.chat.id, args||null);
-  });
 
-  bot.command('tag', async ctx => {
-    if (!['group','supergroup'].includes(ctx.chat?.type)) return;
-    if (!ctx.isOwner && !ctx.isAdmin) return;
-    const args = ctx.message.text.split(' ').slice(1).join(' ');
-    return tagAll(ctx, ctx.chat.id, args||null);
-  });
 
   bot.command('mute', async ctx => {
     if (!['group','supergroup'].includes(ctx.chat?.type)) return;
