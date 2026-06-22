@@ -376,21 +376,29 @@ async function tagAll(ctx, chatId, customMessage) {
       ? ('*' + customMessage + '*\n\n')
       : ('📢 *تنبيه للأعضاء*\n\n');
 
-    // 5 أشخاص/رسالة لتجنب تجاوز حد تيليجرام
-    const CHUNK = 5;
+    // بناء الرسائل حسب حد تيليجرام (4096 حرف)
+    const MAX_LEN = 3800;
     let first = true, sentChunks = 0;
+    let i = 0;
 
-    for (let i = 0; i < members.length; i += CHUNK) {
-      const chunk = members.slice(i, i + CHUNK);
-      const mentions = chunk.map(m =>
-        '[' + m.name.substring(0, 15) + '](tg://user?id=' + m.id + ')'
-      ).join(' ');
-      const text = (first ? header : '') + mentions;
+    while (i < members.length) {
+      let text = first ? header : '';
+      let count = 0;
+
+      while (i < members.length) {
+        const mention = '[' + members[i].name.substring(0, 15) + '](tg://user?id=' + members[i].id + ') ';
+        if (text.length + mention.length > MAX_LEN) break;
+        text += mention;
+        count++;
+        i++;
+      }
+
+      if (!count) { i++; continue; } // تجنب infinite loop
 
       let retries = 3;
       while (retries > 0) {
         try {
-          await ctx.telegram.sendMessage(chatId, text, {
+          await ctx.telegram.sendMessage(chatId, text.trim(), {
             parse_mode: 'Markdown',
             disable_web_page_preview: true,
           });
@@ -404,7 +412,7 @@ async function tagAll(ctx, chatId, customMessage) {
       }
 
       first = false;
-      if (i + CHUNK < members.length) await sleep(1500);
+      if (i < members.length) await sleep(1500);
     }
 
     await ctx.telegram.sendMessage(
