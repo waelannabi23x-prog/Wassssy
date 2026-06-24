@@ -8,8 +8,8 @@ const kb = require('./keyboards');
 const { parseCbAdmin } = require('./codec');
 const state = require('./state');
 
-const STEP = { reg_timeout: 30000, choice_timeout: 5000, submit_timeout: 10000, answer_timeout: 5000, banter_timeout: 5000, min_players: 1 };
-const MIN  = { reg_timeout: 0, choice_timeout: 5000, submit_timeout: 10000, answer_timeout: 10000, banter_timeout: 5000, min_players: 2 };
+const STEP = { reg_timeout: 30000, choice_timeout: 10000, submit_timeout: 15000, answer_timeout: 10000, banter_timeout: 5000, min_players: 1 };
+const MIN  = { reg_timeout: 0, choice_timeout: 10000, submit_timeout: 15000, answer_timeout: 15000, banter_timeout: 5000, min_players: 2 };
 const MAX  = { reg_timeout: 1800000, choice_timeout: 120000, submit_timeout: 300000, answer_timeout: 180000, banter_timeout: 60000, min_players: 30 };
 
 async function panelText(chatId) {
