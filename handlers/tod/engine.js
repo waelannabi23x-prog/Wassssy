@@ -170,6 +170,9 @@ async function runRoundLoop(session) {
     if (isOver(session)) return;
     session.round++;
 
+    // 🔧 إعادة تحميل الإعدادات في كل جولة — يضمن مزامنة فورية مع لوحة التحكم
+    await loadSettingsInto(session).catch(() => {});
+
     const asker = fairness.pickAsker(session, session.settings.fairness_enabled);
     if (!asker) { await endSession(session, 'لا يوجد لاعبون كافون للمتابعة.'); return; }
     const answerer = fairness.pickAnswerer(session, asker.id, session.settings.fairness_enabled);
@@ -238,13 +241,20 @@ async function runRoundLoop(session) {
     session.lastAsker = asker.id;
     session.lastAnswerer = answerer.id;
 
-    // ── الدردشة لثوانٍ (نُحدّث البطاقة فوراً، ولا ننتظر كتابة قاعدة البيانات) ──
+    // ── الدردشة — رسالة فتح منفصلة واضحة ──────────────────────
     session.status = 'banter';
     const banterMs = session.settings.banter || CFG.DEFAULT_TIMERS.BANTER;
-    info.banterSecs = Math.round(banterMs / 1000);
+    const banterSecs = Math.round(banterMs / 1000);
+    info.banterSecs = banterSecs;
     await updateCard();
 
-    // عمليات الخلفية (لا تؤخر الرد المرئي للاعبين)
+    // رسالة فتح الدردشة (مستقلة عن البطاقة)
+    const openMsg = await safeSend(
+      session.chatId,
+      `💬 *الدردشة مفتوحة الآن!*\n⏱️ لديكم *${banterSecs}* ثانية للتعليق والضحك 😄`
+    );
+
+    // عمليات الخلفية بالتوازي مع انتظار الدردشة
     Promise.all([
       tdb.applyRoundStats({ userId: asker.id, firstName: asker.name, username: asker.username, asked: true }),
       tdb.applyRoundStats({
@@ -257,7 +267,13 @@ async function runRoundLoop(session) {
     await sleep(banterMs);
     if (isOver(session)) return;
     session.status = 'active';
-    await sleep(800);
+
+    // حذف رسالة الفتح + إرسال رسالة إغلاق قصيرة
+    if (openMsg) {
+      await BOT.telegram.deleteMessage(session.chatId, openMsg.message_id).catch(() => {});
+    }
+    await safeSend(session.chatId, '🔇 انتهى وقت الدردشة — استعدّوا للجولة القادمة!');
+    await sleep(1200);
   }
 }
 
