@@ -239,6 +239,70 @@ exports.showWallet = async (ctx) => {
 };
 
 // ────────────────────────────────────────────────
+//  حسابي — تفاصيل بدون أزرار
+// ────────────────────────────────────────────────
+exports.showWalletNoButtons = async (ctx) => {
+  const uid = ctx.from?.id;
+  const acc = await ensureAccount(uid, ctx.from?.first_name, ctx.from?.username);
+  const card = CARD_TYPES[acc.card_type];
+  const acct = ACCOUNT_TYPES[acc.account_type] || ACCOUNT_TYPES.current;
+  const score = creditScore(acc);
+  const scoreBar = '█'.repeat(Math.floor(score/85)) + '░'.repeat(10 - Math.floor(score/85));
+
+  const loans = await get(
+    'SELECT COALESCE(SUM(amount),0) as total FROM pro_bank_loans WHERE user_id=$1 AND paid=0',
+    [uid]
+  ).catch(() => ({ total: 0 }));
+
+  const text =
+    `${card.color} *${BANK_NAME}*
+` +
+    `━━━━━━━━━━━━━━━━━━━━
+
+` +
+    `👤 العميل: *${acc.first_name || ctx.from?.first_name}*
+` +
+    `🆔 ID: \`${uid}\`
+` +
+    `🏦 IBAN: \`${acc.iban}\`
+
+` +
+    `💰 الرصيد: *${fmt(acc.balance)} DA*
+` +
+    (Number(loans?.total) > 0 ? `🔴 ديون: ${fmt(loans.total)} DA
+` : '') +
+    `
+💳 البطاقة: ${card.emoji} *${card.label}*
+` +
+    `${acct.icon} الحساب: *${acct.label}*
+
+` +
+    `📊 Credit Score:
+` +
+    `\`${scoreBar}\` ${score}/850
+
+` +
+    `🔒 الحالة: ${acc.is_frozen ? '🔴 مجمد' : '🟢 نشط'}`;
+
+  return ctx.reply(text, {
+    parse_mode: 'Markdown',
+    reply_to_message_id: ctx.message?.message_id,
+  }).catch(() => {});
+};
+
+// ────────────────────────────────────────────────
+//  فلوسي — رصيد فقط
+// ────────────────────────────────────────────────
+exports.showBalance = async (ctx) => {
+  const uid = ctx.from?.id;
+  const acc = await ensureAccount(uid, ctx.from?.first_name, ctx.from?.username);
+  return ctx.reply(
+    `💰 رصيدك: *${fmt(acc.balance)} DA*`,
+    { parse_mode: 'Markdown', reply_to_message_id: ctx.message?.message_id }
+  ).catch(() => {});
+};
+
+// ────────────────────────────────────────────────
 //  3. بطاقتي
 // ────────────────────────────────────────────────
 exports.showCard = async (ctx) => {

@@ -281,6 +281,8 @@ const gameAndBankMiddleware = async (ctx, next) => {
     // bank.js القديم محذوف — استخدم bank_pro.js
 
     // 🏦 Taline Bank
+    if (/^حسابي$/i.test(txt))                     return bankPro.showWalletNoButtons(ctx).catch(() => next());
+    if (/^فلوسي$/i.test(txt))                     return bankPro.showBalance(ctx).catch(() => next());
     if (/^بنك$/i.test(txt))                       return bankPro.openAccount(ctx).catch(() => next());
     if (/^محفظتي$/i.test(txt))                    return bankPro.showWallet(ctx).catch(() => next());
     if (/^بطاقتي$/i.test(txt))                    return bankPro.showCard(ctx).catch(() => next());
