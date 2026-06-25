@@ -132,7 +132,15 @@ async function processGroupNotifications() {
         try {
           const label = '📄 ' + r.title.substring(0, 30) + (r.sub_name ? ' · ' + r.sub_name : '');
           const kb = un ? { reply_markup: { inline_keyboard: [[{ text: '⬇️ تحميل', url: 'https://t.me/' + un + '?start=file_' + r.id }]] } } : {};
-          await _bot.telegram.sendMessage(r.chat_id, '📢 *ملف جديد*\n\n' + label, { parse_mode: 'Markdown', ...kb });
+          try {
+            await _bot.telegram.sendMessage(r.chat_id, '📢 *ملف جديد*\n\n' + label, { parse_mode: 'Markdown', ...kb });
+          } catch(e) {
+            if (e.message?.includes('kicked') || e.message?.includes('403') || e.message?.includes('Forbidden') || e.message?.includes('chat not found')) {
+              await run('UPDATE group_chats SET notify_new_files=0 WHERE chat_id=$1', [r.chat_id]).catch(()=>{});
+              logger.warn('[Sched] قروب محذوف — تعطيل الإشعارات: ' + r.chat_id);
+              continue;
+            }
+          }
           await run(
             'INSERT INTO group_notify_log(file_id, chat_id, sent_at) VALUES($1, $2, CURRENT_TIMESTAMP) ON CONFLICT DO NOTHING',
             [r.id, r.chat_id]
