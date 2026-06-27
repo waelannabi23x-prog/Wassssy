@@ -329,10 +329,34 @@ bot.hears(/^.{2,25}$/, async (ctx, next) => {
     if (!trigger) return next();
     const card = await _get("SELECT * FROM member_cards WHERE chat_id=$1 AND user_id=$2", [ctx.chat.id, trigger.user_id]).catch(() => null);
     if (!card) return next();
-    const text = (card.bio ? card.bio + "\n\n" : "") + "• Use <- [" + (card.first_name||"عضو") + "](tg://user?id=" + card.user_id + ")\n" + (card.username ? "• @" + card.username : "");
-    const kb = { inline_keyboard: [[{ text: card.first_name||"عضو", url: "tg://user?id=" + card.user_id }]] };
-    if (card.photo_file_id) { await ctx.replyWithPhoto(card.photo_file_id, { caption: text, parse_mode: "Markdown", reply_markup: kb, reply_to_message_id: ctx.message.message_id }).catch(() => {}); }
-    else { await ctx.reply(text, { parse_mode: "Markdown", reply_markup: kb, reply_to_message_id: ctx.message.message_id }).catch(() => {}); }
+    // جيب صورة البروفايل الحالية من تيليجرام مباشرة
+    let livePhoto = card.photo_file_id;
+    try {
+      const photos = await ctx.telegram.getUserProfilePhotos(card.user_id, { limit: 1 });
+      if (photos && photos.total_count > 0 && photos.photos[0]) {
+        const arr = photos.photos[0];
+        livePhoto = arr[arr.length - 1].file_id;
+      }
+    } catch(_) {}
+
+    // جيب bio الحالي
+    let liveBio = card.bio;
+    try {
+      const userChat = await ctx.telegram.getChat(card.user_id);
+      if (userChat.bio) liveBio = userChat.bio;
+    } catch(_) {}
+
+    const name = card.first_name || "عضو";
+    const uname = card.username ? "@" + card.username : "";
+    const text = (liveBio ? liveBio + "\n\n" : "") +
+      "• " + "[" + name + "](tg://user?id=" + card.user_id + ")" +
+      (uname ? "\n• " + uname : "");
+    const kb = { inline_keyboard: [[{ text: name, url: "tg://user?id=" + card.user_id }]] };
+    if (livePhoto) {
+      await ctx.replyWithPhoto(livePhoto, { caption: text, parse_mode: "Markdown", reply_markup: kb, reply_to_message_id: ctx.message.message_id }).catch(() => {});
+    } else {
+      await ctx.reply(text, { parse_mode: "Markdown", reply_markup: kb, reply_to_message_id: ctx.message.message_id }).catch(() => {});
+    }
   } catch(_) { return next(); }
 });
 
