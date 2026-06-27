@@ -861,6 +861,13 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   // 💳 البطاقة الشخصية — ضف ردك
   // ══════════════════════════════════════════
+  bot.hears(/^امحي ردي$/i, async ctx => {
+    if (!isGroup(ctx)) return;
+    run("DELETE FROM member_cards WHERE chat_id=$1 AND user_id=$2", [ctx.chat.id, ctx.from.id]).catch(() => {});
+    run("DELETE FROM member_card_triggers WHERE chat_id=$1 AND user_id=$2", [ctx.chat.id, ctx.from.id]).catch(() => {});
+    ctx.reply("🗑 تم حذف بطاقتك", { reply_to_message_id: ctx.message.message_id }).catch(() => {});
+  });
+
   bot.hears(/^ضف رد$/i, async ctx => {
     if (!isGroup(ctx)) return;
     await require('../utils/stateManager').setState(ctx.from.id, {

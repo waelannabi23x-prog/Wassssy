@@ -323,7 +323,15 @@ bot.hears(/^.{2,25}$/, async (ctx, next) => {
   if (!["group","supergroup"].includes(ctx.chat?.type)) return next();
   const txt = ctx.message?.text?.trim();
   if (!txt || txt.startsWith("/") || txt.startsWith("@")) return next();
-  if (ctx.message?.reply_to_message) return next(); // ما نرد على الردود العادية
+  if (ctx.message?.reply_to_message) return next();
+  // تجاهل الكلمات المحجوزة
+  const _blocked = ["ضف رد","امحي ردي","اعمل","بنك","مواطن","دولتي","لوب غارو","werewolf","خمن","مليون","بطاقتي","فلوسي","حسابي"];
+  if (_blocked.some(b => txt.toLowerCase() === b.toLowerCase())) return next();
+  // تجاهل إذا المستخدم في state نشط
+  try {
+    const _st = require('./utils/stateManager').getState(ctx.from?.id);
+    if (_st?.type?.startsWith('member_card')) return next();
+  } catch(_) {}
   try {
     const { get: _get } = require("./database/db");
     const trigger = await _get("SELECT user_id FROM member_card_triggers WHERE chat_id=$1 AND trigger_word=$2", [ctx.chat.id, txt.toLowerCase()]).catch(() => null);
