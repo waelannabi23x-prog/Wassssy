@@ -95,7 +95,31 @@ module.exports.registerMessages = function(bot, deps) {
       return next();
     }
     // في الخاص — لا next() لأن text/document/photo handlers يشتغلون
-    return next();
+    
+  // بطاقة المستخدم
+  if (['group','supergroup'].includes(ctx.chat?.type) && ctx.message?.text) {
+    const txt = (ctx.message.text || '').trim().toLowerCase();
+    if (txt.length > 0 && txt.length <= 40) {
+      const { get: _gc } = require('../database/db');
+      const card = await _gc(
+        'SELECT mc.* FROM member_card_triggers mct JOIN member_cards mc ON mc.chat_id=mct.chat_id AND mc.user_id=mct.user_id WHERE mct.chat_id=$1 AND LOWER(mct.trigger_word)=$2 LIMIT 1',
+        [ctx.chat.id, txt]
+      ).catch(() => null);
+      if (card) {
+        const name = card.first_name || '';
+        const user = card.username ? ' @' + card.username : '';
+        const bio = card.bio ? '\n\n' + card.bio : '';
+        const caption = name + user + bio;
+        if (card.photo_file_id) {
+          await ctx.replyWithPhoto(card.photo_file_id, { caption: caption || undefined, parse_mode: 'Markdown' }).catch(() => {});
+        } else {
+          await ctx.reply(caption || 'مستخدم', { parse_mode: 'Markdown' }).catch(() => {});
+        }
+        return;
+      }
+    }
+  }
+  return next();
   });
 
   // ── Documents ──
