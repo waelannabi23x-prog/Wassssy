@@ -348,8 +348,8 @@ bot.hears(/^.{2,25}$/, async (ctx, next) => {
 
     const name = card.first_name || "عضو";
     const uname = card.username ? "@" + card.username : "";
-    const text = (liveBio ? liveBio + "\n\n" : "") +
-      "• " + "[" + name + "](tg://user?id=" + card.user_id + ")" +
+    const text = "• Use ↤ [" + name + "](tg://user?id=" + card.user_id + ")" +
+      (liveBio ? "\n\n• Bio ↤ " + liveBio : "") +
       (uname ? "\n• " + uname : "");
     const kb = { inline_keyboard: [[{ text: name, url: "tg://user?id=" + card.user_id }]] };
     if (livePhoto) {
