@@ -989,6 +989,32 @@ module.exports.registerCallbacks = function(bot, deps) {
             return ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {});
           }
         }
+
+        // ── ترقية لمشرف ──
+        if (data.startsWith('grp_promote_')) {
+          const parts3 = data.replace('grp_promote_', '').split('_');
+          const uid3   = parseInt(parts3[0]);
+          const cid3   = parseInt(parts3[1]);
+          // عرض لوحة اختيار صلاحيات الترقية
+          const promoteKb = [
+            [{ text: '✅ حذف الرسائل',      callback_data: 'grp_aptog_can_delete_messages_' + uid3 + '_' + cid3 }],
+            [{ text: '✅ حظر الأعضاء',       callback_data: 'grp_aptog_can_restrict_members_' + uid3 + '_' + cid3 }],
+            [{ text: '✅ تثبيت الرسائل',     callback_data: 'grp_aptog_can_pin_messages_' + uid3 + '_' + cid3 }],
+            [{ text: '✅ دعوة عبر رابط',     callback_data: 'grp_aptog_can_invite_users_' + uid3 + '_' + cid3 }],
+            [{ text: '✅ تغيير معلومات',     callback_data: 'grp_aptog_can_change_info_' + uid3 + '_' + cid3 }],
+            [{ text: '✅ إدارة البث',         callback_data: 'grp_aptog_can_manage_video_chats_' + uid3 + '_' + cid3 }],
+            [{ text: '✅ إدارة القروب',       callback_data: 'grp_aptog_can_manage_chat_' + uid3 + '_' + cid3 }],
+            [
+              { text: '💾 حفظ الصلاحيات', callback_data: 'grp_apsave_' + uid3 + '_' + cid3 },
+              { text: '❌ إلغاء',           callback_data: 'grp_cancel' },
+            ],
+          ];
+          await ctx.editMessageText(
+            '👑 *اختر صلاحيات المشرف الجديد:*\n\n_اضغط على صلاحية لتفعيلها/إلغائها_',
+            { parse_mode: 'Markdown', reply_markup: { inline_keyboard: promoteKb } }
+          ).catch(() => ctx.reply('👑 اختر صلاحيات المشرف:', { reply_markup: { inline_keyboard: promoteKb } }).catch(() => {}));
+          return ctx.answerCbQuery('').catch(() => {});
+        }
         if (data.startsWith('grp_restrict_')) {
           const uid2 = parseInt(data.replace('grp_restrict_', ''));
           await ctx.telegram.restrictChatMember(ctx.chat.id, uid2, {
@@ -1161,7 +1187,16 @@ module.exports.registerCallbacks = function(bot, deps) {
           || data.startsWith('gsf-') || data.startsWith('games_how_')
           || data.startsWith('adv_') || data.startsWith('nat_') || data.startsWith('nation_')
           || data.startsWith('ww:') || data.startsWith('wwx:')
-          || data.startsWith('tod:') || data.startsWith('todadm:');
+          || data.startsWith('tod:') || data.startsWith('todadm:')
+          || data.startsWith('grp_promote_') || data.startsWith('grp_aptog_')
+          || data.startsWith('grp_apsave_') || data.startsWith('grp_demote_')
+          || data.startsWith('grp_mute_menu_') || data.startsWith('grp_ban_confirm_')
+          || data.startsWith('grp_warn1_') || data.startsWith('grp_unwarn1_')
+          || data.startsWith('grp_clearwarn_') || data === 'grp_cancel'
+          || data.startsWith('grp_warnmenu_') || data.startsWith('grp_warnback_')
+          || data.startsWith('grp_wadd_') || data.startsWith('grp_wdel_')
+          || data.startsWith('grp_pall_') || data.startsWith('grp_pnone_')
+          || data.startsWith('grp_unban_') || data.startsWith('grp_unmute_');
         if (!_grpOk)
           return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }

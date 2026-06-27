@@ -566,16 +566,29 @@ function setupGroupCommands(bot) {
       disable_web_page_preview: true,
     }).catch(() => {});
 
-    // أرسل الأزرار للخاص فقط
+    // أرسل لوحة الإجراءات للمشرف في الخاص
     if (kb.length && isReqAdm) {
       const adminId = ctx.from.id;
-      const pvTxt = "👤 *" + name + "*\n🆔 " + target.id + " • " + (isAdmTarget ? "مشرف" : "عضو") + "\n\n_اختر الاجراء:_";
+      const pvTxt =
+        "👤 *" + name + "*\n" +
+        "🆔 `" + target.id + "`" + (target.username ? " • @" + target.username : "") + "\n" +
+        "🎭 " + (isOwner ? "👑 صاحب القروب" : isAdmTarget ? "🛡️ مشرف" : "👤 عضو") + "\n" +
+        "⚠️ التحذيرات: *" + warnCnt + "/3*\n\n" +
+        "_اختر الإجراء:_";
       ctx.telegram.sendMessage(adminId, pvTxt, {
         parse_mode: "Markdown",
         reply_markup: { inline_keyboard: kb },
-      }).catch(() => {});
+      }).catch(e => {
+        if (e.message?.includes('blocked') || e.message?.includes('not found')) {
+          ctx.reply("⚠️ افتح الخاص مع البوت أولاً!", {
+            reply_to_message_id: ctx.message.message_id,
+            reply_markup: { inline_keyboard: [[{ text: "📨 فتح الخاص", url: "https://t.me/" + (ctx.botInfo?.username || "") }]] }
+          }).catch(() => {});
+        }
+      });
     }
   });
+
 
 
   // ══ /cmds ══
