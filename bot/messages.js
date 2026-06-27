@@ -277,18 +277,28 @@ module.exports.registerMessages = function(bot, deps) {
         const firstName = ctx.from.first_name || 'عضو';
         const username = ctx.from.username || null;
 
-        // جيب صورة البروفايل من تيليجرام
+        // جيب صورة البروفايل
         let photoFileId = null;
         try {
           const photos = await ctx.telegram.getUserProfilePhotos(uid, { limit: 1 });
-          if (photos.total_count > 0) photoFileId = photos.photos[0][photos.photos[0].length-1].file_id;
+          if (photos && photos.total_count > 0 && photos.photos[0]) {
+            const photoArr = photos.photos[0];
+            photoFileId = photoArr[photoArr.length - 1].file_id;
+          }
         } catch(_) {}
+        // إذا ما أعطى صورة — جرب من avatar المستخدم
+        if (!photoFileId) {
+          try {
+            const member = await ctx.telegram.getChatMember(chatId, uid);
+            if (member?.user?.photo?.big_file_id) photoFileId = member.user.photo.big_file_id;
+          } catch(_) {}
+        }
 
         // جيب bio من تيليجرام
         let bio = null;
         try {
-          const chat = await ctx.telegram.getChat(uid);
-          bio = chat.bio || null;
+          const userChat = await ctx.telegram.getChat(uid);
+          bio = userChat.bio || null;
         } catch(_) {}
 
         const { run: _run } = require('../database/db');
