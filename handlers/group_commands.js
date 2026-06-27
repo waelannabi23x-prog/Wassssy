@@ -423,7 +423,15 @@ function setupGroupCommands(bot) {
   bot.command(['rob','سرقة'], async ctx => { if(!isGroup(ctx)) return; const {handleRob}=require('./bank_games'); return handleRob(ctx).catch(()=>{}); });
   bot.command(['leaderboard','متصدرين','lb'], async ctx => { if(!isGroup(ctx)) return; const {handleLeaderboard}=require('./bank_games'); return handleLeaderboard(ctx).catch(()=>{}); });
 
-    bot.action(/^grp_unban_(\d+)$/, async ctx => {
+    bot.action(/^grp_clearwarn_(\d+)$/, async ctx => {
+    if (!await isTgAdmin(ctx)) return ctx.answerCbQuery('🚫').catch(() => {});
+    const userId = parseInt(ctx.match[1]);
+    await run('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [ctx.chat.id, userId]).catch(() => {});
+    ctx.answerCbQuery('✅ تم مسح كل التحذيرات').catch(() => {});
+    ctx.editMessageReplyMarkup({ inline_keyboard: [] }).catch(() => {});
+  });
+
+  bot.action(/^grp_unban_(\d+)$/, async ctx => {
     if (!await isTgAdmin(ctx)) return ctx.answerCbQuery('🚫').catch(() => {});
     const userId = parseInt(ctx.match[1]);
     try {
@@ -849,7 +857,7 @@ function setupGroupCommands(bot) {
       ).catch(()=>{});
     }
     const members = await require('../database/db').all(
-      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 AND is_bot=0 ORDER BY RANDOM() LIMIT 20', [cid]
+      'SELECT user_id, first_name FROM group_members WHERE chat_id=$1 AND (is_bot=0 OR is_bot IS NULL) ORDER BY RANDOM() LIMIT 20', [cid]
     ).catch(()=>[]);
     if (!members || members.length < 2) return ctx.reply('❌ ما في أعضاء كافيين!', { reply_to_message_id: ctx.message?.message_id }).catch(()=>{});
     const u1 = members[0], u2 = members[1];

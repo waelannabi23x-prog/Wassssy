@@ -347,7 +347,7 @@ setTimeout(async () => {
 
 // 🧹 مسح كل الردود مؤقت
 bot.command('clear_cards', async ctx => {
-  if (ctx.from.id !== parseInt(process.env.OWNER_ID)) return;
+  if (String(ctx.from?.id) !== String(process.env.OWNER_ID)) return ctx.reply('🚫').catch(() => {});
   await dbRun('DELETE FROM member_cards').catch(() => {});
   await dbRun('DELETE FROM member_card_triggers').catch(() => {});
   ctx.reply('✅ تم مسح كل الردود').catch(() => {});
@@ -370,7 +370,7 @@ bot.hears(/^.{2,25}$/, async (ctx, next) => {
   // تجاهل إذا المستخدم في state نشط
   try {
     const _st = require('./utils/stateManager').getState(ctx.from?.id);
-    if (_st?.type?.startsWith('member_card')) return next();
+    if (_st?.type?.startsWith('member_card') || _st?.type?.startsWith('tod') || _st?.type?.startsWith('mg_') || _st?.type?.startsWith('gp_')) return next();
   } catch(_) {}
   try {
     const { get: _get } = require("./database/db");
@@ -446,7 +446,7 @@ require('./handlers/group_commands_pro').setupProCommands(bot);
 require('./handlers/group_commands_ar').setupArabicModCommands(bot);
 require('./handlers/group_pro_features').setupProFeatures(bot);
 require('./handlers/group_schedule').setupSchedule(bot);
-  require('./handlers/nations').setup(bot);
+require('./handlers/nations').setup(bot);
 require('./handlers/group_filters').setupFilters(bot);
 require('./handlers/group_extras').setupExtras(bot);
 
@@ -536,7 +536,7 @@ async function launch() {
     // تنظيف القروبات المطرود منها عند البدء
     setTimeout(async () => {
       try {
-        const groups = await dbAll('SELECT chat_id FROM group_chats WHERE COALESCE(is_active::text,\'1\') != \'0\'').catch(() => []);
+        const groups = await dbAll('SELECT chat_id FROM group_chats WHERE is_active != 0').catch(() => []);
         for (const g of groups) {
           try {
             await bot.telegram.getChat(g.chat_id);
@@ -643,7 +643,7 @@ async function launch() {
             ).catch(() => {});
             logger.info('[GroupReg] ✅ أُضيف البوت لـ: ' + (chat.title || chat.id));
           } else if (['left', 'kicked'].includes(member?.status)) {
-            await dbRun('UPDATE group_chats SET is_active=false WHERE chat_id=$1', [chat.id]).catch(() => {});
+            await dbRun('UPDATE group_chats SET is_active=0 WHERE chat_id=$1', [chat.id]).catch(() => {});
             logger.info('[GroupReg] 🚪 خرج البوت من: ' + (chat.title || chat.id));
           }
         } catch(e) { logger.error('[my_chat_member]', e.message); }

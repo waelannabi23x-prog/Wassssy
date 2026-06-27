@@ -1,5 +1,5 @@
-const { handleBankGamesCallback } = require('../handlers/bank_games');
 'use strict';
+const { handleBankGamesCallback } = require('../handlers/bank_games');
 const { handleSettingsCallback } = require('../handlers/group_commands');
 const browse      = require('../handlers/browse');
 const groupPanel  = require('../handlers/group_panel');
@@ -1159,7 +1159,9 @@ module.exports.registerCallbacks = function(bot, deps) {
           || data.startsWith('tnd_') || data.startsWith('slot_')
           || data.startsWith('shop_') || data === 'shop_close'
           || data.startsWith('gsf-') || data.startsWith('games_how_')
-          || data.startsWith('adv_') || data.startsWith('nat_') || data.startsWith('nation_');
+          || data.startsWith('adv_') || data.startsWith('nat_') || data.startsWith('nation_')
+          || data.startsWith('ww:') || data.startsWith('wwx:')
+          || data.startsWith('tod:') || data.startsWith('todadm:');
         if (!_grpOk)
           return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }
