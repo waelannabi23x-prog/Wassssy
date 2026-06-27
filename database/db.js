@@ -240,6 +240,16 @@ async function initSchema() {
       logger.info('✅ Indexes جاهزة (' + IDX.length + ')');
   }
 
+  // member_cards tables
+  try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS member_cards (
+    chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL,
+    trigger_word TEXT, photo_file_id TEXT, bio TEXT,
+    username TEXT, first_name TEXT, updated_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY(chat_id, user_id))`); } catch(err) { require('./logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS member_card_triggers (
+    chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL, trigger_word TEXT NOT NULL,
+    PRIMARY KEY(chat_id, trigger_word))`); } catch(err) { require('./logger').debug('[catch]', err.message); }
+
   // Migration: history unique constraint
   try { if(pg) await pg.query('ALTER TABLE history ADD COLUMN IF NOT EXISTS date DATE DEFAULT CURRENT_DATE'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query('DELETE FROM history h1 USING history h2 WHERE h1.id > h2.id AND h1.user_id = h2.user_id AND h1.file_id = h2.file_id'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
