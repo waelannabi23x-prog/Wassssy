@@ -868,6 +868,14 @@ function setupGroupCommands(bot) {
     ctx.reply("🗑 تم حذف بطاقتك", { reply_to_message_id: ctx.message.message_id }).catch(() => {});
   });
 
+  bot.command('check_cards', async ctx => {
+    if (!ctx.isOwner) return;
+    const { all: _all } = require('../database/db');
+    const rows = await _all('SELECT chat_id, user_id, trigger_word, first_name FROM member_card_triggers LIMIT 20').catch(() => []);
+    const text = rows.length ? rows.map(r => `chat:${r.chat_id} | user:${r.user_id} | word:${r.trigger_word} | name:${r.first_name}`).join('\n') : 'لا يوجد';
+    ctx.reply('📋 البطاقات:\n' + text).catch(() => {});
+  });
+
   bot.hears(/^ضف رد$/i, async ctx => {
     if (!isGroup(ctx)) return;
     await require('../utils/stateManager').setState(ctx.from.id, {
