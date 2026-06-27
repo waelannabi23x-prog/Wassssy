@@ -875,10 +875,65 @@ function setupGroupCommands(bot) {
     });
     ctx.reply(
       '💳 *إنشاء ردك الشخصي*\n━━━━━━━━━━━━\n\n' +
-      '✏️ اكتب الكلمة التي تريد الناس يكتبوها لتظهر بطاقتك:\n\n' +
+      '✏️ اكتب الكلمة هنا في القروب مباشرة:\n\n' +
       '_مثال: هبة، Hiba، papa_',
       { parse_mode: 'Markdown', reply_to_message_id: ctx.message.message_id }
     ).catch(() => {});
+  });
+
+  // استقبال الكلمة مباشرة في القروب
+  bot.on('message', async (ctx, next) => {
+    if (!isGroup(ctx)) return next();
+    const s = require('../utils/stateManager').getState(ctx.from?.id);
+    if (s?.type !== 'member_card_word') return next();
+    if (s.chatId !== ctx.chat.id) return next();
+    const txt = ctx.message?.text?.trim();
+    if (!txt || txt.length < 1 || txt.length > 25) {
+      return ctx.reply('⚠️ الكلمة بين 1 و25 حرف').catch(() => {});
+    }
+    if (txt.startsWith('/') || txt.startsWith('@')) {
+      return ctx.reply('⚠️ الكلمة لا تبدأ بـ / أو @').catch(() => {});
+    }
+    const uid = ctx.from.id;
+    const firstName = ctx.from.first_name || 'عضو';
+    const username = ctx.from.username || null;
+    let photoFileId = null;
+    try {
+      const photos = await ctx.telegram.getUserProfilePhotos(uid, { limit: 1 });
+      if (photos?.total_count > 0) {
+        const arr = photos.photos[0];
+        photoFileId = arr[arr.length - 1].file_id;
+      }
+    } catch(_) {}
+    let bio = null;
+    try {
+      const userChat = await ctx.telegram.getChat(uid);
+      bio = userChat.bio || null;
+    } catch(_) {}
+    const { run: _run } = require('../database/db');
+    await _run(
+      `INSERT INTO member_cards(chat_id,user_id,trigger_word,photo_file_id,bio,username,first_name)
+       VALUES($1,$2,$3,$4,$5,$6,$7)
+       ON CONFLICT(chat_id,user_id) DO UPDATE SET
+       trigger_word=$3,photo_file_id=$4,bio=$5,username=$6,first_name=$7,updated_at=NOW()`,
+      [ctx.chat.id, uid, txt.toLowerCase(), photoFileId, bio, username, firstName]
+    ).catch(() => {});
+    await _run(
+      `INSERT INTO member_card_triggers(chat_id,user_id,trigger_word) VALUES($1,$2,$3)
+       ON CONFLICT(chat_id,trigger_word) DO UPDATE SET user_id=$2`,
+      [ctx.chat.id, uid, txt.toLowerCase()]
+    ).catch(() => {});
+    await require('../utils/stateManager').delState(uid);
+    const confirmText =
+      '✅ *تم حفظ بطاقتك!*\n\n' +
+      '🔑 الكلمة: *' + txt + '*\n' +
+      (bio ? '📝 Bio: ' + bio + '\n' : '') +
+      (photoFileId ? '📸 الصورة: محفوظة\n' : '') +
+      '\nلما أحد يكتب *' + txt + '* ستظهر بطاقتك!';
+    if (photoFileId) {
+      return ctx.replyWithPhoto(photoFileId, { caption: confirmText, parse_mode: 'Markdown' }).catch(() => {});
+    }
+    return ctx.reply(confirmText, { parse_mode: 'Markdown' }).catch(() => {});
   });
 
 
