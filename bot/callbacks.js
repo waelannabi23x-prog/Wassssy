@@ -845,10 +845,12 @@ module.exports.registerCallbacks = function(bot, deps) {
 
         // ── تأكيد الحظر ──
         if (data.startsWith('grp_ban_confirm_')) {
-          const uid2 = parseInt(data.replace('grp_ban_confirm_', ''));
+          const _bp = data.replace('grp_ban_confirm_', '').split('_');
+          const uid2 = parseInt(_bp[0]);
+          const _bchatId = parseInt(_bp[1]) || ctx.chat?.id;
           const kb = [[
-            { text: '✅ تأكيد الحظر', callback_data: 'grp_ban_now_' + uid2 },
-            { text: '❌ إلغاء',        callback_data: 'grp_cancel' },
+            { text: 'تأكيد الحظر', callback_data: 'grp_ban_now_' + uid2 + '_' + _bchatId },
+            { text: 'الغاء',        callback_data: 'grp_cancel' },
           ]];
           return ctx.editMessageReplyMarkup({ inline_keyboard: kb }).catch(() => ctx.answerCbQuery('').catch(() => {}));
         }
@@ -1078,7 +1080,7 @@ module.exports.registerCallbacks = function(bot, deps) {
           if (parseInt(cnt) >= 3) {
             await ctx.telegram.banChatMember(cid_w, uid2).catch(() => {});
             await dbRun('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [cid_w, uid2]).catch(() => {});
-            return ctx.editMessageText('🚫 *تم الحظر تلقائياً بعد 3 إنذارات!*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '🔓 رفع الحظر', callback_data: 'grp_unban_' + uid2 }]] }}).catch(() => {});
+            return ctx.editMessageText('🚫 *تم الحظر تلقائياً بعد 3 إنذارات!*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: 'رفع الحظر', callback_data: 'grp_unban_' + uid2 + '_' + _bncid }]] }}).catch(() => {});
           }
           await ctx.editMessageText(
             '❗ *إنذارات العضو: ' + cnt + '/3*\n\n✅ تم إضافة إنذار',
@@ -1116,8 +1118,10 @@ module.exports.registerCallbacks = function(bot, deps) {
           return ctx.answerCbQuery('🔇 تم الكتم ساعة').catch(() => {});
         }
         if (data.startsWith('grp_ban_now_')) {
-          const uid2 = parseInt(data.replace('grp_ban_now_', ''));
-          await ctx.telegram.banChatMember(ctx.chat.id, uid2).catch(() => {});
+          const _bnp = data.replace('grp_ban_now_', '').split('_');
+          const uid2 = parseInt(_bnp[0]);
+          const _bncid = parseInt(_bnp[1]) || ctx.chat?.id;
+          await ctx.telegram.banChatMember(_bncid, uid2).catch(() => {});
           await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '🔓 رفع الحظر', callback_data: 'grp_unban_' + uid2 }]] }).catch(() => {});
           return ctx.answerCbQuery('🚫 تم الحظر').catch(() => {});
         }
