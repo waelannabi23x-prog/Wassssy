@@ -474,10 +474,10 @@ async function muteAll(ctx, chatId) {
         parse_mode: 'Markdown',
         reply_to_message_id: ctx.message?.reply_to_message?.message_id,
         reply_markup: { inline_keyboard: [
-          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + targetUserId },
-           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + targetUserId }],
-          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + targetUserId },
-           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + targetUserId }],
+          [{ text: 'انذارات', callback_data: 'grp_warnmenu_' + targetUserId + '_' + chatId },
+           { text: 'كتم', callback_data: 'grp_mute_menu_' + targetUserId + '_' + chatId }],
+          [{ text: 'حظر',        callback_data: 'grp_ban_now_' + targetUserId },
+           { text: 'اذونات',     callback_data: 'grp_perms_' + targetUserId + '_' + chatId }],
         ]}
       }
     ).catch(() => null);
@@ -534,10 +534,10 @@ async function unmuteAll(ctx, chatId) {
         parse_mode: 'Markdown',
         reply_to_message_id: ctx.message?.reply_to_message?.message_id,
         reply_markup: { inline_keyboard: [
-          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + targetUserId },
-           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + targetUserId }],
-          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + targetUserId },
-           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + targetUserId }],
+          [{ text: 'انذارات', callback_data: 'grp_warnmenu_' + targetUserId + '_' + chatId },
+           { text: 'كتم', callback_data: 'grp_mute_menu_' + targetUserId + '_' + chatId }],
+          [{ text: 'حظر',        callback_data: 'grp_ban_now_' + targetUserId },
+           { text: 'اذونات',     callback_data: 'grp_perms_' + targetUserId + '_' + chatId }],
         ]}
       }
     ).catch(() => null);
@@ -669,10 +669,10 @@ async function warnMember(ctx, chatId, targetUserId, reason) {
     }
 
     const _warnKb = count < MAX_WARNS ? [
-      [{ text: '❗ الإنذارات', callback_data: 'grp_warns_' + targetUserId },
-       { text: '🔇 كتم 🪃',   callback_data: 'grp_mute_1h_' + targetUserId }],
-      [{ text: '🚫 حظر 🏹',   callback_data: 'grp_ban_' + targetUserId },
-       { text: '🎛 أذونات 📡', callback_data: 'grp_perms_' + targetUserId }],
+      [{ text: 'انذارات', callback_data: 'grp_warnmenu_' + targetUserId + '_' + chatId },
+       { text: 'كتم', callback_data: 'grp_mute_menu_' + targetUserId + '_' + chatId }],
+      [{ text: '🚫 حظر 🏹',   callback_data: 'grp_ban_confirm_' + targetUserId + '_' + chatId },
+       { text: 'اذونات', callback_data: 'grp_perms_' + targetUserId + '_' + chatId }],
     ] : [
       [{ text: '🔓 رفع الحظر', callback_data: 'grp_unban_' + targetUserId }],
     ];
@@ -746,10 +746,10 @@ async function banMember(ctx, chatId, targetUserId, reason, deleteMessages) {
         parse_mode: 'Markdown',
         reply_to_message_id: ctx.message?.reply_to_message?.message_id,
         reply_markup: { inline_keyboard: [
-          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + targetUserId },
-           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + targetUserId }],
-          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + targetUserId },
-           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + targetUserId }],
+          [{ text: 'انذارات', callback_data: 'grp_warnmenu_' + targetUserId + '_' + chatId },
+           { text: 'كتم', callback_data: 'grp_mute_menu_' + targetUserId + '_' + chatId }],
+          [{ text: 'حظر',        callback_data: 'grp_ban_now_' + targetUserId },
+           { text: 'اذونات',     callback_data: 'grp_perms_' + targetUserId + '_' + chatId }],
         ]}
       }
     ).catch(() => null);
@@ -801,10 +801,10 @@ async function muteMember(ctx, chatId, targetUserId, durationMinutes) {
         parse_mode: 'Markdown',
         reply_to_message_id: ctx.message?.reply_to_message?.message_id,
         reply_markup: { inline_keyboard: [
-          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + targetUserId },
-           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + targetUserId }],
-          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + targetUserId },
-           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + targetUserId }],
+          [{ text: 'انذارات', callback_data: 'grp_warnmenu_' + targetUserId + '_' + chatId },
+           { text: 'كتم', callback_data: 'grp_mute_menu_' + targetUserId + '_' + chatId }],
+          [{ text: 'حظر',        callback_data: 'grp_ban_now_' + targetUserId },
+           { text: 'اذونات',     callback_data: 'grp_perms_' + targetUserId + '_' + chatId }],
         ]}
       }
     ).catch(() => null);
@@ -835,10 +835,10 @@ async function unmuteMember(ctx, chatId, targetUserId) {
         parse_mode: 'Markdown',
         reply_to_message_id: ctx.message?.reply_to_message?.message_id,
         reply_markup: { inline_keyboard: [
-          [{ text: '❗ الإنذارات', callback_data: 'grp_warns_show_' + targetUserId },
-           { text: '🔇 كتم ساعة',  callback_data: 'grp_mute_60_' + targetUserId }],
-          [{ text: '🚫 حظر',        callback_data: 'grp_ban_now_' + targetUserId },
-           { text: '🎛 أذونات',     callback_data: 'grp_perms_' + targetUserId }],
+          [{ text: 'انذارات', callback_data: 'grp_warnmenu_' + targetUserId + '_' + chatId },
+           { text: 'كتم', callback_data: 'grp_mute_menu_' + targetUserId + '_' + chatId }],
+          [{ text: 'حظر',        callback_data: 'grp_ban_now_' + targetUserId },
+           { text: 'اذونات',     callback_data: 'grp_perms_' + targetUserId + '_' + chatId }],
         ]}
       }
     ).catch(() => null);
