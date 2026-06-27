@@ -528,32 +528,45 @@ function setupGroupCommands(bot) {
     }
 
     const kb = [];
-    if (isReqAdm && !isAdmTarget && target.id !== ctx.from.id) {
+    if (isReqAdm && target.id !== ctx.from.id && !isOwner) {
       kb.push([
-        { text: "⚠️ ! الإنذارات", callback_data: "grp_warns_show_" + target.id + "_" + chatId },
-        { text: "🎛 الصلاحيات",    callback_data: "grp_perms_" + target.id + "_" + chatId },
+        { text: "كتم",         callback_data: "grp_mute_menu_" + target.id + "_" + chatId },
+        { text: "حظر",         callback_data: "grp_ban_confirm_" + target.id + "_" + chatId },
       ]);
       kb.push([
-        { text: "✅ الغاء الكتم",   callback_data: "grp_unmute_" + target.id },
-        { text: "🚫 حظر",           callback_data: "grp_ban_confirm_" + target.id },
+        { text: "الغاء الكتم", callback_data: "grp_unrestrict_" + target.id + "_" + chatId },
+        { text: "انذار",       callback_data: "grp_warn1_" + target.id + "_" + chatId },
       ]);
       kb.push([
-        { text: "🔇 كتم 🔔",        callback_data: "grp_mute_menu_" + target.id },
-        { text: "🔰 أذونات ↗",      callback_data: "grp_perms_" + target.id + "_" + chatId },
+        { text: "اذونات",      callback_data: "grp_perms_" + target.id + "_" + chatId },
       ]);
-    } else if (isReqAdm && isAdmTarget && !isOwner && target.id !== ctx.from.id) {
-      kb.push([
-        { text: "⚠️ الإنذارات",     callback_data: "grp_warns_show_" + target.id + "_" + chatId },
-        { text: "🔰 أذونات ↗",      callback_data: "grp_perms_" + target.id + "_" + chatId },
-      ]);
+      if (isAdmTarget) {
+        kb.push([
+          { text: "ازالة من المشرفين", callback_data: "grp_demote_" + target.id + "_" + chatId },
+        ]);
+      } else {
+        kb.push([
+          { text: "ترقية لمشرف", callback_data: "grp_promote_" + target.id + "_" + chatId },
+        ]);
+      }
     }
 
+    // أرسل رسالة القروب بدون أزرار
     ctx.reply(txt, {
       parse_mode: "Markdown",
       reply_to_message_id: ctx.message?.reply_to_message?.message_id,
-      reply_markup: kb.length ? { inline_keyboard: kb } : undefined,
       disable_web_page_preview: true,
     }).catch(() => {});
+
+    // أرسل الأزرار للخاص فقط
+    if (kb.length && isReqAdm) {
+      const adminId = ctx.from.id;
+      const pvTxt = "👤 *" + name + "*\n🆔 " + target.id + " • " + (isAdmTarget ? "مشرف" : "عضو") + "\n\n_اختر الاجراء:_";
+      ctx.telegram.sendMessage(adminId, pvTxt, {
+        parse_mode: "Markdown",
+        reply_markup: { inline_keyboard: kb },
+      }).catch(() => {});
+    }
   });
 
 
