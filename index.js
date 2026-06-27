@@ -442,6 +442,23 @@ async function launch() {
     const _me = await bot.telegram.getMe().catch(() => ({}));
     const BOT_USERNAME = _me.username || process.env.BOT_USERNAME || '';
     logger.info('✅ Services started — @' + BOT_USERNAME);
+    // تنظيف القروبات المطرود منها عند البدء
+    setTimeout(async () => {
+      try {
+        const groups = await dbAll('SELECT chat_id FROM group_chats WHERE is_active=true').catch(() => []);
+        for (const g of groups) {
+          try {
+            await bot.telegram.getChat(g.chat_id);
+          } catch(e) {
+            if (e.message?.includes('kicked') || e.message?.includes('Forbidden') || e.message?.includes('not found')) {
+              await dbRun('UPDATE group_chats SET is_active=false, notify_new_files=0 WHERE chat_id=$1', [g.chat_id]).catch(()=>{});
+              logger.info('[Cleanup] مطرود من: ' + g.chat_id);
+            }
+          }
+        }
+        logger.info('[Cleanup] ✅ تم تنظيف القروبات');
+      } catch(e) { logger.error('[Cleanup]', e.message); }
+    }, 10000);
 
     app.use(bot.webhookCallback('/webhook/' + TOKEN, { secretToken: WEBHOOK_SECRET || undefined }));
 
