@@ -711,7 +711,10 @@ module.exports.registerCallbacks = function(bot, deps) {
             data.startsWith('grp_clearwarn_') || data.startsWith('grp_pall_') ||
             data.startsWith('grp_pnone_') || data.startsWith('grp_aptog_') ||
             data.startsWith('grp_apsave_') || data.startsWith('grp_demote_') ||
-            data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_')) {
+            data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_') ||
+            data.startsWith('grp_ban_confirm_') || data.startsWith('grp_ban_now_') ||
+            data.startsWith('grp_promote_') || data.startsWith('grp_mute_menu_') ||
+            data.startsWith('grp_unban_') || data.startsWith('grp_unmute_')) {
           // استخرج chatId من آخر جزء في الـ data
           const _dataParts = data.split('_');
           const _extractedChatId = parseInt(_dataParts[_dataParts.length - 1]) || ctx.chat?.id;
