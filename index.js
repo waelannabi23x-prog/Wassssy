@@ -445,7 +445,7 @@ async function launch() {
     // تنظيف القروبات المطرود منها عند البدء
     setTimeout(async () => {
       try {
-        const groups = await dbAll('SELECT chat_id FROM group_chats WHERE is_active=1 OR is_active=true').catch(() => []);
+        const groups = await dbAll('SELECT chat_id FROM group_chats WHERE is_active IS NOT FALSE').catch(() => []);
         for (const g of groups) {
           try {
             await bot.telegram.getChat(g.chat_id);
