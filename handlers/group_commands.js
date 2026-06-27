@@ -876,6 +876,28 @@ function setupGroupCommands(bot) {
     ctx.reply('📋 البطاقات:\n' + text).catch(() => {});
   });
 
+  // وقف/فعل الردود التلقائية في القروب
+  bot.hears(/^(وقف رد|فعل رد)$/i, async ctx => {
+    if (!isGroup(ctx)) return;
+    if (!ctx.isOwner && !ctx.isAdmin) return;
+    const { run: _r } = require('../database/db');
+    const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
+    const chatId = ctx.chat.id;
+    const isStop = /وقف/.test(ctx.message.text);
+    const key = 'auto_reply_disabled_' + chatId;
+    if (isStop) {
+      cacheSet(key, 1, 86400000);
+      await _r('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=$2',
+        ['auto_reply_disabled_' + chatId, '1']).catch(() => {});
+      return ctx.reply('🔇 *تم إيقاف الردود التلقائية في هذا القروب*', { parse_mode: 'Markdown', reply_to_message_id: ctx.message.message_id }).catch(() => {});
+    } else {
+      cacheClear(key);
+      await _r('INSERT INTO settings(key,value) VALUES($1,$2) ON CONFLICT(key) DO UPDATE SET value=$2',
+        ['auto_reply_disabled_' + chatId, '0']).catch(() => {});
+      return ctx.reply('🔔 *تم تفعيل الردود التلقائية في هذا القروب*', { parse_mode: 'Markdown', reply_to_message_id: ctx.message.message_id }).catch(() => {});
+    }
+  });
+
   bot.hears(/^ضف رد$/i, async ctx => {
     if (!isGroup(ctx)) return;
     await require('../utils/stateManager').setState(ctx.from.id, {

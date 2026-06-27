@@ -179,6 +179,17 @@ const groupProtectionMiddleware = async (ctx, next) => {
   const _inArMode = _state4ar?.type?.startsWith('mg_ar') || _state4ar?.type?.startsWith('mg_awaiting');
 
   if (txt && txt.length > 0 && !_isGameMsg && !_inArMode) {
+      // فحص إذا الردود موقوفة في هذا القروب
+      const _arDisKey = 'auto_reply_disabled_' + cid;
+      let _arDis = _cGet(_arDisKey);
+      if (_arDis === null) {
+        const { get: _dbGet } = require('./database/db');
+        const _row = await _dbGet('SELECT value FROM settings WHERE key=$1', [_arDisKey]).catch(() => null);
+        _arDis = _row?.value === '1' ? 1 : 0;
+        _cSet(_arDisKey, _arDis, 86400000);
+      }
+      if (_arDis === 1) return next();
+
     const arKey = 'auto_replies_all';
     let arList = _cGet(arKey);
     if (!arList) {
