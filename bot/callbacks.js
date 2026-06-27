@@ -712,7 +712,10 @@ module.exports.registerCallbacks = function(bot, deps) {
             data.startsWith('grp_pnone_') || data.startsWith('grp_aptog_') ||
             data.startsWith('grp_apsave_') || data.startsWith('grp_demote_') ||
             data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_')) {
-          const chatIdCheck = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+          // استخرج chatId من آخر جزء في الـ data
+          const _dataParts = data.split('_');
+          const _extractedChatId = parseInt(_dataParts[_dataParts.length - 1]) || ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+          const chatIdCheck = _extractedChatId;
           const callerMember = await ctx.telegram.getChatMember(chatIdCheck, ctx.from.id).catch(() => null);
           const isCallerAdm  = ctx.isAdmin || ctx.isOwner || ['administrator','creator'].includes(callerMember?.status);
           if (!isCallerAdm) return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(() => {});
