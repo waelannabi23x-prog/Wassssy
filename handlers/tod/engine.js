@@ -373,6 +373,14 @@ async function resumeAllSessions() {
       session.round = snap.round || 0;
       await loadSettingsInto(session);
 
+      // تحقق أن البوت لا يزال في القروب قبل الإرسال
+      try {
+        await BOT.telegram.getChat(snap.chatId);
+      } catch(e) {
+        logger.warn('[ToD] قروب غير موجود، تخطي: ' + snap.chatId);
+        await tdb.deleteSnapshot(snap.chatId).catch(() => {});
+        continue;
+      }
       if (snap.status === 'registration') {
         session.status = 'registration';
         const msg = await safeSend(snap.chatId, '♻️ *تم استرجاع غرفة أكسيو أو فيريتي بعد إعادة تشغيل البوت*\n\n' + texts.registrationText(session));
