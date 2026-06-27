@@ -313,6 +313,14 @@ const gameAndBankMiddleware = async (ctx, next) => {
 // ── تسجيل middleware بالترتيب الصحيح ──
 bot.use(rateLimit);
 
+// 🧹 مسح كل الردود مؤقت
+bot.command('clear_cards', async ctx => {
+  if (ctx.from.id !== parseInt(process.env.OWNER_ID)) return;
+  await dbRun('DELETE FROM member_cards').catch(() => {});
+  await dbRun('DELETE FROM member_card_triggers').catch(() => {});
+  ctx.reply('✅ تم مسح كل الردود').catch(() => {});
+});
+
 // 🐺 لوب غارو trigger
 bot.hears(/^(لوب غارو|لوب_غارو|ذئب|werewolf)$/i, async (ctx) => {
   if (!['group','supergroup'].includes(ctx.chat?.type)) return;
