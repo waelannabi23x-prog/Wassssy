@@ -158,6 +158,16 @@ module.exports.registerMessages = function(bot, deps) {
 
     // ── Photos / Videos / Audio / Voice ──
   bot.on(['photo', 'video', 'audio', 'voice'], async ctx => {
+    // 💳 معالج صورة البطاقة الشخصية (في القروب أو الخاص)
+    const _s = require('../utils/stateManager').getState(ctx.uid);
+    if (_s?.type === 'member_card_photo') {
+      const fileId = ctx.message.photo?.[ctx.message.photo.length - 1]?.file_id;
+      if (fileId) {
+        await require('../utils/stateManager').setState(ctx.uid, { type: 'member_card_bio', chatId: _s.chatId, photo: fileId });
+        return ctx.reply('✏️ *الخطوة 2/2:* اكتب bio تعريفي عنك\n_(أو . للتخطي)_', { parse_mode: 'Markdown' }).catch(() => {});
+      }
+    }
+
     if (ctx.chat?.type !== 'private') return;
     if (!ctx.isAdmin && !ctx.isOwner) return;
     const s = require('../utils/stateManager').getState(ctx.uid);
@@ -253,6 +263,32 @@ module.exports.registerMessages = function(bot, deps) {
         return ctx.reply('✅ تم إنشاء الحزمة: *' + name + '*\n\nأرسل الملفات الآن.\n/done للإنهاء', { parse_mode: 'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }
       if (s.type === 'search')      return userH.handleSearch(ctx, txt);
+      // 💳 البطاقة الشخصية
+      if (s.type === 'member_card_photo') {
+        const chatId = s.chatId;
+        if (txt === '.') {
+          await require('../utils/stateManager').setState(ctx.uid, { type: 'member_card_bio', chatId, photo: null });
+          return ctx.reply('✏️ *الخطوة 2/2:* اكتب bio تعريفي عنك\n_(أو . للتخطي)_', { parse_mode: 'Markdown' }).catch(() => {});
+        }
+        return ctx.reply('📸 أرسل صورة أو اكتب . للتخطي').catch(() => {});
+      }
+      if (s.type === 'member_card_bio') {
+        const chatId = s.chatId;
+        const bio = txt === '.' ? null : txt.substring(0, 150);
+        const { run: _run } = require('../database/db');
+        await _run(
+          `INSERT INTO member_cards(chat_id, user_id, photo_file_id, bio, username, first_name)
+           VALUES($1,$2,$3,$4,$5,$6)
+           ON CONFLICT(chat_id, user_id) DO UPDATE SET bio=$4, username=$5, first_name=$6, updated_at=NOW()`,
+          [chatId, ctx.uid, s.photo || null, bio, ctx.from.username || null, ctx.from.first_name || 'عضو']
+        ).catch(() => {});
+        await require('../utils/stateManager').delState(ctx.uid);
+        return ctx.reply(
+          '✅ *تم حفظ بطاقتك!*\n\nلما أحد يكتب اسمك في القروب سيظهر ردك تلقائياً.',
+          { parse_mode: 'Markdown' }
+        ).catch(() => {});
+      }
+
       if (s.type === 'add_comment') {
         if (!txt || txt === '/cancel') { await require('../utils/stateManager').delState(ctx.uid); return ctx.reply('❌ تم الإلغاء.').catch(err => { require('../utils/logger').debug("[silent]", err.message); }); }
         if (txt.length > 500) return ctx.reply('⚠️ الحد 500 حرف.').catch(err => { require('../utils/logger').debug("[silent]", err.message); });

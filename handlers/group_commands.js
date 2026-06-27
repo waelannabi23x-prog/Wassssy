@@ -858,6 +858,41 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   // 🔍 + اسم الملف — بحث سريع في القروب
   // ══════════════════════════════════════════
+  // ══════════════════════════════════════════
+  // 💳 البطاقة الشخصية — ضف ردك
+  // ══════════════════════════════════════════
+  bot.hears(/^ضف رد$/i, async ctx => {
+    if (!isGroup(ctx)) return;
+    const uid = ctx.from.id;
+    await run(`CREATE TABLE IF NOT EXISTS member_cards (
+      chat_id BIGINT NOT NULL,
+      user_id BIGINT NOT NULL,
+      photo_file_id TEXT,
+      bio TEXT,
+      username TEXT,
+      first_name TEXT,
+      updated_at TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY(chat_id, user_id)
+    )`).catch(() => {});
+
+    await require('../utils/stateManager').setState(uid, { type: 'member_card_photo', chatId: ctx.chat.id });
+    ctx.reply(
+      '💳 *إنشاء بطاقتك الشخصية*
+━━━━━━━━━━━━
+
+' +
+      '📸 *الخطوة 1/2:* أرسل صورتك
+_(أو اكتب . للتخطي)_',
+      { parse_mode: 'Markdown', reply_to_message_id: ctx.message.message_id }
+    ).catch(() => {});
+  });
+
+  // عرض بطاقة عضو لما يكتب اسمه
+  bot.hears(/^هبة|^بطاقة\s+(.+)|^card\s+(.+)/i, async ctx => {
+    if (!isGroup(ctx)) return;
+    // هذا يتعامل معه الـ auto-reply في messages.js
+  });
+
   bot.hears(/^[+＋]\s*(.+)/, async ctx => {
     if (!isGroup(ctx)) return;
     const query = ctx.match[1]?.trim();
