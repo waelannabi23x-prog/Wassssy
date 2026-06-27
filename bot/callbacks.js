@@ -8,6 +8,14 @@ const gamesPanel  = require('../handlers/games_panel');
 const millionGame = require('../handlers/millionaire');
 
 module.exports.registerCallbacks = function(bot, deps) {
+  // استخراج uid و chatId من callback_data بشكل آمن مع chatId السالب
+  function extractUidChat(str) {
+    // format: uid_chatId حيث chatId قد يكون سالب مثل -1001234567
+    const match = str.match(/^(-?\d+)_(-?\d+)$/);
+    if (match) return { uid: parseInt(match[1]), chatId: parseInt(match[2]) };
+    // fallback: uid فقط
+    return { uid: parseInt(str), chatId: null };
+  }
   const {
     CBDedup, cbRes, startHandler, manage, browse, userH,
     bundlesDb, contentDb, usersDb, interactions, commentsDb,
@@ -777,9 +785,7 @@ module.exports.registerCallbacks = function(bot, deps) {
 
         // ── +1 تحذير ──
         if (data.startsWith('grp_warn1_')) {
-          const _w1parts = data.replace('grp_warn1_', '').split('_');
-          const uid2    = parseInt(_w1parts[0]);
-          const chatId2 = parseInt(_w1parts[1]) || ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+          const { uid: uid2, chatId: chatId2 } = extractUidChat(data.replace('grp_warn1_', ''));
           const { run: dbR, all: dbA } = require('../database/db');
           await dbR(
             'INSERT INTO group_warns(chat_id,user_id,reason,warned_by) VALUES($1,$2,$3,$4)',
@@ -815,9 +821,7 @@ module.exports.registerCallbacks = function(bot, deps) {
 
         // ── قائمة خيارات الكتم ──
         if (data.startsWith('grp_mute_menu_')) {
-          const _mp = data.replace('grp_mute_menu_', '').split('_');
-          const uid2 = parseInt(_mp[0]);
-          const cid2 = parseInt(_mp[1]) || 0;
+          const { uid: uid2, chatId: cid2 } = extractUidChat(data.replace('grp_mute_menu_', ''));
           const kb = [[
             { text: '5 دقائق',  callback_data: 'grp_mute_5_'    + uid2 + '_' + cid2 },
             { text: '30 دقيقة', callback_data: 'grp_mute_30_'   + uid2 + '_' + cid2 },
@@ -848,9 +852,7 @@ module.exports.registerCallbacks = function(bot, deps) {
 
         // ── تأكيد الحظر ──
         if (data.startsWith('grp_ban_confirm_')) {
-          const _bp = data.replace('grp_ban_confirm_', '').split('_');
-          const uid2 = parseInt(_bp[0]);
-          const _bchatId = parseInt(_bp[1]) || ctx.chat?.id;
+          const { uid: uid2, chatId: _bchatId } = extractUidChat(data.replace('grp_ban_confirm_', ''));
           const kb = [[
             { text: 'تأكيد الحظر', callback_data: 'grp_ban_now_' + uid2 + '_' + _bchatId },
             { text: 'الغاء',        callback_data: 'grp_cancel' },
@@ -1121,9 +1123,7 @@ module.exports.registerCallbacks = function(bot, deps) {
           return ctx.answerCbQuery('🔇 تم الكتم ساعة').catch(() => {});
         }
         if (data.startsWith('grp_ban_now_')) {
-          const _bnp = data.replace('grp_ban_now_', '').split('_');
-          const uid2 = parseInt(_bnp[0]);
-          const _bncid = parseInt(_bnp[1]) || ctx.chat?.id;
+          const { uid: uid2, chatId: _bncid } = extractUidChat(data.replace('grp_ban_now_', ''));
           await ctx.telegram.banChatMember(_bncid, uid2).catch(() => {});
           await ctx.editMessageReplyMarkup({ inline_keyboard: [[{ text: '🔓 رفع الحظر', callback_data: 'grp_unban_' + uid2 }]] }).catch(() => {});
           return ctx.answerCbQuery('🚫 تم الحظر').catch(() => {});

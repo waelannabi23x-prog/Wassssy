@@ -240,6 +240,9 @@ async function initSchema() {
       logger.info('✅ Indexes جاهزة (' + IDX.length + ')');
   }
 
+  // migration: created_at في users
+  try { if(pg) await pg.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'); } catch(err) { require('./logger').debug('[catch]', err.message); }
+
   // member_cards migrations
   try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS trigger_word TEXT'); } catch(err) { require('./logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS first_name TEXT'); } catch(err) { require('./logger').debug('[catch]', err.message); }
