@@ -240,6 +240,14 @@ async function initSchema() {
       logger.info('✅ Indexes جاهزة (' + IDX.length + ')');
   }
 
+  // member_cards migrations
+  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS trigger_word TEXT'); } catch(err) { require('./logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS first_name TEXT'); } catch(err) { require('./logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS username TEXT'); } catch(err) { require('./logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS photo_file_id TEXT'); } catch(err) { require('./logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS bio TEXT'); } catch(err) { require('./logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()'); } catch(err) { require('./logger').debug('[catch]', err.message); }
+
   // member_cards tables
   try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS member_cards (
     chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL,
