@@ -28,6 +28,7 @@ const guessGame     = require('./handlers/guess_game');
 const tools         = require('./handlers/owner_tools');
 const bank          = require('./handlers/bank');
 const bankPro       = require('./handlers/bank_pro');
+const music         = require('./handlers/music');
 const ownerH        = require('./handlers/owner');
 const contentDb     = require('./database/content');
 const usersDb       = require('./database/users');
@@ -291,7 +292,12 @@ const gameAndBankMiddleware = async (ctx, next) => {
     // البنك
     // bank.js القديم محذوف — استخدم bank_pro.js
 
-    // 🏦 Taline Bank
+    // 🎵 البحث عن الأغاني
+    if (/^🎵\s+.+/i.test(txt) || /^موسيقى\s+.+/i.test(txt) || /^اغنية\s+.+/i.test(txt) || /^أغنية\s+.+/i.test(txt)) {
+      return music.handleSearch(ctx).catch(() => next());
+    }
+
+        // 🏦 Taline Bank
     if (/^حسابي$/i.test(txt))                     return bankPro.showWalletNoButtons(ctx).catch(() => next());
     if (/^فلوسي$/i.test(txt))                     return bankPro.showBalance(ctx).catch(() => next());
     if (/^بنك$/i.test(txt))                       return bankPro.openAccount(ctx).catch(() => next());

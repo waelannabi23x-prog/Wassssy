@@ -1348,5 +1348,10 @@ module.exports.registerCallbacks = function(bot, deps) {
   }
 
 
+  // ══ 🎵 Music Search Callbacks ══
+  if (data === 'music_close' || data.startsWith('music_track_')) {
+    return require('../handlers/music').handleCallback(ctx).catch(() => {});
+  }
+
   });
 };
