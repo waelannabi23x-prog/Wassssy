@@ -318,26 +318,21 @@ bot.hears(/^(لوب غارو|لوب_غارو|ذئب|werewolf)$/i, async (ctx) =>
   if (!['group','supergroup'].includes(ctx.chat?.type)) return;
   try { return require('./handlers/werewolf/engine').createLobby(ctx); } catch(e) {}
 });
-// 💳 عرض بطاقة عضو
+// 💳 عرض بطاقة عضو تلقائياً
 bot.hears(/^.{2,25}$/, async (ctx, next) => {
-  if (!['group','supergroup'].includes(ctx.chat?.type)) return next();
+  if (!["group","supergroup"].includes(ctx.chat?.type)) return next();
   const txt = ctx.message?.text?.trim();
-  if (!txt || txt.startsWith('/') || txt.startsWith('@')) return next();
+  if (!txt || txt.startsWith("/") || txt.startsWith("@")) return next();
   try {
-    const { all: _all } = require('./database/db');
-    const cards = await _all(
-      "SELECT * FROM member_cards WHERE chat_id=$1 AND (first_name ILIKE $2 OR username ILIKE $2)",
-      [ctx.chat.id, txt]
-    ).catch(() => []);
-    if (!cards.length) return next();
-    const c = cards[0];
-    const text = (c.bio ? '_' + c.bio + '_\n\n' : '') + '• Use \u2190 [' + (c.first_name || 'عضو') + '](tg://user?id=' + c.user_id + ')\n' + (c.username ? '• Bio \u2190' : '');
-    const kb = { inline_keyboard: [[{ text: c.first_name || 'عضو', url: 'tg://user?id=' + c.user_id }]] };
-    if (c.photo_file_id) {
-      await ctx.replyWithPhoto(c.photo_file_id, { caption: text, parse_mode: 'Markdown', reply_markup: kb }).catch(() => {});
-    } else {
-      await ctx.reply(text, { parse_mode: 'Markdown', reply_markup: kb }).catch(() => {});
-    }
+    const { get: _get } = require("./database/db");
+    const trigger = await _get("SELECT user_id FROM member_card_triggers WHERE chat_id=$1 AND trigger_word=$2", [ctx.chat.id, txt.toLowerCase()]).catch(() => null);
+    if (!trigger) return next();
+    const card = await _get("SELECT * FROM member_cards WHERE chat_id=$1 AND user_id=$2", [ctx.chat.id, trigger.user_id]).catch(() => null);
+    if (!card) return next();
+    const text = (card.bio ? card.bio + "\n\n" : "") + "• Use <- [" + (card.first_name||"عضو") + "](tg://user?id=" + card.user_id + ")\n" + (card.username ? "• @" + card.username : "");
+    const kb = { inline_keyboard: [[{ text: card.first_name||"عضو", url: "tg://user?id=" + card.user_id }]] };
+    if (card.photo_file_id) { await ctx.replyWithPhoto(card.photo_file_id, { caption: text, parse_mode: "Markdown", reply_markup: kb, reply_to_message_id: ctx.message.message_id }).catch(() => {}); }
+    else { await ctx.reply(text, { parse_mode: "Markdown", reply_markup: kb, reply_to_message_id: ctx.message.message_id }).catch(() => {}); }
   } catch(_) { return next(); }
 });
 
