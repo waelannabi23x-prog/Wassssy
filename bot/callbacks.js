@@ -858,62 +858,34 @@ module.exports.registerCallbacks = function(bot, deps) {
           const tog  = (label, key) => [{ text: (can(key)  ? '✅ ' : '❌ ') + label, callback_data: 'grp_ptog_'  + key + '_' + uid2 + '_' + chatId2 }];
           const atog = (label, key) => [{ text: (acan(key) ? '✅ ' : '❌ ') + label, callback_data: 'grp_aptog_' + key + '_' + uid2 + '_' + chatId2 }];
 
-          let kb, txt;
+          const name2 = member?.user?.first_name || 'عضو';
+          const txt2 = (isAdminMember ? '👮' : '👤') + ' *' + name2 + '*\n' +
+            '🆔 ' + uid2 + ' • ' + (isAdminMember ? 'مشرف' : 'عضو') + '\n\n' +
+            '_اختر الإجراء:_';
+          const kb2 = [
+            [
+              { text: '🔇 كتم',      callback_data: 'grp_mute_' + uid2 + '_' + chatId2 },
+              { text: '🚫 حظر',      callback_data: 'grp_ban_'  + uid2 + '_' + chatId2 },
+            ],
+            [
+              { text: '🔓 الغاء الكتم', callback_data: 'grp_unrestrict_' + uid2 + '_' + chatId2 },
+              { text: '⚠️ إنذار',       callback_data: 'grp_warn1_'      + uid2 + '_' + chatId2 },
+            ],
+            [
+              { text: '🛡️ الصلاحيات', callback_data: isAdminMember
+                ? 'grp_apsave_show_' + uid2 + '_' + chatId2
+                : 'grp_psave_show_'  + uid2 + '_' + chatId2 },
+            ],
+          ];
           if (isAdminMember) {
-            // إذونات المشرف
-            txt = '👮 *إذونات المشرف*\n' +
-                  '[' + (member?.user?.first_name||'مشرف') + '](tg://user?id=' + uid2 + ')  •  ' + chatId2 + '\n\n' +
-                  '_اضغط لتفعيل/تعطيل ثم احفظ_';
-            kb = [
-              atog('حذف الرسائل',       'can_delete_messages'),
-              atog('حظر الأعضاء',       'can_restrict_members'),
-              atog('تثبيت الرسائل',     'can_pin_messages'),
-              atog('دعوة عبر رابط',     'can_invite_users'),
-              atog('تغيير معلومات',     'can_change_info'),
-              atog('إدارة البث المباشر','can_manage_video_chats'),
-              atog('إدارة القروب',       'can_manage_chat'),
-              atog('إضافة مشرفين',      'can_promote_members'),
-              [{ text: '💾 حفظ', callback_data: 'grp_apsave_' + uid2 + '_' + chatId2 }],
-              [{ text: '🗑 إزالة من المشرفين', callback_data: 'grp_demote_' + uid2 + '_' + chatId2 }],
-            ];
-          } else {
-            // إذونات العضو
-            txt = '👤 *إذونات العضو*\n' +
-                  '[' + (member?.user?.first_name||'عضو') + '](tg://user?id=' + uid2 + ')  •  ' + chatId2 + '\n\n' +
-                  '_اضغط لتفعيل/تعطيل ثم احفظ_';
-            kb = [
-              tog('الرسائل النصية',       'can_send_messages'),
-              [
-                { text: (can('can_send_photos')  ? '✅ ' : '❌ ') + 'صورة',  callback_data: 'grp_ptog_can_send_photos_'  + uid2 + '_' + chatId2 },
-                { text: (can('can_send_videos')  ? '✅ ' : '❌ ') + 'فيديو', callback_data: 'grp_ptog_can_send_videos_'  + uid2 + '_' + chatId2 },
-              ],
-              [
-                { text: (can('can_send_audios')  ? '✅ ' : '❌ ') + 'صوتي', callback_data: 'grp_ptog_can_send_audios_'   + uid2 + '_' + chatId2 },
-                { text: (can('can_send_documents')? '✅ ' : '❌ ') + 'ملف',  callback_data: 'grp_ptog_can_send_documents_'+ uid2 + '_' + chatId2 },
-              ],
-              [
-                { text: (can('can_send_voice_notes')  ? '✅ ' : '❌ ') + 'بصمة صوت',  callback_data: 'grp_ptog_can_send_voice_notes_'  + uid2 + '_' + chatId2 },
-                { text: (can('can_send_video_notes')  ? '✅ ' : '❌ ') + 'بصمة فيديو',callback_data: 'grp_ptog_can_send_video_notes_'  + uid2 + '_' + chatId2 },
-              ],
-              [
-                { text: (can('can_send_polls')        ? '✅ ' : '❌ ') + 'استطلاع',   callback_data: 'grp_ptog_can_send_polls_'        + uid2 + '_' + chatId2 },
-                { text: (can('can_send_other_messages')? '✅ ' : '❌ ') + 'ملصق/GIF', callback_data: 'grp_ptog_can_send_other_messages_'+ uid2 + '_' + chatId2 },
-              ],
-              tog('تمكين معاينات الروابط', 'can_add_web_page_previews'),
-              tog('تعديل لقبه الخاص',      'can_change_info'),
-              tog('دعوة أعضاء',             'can_invite_users'),
-              tog('تثبيت الرسائل',          'can_pin_messages'),
-              [{ text: '✅ كل الإذونات',   callback_data: 'grp_pall_'  + uid2 + '_' + chatId2 },
-               { text: '❌ سحب الكل',      callback_data: 'grp_pnone_' + uid2 + '_' + chatId2 }],
-              [{ text: '💾 حفظ', callback_data: 'grp_psave_' + uid2 + '_' + chatId2 }],
-            ];
+            kb2.push([{ text: '🗑 إزالة من المشرفين', callback_data: 'grp_demote_' + uid2 + '_' + chatId2 }]);
           }
           try {
-            await ctx.telegram.sendMessage(adminId, txt, {
+            await ctx.telegram.sendMessage(adminId, txt2, {
               parse_mode: 'Markdown',
-              reply_markup: { inline_keyboard: kb }
+              reply_markup: { inline_keyboard: kb2 }
             });
-            return ctx.answerCbQuery('📨 تم الإرسال للخاص').catch(() => {});
+            return ctx.answerCbQuery('📨 تم').catch(() => {});
           } catch(_) {
             return ctx.answerCbQuery('⚠️ افتح الخاص مع البوت أولاً', { show_alert: true }).catch(() => {});
           }
