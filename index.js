@@ -313,6 +313,21 @@ const gameAndBankMiddleware = async (ctx, next) => {
 // ── تسجيل middleware بالترتيب الصحيح ──
 bot.use(rateLimit);
 
+// 🏗 إنشاء جداول member cards عند البدء
+setTimeout(async () => {
+  try {
+    await dbRun(`CREATE TABLE IF NOT EXISTS member_cards (
+      chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL,
+      trigger_word TEXT, photo_file_id TEXT, bio TEXT,
+      username TEXT, first_name TEXT, updated_at TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY(chat_id, user_id))`);
+    await dbRun(`CREATE TABLE IF NOT EXISTS member_card_triggers (
+      chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL, trigger_word TEXT NOT NULL,
+      PRIMARY KEY(chat_id, trigger_word))`);
+    logger.info('[MemberCards] ✅ Tables ready');
+  } catch(e) { logger.error('[MemberCards]', e.message); }
+}, 3000);
+
 // 🧹 مسح كل الردود مؤقت
 bot.command('clear_cards', async ctx => {
   if (ctx.from.id !== parseInt(process.env.OWNER_ID)) return;
