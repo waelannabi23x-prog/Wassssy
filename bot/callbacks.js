@@ -714,10 +714,18 @@ module.exports.registerCallbacks = function(bot, deps) {
             data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_')) {
           // استخرج chatId من آخر جزء في الـ data
           const _dataParts = data.split('_');
-          const _extractedChatId = parseInt(_dataParts[_dataParts.length - 1]) || ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+          const _extractedChatId = parseInt(_dataParts[_dataParts.length - 1]) || ctx.chat?.id;
           const chatIdCheck = _extractedChatId;
-          const callerMember = await ctx.telegram.getChatMember(chatIdCheck, ctx.from.id).catch(() => null);
-          const isCallerAdm  = ctx.isAdmin || ctx.isOwner || ['administrator','creator'].includes(callerMember?.status);
+          let isCallerAdm = ctx.isAdmin || ctx.isOwner;
+          if (!isCallerAdm && chatIdCheck && chatIdCheck < 0) {
+            const callerMember = await ctx.telegram.getChatMember(chatIdCheck, ctx.from.id).catch(() => null);
+            isCallerAdm = ['administrator','creator'].includes(callerMember?.status);
+          } else if (!isCallerAdm) {
+            // من الخاص — نتحقق من جدول admins
+            const { get: _ag } = require('../database/db');
+            const _arow = await _ag('SELECT user_id FROM admins WHERE user_id=$1', [ctx.from.id]).catch(() => null);
+            isCallerAdm = !!_arow || String(ctx.from.id) === String(process.env.OWNER_ID);
+          }
           if (!isCallerAdm) return ctx.answerCbQuery('🚫 للمشرفين فقط', { show_alert: true }).catch(() => {});
         }
 
