@@ -877,12 +877,7 @@ function setupGroupCommands(bot) {
 
     await require('../utils/stateManager').setState(uid, { type: 'member_card_photo', chatId: ctx.chat.id });
     ctx.reply(
-      '💳 *إنشاء بطاقتك الشخصية*
-━━━━━━━━━━━━
-
-' +
-      '📸 *الخطوة 1/2:* أرسل صورتك
-_(أو اكتب . للتخطي)_',
+      '💳 *إنشاء بطاقتك الشخصية*\n━━━━━━━━━━━━\n\n📸 *الخطوة 1/2:* أرسل صورتك\n_(أو اكتب . للتخطي)_',
       { parse_mode: 'Markdown', reply_to_message_id: ctx.message.message_id }
     ).catch(() => {});
   });
