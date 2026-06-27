@@ -751,23 +751,24 @@ module.exports.registerCallbacks = function(bot, deps) {
           const cnt = warns.length;
           return ctx.editMessageReplyMarkup({ inline_keyboard: [
             [
-              { text: '⚠️ الإنذارات ' + cnt + '/3', callback_data: 'grp_warnmenu_' + uid2 + '_' + chatId2 },
-              { text: '🎛 الصلاحيات',               callback_data: 'grp_perms_'    + uid2 + '_' + chatId2 },
+              { text: 'كتم',      callback_data: 'grp_mute_menu_'   + uid2 },
+              { text: 'حظر',      callback_data: 'grp_ban_confirm_' + uid2 },
             ],
             [
-              { text: '🔇 كتم', callback_data: 'grp_mute_menu_'   + uid2 },
-              { text: '🚫 حظر', callback_data: 'grp_ban_confirm_' + uid2 },
+              { text: 'الغاء الكتم', callback_data: 'grp_unrestrict_' + uid2 + '_' + chatId2 },
+              { text: 'انذارات ' + cnt + '/3', callback_data: 'grp_warnmenu_' + uid2 + '_' + chatId2 },
             ],
             [
-              { text: '🎛 أذونات ↗', callback_data: 'grp_perms_' + uid2 + '_' + chatId2 },
+              { text: 'اذونات', callback_data: 'grp_perms_' + uid2 + '_' + chatId2 },
             ],
           ]}).catch(() => ctx.answerCbQuery('').catch(() => {}));
         }
 
         // ── +1 تحذير ──
         if (data.startsWith('grp_warn1_')) {
-          const uid2   = parseInt(data.replace('grp_warn1_', ''));
-          const chatId2 = ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
+          const _w1parts = data.replace('grp_warn1_', '').split('_');
+          const uid2    = parseInt(_w1parts[0]);
+          const chatId2 = parseInt(_w1parts[1]) || ctx.chat?.id || ctx.callbackQuery?.message?.chat?.id;
           const { run: dbR, all: dbA } = require('../database/db');
           await dbR(
             'INSERT INTO group_warns(chat_id,user_id,reason,warned_by) VALUES($1,$2,$3,$4)',
@@ -864,17 +865,15 @@ module.exports.registerCallbacks = function(bot, deps) {
             '_اختر الإجراء:_';
           const kb2 = [
             [
-              { text: '🔇 كتم',      callback_data: 'grp_mute_' + uid2 + '_' + chatId2 },
-              { text: '🚫 حظر',      callback_data: 'grp_ban_'  + uid2 + '_' + chatId2 },
+              { text: 'كتم',        callback_data: 'grp_mute_menu_'   + uid2 + '_' + chatId2 },
+              { text: 'حظر',        callback_data: 'grp_ban_confirm_' + uid2 + '_' + chatId2 },
             ],
             [
-              { text: '🔓 الغاء الكتم', callback_data: 'grp_unrestrict_' + uid2 + '_' + chatId2 },
-              { text: '⚠️ إنذار',       callback_data: 'grp_warn1_'      + uid2 + '_' + chatId2 },
+              { text: 'الغاء الكتم', callback_data: 'grp_unrestrict_' + uid2 + '_' + chatId2 },
+              { text: 'انذار',       callback_data: 'grp_warn1_'      + uid2 + '_' + chatId2 },
             ],
             [
-              { text: '🛡️ الصلاحيات', callback_data: isAdminMember
-                ? 'grp_apsave_show_' + uid2 + '_' + chatId2
-                : 'grp_psave_show_'  + uid2 + '_' + chatId2 },
+              { text: 'الاذونات', callback_data: 'grp_perms_' + uid2 + '_' + chatId2 },
             ],
           ];
           if (isAdminMember) {
