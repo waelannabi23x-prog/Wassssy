@@ -264,6 +264,76 @@ module.exports.registerMessages = function(bot, deps) {
       }
       if (s.type === 'search')      return userH.handleSearch(ctx, txt);
       // 💳 البطاقة الشخصية
+      if (s.type === 'member_card_word') {
+        const chatId = s.chatId;
+        const word = txt?.trim();
+        if (!word || word.length < 1 || word.length > 25) {
+          return ctx.reply('⚠️ الكلمة بين 1 و25 حرف').catch(() => {});
+        }
+        if (word.startsWith('/') || word.startsWith('@')) {
+          return ctx.reply('⚠️ الكلمة لا تبدأ بـ / أو @').catch(() => {});
+        }
+        const uid = ctx.uid || ctx.from.id;
+        const firstName = ctx.from.first_name || 'عضو';
+        const username = ctx.from.username || null;
+
+        // جيب صورة البروفايل من تيليجرام
+        let photoFileId = null;
+        try {
+          const photos = await ctx.telegram.getUserProfilePhotos(uid, { limit: 1 });
+          if (photos.total_count > 0) photoFileId = photos.photos[0][photos.photos[0].length-1].file_id;
+        } catch(_) {}
+
+        // جيب bio من تيليجرام
+        let bio = null;
+        try {
+          const chat = await ctx.telegram.getChat(uid);
+          bio = chat.bio || null;
+        } catch(_) {}
+
+        const { run: _run } = require('../database/db');
+
+        // إنشاء الجداول
+        await _run(`CREATE TABLE IF NOT EXISTS member_cards (
+          chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL,
+          trigger_word TEXT, photo_file_id TEXT, bio TEXT,
+          username TEXT, first_name TEXT, updated_at TIMESTAMP DEFAULT NOW(),
+          PRIMARY KEY(chat_id, user_id))`).catch(() => {});
+        await _run(`CREATE TABLE IF NOT EXISTS member_card_triggers (
+          chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL, trigger_word TEXT NOT NULL,
+          PRIMARY KEY(chat_id, trigger_word))`).catch(() => {});
+
+        // احفظ البطاقة
+        await _run(
+          `INSERT INTO member_cards(chat_id,user_id,trigger_word,photo_file_id,bio,username,first_name)
+           VALUES($1,$2,$3,$4,$5,$6,$7)
+           ON CONFLICT(chat_id,user_id) DO UPDATE SET
+           trigger_word=$3,photo_file_id=$4,bio=$5,username=$6,first_name=$7,updated_at=NOW()`,
+          [chatId, uid, word.toLowerCase(), photoFileId, bio, username, firstName]
+        ).catch(() => {});
+
+        // احفظ الـ trigger
+        await _run(
+          `INSERT INTO member_card_triggers(chat_id,user_id,trigger_word) VALUES($1,$2,$3)
+           ON CONFLICT(chat_id,trigger_word) DO UPDATE SET user_id=$2`,
+          [chatId, uid, word.toLowerCase()]
+        ).catch(() => {});
+
+        await require('../utils/stateManager').delState(uid);
+
+        const confirmText =
+          '✅ *تم حفظ بطاقتك!*\n\n' +
+          '🔑 الكلمة: *' + word + '*\n' +
+          (bio ? '📝 Bio: ' + bio + '\n' : '') +
+          (photoFileId ? '📸 الصورة: محفوظة\n' : '') +
+          '\nلما أحد يكتب *' + word + '* ستظهر بطاقتك!';
+
+        if (photoFileId) {
+          return ctx.replyWithPhoto(photoFileId, { caption: confirmText, parse_mode: 'Markdown' }).catch(() => {});
+        }
+        return ctx.reply(confirmText, { parse_mode: 'Markdown' }).catch(() => {});
+      }
+
       if (s.type === 'member_card_photo') {
         const chatId = s.chatId;
         if (txt === '.') {

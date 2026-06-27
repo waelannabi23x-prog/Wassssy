@@ -863,83 +863,17 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   bot.hears(/^ضف رد$/i, async ctx => {
     if (!isGroup(ctx)) return;
-    const uid = ctx.from.id;
-    const chatId = ctx.chat.id;
-
-    // إنشاء الجدول إذا ما كان موجود
-    await run(`CREATE TABLE IF NOT EXISTS member_cards (
-      chat_id BIGINT NOT NULL,
-      user_id BIGINT NOT NULL,
-      trigger_word TEXT NOT NULL,
-      photo_file_id TEXT,
-      bio TEXT,
-      username TEXT,
-      first_name TEXT,
-      updated_at TIMESTAMP DEFAULT NOW(),
-      PRIMARY KEY(chat_id, user_id)
-    )`).catch(() => {});
-
-    // جيب صورة البروفايل من تيليجرام مباشرة
-    let photoFileId = null;
-    try {
-      const photos = await ctx.telegram.getUserProfilePhotos(uid, { limit: 1 });
-      if (photos.total_count > 0) {
-        photoFileId = photos.photos[0][0].file_id;
-      }
-    } catch(_) {}
-
-    // احفظ البطاقة بالاسم واليوزر تلقائياً
-    const firstName = ctx.from.first_name || 'عضو';
-    const username = ctx.from.username || null;
-    const bio = username ? '@' + username : null;
-
-    await run(
-      `INSERT INTO member_cards(chat_id, user_id, trigger_word, photo_file_id, bio, username, first_name)
-       VALUES($1,$2,$3,$4,$5,$6,$7)
-       ON CONFLICT(chat_id, user_id) DO UPDATE SET
-         trigger_word=$3, photo_file_id=$4, bio=$5, username=$6, first_name=$7, updated_at=NOW()`,
-      [chatId, uid, firstName.toLowerCase(), photoFileId, bio, username, firstName]
+    await require('../utils/stateManager').setState(ctx.from.id, {
+      type: 'member_card_word', chatId: ctx.chat.id
+    });
+    ctx.reply(
+      '💳 *إنشاء ردك الشخصي*\n━━━━━━━━━━━━\n\n' +
+      '✏️ اكتب الكلمة التي تريد الناس يكتبوها لتظهر بطاقتك:\n\n' +
+      '_مثال: هبة، Hiba، papa_',
+      { parse_mode: 'Markdown', reply_to_message_id: ctx.message.message_id }
     ).catch(() => {});
-
-    // أضف username كـ trigger ثاني إذا موجود
-    if (username) {
-      await run(
-        `CREATE TABLE IF NOT EXISTS member_card_triggers (
-          chat_id BIGINT NOT NULL,
-          user_id BIGINT NOT NULL,
-          trigger_word TEXT NOT NULL,
-          PRIMARY KEY(chat_id, trigger_word)
-        )`
-      ).catch(() => {});
-      await run(
-        `INSERT INTO member_card_triggers(chat_id, user_id, trigger_word) VALUES($1,$2,$3)
-         ON CONFLICT DO NOTHING`,
-        [chatId, uid, username.toLowerCase()]
-      ).catch(() => {});
-      await run(
-        `INSERT INTO member_card_triggers(chat_id, user_id, trigger_word) VALUES($1,$2,$3)
-         ON CONFLICT DO NOTHING`,
-        [chatId, uid, firstName.toLowerCase()]
-      ).catch(() => {});
-    }
-
-    const confirmText =
-      '✅ *تم تسجيل بطاقتك!*\n\n' +
-      '👤 الاسم: *' + firstName + '*\n' +
-      (username ? '🔗 اليوزر: @' + username + '\n' : '') +
-      (photoFileId ? '📸 الصورة: محفوظة\n' : '📸 الصورة: لا توجد صورة بروفايل\n') +
-      '\nلما أحد يكتب *' + firstName + '* في القروب سيظهر ردك تلقائياً!';
-
-    if (photoFileId) {
-      ctx.replyWithPhoto(photoFileId, {
-        caption: confirmText,
-        parse_mode: 'Markdown',
-        reply_to_message_id: ctx.message.message_id
-      }).catch(() => {});
-    } else {
-      ctx.reply(confirmText, { parse_mode: 'Markdown', reply_to_message_id: ctx.message.message_id }).catch(() => {});
-    }
   });
+
 
   bot.hears(/^[+＋]\s*(.+)/, async ctx => {
     if (!isGroup(ctx)) return;
