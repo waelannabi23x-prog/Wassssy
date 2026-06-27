@@ -804,16 +804,18 @@ module.exports.registerCallbacks = function(bot, deps) {
 
         // ── قائمة خيارات الكتم ──
         if (data.startsWith('grp_mute_menu_')) {
-          const uid2 = parseInt(data.replace('grp_mute_menu_', ''));
+          const _mp = data.replace('grp_mute_menu_', '').split('_');
+          const uid2 = parseInt(_mp[0]);
+          const cid2 = parseInt(_mp[1]) || 0;
           const kb = [[
-            { text: '5 دقائق',  callback_data: 'grp_mute_5_'  + uid2 },
-            { text: '30 دقيقة', callback_data: 'grp_mute_30_' + uid2 },
+            { text: '5 دقائق',  callback_data: 'grp_mute_5_'    + uid2 + '_' + cid2 },
+            { text: '30 دقيقة', callback_data: 'grp_mute_30_'   + uid2 + '_' + cid2 },
           ],[
-            { text: 'ساعة',     callback_data: 'grp_mute_60_'  + uid2 },
-            { text: '6 ساعات',  callback_data: 'grp_mute_360_' + uid2 },
+            { text: 'ساعة',     callback_data: 'grp_mute_60_'   + uid2 + '_' + cid2 },
+            { text: '6 ساعات',  callback_data: 'grp_mute_360_'  + uid2 + '_' + cid2 },
           ],[
-            { text: 'يوم كامل', callback_data: 'grp_mute_1440_' + uid2 },
-            { text: '❌ إلغاء',  callback_data: 'grp_cancel' },
+            { text: 'يوم كامل', callback_data: 'grp_mute_1440_' + uid2 + '_' + cid2 },
+            { text: 'الغاء',    callback_data: 'grp_cancel' },
           ]];
           return ctx.editMessageReplyMarkup({ inline_keyboard: kb }).catch(() => ctx.answerCbQuery('').catch(() => {}));
         }
@@ -823,13 +825,14 @@ module.exports.registerCallbacks = function(bot, deps) {
           const parts = data.replace('grp_mute_', '').split('_');
           const mins  = parseInt(parts[0]);
           const uid2  = parseInt(parts[1]);
+          const cid2  = parseInt(parts[2]) || ctx.chat?.id;
           const { muteMember } = require('../handlers/group_admin');
-          await muteMember(ctx, ctx.chat.id, uid2, mins).catch(() => {});
+          await muteMember(ctx, cid2, uid2, mins).catch(() => {});
           const label = mins < 60 ? mins + ' دقيقة' : (mins/60) + ' ساعة';
           await ctx.editMessageReplyMarkup({ inline_keyboard: [[
-            { text: '🔊 رفع الكتم', callback_data: 'grp_unmute_' + uid2 }
+            { text: 'رفع الكتم', callback_data: 'grp_unmute_' + uid2 + '_' + cid2 }
           ]]}).catch(() => {});
-          return ctx.answerCbQuery('🔇 تم الكتم ' + label).catch(() => {});
+          return ctx.answerCbQuery('تم الكتم ' + label).catch(() => {});
         }
 
         // ── تأكيد الحظر ──
