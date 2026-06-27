@@ -941,6 +941,8 @@ function setupGroupCommands(bot) {
       bio = userChat.bio || null;
     } catch(_) {}
     const { run: _run } = require('../database/db');
+    // احذف الكلمة القديمة أولاً — كل مستخدم رد واحد فقط
+    await _run('DELETE FROM member_card_triggers WHERE chat_id=$1 AND user_id=$2', [ctx.chat.id, uid]).catch(() => {});
     await _run(
       `INSERT INTO member_cards(chat_id,user_id,trigger_word,photo_file_id,bio,username,first_name)
        VALUES($1,$2,$3,$4,$5,$6,$7)
