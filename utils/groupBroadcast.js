@@ -88,8 +88,8 @@ async function broadcastToGroups(bot, opts = {}) {
 
   // جلب القروبات المستهدفة
   const groups = specialtyId
-    ? await all('SELECT chat_id FROM group_chats WHERE specialty_id=$1', [specialtyId])
-    : await all('SELECT chat_id FROM group_chats');
+    ? await all('SELECT chat_id FROM group_chats WHERE specialty_id=$1 AND is_active=true', [specialtyId])
+    : await all('SELECT chat_id FROM group_chats WHERE is_active=true');
 
   if (!groups.length) return { sent: 0, fail: 0, fatal: 0, total: 0, duration: 0 };
 
