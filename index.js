@@ -613,10 +613,6 @@ async function launch() {
                   const _kb = { inline_keyboard: [[
                     { text: '👑 أضفني كـ مشرف 🛡️', url: 'https://t.me/' + un + '?startgroup=true&admin=delete_messages+restrict_members+pin_messages+invite_users+manage_chat' },
                   ]]};
-                  await ctx.telegram.sendMessage(chatId,
-                    '👋 مرحباً! أنا *' + (un || 'البوت') + '*\n\n❌ تم إضافتي بدون صلاحيات ادمين.\n\n👇 اضغط لإعادة إضافتي كمشرف:',
-                    { parse_mode: 'Markdown', reply_markup: _kb }
-                  ).catch(() => {});
                   await ctx.telegram.sendMessage(addedBy.id,
                     '⚠️ أضفتني في *' + title + '* بدون صلاحيات ادمين!\n\n👇 اضغط لإعادة إضافتي كمشرف:',
                     { parse_mode: 'Markdown', reply_markup: _kb }
