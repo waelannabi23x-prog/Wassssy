@@ -139,11 +139,16 @@ const PERMS_DEF = [
 
 async function buildPermsPanel(telegram, uid, chatId) {
   const member = await telegram.getChatMember(chatId, uid).catch(() => null);
-  const perms = member?.permissions || {};
+  // الصلاحيات تجي مباشرة على member للأعضاء العاديين
+  function getPerm(key) {
+    if (member?.permissions && member.permissions[key] !== undefined) return member.permissions[key] !== false;
+    if (member?.[key] !== undefined) return member[key] !== false;
+    return true; // افتراضي: مسموح
+  }
 
   let t = '🎛 *الصلاحيات*\n━━━━━━━━━━━━━━━━━━\n\n';
   const rows = PERMS_DEF.map(p => {
-    const val = perms[p.key] !== false;
+    const val = getPerm(p.key);
     t += (val ? '✅' : '⬜') + ' ' + p.label + '\n';
     return [{ text: (val ? '✅ ' : '⬜ ') + p.label, callback_data: 'inf_ptog_' + p.key + '_' + uid + '_' + chatId }];
   });
@@ -391,9 +396,12 @@ async function handleCallback(ctx, data) {
       const PERM_KEYS = ['can_send_messages','can_send_photos','can_send_videos',
         'can_send_other_messages','can_send_polls','can_add_web_page_previews',
         'can_invite_users','can_pin_messages'];
-      const perms = member?.permissions || {};
       const cur = {};
-      for (const k of PERM_KEYS) cur[k] = perms[k] !== false;
+      for (const k of PERM_KEYS) {
+        if (member?.permissions?.[k] !== undefined) cur[k] = member.permissions[k] !== false;
+        else if (member?.[k] !== undefined) cur[k] = member[k] !== false;
+        else cur[k] = true;
+      }
       const newVal = !cur[perm];
       const updated = { ...cur, [perm]: newVal };
       await ctx.telegram.restrictChatMember(chatId, uid, { permissions: updated });
