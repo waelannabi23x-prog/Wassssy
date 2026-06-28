@@ -847,6 +847,36 @@ module.exports.registerCallbacks = function(bot, deps) {
         return ctx.answerCbQuery('').catch(() => {});
       }
 
+      // grp_kick_ handler
+      if (data.startsWith('grp_kick_')) {
+        const parts = data.replace('grp_kick_', '').split('_');
+        const uid2 = parseInt(parts[0]);
+        const cid2 = parseInt(parts[1]) || ctx.chat?.id;
+        try {
+          await ctx.telegram.banChatMember(cid2, uid2);
+          await ctx.telegram.unbanChatMember(cid2, uid2);
+          return ctx.editMessageText('🦵 *تم الطرد*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '🚫 حظر', callback_data: 'grp_ban_now_' + uid2 }]] } }).catch(() => {});
+        } catch(e) { return ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
+      }
+
+      // grp_violations_ handler
+      if (data.startsWith('grp_violations_')) {
+        const parts = data.replace('grp_violations_', '').split('_');
+        const uid2 = parseInt(parts[0]);
+        const cid2 = parseInt(parts[1]);
+        const { get: _g2, run: _r2 } = require('../database/db');
+        const vio = await _g2('SELECT violations FROM grp_member_stats WHERE chat_id=$1 AND user_id=$2', [cid2, uid2]).catch(() => null);
+        const cnt = vio?.violations || 0;
+        const warns = await _g2('SELECT COUNT(*) as c FROM group_warns WHERE chat_id=$1 AND user_id=$2', [cid2, uid2]).then(r => r?.c || 0).catch(() => 0);
+        const txt = '🛡 *مخالفات الحماية*\n━━━━━━━━━━━━\n\n' +
+          '🔴 مخالفات الفلاتر: *' + cnt + '*\n' +
+          '⚠️ الإنذارات: *' + warns + '/3*';
+        const kb = [[
+          { text: '♻️ تصفير المخالفات', callback_data: 'gpq_reset_' + uid2 + '_' + cid2 },
+        ]];
+        return ctx.editMessageText(txt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: kb } }).catch(() => {});
+      }
+
       // gpq_ تشتغل في الخاص والقروب
       if (data.startsWith('gpq_')) {
         const _gpqFn = _getPrefixHandler(data);
