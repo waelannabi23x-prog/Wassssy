@@ -850,6 +850,13 @@ module.exports.registerCallbacks = function(bot, deps) {
         return ctx.answerCbQuery('').catch(() => {});
       }
 
+      // gpq_ تشتغل في الخاص والقروب
+      if (data.startsWith('gpq_')) {
+        const _gpqFn = _getPrefixHandler(data);
+        if (_gpqFn) return _gpqFn(ctx, data);
+        return;
+      }
+
       if (ctx.chat?.type !== 'private') {
         if (data.startsWith('grp_main_')) {
           const chatId = data.replace('grp_main_', '');
