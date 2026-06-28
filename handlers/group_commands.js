@@ -559,32 +559,82 @@ function setupGroupCommands(bot) {
       }
     }
 
-    // أرسل رسالة القروب بدون أزرار
+    const proDb = require('../database/group_pro_db');
+    const rolesDb = require('./group_roles');
+    const [violations, proRole, msgCount, approved] = await Promise.all([
+      proDb.getViolationCount(chatId, target.id, 24).catch(() => 0),
+      rolesDb.getEffectiveRole(ctx, chatId, target.id).catch(() => null),
+      dbGet('SELECT msg_count FROM group_members WHERE chat_id=$1 AND user_id=$2', [chatId, target.id]).catch(() => null),
+      dbGet('SELECT 1 FROM grp_approved WHERE chat_id=$1 AND user_id=$2', [chatId, target.id]).catch(() => null),
+    ]);
+
+    if (proRole) txt += "🎭 الرتبة: *" + rolesDb.roleLabel(proRole) + "*\n";
+    if (violations > 0) txt += "🛡 مخالفات (24س): *" + violations + "*\n";
+    if (msgCount && msgCount.msg_count) txt += "💬 الرسائل: *" + Number(msgCount.msg_count).toLocaleString() + "*\n";
+    if (approved) txt += "✅ مستثنى من الحماية\n";
+
     ctx.reply(txt, {
       parse_mode: "Markdown",
       reply_to_message_id: ctx.message?.reply_to_message?.message_id,
       disable_web_page_preview: true,
     }).catch(() => {});
 
-    // أرسل لوحة الإجراءات للمشرف في الخاص
-    if (kb.length && isReqAdm) {
+    if (isReqAdm && target.id !== ctx.from.id && !isOwner) {
       const adminId = ctx.from.id;
       const pvTxt =
-        "👤 *" + name + "*\n" +
-        "🆔 `" + target.id + "`" + (target.username ? " • @" + target.username : "") + "\n" +
-        "🎭 " + (isOwner ? "👑 صاحب القروب" : isAdmTarget ? "🛡️ مشرف" : "👤 عضو") + "\n" +
-        "⚠️ التحذيرات: *" + warnCnt + "/3*\n\n" +
-        "_اختر الإجراء:_";
+        "⚡ *لوحة التحكم بالعضو*\n━━━━━━━━━━━━━━━\n\n" +
+        "👤 [" + name + "](tg://user?id=" + target.id + ")\n" +
+        "🆔 `" + target.id + "`" + (target.username ? "  @" + target.username : "") + "\n" +
+        "📊 الحالة: " + (statusMap[member && member.status] || "غير معروف") + "\n" +
+        (proRole ? "🎭 الرتبة: *" + rolesDb.roleLabel(proRole) + "*\n" : "") +
+        "⚠️ الإنذارات: *" + warnCnt + "*  🛡 المخالفات: *" + violations + "*\n" +
+        (msgCount && msgCount.msg_count ? "💬 الرسائل: *" + Number(msgCount.msg_count).toLocaleString() + "*\n" : "") +
+        "\n👇 اختر الإجراء:";
+
+      const pvKb = [];
+      pvKb.push([
+        { text: "🚫 حظر", callback_data: "grp_ban_confirm_" + target.id + "_" + chatId },
+        { text: "🦵 طرد", callback_data: "grp_kick_" + target.id + "_" + chatId },
+      ]);
+      pvKb.push([
+        { text: "🔇 كتم", callback_data: "grp_mute_menu_" + target.id + "_" + chatId },
+        { text: "⚠️ إنذار", callback_data: "grp_warn1_" + target.id + "_" + chatId },
+      ]);
+      pvKb.push([
+        { text: "🔊 رفع كتم", callback_data: "grp_unrestrict_" + target.id + "_" + chatId },
+        { text: "📋 الإنذارات", callback_data: "grp_warns_show_" + target.id + "_" + chatId },
+      ]);
+      pvKb.push([
+        { text: "🎛 الصلاحيات", callback_data: "grp_perms_" + target.id + "_" + chatId },
+        { text: "🛡 مخالفات الحماية", callback_data: "grp_violations_" + target.id + "_" + chatId },
+      ]);
+      pvKb.push([
+        { text: "🎭 رتبة +", callback_data: "gpq_role_up_" + target.id + "_" + chatId },
+        { text: "🎭 رتبة -", callback_data: "gpq_role_down_" + target.id + "_" + chatId },
+      ]);
+      pvKb.push([
+        approved
+          ? { text: "❌ الغاء الاستثناء من الحماية", callback_data: "gpq_unapprove_" + target.id + "_" + chatId }
+          : { text: "✅ استثناء من الحماية", callback_data: "gpq_approve_" + target.id + "_" + chatId },
+      ]);
+      pvKb.push([
+        { text: "👁 مراقبة", callback_data: "gpq_watch_" + target.id + "_" + chatId },
+        { text: "♻️ تصفير", callback_data: "gpq_reset_" + target.id + "_" + chatId },
+      ]);
+      if (isAdmTarget) {
+        pvKb.push([{ text: "⬇️ ازالة من المشرفين", callback_data: "grp_demote_" + target.id + "_" + chatId }]);
+      } else {
+        pvKb.push([{ text: "⬆️ ترقية لمشرف تيليجرام", callback_data: "grp_promote_" + target.id + "_" + chatId }]);
+      }
+
       ctx.telegram.sendMessage(adminId, pvTxt, {
         parse_mode: "Markdown",
-        reply_markup: { inline_keyboard: kb },
-      }).catch(e => {
-        if (e.message?.includes('blocked') || e.message?.includes('not found')) {
-          ctx.reply("⚠️ افتح الخاص مع البوت أولاً!", {
-            reply_to_message_id: ctx.message.message_id,
-            reply_markup: { inline_keyboard: [[{ text: "📨 فتح الخاص", url: "https://t.me/" + (ctx.botInfo?.username || "") }]] }
-          }).catch(() => {});
-        }
+        disable_web_page_preview: true,
+        reply_markup: { inline_keyboard: pvKb },
+      }).catch(() => {
+        ctx.reply("⚠️ افتح الخاص مع البوت اولاً!", {
+          reply_markup: { inline_keyboard: [[{ text: "📨 فتح الخاص", url: "https://t.me/" + (ctx.botInfo?.username || "") }]] }
+        }).catch(() => {});
       });
     }
   });
