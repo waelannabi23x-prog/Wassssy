@@ -342,6 +342,21 @@ setTimeout(async () => {
       chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL, trigger_word TEXT NOT NULL,
       PRIMARY KEY(chat_id, trigger_word))`);
     logger.info('[MemberCards] ✅ Tables ready');
+    // جداول gpq_approve
+    await dbRun(`CREATE TABLE IF NOT EXISTS group_approved (
+      chat_id BIGINT NOT NULL,
+      user_id BIGINT NOT NULL,
+      approved_by BIGINT,
+      approved_at TIMESTAMP DEFAULT NOW(),
+      PRIMARY KEY(chat_id, user_id)
+    )`).catch(() => {});
+    await dbRun(`CREATE TABLE IF NOT EXISTS group_protection_stats (
+      chat_id BIGINT NOT NULL,
+      user_id BIGINT NOT NULL,
+      violations INT DEFAULT 0,
+      last_violation TIMESTAMP,
+      PRIMARY KEY(chat_id, user_id)
+    )`).catch(() => {});
   } catch(e) { logger.error('[MemberCards]', e.message); }
 }, 3000);
 
