@@ -4,6 +4,7 @@ const { showAllMembers, tagAll, muteAll, unmuteAll,
         warnMember, banMember, unbanMember,
         muteMember, unmuteMember } = require('./group_admin');
 const million = require('./million_battle');
+const infoPanel = require('./group_info_panel');
 const { get, all, run } = require('../database/db');
 const { build } = require('../utils/keyboard');
 
@@ -490,153 +491,9 @@ function setupGroupCommands(bot) {
   bot.command("info", async ctx => {
     if (!isGroup(ctx)) return;
     delCmd(ctx);
-    const target   = ctx.message.reply_to_message?.from || ctx.from;
-    const isReqAdm = await isTgAdmin(ctx);
-    const { get: dbGet, all: dbAll } = require("../database/db");
-    const chatId = ctx.chat.id;
-
-    const [member, warnsRow, userRow] = await Promise.all([
-      ctx.telegram.getChatMember(chatId, target.id).catch(() => null),
-      dbGet("SELECT COUNT(*) as c FROM group_warns WHERE chat_id=$1 AND user_id=$2", [chatId, target.id]).catch(() => ({ c:0 })),
-      dbGet("SELECT xp, level, balance, created_at FROM users WHERE id=$1", [target.id]).catch(() => null),
-    ]);
-
-    const statusMap = {
-      member:"عضو 👤", administrator:"مشرف 🛡️", creator:"مؤسس 👑",
-      restricted:"مقيّد 🔒", left:"غادر 🚪", kicked:"محظور 🚫"
-    };
-    const name    = [target.first_name, target.last_name].filter(Boolean).join(" ");
-    const isOwner = member?.status === "creator";
-    const isAdmTarget = ["administrator","creator"].includes(member?.status);
-    const warnCnt = parseInt(warnsRow?.c || 0);
-
-    // تاريخ الانضمام
-    let joinDate = "";
-    if (member?.status === "restricted" && member?.until_date) {
-      joinDate = new Date(member.until_date * 1000).toLocaleDateString("ar");
-    } else if (userRow?.created_at) {
-      joinDate = new Date(userRow.created_at).toLocaleDateString("ar-DZ");
-    }
-
-    // الدور
-    let role = isOwner ? "👑 صاحب القروب" : isAdmTarget ? "🛡️ مشرف" : "👤 عضو";
-
-    let txt = "👤 *معلومات العضو*\n━━━━━━━━━━━━━━━\n\n";
-    txt += "🪪 الاسم: [" + name + "](tg://user?id=" + target.id + ")\n";
-    if (target.username) txt += "🔗 يوزر: @" + target.username + "\n";
-    txt += "🆔 الرقم التعريفي: `" + target.id + "`\n";
-    txt += "🎭 الدور: " + role + "\n";
-    txt += "👁 الحالة: " + (statusMap[member?.status] || "غير معروف") + "\n";
-    if (joinDate) txt += "📅 الانضمام: " + joinDate + "\n";
-    txt += "\n📊 *الإحصائيات:*\n";
-    txt += "⚠️ الإنذارات: *" + warnCnt + "/3*\n";
-    if (userRow) {
-      if (userRow.balance != null) txt += "💰 الرصيد: *" + Number(userRow.balance).toLocaleString() + "* $\n";
-      if (userRow.xp != null) txt += "🏆 XP: *" + userRow.xp + "* | المستوى: *" + (userRow.level||0) + "*\n";
-    }
-
-    const kb = [];
-    if (isReqAdm && target.id !== ctx.from.id && !isOwner) {
-      kb.push([
-        { text: "كتم",         callback_data: "grp_mute_menu_" + target.id + "_" + chatId },
-        { text: "حظر",         callback_data: "grp_ban_confirm_" + target.id + "_" + chatId },
-      ]);
-      kb.push([
-        { text: "الغاء الكتم", callback_data: "grp_unrestrict_" + target.id + "_" + chatId },
-        { text: "انذار",       callback_data: "grp_warn1_" + target.id + "_" + chatId },
-      ]);
-      kb.push([
-        { text: "اذونات",      callback_data: "grp_perms_" + target.id + "_" + chatId },
-      ]);
-      if (isAdmTarget) {
-        kb.push([
-          { text: "ازالة من المشرفين", callback_data: "grp_demote_" + target.id + "_" + chatId },
-        ]);
-      } else {
-        kb.push([
-          { text: "ترقية لمشرف", callback_data: "grp_promote_" + target.id + "_" + chatId },
-        ]);
-      }
-    }
-
-    const proDb = require('../database/group_pro_db');
-    const rolesDb = require('./group_roles');
-    const [violations, proRole, msgCount, approved] = await Promise.all([
-      proDb.getViolationCount(chatId, target.id, 24).catch(() => 0),
-      rolesDb.getEffectiveRole(ctx, chatId, target.id).catch(() => null),
-      dbGet('SELECT msg_count FROM group_members WHERE chat_id=$1 AND user_id=$2', [chatId, target.id]).catch(() => null),
-      dbGet('SELECT 1 FROM grp_approved WHERE chat_id=$1 AND user_id=$2', [chatId, target.id]).catch(() => null),
-    ]);
-
-    if (proRole) txt += "🎭 الرتبة: *" + rolesDb.roleLabel(proRole) + "*\n";
-    if (violations > 0) txt += "🛡 مخالفات (24س): *" + violations + "*\n";
-    if (msgCount && msgCount.msg_count) txt += "💬 الرسائل: *" + Number(msgCount.msg_count).toLocaleString() + "*\n";
-    if (approved) txt += "✅ مستثنى من الحماية\n";
-
-    ctx.reply(txt, {
-      parse_mode: "Markdown",
-      reply_to_message_id: ctx.message?.reply_to_message?.message_id,
-      disable_web_page_preview: true,
-    }).catch(() => {});
-
-    if (isReqAdm && target.id !== ctx.from.id && !isOwner) {
-      const adminId = ctx.from.id;
-      const pvTxt =
-        "⚡ *لوحة التحكم بالعضو*\n━━━━━━━━━━━━━━━\n\n" +
-        "👤 [" + name + "](tg://user?id=" + target.id + ")\n" +
-        "🆔 `" + target.id + "`" + (target.username ? "  @" + target.username : "") + "\n" +
-        "📊 الحالة: " + (statusMap[member && member.status] || "غير معروف") + "\n" +
-        (proRole ? "🎭 الرتبة: *" + rolesDb.roleLabel(proRole) + "*\n" : "") +
-        "⚠️ الإنذارات: *" + warnCnt + "*  🛡 المخالفات: *" + violations + "*\n" +
-        (msgCount && msgCount.msg_count ? "💬 الرسائل: *" + Number(msgCount.msg_count).toLocaleString() + "*\n" : "") +
-        "\n👇 اختر الإجراء:";
-
-      const pvKb = [];
-      pvKb.push([
-        { text: "🚫 حظر", callback_data: "grp_ban_confirm_" + target.id + "_" + chatId },
-        { text: "🦵 طرد", callback_data: "grp_kick_" + target.id + "_" + chatId },
-      ]);
-      pvKb.push([
-        { text: "🔇 كتم", callback_data: "grp_mute_menu_" + target.id + "_" + chatId },
-        { text: "⚠️ إنذار", callback_data: "grp_warn1_" + target.id + "_" + chatId },
-      ]);
-      pvKb.push([
-        { text: "🔊 رفع كتم", callback_data: "grp_unrestrict_" + target.id + "_" + chatId },
-        { text: "📋 الإنذارات", callback_data: "grp_warns_show_" + target.id + "_" + chatId },
-      ]);
-      pvKb.push([
-        { text: "🎛 الصلاحيات", callback_data: "grp_perms_" + target.id + "_" + chatId },
-        { text: "🛡 مخالفات الحماية", callback_data: "grp_violations_" + target.id + "_" + chatId },
-      ]);
-      pvKb.push([
-        { text: "🎭 رتبة +", callback_data: "gpq_role_up_" + target.id + "_" + chatId },
-        { text: "🎭 رتبة -", callback_data: "gpq_role_down_" + target.id + "_" + chatId },
-      ]);
-      pvKb.push([
-        approved
-          ? { text: "❌ الغاء الاستثناء من الحماية", callback_data: "gpq_unapprove_" + target.id + "_" + chatId }
-          : { text: "✅ استثناء من الحماية", callback_data: "gpq_approve_" + target.id + "_" + chatId },
-      ]);
-      pvKb.push([
-        { text: "👁 مراقبة", callback_data: "gpq_watch_" + target.id + "_" + chatId },
-        { text: "♻️ تصفير", callback_data: "gpq_reset_" + target.id + "_" + chatId },
-      ]);
-      if (isAdmTarget) {
-        pvKb.push([{ text: "⬇️ ازالة من المشرفين", callback_data: "grp_demote_" + target.id + "_" + chatId }]);
-      } else {
-        pvKb.push([{ text: "⬆️ ترقية لمشرف تيليجرام", callback_data: "grp_promote_" + target.id + "_" + chatId }]);
-      }
-
-      ctx.telegram.sendMessage(adminId, pvTxt, {
-        parse_mode: "Markdown",
-        disable_web_page_preview: true,
-        reply_markup: { inline_keyboard: pvKb },
-      }).catch(() => {
-        ctx.reply("⚠️ افتح الخاص مع البوت اولاً!", {
-          reply_markup: { inline_keyboard: [[{ text: "📨 فتح الخاص", url: "https://t.me/" + (ctx.botInfo?.username || "") }]] }
-        }).catch(() => {});
-      });
-    }
+    if (!await isTgAdmin(ctx)) return;
+    const target = ctx.message.reply_to_message?.from || ctx.from;
+    await infoPanel.sendInfoPanel(ctx, ctx.chat.id, target.id, ctx.from.id);
   });
 
 

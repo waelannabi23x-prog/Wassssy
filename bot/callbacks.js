@@ -408,6 +408,7 @@ module.exports.registerCallbacks = function(bot, deps) {
         return ctx.deleteMessage().catch(() => {});
       }
     }},
+    { p: 'inf_',        fn: (ctx, d) => require('../handlers/group_info_panel').handleCallback(ctx, d) },
     { p: 'nat_',        fn: (ctx, d) => require('../handlers/nations').handleCallback(ctx, d) },
     { p: 'nation_',     fn: (ctx, d) => require('../handlers/nations').handleCallback(ctx, d) },
     { p: 'gpx_',        fn: (ctx, d) => require('../handlers/group_pro_panel').handleCallback(ctx, d) },
@@ -845,6 +846,13 @@ module.exports.registerCallbacks = function(bot, deps) {
       if (data === 'grp_search_close') {
         await ctx.deleteMessage().catch(() => {});
         return ctx.answerCbQuery('').catch(() => {});
+      }
+
+      // inf_ تشتغل في الخاص والقروب
+      if (data.startsWith('inf_')) {
+        const _infFn = _getPrefixHandler(data);
+        if (_infFn) return _infFn(ctx, data);
+        return;
       }
 
       // grp_kick_ handler
