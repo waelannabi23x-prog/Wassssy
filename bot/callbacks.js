@@ -232,6 +232,185 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'grp_main_',   fn: (ctx, d) => { const chatId = d.replace('grp_main_',''); const { showAllMembers } = require('../handlers/group_admin'); return showAllMembers(ctx, chatId); } },
     { p: 'grp_main',    fn: (ctx, d) => { const uid = ctx.uid || ctx.from?.id; const isOwner = uid === parseInt(process.env.OWNER_ID); return isOwner ? groupPanel.showMainMenu(ctx) : groupPanel.showMyGroups(ctx); } },
     { p: 'gp_',         fn: (ctx, d) => groupPanel.handleCallback(ctx, d) },
+    { p: 'gpq_',        fn: async (ctx, d) => {
+      const parts = d.replace('gpq_', '').split('_');
+      // صيغتان: gpq_action_chatId_userId أو gpq_action_userId_chatId
+      const action = parts[0];
+      const p1 = parseInt(parts[1]);
+      const p2 = parseInt(parts[2]);
+      // chatId هو الأكبر سالباً أو الأكبر عدداً
+      const chatId  = p1 < 0 ? p1 : p2;
+      const userId  = p1 < 0 ? p2 : p1;
+      const { run: _r, all: _a, get: _g } = require('../database/db');
+      const { muteMember, unmuteMember } = require('../handlers/group_admin');
+
+      ctx.answerCbQuery('').catch(() => {});
+
+      if (action === 'ban') {
+        try {
+          await ctx.telegram.banChatMember(chatId, userId);
+          return ctx.editMessageText('🚫 *تم الحظر*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '🔓 رفع الحظر', callback_data: 'gpq_unban_' + chatId + '_' + userId }]] } }).catch(() => {});
+        } catch(e) { return ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
+      }
+
+      if (action === 'unban') {
+        try {
+          await ctx.telegram.unbanChatMember(chatId, userId);
+          return ctx.editMessageText('✅ *رُفع الحظر*', { parse_mode: 'Markdown' }).catch(() => {});
+        } catch(e) { return ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
+      }
+
+      if (action === 'kick') {
+        try {
+          await ctx.telegram.banChatMember(chatId, userId);
+          await ctx.telegram.unbanChatMember(chatId, userId);
+          return ctx.editMessageText('🦵 *تم الطرد*', { parse_mode: 'Markdown' }).catch(() => {});
+        } catch(e) { return ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
+      }
+
+      if (action === 'mute') {
+        // عرض خيارات المدة
+        const muteKb = [
+          [{ text: '5د', callback_data: 'gpq_muted_5_' + chatId + '_' + userId }, { text: '15د', callback_data: 'gpq_muted_15_' + chatId + '_' + userId }, { text: '30د', callback_data: 'gpq_muted_30_' + chatId + '_' + userId }],
+          [{ text: '1س', callback_data: 'gpq_muted_60_' + chatId + '_' + userId }, { text: '6س', callback_data: 'gpq_muted_360_' + chatId + '_' + userId }, { text: '24س', callback_data: 'gpq_muted_1440_' + chatId + '_' + userId }],
+          [{ text: '◀️ رجوع', callback_data: 'gpq_back_' + chatId + '_' + userId }],
+        ];
+        return ctx.editMessageReplyMarkup({ inline_keyboard: muteKb }).catch(() => {});
+      }
+
+      if (action === 'muted') {
+        const mins = parseInt(parts[1]);
+        const cid2 = parseInt(parts[2]);
+        const uid2 = parseInt(parts[3]);
+        try {
+          await muteMember(ctx, cid2, uid2, mins);
+          const label = mins < 60 ? mins + 'د' : (mins/60) + 'س';
+          return ctx.editMessageText('🔇 *تم الكتم ' + label + '*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '🔊 رفع الكتم', callback_data: 'gpq_unmute_' + cid2 + '_' + uid2 }]] } }).catch(() => {});
+        } catch(e) { return ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
+      }
+
+      if (action === 'unmute') {
+        try {
+          await unmuteMember(ctx, chatId, userId);
+          return ctx.editMessageText('🔊 *رُفع الكتم*', { parse_mode: 'Markdown' }).catch(() => {});
+        } catch(e) { return ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
+      }
+
+      if (action === 'warn') {
+        await _r('INSERT INTO group_warns(chat_id,user_id,reason,warned_by) VALUES($1,$2,$3,$4)', [chatId, userId, 'إنذار يدوي', ctx.from.id]).catch(() => {});
+        const cnt = await _g('SELECT COUNT(*) as c FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).then(r => r?.c || 0).catch(() => 0);
+        if (parseInt(cnt) >= 3) {
+          await ctx.telegram.banChatMember(chatId, userId).catch(() => {});
+          await _r('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => {});
+          return ctx.editMessageText('🚫 *تم الحظر تلقائياً بعد 3 إنذارات!*', { parse_mode: 'Markdown' }).catch(() => {});
+        }
+        const warnKb = [
+          [{ text: '➕ إنذار', callback_data: 'gpq_warn_' + chatId + '_' + userId }, { text: '➖ إنذار', callback_data: 'gpq_unwarn_' + chatId + '_' + userId }],
+          [{ text: '◀️ رجوع', callback_data: 'gpq_back_' + chatId + '_' + userId }],
+        ];
+        return ctx.editMessageText('⚠️ *الإنذارات: ' + cnt + '/3*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: warnKb } }).catch(() => {});
+      }
+
+      if (action === 'unwarn') {
+        const last = await _g('SELECT id FROM group_warns WHERE chat_id=$1 AND user_id=$2 ORDER BY id DESC LIMIT 1', [chatId, userId]).catch(() => null);
+        if (last) await _r('DELETE FROM group_warns WHERE id=$1', [last.id]).catch(() => {});
+        const cnt = await _g('SELECT COUNT(*) as c FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).then(r => r?.c || 0).catch(() => 0);
+        return ctx.answerCbQuery('✅ الإنذارات: ' + cnt + '/3').catch(() => {});
+      }
+
+      if (action === 'reset') {
+        await _r('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => {});
+        await _r('UPDATE group_protection_stats SET violations=0 WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => {});
+        return ctx.editMessageText('♻️ *تم تصفير المخالفات والإنذارات*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '◀️ رجوع', callback_data: 'gpq_back_' + chatId + '_' + userId }]] } }).catch(() => {});
+      }
+
+      if (action === 'approve') {
+        await _r('INSERT INTO group_approved(chat_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [chatId, userId]).catch(() => {});
+        return ctx.answerCbQuery('✅ تم الاستثناء من الحماية').catch(() => {});
+      }
+
+      if (action === 'unapprove') {
+        await _r('DELETE FROM group_approved WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => {});
+        return ctx.answerCbQuery('✅ تم إلغاء الاستثناء').catch(() => {});
+      }
+
+      if (action === 'watch') {
+        await _r('INSERT INTO group_watching(chat_id,user_id,admin_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [chatId, userId, ctx.from.id]).catch(() => {});
+        return ctx.answerCbQuery('👁 تم تفعيل المراقبة').catch(() => {});
+      }
+
+      if (action === 'perms') {
+        try {
+          const member = await ctx.telegram.getChatMember(chatId, userId);
+          const p = member;
+          const can = key => p[key] !== false;
+          const permsKb = [
+            [{ text: (can('can_send_messages') ? '✅' : '❌') + ' الرسائل', callback_data: 'gpq_ptog_can_send_messages_' + chatId + '_' + userId }],
+            [{ text: (can('can_send_media_messages') ? '✅' : '❌') + ' الوسائط', callback_data: 'gpq_ptog_can_send_media_messages_' + chatId + '_' + userId }],
+            [{ text: (can('can_send_polls') ? '✅' : '❌') + ' الاستطلاعات', callback_data: 'gpq_ptog_can_send_polls_' + chatId + '_' + userId }],
+            [{ text: (can('can_add_web_page_previews') ? '✅' : '❌') + ' معاينة الروابط', callback_data: 'gpq_ptog_can_add_web_page_previews_' + chatId + '_' + userId }],
+            [{ text: (can('can_invite_users') ? '✅' : '❌') + ' دعوة أعضاء', callback_data: 'gpq_ptog_can_invite_users_' + chatId + '_' + userId }],
+            [{ text: (can('can_pin_messages') ? '✅' : '❌') + ' تثبيت رسائل', callback_data: 'gpq_ptog_can_pin_messages_' + chatId + '_' + userId }],
+            [
+              { text: '💾 حفظ', callback_data: 'gpq_psave_' + chatId + '_' + userId },
+              { text: '◀️ رجوع', callback_data: 'gpq_back_' + chatId + '_' + userId },
+            ],
+          ];
+          return ctx.editMessageReplyMarkup({ inline_keyboard: permsKb }).catch(() => {});
+        } catch(e) { return ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
+      }
+
+      if (action === 'ptog') {
+        const permKey = parts[1];
+        const cid2 = parseInt(parts[2]);
+        const uid2 = parseInt(parts[3]);
+        const curKb = ctx.callbackQuery?.message?.reply_markup?.inline_keyboard || [];
+        const newKb = curKb.map(row => row.map(btn => {
+          if (btn.callback_data === d) {
+            const isOn = btn.text.startsWith('✅');
+            return { ...btn, text: (isOn ? '❌' : '✅') + btn.text.slice(1) };
+          }
+          return btn;
+        }));
+        return ctx.editMessageReplyMarkup({ inline_keyboard: newKb }).catch(() => {});
+      }
+
+      if (action === 'psave') {
+        const curKb = ctx.callbackQuery?.message?.reply_markup?.inline_keyboard || [];
+        const perms = {};
+        for (const row of curKb) {
+          for (const btn of row) {
+            if (btn.callback_data?.startsWith('gpq_ptog_')) {
+              const key = btn.callback_data.split('_').slice(2, -2).join('_');
+              perms[key] = btn.text.startsWith('✅');
+            }
+          }
+        }
+        try {
+          await ctx.telegram.restrictChatMember(chatId, userId, { permissions: { ...perms, can_send_other_messages: perms.can_send_messages } });
+          return ctx.editMessageText('✅ *تم حفظ الأذونات*', { parse_mode: 'Markdown' }).catch(() => {});
+        } catch(e) { return ctx.answerCbQuery('❌ ' + e.message, { show_alert: true }).catch(() => {}); }
+      }
+
+      if (action === 'back') {
+        // رجوع للوحة الرئيسية
+        const { buildQuickPanel } = require('../handlers/group_pro');
+        try {
+          const panel = await buildQuickPanel(chatId, userId, ctx);
+          return ctx.editMessageText(panel.txt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: panel.kb } }).catch(() => {});
+        } catch(_) {}
+      }
+
+      if (action === 'violations') {
+        const vio = await _g('SELECT violations FROM group_protection_stats WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => null);
+        const cnt = vio?.violations || 0;
+        return ctx.editMessageText('🛡 *مخالفات الحماية: ' + cnt + '*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '♻️ تصفير', callback_data: 'gpq_reset_' + chatId + '_' + userId }, { text: '◀️ رجوع', callback_data: 'gpq_back_' + chatId + '_' + userId }]] } }).catch(() => {});
+      }
+
+      if (action === 'cancel') {
+        return ctx.deleteMessage().catch(() => {});
+      }
+    }},
     { p: 'nat_',        fn: (ctx, d) => require('../handlers/nations').handleCallback(ctx, d) },
     { p: 'nation_',     fn: (ctx, d) => require('../handlers/nations').handleCallback(ctx, d) },
     { p: 'gpx_',        fn: (ctx, d) => require('../handlers/group_pro_panel').handleCallback(ctx, d) },
@@ -1203,7 +1382,8 @@ module.exports.registerCallbacks = function(bot, deps) {
           || data.startsWith('grp_warnmenu_') || data.startsWith('grp_warnback_')
           || data.startsWith('grp_wadd_') || data.startsWith('grp_wdel_')
           || data.startsWith('grp_pall_') || data.startsWith('grp_pnone_')
-          || data.startsWith('grp_unban_') || data.startsWith('grp_unmute_');
+          || data.startsWith('grp_unban_') || data.startsWith('grp_unmute_')
+          || data.startsWith('gpq_');
         if (!_grpOk)
           return ctx.answerCbQuery('👉 استخدم البوت في الخاص', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       }
