@@ -488,15 +488,20 @@ function setupGroupCommands(bot) {
   });
 
   // ══ /info ══
-  bot.command("info", async ctx => {
+  bot.command('info', async ctx => {
     if (!isGroup(ctx)) return;
     delCmd(ctx);
-    if (!await isTgAdmin(ctx)) return;
-    const target = ctx.message.reply_to_message?.from || ctx.from;
-    await infoPanel.sendInfoPanel(ctx, target, ctx.chat.id, ctx.from.id);
+    if (!ctx.isAdmin && !ctx.isOwner) return;
+    const target = ctx.message.reply_to_message?.from;
+    if (!target) {
+      return ctx.reply('↩️ رد على رسالة العضو لعرض معلوماته', {
+        reply_to_message_id: ctx.message.message_id
+      }).catch(() => {});
+    }
+    if (target.is_bot) return ctx.reply('🤖 هذا بوت').catch(() => {});
+    const { sendInfoPanel } = require('../handlers/group_info_panel');
+    await sendInfoPanel(ctx, target, ctx.chat.id, ctx.from.id);
   });
-
-
 
   // ══ /cmds ══
   bot.command(["cmds", "اوامر"], async ctx => {

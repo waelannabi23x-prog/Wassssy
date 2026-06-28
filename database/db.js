@@ -243,6 +243,14 @@ async function initSchema() {
   // migration: created_at في users
   try { if(pg) await pg.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'); } catch(err) { require('./logger').debug('[catch]', err.message); }
 
+  // grp_approved و group_watching
+  try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS grp_approved (
+    chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL, approved_by BIGINT,
+    created_at TIMESTAMP DEFAULT NOW(), PRIMARY KEY(chat_id,user_id))`); } catch(e) {}
+  try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS group_watching (
+    chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL, admin_id BIGINT,
+    created_at TIMESTAMP DEFAULT NOW(), PRIMARY KEY(chat_id,user_id))`); } catch(e) {}
+
   // member_cards migrations
   try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS trigger_word TEXT'); } catch(err) { require('./logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS first_name TEXT'); } catch(err) { require('./logger').debug('[catch]', err.message); }

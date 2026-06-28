@@ -8,6 +8,7 @@ const gamesPanel  = require('../handlers/games_panel');
 const millionGame = require('../handlers/millionaire');
 
 module.exports.registerCallbacks = function(bot, deps) {
+  const { handleCallback: infoCb } = require('../handlers/group_info_panel');
   // استخراج uid و chatId من callback_data بشكل آمن مع chatId السالب
   function extractUidChat(str) {
     // format: uid_chatId حيث chatId قد يكون سالب مثل -1001234567
