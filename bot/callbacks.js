@@ -320,12 +320,12 @@ module.exports.registerCallbacks = function(bot, deps) {
 
       if (action === 'reset') {
         await _r('DELETE FROM group_warns WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => {});
-        await _r('UPDATE group_protection_stats SET violations=0 WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => {});
+        await _r('UPDATE grp_member_stats SET violations=0 WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => {});
         return ctx.editMessageText('♻️ *تم تصفير المخالفات والإنذارات*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '◀️ رجوع', callback_data: 'gpq_back_' + chatId + '_' + userId }]] } }).catch(() => {});
       }
 
       if (action === 'approve') {
-        await _r('INSERT INTO group_approved(chat_id,user_id) VALUES($1,$2) ON CONFLICT DO NOTHING', [chatId, userId]).catch(() => {});
+        await _r('INSERT INTO group_approved(chat_id,user_id,approved_by) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [chatId, userId, ctx.from.id]).catch(() => {});
         return ctx.answerCbQuery('✅ تم الاستثناء من الحماية').catch(() => {});
       }
 
@@ -402,7 +402,7 @@ module.exports.registerCallbacks = function(bot, deps) {
       }
 
       if (action === 'violations') {
-        const vio = await _g('SELECT violations FROM group_protection_stats WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => null);
+        const vio = await _g('SELECT violations FROM grp_member_stats WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => null);
         const cnt = vio?.violations || 0;
         return ctx.editMessageText('🛡 *مخالفات الحماية: ' + cnt + '*', { parse_mode: 'Markdown', reply_markup: { inline_keyboard: [[{ text: '♻️ تصفير', callback_data: 'gpq_reset_' + chatId + '_' + userId }, { text: '◀️ رجوع', callback_data: 'gpq_back_' + chatId + '_' + userId }]] } }).catch(() => {});
       }
