@@ -139,7 +139,7 @@ const PERMS_DEF = [
 
 async function buildPermsPanel(telegram, uid, chatId) {
   const member = await telegram.getChatMember(chatId, uid).catch(() => null);
-  const perms = member?.permissions || member?.user?.permissions || {};
+  const perms = member?.permissions || {};
 
   let t = '🎛 *الصلاحيات*\n━━━━━━━━━━━━━━━━━━\n\n';
   const rows = PERMS_DEF.map(p => {
@@ -388,10 +388,12 @@ async function handleCallback(ctx, data) {
     try {
       const member = await ctx.telegram.getChatMember(chatId, uid).catch(() => null);
       // استخرج الأذونات من member مباشرة (مش من permissions object)
-      const PERM_KEYS = ['can_send_messages','can_send_media_messages','can_send_polls',
-        'can_send_other_messages','can_add_web_page_previews','can_invite_users','can_pin_messages'];
+      const PERM_KEYS = ['can_send_messages','can_send_photos','can_send_videos',
+        'can_send_other_messages','can_send_polls','can_add_web_page_previews',
+        'can_invite_users','can_pin_messages'];
+      const perms = member?.permissions || {};
       const cur = {};
-      for (const k of PERM_KEYS) cur[k] = member?.[k] !== false;
+      for (const k of PERM_KEYS) cur[k] = perms[k] !== false;
       const newVal = !cur[perm];
       const updated = { ...cur, [perm]: newVal };
       await ctx.telegram.restrictChatMember(chatId, uid, { permissions: updated });
@@ -455,19 +457,71 @@ async function handleCallback(ctx, data) {
   // ── مراقبة ──
   if (data.startsWith('inf_watch_')) {
     const { uid, chatId } = parse(data, 'inf_watch_');
-    await run('INSERT INTO group_watching(chat_id,user_id,admin_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [chatId, uid, ctx.from.id]).catch(() => {});
-    return toast(ctx, '👁 بدأت المراقبة على العضو', true);
+    const existing = await get('SELECT 1 FROM group_watching WHERE chat_id=$1 AND user_id=$2', [chatId, uid]).catch(() => null);
+    if (existing) {
+      await run('DELETE FROM group_watching WHERE chat_id=$1 AND user_id=$2', [chatId, uid]).catch(() => {});
+      await toast(ctx, '✅ تم إيقاف المراقبة', true);
+    } else {
+      await run('INSERT INTO group_watching(chat_id,user_id,admin_id) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [chatId, uid, ctx.from.id]).catch(() => {});
+      await toast(ctx, '👁 بدأت المراقبة على العضو', true);
+    }
+    const d = await loadMemberData(ctx.telegram, chatId, uid);
+    return edit(ctx, mainText(d, uid), mainKb(uid, chatId, d));
   }
 
   // ── ترقية/تنزيل TG ──
-  if (data.startsWith('inf_promote_')) {
+  if (data.startsWith('inf_promote_') && !data.startsWith('inf_promote_c_')) {
     const { uid, chatId } = parse(data, 'inf_promote_');
+    const p2 = uid + '_' + chatId;
+    return edit(ctx,
+      '⬆️ *ترقية لمشرف*\n━━━━━━━━━━━━━━━━━━\n\nاختر الصلاحيات:',
+      { inline_keyboard: [
+        [{ text: '✅ حذف رسائل',   callback_data: 'inf_aptog_del_'  + p2 },
+         { text: '✅ حظر أعضاء',   callback_data: 'inf_aptog_ban_'  + p2 }],
+        [{ text: '✅ تثبيت',       callback_data: 'inf_aptog_pin_'  + p2 },
+         { text: '⬜ إضافة مشرفين',callback_data: 'inf_aptog_prom_' + p2 }],
+        [{ text: '✅ إدارة القروب', callback_data: 'inf_aptog_mgmt_' + p2 },
+         { text: '✅ دعوة',        callback_data: 'inf_aptog_inv_'  + p2 }],
+        [{ text: '✅ تأكيد الترقية',callback_data: 'inf_promote_c_' + p2 }],
+        [backBtn(uid, chatId)],
+      ]}
+    );
+  }
+  if (data.startsWith('inf_promote_c_')) {
+    const { uid, chatId } = parse(data, 'inf_promote_c_');
+    const kb = ctx.callbackQuery?.message?.reply_markup?.inline_keyboard || [];
+    const permsMap = {
+      'inf_aptog_del_':  'can_delete_messages',
+      'inf_aptog_ban_':  'can_restrict_members',
+      'inf_aptog_pin_':  'can_pin_messages',
+      'inf_aptog_prom_': 'can_promote_members',
+      'inf_aptog_mgmt_': 'can_manage_chat',
+      'inf_aptog_inv_':  'can_invite_users',
+    };
+    const rights = { can_manage_chat: false, can_delete_messages: false, can_restrict_members: false, can_promote_members: false, can_change_info: false, can_invite_users: false, can_pin_messages: false };
+    for (const row of kb) for (const btn of row) {
+      for (const [pfx, key] of Object.entries(permsMap)) {
+        if (btn.callback_data?.startsWith(pfx)) rights[key] = btn.text.startsWith('✅');
+      }
+    }
     try {
-      await ctx.telegram.promoteChatMember(chatId, uid, { can_delete_messages: true, can_restrict_members: true, can_pin_messages: true });
-      await toast(ctx, '✅ تمت الترقية لمشرف');
+      await ctx.telegram.promoteChatMember(chatId, uid, rights);
+      await toast(ctx, '✅ تمت الترقية');
       const d = await loadMemberData(ctx.telegram, chatId, uid);
       return edit(ctx, mainText(d, uid), mainKb(uid, chatId, d));
     } catch (e) { return toast(ctx, '❌ ' + e.message, true); }
+  }
+  if (data.startsWith('inf_aptog_')) {
+    const kb = ctx.callbackQuery?.message?.reply_markup?.inline_keyboard || [];
+    const newKb = kb.map(row => row.map(btn => {
+      if (btn.callback_data === data) {
+        const isOn = btn.text.startsWith('✅');
+        return { ...btn, text: (isOn ? '⬜ ' : '✅ ') + btn.text.slice(2) };
+      }
+      return btn;
+    }));
+    await ctx.editMessageReplyMarkup({ inline_keyboard: newKb }).catch(() => {});
+    return ctx.answerCbQuery('').catch(() => {});
   }
   if (data.startsWith('inf_demote_')) {
     const { uid, chatId } = parse(data, 'inf_demote_');
