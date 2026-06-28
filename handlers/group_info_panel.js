@@ -390,6 +390,7 @@ async function handleCallback(ctx, data) {
     const chatId = parseInt(parts.pop());
     const uid    = parseInt(parts.pop());
     const perm   = parts.join('_');
+    ctx.answerCbQuery('⏳').catch(() => {}); // فوري
     try {
       const member = await ctx.telegram.getChatMember(chatId, uid).catch(() => null);
       // استخرج الأذونات من member مباشرة (مش من permissions object)

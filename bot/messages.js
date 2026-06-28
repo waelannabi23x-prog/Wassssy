@@ -66,10 +66,14 @@ module.exports.registerMessages = function(bot, deps) {
             const user = card.username ? ' @' + card.username : '';
             const bio = card.bio ? '\n\n' + card.bio : '';
             const caption = (name + user + bio).trim();
+            const _tOpts = {
+              reply_to_message_id: ctx.message?.message_id,
+              ...(ctx.message?.message_thread_id ? { message_thread_id: ctx.message.message_thread_id } : {}),
+            };
             if (card.photo_file_id) {
-              await ctx.replyWithPhoto(card.photo_file_id, { caption: caption || undefined }).catch(() => {});
+              await ctx.replyWithPhoto(card.photo_file_id, { ...(_tOpts), caption: caption || undefined }).catch(() => {});
             } else {
-              await ctx.reply(caption || 'مستخدم').catch(() => {});
+              await ctx.reply(caption || 'مستخدم', _tOpts).catch(() => {});
             }
             return;
           }
