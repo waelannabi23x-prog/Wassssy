@@ -493,7 +493,7 @@ function setupGroupCommands(bot) {
     delCmd(ctx);
     if (!await isTgAdmin(ctx)) return;
     const target = ctx.message.reply_to_message?.from || ctx.from;
-    await infoPanel.sendInfoPanel(ctx, ctx.chat.id, target.id, ctx.from.id);
+    await infoPanel.sendInfoPanel(ctx, target, ctx.chat.id, ctx.from.id);
   });
 
 

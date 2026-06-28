@@ -387,8 +387,12 @@ async function handleCallback(ctx, data) {
     const perm   = parts.join('_');
     try {
       const member = await ctx.telegram.getChatMember(chatId, uid).catch(() => null);
-      const cur = member?.permissions || {};
-      const newVal = cur[perm] === false ? true : false;
+      // استخرج الأذونات من member مباشرة (مش من permissions object)
+      const PERM_KEYS = ['can_send_messages','can_send_media_messages','can_send_polls',
+        'can_send_other_messages','can_add_web_page_previews','can_invite_users','can_pin_messages'];
+      const cur = {};
+      for (const k of PERM_KEYS) cur[k] = member?.[k] !== false;
+      const newVal = !cur[perm];
       const updated = { ...cur, [perm]: newVal };
       await ctx.telegram.restrictChatMember(chatId, uid, { permissions: updated });
       await toast(ctx, (newVal ? '✅ ' : '⬜ ') + perm);
