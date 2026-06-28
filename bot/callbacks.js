@@ -234,13 +234,10 @@ module.exports.registerCallbacks = function(bot, deps) {
     { p: 'gp_',         fn: (ctx, d) => groupPanel.handleCallback(ctx, d) },
     { p: 'gpq_',        fn: async (ctx, d) => {
       const parts = d.replace('gpq_', '').split('_');
-      // صيغتان: gpq_action_chatId_userId أو gpq_action_userId_chatId
       const action = parts[0];
-      const p1 = parseInt(parts[1]);
-      const p2 = parseInt(parts[2]);
-      // chatId هو الأكبر سالباً أو الأكبر عدداً
-      const chatId  = p1 < 0 ? p1 : p2;
-      const userId  = p1 < 0 ? p2 : p1;
+      // الصيغة: gpq_action_userId_chatId
+      const userId  = parseInt(parts[1]);
+      const chatId  = parseInt(parts[2]);
       const { run: _r, all: _a, get: _g } = require('../database/db');
       const { muteMember, unmuteMember } = require('../handlers/group_admin');
 
