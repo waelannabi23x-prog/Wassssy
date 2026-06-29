@@ -126,8 +126,9 @@ exports.handleSearch = async (ctx) => {
     }).catch(()=>{});
 
   } catch(e) {
+    console.error('[Music] Search error:', e.message);
     if (loading) ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id).catch(()=>{});
-    return ctx.reply('❌ فشل البحث، حاول مجدداً.').catch(()=>{});
+    return ctx.reply('❌ فشل البحث: ' + e.message).catch(()=>{});
   }
 };
 
