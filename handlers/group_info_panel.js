@@ -390,29 +390,38 @@ async function handleCallback(ctx, data) {
     const chatId = parseInt(parts.pop());
     const uid    = parseInt(parts.pop());
     const perm   = parts.join('_');
-    ctx.answerCbQuery('⏳').catch(() => {}); // فوري
-    try {
-      const member = await ctx.telegram.getChatMember(chatId, uid).catch(() => null);
-      // استخرج الأذونات من member مباشرة (مش من permissions object)
-      const PERM_KEYS = ['can_send_messages','can_send_photos','can_send_videos',
-        'can_send_other_messages','can_send_polls','can_add_web_page_previews',
-        'can_invite_users','can_pin_messages'];
-      const cur = {};
-      for (const k of PERM_KEYS) {
-        if (member?.permissions?.[k] !== undefined) cur[k] = member.permissions[k] !== false;
-        else if (member?.[k] !== undefined) cur[k] = member[k] !== false;
-        else cur[k] = true;
+
+    // قرأ الحالة من الزر مباشرة بدون API call
+    const curKb = ctx.callbackQuery?.message?.reply_markup?.inline_keyboard || [];
+    const cur = {};
+    for (const row of curKb) {
+      for (const btn of row) {
+        if (btn.callback_data?.startsWith('inf_ptog_')) {
+          const bp = btn.callback_data.replace('inf_ptog_', '').split('_');
+          bp.pop(); bp.pop(); // chatId, uid
+          const bperm = bp.join('_');
+          cur[bperm] = btn.text.startsWith('✅');
+        }
       }
-      const newVal = !cur[perm];
-      const updated = { ...cur, [perm]: newVal };
-      await ctx.telegram.restrictChatMember(chatId, uid, { permissions: updated });
-      await toast(ctx, (newVal ? '✅ ' : '⬜ ') + perm);
-      const p = await buildPermsPanel(ctx.telegram, uid, chatId);
-      return edit(ctx, p.text, p.kb);
+    }
+
+    const newVal = !cur[perm];
+    cur[perm] = newVal;
+
+    try {
+      await ctx.telegram.restrictChatMember(chatId, uid, { permissions: cur });
+      ctx.answerCbQuery((newVal ? '✅ ' : '⬜ ') + perm.replace('can_','').replace(/_/g,' ')).catch(() => {});
+
+      // حدّث الأزرار مباشرة بدون API call
+      const newKb = curKb.map(row => row.map(btn => {
+        if (btn.callback_data === data) {
+          return { ...btn, text: (newVal ? '✅ ' : '⬜ ') + btn.text.slice(2) };
+        }
+        return btn;
+      }));
+      return ctx.editMessageReplyMarkup({ inline_keyboard: newKb }).catch(() => {});
     } catch (e) { return toast(ctx, '❌ ' + e.message, true); }
   }
-
-  // ── الرتب ──
   if (data.startsWith('inf_role_') && !data.startsWith('inf_setrole_') && !data.startsWith('inf_rmrole_')) {
     const { uid, chatId } = parse(data, 'inf_role_');
     const cur = await proDb.getRole(chatId, uid).catch(() => null);
