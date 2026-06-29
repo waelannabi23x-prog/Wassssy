@@ -100,7 +100,7 @@ async function showGroupsLeaderboard(ctx, opts = {}) {
     await ctx.answerCbQuery(force ? '🔄 جاري التحديث...' : '⏳ جاري التحميل...').catch(() => {});
   }
 
-  const groups = await all('SELECT chat_id, title FROM group_chats WHERE is_active=1').catch(() => []);
+  const groups = await all('SELECT chat_id, title FROM group_chats WHERE is_active!=0').catch(() => []);
 
   if (!groups.length) {
     return eos(ctx, '📭 لا توجد قروبات نشطة بعد.', {
@@ -464,7 +464,7 @@ async function _doBroadcast(ctx, spId, text, fileId, mediaType) {
 // القائمة الرئيسية للقروبات
 // ══════════════════════════════════════════════════════════
 async function showMainMenu(ctx) {
-  const groups  = await all('SELECT COUNT(*) AS cnt FROM group_chats WHERE is_active=1').then(r => r[0]?.cnt || 0).catch(() => 0);
+  const groups  = await all('SELECT COUNT(*) AS cnt FROM group_chats WHERE is_active!=0').then(r => r[0]?.cnt || 0).catch(() => 0);
   const channels = await all('SELECT COUNT(*) AS cnt FROM group_chats WHERE specialty_id IS NOT NULL').then(r => r[0]?.cnt || 0).catch(() => 0);
 
   const rows = [
@@ -487,7 +487,7 @@ async function showMyGroups(ctx) {
   const uid = ctx.uid || ctx.from?.id;
   const isOwner = uid === parseInt(process.env.OWNER_ID);
 
-  const allGroups = await all('SELECT chat_id, title FROM group_chats WHERE is_active=1 ORDER BY title').catch(() => []);
+  const allGroups = await all('SELECT chat_id, title FROM group_chats WHERE is_active!=0 ORDER BY title').catch(() => []);
 
   const BOT_UN = process.env.BOT_USERNAME || '';
 
@@ -536,7 +536,7 @@ async function handleInviteMeList(ctx) {
   if (uid !== parseInt(process.env.OWNER_ID)) return ctx.answerCbQuery('🚫').catch(() => {});
   ctx.answerCbQuery('').catch(() => {});
 
-  const groups = await all('SELECT chat_id, title FROM group_chats WHERE is_active=1 ORDER BY title').catch(() => []);
+  const groups = await all('SELECT chat_id, title FROM group_chats WHERE is_active!=0 ORDER BY title').catch(() => []);
   if (!groups.length) return ctx.reply('لا توجد قروبات مسجلة.').catch(() => {});
 
   let text = '📨 *اختر قروب لتوليد رابط دعوة لك:*\n\n';
