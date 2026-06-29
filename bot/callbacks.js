@@ -1427,7 +1427,7 @@ module.exports.registerCallbacks = function(bot, deps) {
           || data.startsWith('grp_wadd_') || data.startsWith('grp_wdel_')
           || data.startsWith('grp_pall_') || data.startsWith('grp_pnone_')
           || data.startsWith('grp_unban_') || data.startsWith('grp_unmute_')
-          || data.startsWith('gpq_') || data.startsWith('inf_')
+          || data.startsWith('gpq_') || data.startsWith('inf_') || data.startsWith('help_')
           || data.startsWith('grp_perms_') || data.startsWith('grp_mute_')
           || data.startsWith('grp_ban_') || data.startsWith('grp_kick_')
           || data.startsWith('grp_warns_') || data.startsWith('grp_restrict_')
