@@ -269,7 +269,8 @@ async function showUserProfile(ctx, userId) {
 }
 
 
-const PERM_LABELS={upload:'📤 رفع',delete:'🗑 حذف',add_content:'➕ إضافة محتوى',view_users:'👥 مشاهدة المستخدمين',full:'👑 كل الصلاحيات'};
+const PERM_LABELS={upload:'📤 رفع',delete:'🗑 حذف',add_content:'➕ إضافة محتوى',view_users:'👥 مشاهدة المستخدمين',broadcast:'📢 بث للكل',full:'👑 كل الصلاحيات'};
+const ALL_PERMS=['upload','delete','add_content','view_users','broadcast','full'];
 
 async function showEditPerms(ctx, adminId) {
   const list = await adminsDb.getAll();
