@@ -439,7 +439,7 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
         clearState(uid);
         const groups=state.spId==='0'?await all('SELECT chat_id FROM group_chats'):await all('SELECT chat_id FROM group_chats WHERE specialty_id=$1',[state.spId]);
         let gSent=0,gFail=0;
-        const msgText='📣 *إشعار*\n\n'+(state.mediaCaption||text);
+        const msgText=state.mediaCaption||text||'';
 
         const mFileId=state.mediaFileId||null;
         const mType=state.mediaType||null;
