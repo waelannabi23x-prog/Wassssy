@@ -147,11 +147,12 @@ async function buildPermsPanel(telegram, uid, chatId) {
   const chatPerms = chat?.permissions || {};
 
   function getPerm(key) {
-    // إذا العضو مقيّد — خذ من member.permissions
-    if (member?.status === 'restricted' && member?.permissions) {
-      return member.permissions[key] !== false;
+    // عضو مقيّد — الصلاحيات flat fields مباشرة على member
+    if (member?.status === 'restricted') {
+      if (member[key] !== undefined) return member[key] !== false;
+      return false;
     }
-    // عضو عادي — خذ من صلاحيات القروب
+    // عضو عادي — خذ من صلاحيات القروب الافتراضية
     if (chatPerms[key] !== undefined) return chatPerms[key] !== false;
     return true;
   }
@@ -341,7 +342,7 @@ async function handleCallback(ctx, data) {
     try {
       const perms = { can_send_messages: false, can_send_media_messages: false, can_send_polls: false, can_send_other_messages: false };
       const until = mins > 0 ? Math.floor(Date.now() / 1000) + mins * 60 : undefined;
-      await ctx.telegram.restrictChatMember(chatId, uid, { permissions: perms, until_date: until });
+      await ctx.telegram.restrictChatMember(chatId, uid, { permissions: perms, until_date: until, use_independent_chat_permissions: true });
       const label = mins === 0 ? 'دائم' : mins < 60 ? mins + 'د' : mins < 1440 ? (mins/60) + 'س' : (mins/1440) + 'ي';
       await toast(ctx, '✅ تم الكتم ' + label);
       const d = await loadMemberData(ctx.telegram, chatId, uid);
@@ -356,7 +357,7 @@ async function handleCallback(ctx, data) {
       let chat;
       try { chat = await ctx.telegram.getChat(chatId); } catch (_) {}
       const defaultPerms = chat?.permissions || { can_send_messages: true, can_send_media_messages: true, can_send_polls: true, can_send_other_messages: true, can_add_web_page_previews: true };
-      await ctx.telegram.restrictChatMember(chatId, uid, { permissions: defaultPerms });
+      await ctx.telegram.restrictChatMember(chatId, uid, { permissions: defaultPerms, use_independent_chat_permissions: true });
       await toast(ctx, '✅ تم رفع الكتم');
       const d = await loadMemberData(ctx.telegram, chatId, uid);
       return edit(ctx, mainText(d, uid), mainKb(uid, chatId, d));
@@ -438,7 +439,7 @@ async function handleCallback(ctx, data) {
     };
 
     try {
-      await ctx.telegram.restrictChatMember(chatId, uid, { permissions: fullPerms });
+      await ctx.telegram.restrictChatMember(chatId, uid, { permissions: fullPerms, use_independent_chat_permissions: true });
       ctx.answerCbQuery((newVal ? '✅ ' : '⬜ ') + perm.replace('can_','').replace(/_/g,' ')).catch(() => {});
 
       // حدّث الأزرار مباشرة بدون API call
