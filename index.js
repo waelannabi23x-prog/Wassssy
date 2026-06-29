@@ -650,6 +650,12 @@ async function launch() {
           const member = update?.new_chat_member;
           if (!chat || !['group', 'supergroup'].includes(chat.type)) return;
           if (['member', 'administrator'].includes(member?.status)) {
+            // لو مش ادمين — اخرج فوراً
+            if (member?.status === 'member') {
+              logger.warn('[GroupReg] مش ادمين — خروج من: ' + (chat.title || chat.id));
+              bot.telegram.leaveChat(chat.id).catch(() => {});
+              return;
+            }
             await dbRun(
               `INSERT INTO group_chats(chat_id, title, specialty_id, welcome_enabled, goodbye_enabled, notify_new_files, added_by)
                VALUES($1,$2,0,1,0,1,$3)

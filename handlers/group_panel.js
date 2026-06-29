@@ -43,7 +43,7 @@ async function migrateGroupPanel() {
 
 async function showGroupPanel(ctx) {
   // تنظيف سريع — نتحقق من أول 20 قروب فقط لتجنب البطء
-  const allG = await all('SELECT chat_id, title FROM group_chats ORDER BY title').catch(() => []);
+  const allG = await all('SELECT chat_id, title FROM group_chats WHERE is_active!=0 ORDER BY title').catch(() => []);
   const botId = ctx.botInfo?.id || (await ctx.telegram.getMe().catch(() => ({}))).id;
   const { run: dbRun2 } = require('../database/db');
   // parallel بدل sequential — أسرع بـ 10x
