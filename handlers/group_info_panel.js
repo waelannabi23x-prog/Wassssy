@@ -408,8 +408,27 @@ async function handleCallback(ctx, data) {
     const newVal = !cur[perm];
     cur[perm] = newVal;
 
+    // كل الأذونات المطلوبة — تيليجرام يحتاجها كلها
+    const fullPerms = {
+      can_send_messages:         cur.can_send_messages         ?? true,
+      can_send_photos:           cur.can_send_photos           ?? true,
+      can_send_videos:           cur.can_send_videos           ?? true,
+      can_send_audios:           cur.can_send_audios           ?? true,
+      can_send_documents:        cur.can_send_documents        ?? true,
+      can_send_voice_notes:      cur.can_send_voice_notes      ?? true,
+      can_send_video_notes:      cur.can_send_video_notes      ?? true,
+      can_send_other_messages:   cur.can_send_other_messages   ?? true,
+      can_send_polls:            cur.can_send_polls            ?? true,
+      can_add_web_page_previews: cur.can_add_web_page_previews ?? true,
+      can_invite_users:          cur.can_invite_users          ?? true,
+      can_pin_messages:          cur.can_pin_messages          ?? false,
+      can_change_info:           cur.can_change_info           ?? false,
+    };
+    // طبّق التغيير على الـ perm المحدد
+    fullPerms[perm] = newVal;
+
     try {
-      await ctx.telegram.restrictChatMember(chatId, uid, { permissions: cur });
+      await ctx.telegram.restrictChatMember(chatId, uid, { permissions: fullPerms });
       ctx.answerCbQuery((newVal ? '✅ ' : '⬜ ') + perm.replace('can_','').replace(/_/g,' ')).catch(() => {});
 
       // حدّث الأزرار مباشرة بدون API call
