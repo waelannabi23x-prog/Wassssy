@@ -1,8 +1,8 @@
 [phases.setup]
-nixPkgs = ["nodejs_20"]
+nixPkgs = ["nodejs_20", "yt-dlp", "ffmpeg"]
 
 [phases.install]
-cmds = ["npm ci --omit=dev"]
+cmds = ["npm ci --production"]
 
 [start]
-cmd = "node_modules/.bin/pm2-runtime ecosystem.config.js"
+cmd = "node index.js"

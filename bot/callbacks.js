@@ -1406,6 +1406,7 @@ module.exports.registerCallbacks = function(bot, deps) {
           || data.startsWith('grp_warns_') || data.startsWith('grp_perms_')
           || data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_')
           || data.startsWith('games_')
+          || data.startsWith('music_')
           || data.startsWith('bank_') || data.startsWith('bnk_')
           || data.startsWith('bankpro:')
           || data === 'bank_menu' || data === 'bank_wallet'
@@ -1621,7 +1622,7 @@ module.exports.registerCallbacks = function(bot, deps) {
 
 
   // ══ 🎵 Music Search Callbacks ══
-  if (data === 'music_close' || data.startsWith('music_track_')) {
+  if (data === 'music_close' || data.startsWith('music_dl_') || data.startsWith('music_track_')) {
     return require('../handlers/music').handleCallback(ctx).catch(() => {});
   }
 

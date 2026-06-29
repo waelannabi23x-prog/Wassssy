@@ -1,19 +1,25 @@
 'use strict';
 /**
  * ════════════════════════════════════════════
- *  🎵 handlers/music.js — Deezer Music Search
- *  يعمل في القروب والخاص
+ *  🎵 handlers/music.js — Music Search + Download
+ *  Deezer للبحث + yt-dlp للتحميل الكامل
  * ════════════════════════════════════════════
  */
+const { execFile } = require('child_process');
+const fs   = require('fs');
+const path = require('path');
+const os   = require('os');
 
-// ─── Config (غيّر هنا فقط إذا أردت API آخر) ───────────────────
-const API = {
-  search:  q  => `https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=8`,
-  track:   id => `https://api.deezer.com/track/${id}`,
-};
+const DEEZER_SEARCH = q =>
+  `https://api.deezer.com/search?q=${encodeURIComponent(q)}&limit=8`;
 
-// ─── Helpers ───────────────────────────────────────────────────
+const YTDLP_PATH = process.env.YTDLP_PATH || 'yt-dlp';
+const TMP_DIR    = os.tmpdir();
+const MAX_SIZE   = 45 * 1024 * 1024;
+const DL_TIMEOUT = 90_000;
+
 const fmtDur = s => s ? `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}` : '';
+const escMd  = t => (t||'').replace(/[*_`\[\]()~>#+=|{}.!\-]/g,'\\$&');
 
 async function apiGet(url) {
   const res = await fetch(url, { headers: { 'User-Agent': 'TalineBot/1.0' } });
@@ -21,59 +27,99 @@ async function apiGet(url) {
   return res.json();
 }
 
-// ─── Search ────────────────────────────────────────────────────
-async function searchMusic(query) {
-  const data = await apiGet(API.search(query));
-  return (data.data || []).slice(0, 8);
+function ytSearch(query) {
+  return new Promise((resolve, reject) => {
+    execFile(YTDLP_PATH,
+      [`ytsearch5:${query}`, '--dump-json', '--flat-playlist', '--no-warnings', '--quiet'],
+      { timeout: 15000 },
+      (err, stdout) => {
+        if (err) return reject(err);
+        const results = stdout.trim().split('\n')
+          .filter(Boolean)
+          .map(l => { try { return JSON.parse(l); } catch(_) { return null; } })
+          .filter(Boolean);
+        resolve(results);
+      }
+    );
+  });
 }
 
-// ─── Build results message ─────────────────────────────────────
+function ytDownload(videoId, outBase) {
+  return new Promise((resolve, reject) => {
+    execFile(YTDLP_PATH, [
+      `https://www.youtube.com/watch?v=${videoId}`,
+      '-x', '--audio-format', 'mp3',
+      '--audio-quality', '5',
+      '-o', outBase,
+      '--no-playlist', '--quiet', '--no-warnings',
+      '--max-filesize', '45m',
+    ], { timeout: DL_TIMEOUT }, (err) => {
+      if (err) return reject(err);
+      resolve(outBase + '.mp3');
+    });
+  });
+}
+
+function encodeTitle(s) {
+  return encodeURIComponent((s||'').substring(0,20)).substring(0,30);
+}
+
 function buildResultsMsg(tracks, query) {
-  let text = `🎵 *نتائج البحث عن:* _${query}_\n━━━━━━━━━━━━━━━━━━\n\n`;
+  let text = `🎵 *نتائج البحث عن:* _${escMd(query)}_\n━━━━━━━━━━━━━━━━━━\n\n`;
   tracks.forEach((t, i) => {
     const dur = fmtDur(t.duration);
-    text += `${i+1}. 🎵 *${t.title}*\n`;
-    text += `   👤 ${t.artist?.name || '?'}`;
+    text += `${i+1}. 🎵 *${escMd(t.title)}*\n`;
+    text += `   👤 ${escMd(t.artist?.name || '?')}`;
     if (dur) text += `  ⏱ ${dur}`;
     text += '\n';
   });
-  text += '\n_اضغط على رقم الأغنية لتنزيلها_';
+  text += '\n_اضغط على أغنية لتحميلها كاملاً_ 🎶';
   return text;
 }
 
 function buildResultsKb(tracks) {
   return tracks.map((t, i) => [{
-    text: `${i+1}. ${t.title.substring(0,30)} — ${(t.artist?.name||'').substring(0,20)}`,
-    callback_data: `music_track_${t.id}`,
+    text: `${i+1}. ${t.title.substring(0,28)} — ${(t.artist?.name||'').substring(0,18)}`,
+    callback_data: `music_dl_${t.id}_${encodeTitle(t.title)}_${encodeTitle(t.artist?.name||'')}`,
   }]);
 }
 
-// ─── Main search handler (يُستدعى من index.js) ─────────────────
 exports.handleSearch = async (ctx) => {
-  const query = (ctx.message?.text || '').replace(/^🎵\s*/,'').trim();
+  const raw = ctx.message?.text || '';
+  const query = raw
+    .replace(/^🎵\s*/,'')
+    .replace(/^موسيقى\s*/i,'')
+    .replace(/^أغنية\s*/i,'')
+    .replace(/^اغنية\s*/i,'')
+    .trim();
+
   if (!query || query.length < 2) {
-    return ctx.reply('🎵 *البحث عن أغنية*\n\nاكتب: `🎵 اسم الأغنية`\nمثال: `🎵 دق 3 دقات`',
-      { parse_mode:'Markdown', reply_to_message_id: ctx.message?.message_id }).catch(()=>{});
+    return ctx.reply(
+      '🎵 *البحث عن أغنية*\n\nاكتب: `🎵 اسم الأغنية`\nمثال: `🎵 دق 3 دقات`',
+      { parse_mode:'Markdown', reply_to_message_id: ctx.message?.message_id }
+    ).catch(()=>{});
   }
 
-  const loading = await ctx.reply(`🔍 جارٍ البحث عن: _${query}_...`,
-    { parse_mode:'Markdown', reply_to_message_id: ctx.message?.message_id }).catch(()=>null);
+  const loading = await ctx.reply(
+    `🔍 جارٍ البحث عن: _${escMd(query)}_...`,
+    { parse_mode:'Markdown', reply_to_message_id: ctx.message?.message_id }
+  ).catch(()=>null);
 
   try {
-    const tracks = await searchMusic(query);
+    const data   = await apiGet(DEEZER_SEARCH(query));
+    const tracks = (data.data || []).slice(0, 8);
 
     if (loading) ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id).catch(()=>{});
 
     if (!tracks.length) {
-      return ctx.reply(`❌ لا توجد نتائج لـ *${query}*`,
+      return ctx.reply(`❌ لا توجد نتائج لـ *${escMd(query)}*`,
         { parse_mode:'Markdown', reply_to_message_id: ctx.message?.message_id }).catch(()=>{});
     }
 
-    const text = buildResultsMsg(tracks, query);
-    const kb   = buildResultsKb(tracks);
+    const kb = buildResultsKb(tracks);
     kb.push([{ text: '❌ إغلاق', callback_data: 'music_close' }]);
 
-    return ctx.reply(text, {
+    return ctx.reply(buildResultsMsg(tracks, query), {
       parse_mode: 'Markdown',
       reply_to_message_id: ctx.message?.message_id,
       reply_markup: { inline_keyboard: kb },
@@ -81,83 +127,79 @@ exports.handleSearch = async (ctx) => {
 
   } catch(e) {
     if (loading) ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id).catch(()=>{});
-    return ctx.reply('❌ فشل البحث، حاول مجدداً.',
-      { reply_to_message_id: ctx.message?.message_id }).catch(()=>{});
+    return ctx.reply('❌ فشل البحث، حاول مجدداً.').catch(()=>{});
   }
 };
 
-// ─── Callback: اختيار أغنية ────────────────────────────────────
 exports.handleCallback = async (ctx) => {
   const data = ctx.callbackQuery?.data || '';
 
-  // إغلاق
   if (data === 'music_close') {
     await ctx.answerCbQuery('').catch(()=>{});
     return ctx.deleteMessage().catch(()=>{});
   }
 
-  // اختيار أغنية
-  if (data.startsWith('music_track_')) {
-    const trackId = data.replace('music_track_','');
+  if (data.startsWith('music_dl_')) {
+    const parts    = data.replace('music_dl_','').split('_');
+    const deezerId = parts[0];
+    const title    = decodeURIComponent(parts[1] || 'أغنية');
+    const artist   = decodeURIComponent(parts[2] || '');
+
     await ctx.answerCbQuery('⏳ جارٍ التحميل...').catch(()=>{});
 
-    // رسالة "جارٍ الإرسال" مؤقتة
-    const loading = await ctx.reply('🎵 جارٍ إرسال الأغنية...').catch(()=>null);
+    const loading = await ctx.reply(
+      `⬇️ جارٍ تحميل *${escMd(title)}*...\n_قد يستغرق حتى دقيقة_`,
+      { parse_mode:'Markdown' }
+    ).catch(()=>null);
 
+    let outFile = null;
     try {
-      const track = await apiGet(API.track(trackId));
+      const ytResults = await ytSearch(`${title} ${artist} audio`.trim());
+      if (!ytResults.length) throw new Error('لا نتائج على YouTube');
+
+      const videoId = ytResults[0].id;
+      const ydur    = ytResults[0].duration;
+
+      const tmpBase = path.join(TMP_DIR, `music_${Date.now()}_${videoId}`);
+      outFile = await ytDownload(videoId, tmpBase);
+
+      if (!fs.existsSync(outFile)) throw new Error('الملف لم يُنشأ');
+      const size = fs.statSync(outFile).size;
+      if (size > MAX_SIZE) throw new Error(`الملف كبير جداً (${Math.round(size/1024/1024)}MB)`);
+
       if (loading) ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id).catch(()=>{});
 
-      const dur     = fmtDur(track.duration);
-      const preview = track.preview; // 30-ثانية MP3 مجاني من Deezer
+      let cover = null;
+      try {
+        const deezerTrack = await apiGet(`https://api.deezer.com/track/${deezerId}`);
+        cover = deezerTrack.album?.cover_medium;
+      } catch(_) {}
 
       const caption =
-        `🎵 *${track.title}*\n` +
-        `👤 الفنان: *${track.artist?.name || '?'}*\n` +
-        `💿 الألبوم: *${track.album?.title || '?'}*\n` +
-        (dur ? `⏱ المدة: *${dur}*\n` : '') +
-        `\n📻 معاينة 30 ثانية من Deezer`;
+        `🎵 *${escMd(title)}*\n` +
+        (artist ? `👤 *${escMd(artist)}*\n` : '') +
+        (ydur   ? `⏱ ${fmtDur(ydur)}\n`    : '') +
+        `\n🤖 @${ctx.botInfo?.username || 'TalineBot'}`;
 
-      if (preview) {
-        // إرسال ملف صوت مع صورة الغلاف
-        await ctx.replyWithAudio(preview, {
+      await ctx.replyWithAudio(
+        { source: outFile },
+        {
           caption,
           parse_mode: 'Markdown',
-          title: track.title,
-          performer: track.artist?.name || '',
-          thumb: track.album?.cover_medium || undefined,
-          reply_markup: { inline_keyboard: [[
-            { text: '🎵 فتح على Deezer', url: track.link || `https://www.deezer.com/track/${trackId}` },
-          ]]},
-        }).catch(async () => {
-          // fallback: صورة + معلومات فقط
-          await sendTrackInfo(ctx, track, caption);
-        });
-      } else {
-        await sendTrackInfo(ctx, track, caption);
-      }
+          title,
+          performer: artist,
+          thumb: cover ? { url: cover } : undefined,
+        }
+      );
 
     } catch(e) {
       if (loading) ctx.telegram.deleteMessage(ctx.chat.id, loading.message_id).catch(()=>{});
-      ctx.reply('❌ تعذّر جلب الأغنية.').catch(()=>{});
+      const msg = e.message?.includes('كبير') ? `❌ ${e.message}` :
+                  e.message?.includes('YouTube') ? '❌ لم يُعثر على الأغنية في YouTube' :
+                  '❌ فشل التحميل، جرّب أغنية أخرى.';
+      ctx.reply(msg).catch(()=>{});
+    } finally {
+      if (outFile && fs.existsSync(outFile)) fs.unlink(outFile, ()=>{});
     }
   }
 };
-
-// ─── Helper: إرسال معلومات فقط (بدون preview) ─────────────────
-async function sendTrackInfo(ctx, track, caption) {
-  const cover = track.album?.cover_big || track.album?.cover_medium;
-  if (cover) {
-    await ctx.replyWithPhoto(cover, {
-      caption,
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: [[
-        { text: '🎵 فتح على Deezer', url: track.link || `https://www.deezer.com/track/${track.id}` },
-      ]]},
-    }).catch(() => {
-      ctx.reply(caption, { parse_mode:'Markdown' }).catch(()=>{});
-    });
-  } else {
-    ctx.reply(caption, { parse_mode:'Markdown' }).catch(()=>{});
-  }
-}
