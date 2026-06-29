@@ -173,20 +173,9 @@ async function showMainMenu(ctx, name) {
 
   const rows = [
     [btn('📚 تصفح المحتوى', 'browse')],
-    [
-      btn('🔍 بحث سريع',     'search_prompt'),
-      btn('🆕 أحدث الملفات', 'latest'),
-      btn('⭐ مفضلاتي',      'favorites'),
-    ],
-    [
-      btn('🗂 آخر ما شاهدت', 'history'),
-      btn('🤖 المساعد الذكي', 'ai_prompt'),
-      btn(sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', 'change_sp'),
-    ],
-    [
-      btn('👤 ملفي',         'profile'),
-      btn('📊 إحصائياتي',    'stats'),
-    ],
+    [btn('🔍 بحث', 'search_prompt'), btn('🆕 جديد', 'latest'), btn('⭐ مفضلاتي', 'favorites')],
+    [btn('🗂 سجلي', 'history'),     btn('🤖 AI',    'ai_prompt'), btn(sp ? '🎓 تخصصي' : '🎓 اختر', 'change_sp')],
+    [btn('👤 ملفي', 'profile'),     btn('📊 إحصائيات', 'stats')],
   ];
 
   if (lastFileBtn) rows.push([lastFileBtn]);
