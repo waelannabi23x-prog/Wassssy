@@ -138,12 +138,22 @@ const PERMS_DEF = [
 ];
 
 async function buildPermsPanel(telegram, uid, chatId) {
-  const member = await telegram.getChatMember(chatId, uid).catch(() => null);
-  // الصلاحيات تجي مباشرة على member للأعضاء العاديين
+  const [member, chat] = await Promise.all([
+    telegram.getChatMember(chatId, uid).catch(() => null),
+    telegram.getChat(chatId).catch(() => null),
+  ]);
+
+  // صلاحيات القروب الافتراضية
+  const chatPerms = chat?.permissions || {};
+
   function getPerm(key) {
-    if (member?.permissions && member.permissions[key] !== undefined) return member.permissions[key] !== false;
-    if (member?.[key] !== undefined) return member[key] !== false;
-    return true; // افتراضي: مسموح
+    // إذا العضو مقيّد — خذ من member.permissions
+    if (member?.status === 'restricted' && member?.permissions) {
+      return member.permissions[key] !== false;
+    }
+    // عضو عادي — خذ من صلاحيات القروب
+    if (chatPerms[key] !== undefined) return chatPerms[key] !== false;
+    return true;
   }
 
   let t = '🎛 *الصلاحيات*\n━━━━━━━━━━━━━━━━━━\n\n';
