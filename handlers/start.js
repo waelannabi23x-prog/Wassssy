@@ -176,12 +176,10 @@ async function showMainMenu(ctx, name) {
     [
       btn('🔍 بحث سريع',     'search_prompt'),
       btn('🆕 أحدث الملفات', 'latest'),
-    ],
-    [
       btn('⭐ مفضلاتي',      'favorites'),
-      btn('🗂 آخر ما شاهدت', 'history'),
     ],
     [
+      btn('🗂 آخر ما شاهدت', 'history'),
       btn('🤖 المساعد الذكي', 'ai_prompt'),
       btn(sp ? '🎓 تغيير تخصصي' : '🎓 اختر تخصصي', 'change_sp'),
     ],
