@@ -825,7 +825,7 @@ function setupGroupCommands(bot) {
   // وقف/فعل الردود التلقائية في القروب
   bot.hears(/^(وقف رد|فعل رد)$/i, async ctx => {
     if (!isGroup(ctx)) return;
-    if (!ctx.isOwner && !ctx.isAdmin) return;
+    if (!await isTgAdmin(ctx)) return;
     const { run: _r } = require('../database/db');
     const { cacheGet, cacheSet, cacheClear } = require('../utils/cache');
     const chatId = ctx.chat.id;
