@@ -419,7 +419,7 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
         clearState(uid);
         const tId = parseInt(state.targetId);
         if(isNaN(tId)) { ctx.reply('❌ ID غير صحيح.'); break; }
-        const msgTxt = '📩 *رسالة من الإدارة*\n\n' + (state.mediaCaption || text || '');
+        const msgTxt = state.mediaCaption || text || '';
         const mFid   = state.mediaFileId || null;
         const mType  = state.mediaType   || null;
         try {

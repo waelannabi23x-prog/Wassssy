@@ -344,7 +344,7 @@ async function handleText(ctx, text, state) {
     await require('../utils/stateManager').delState(ctx.uid);
     try {
       console.log('[gp_msgone] sending to:', state.chatId);
-      await ctx.telegram.sendMessage(state.chatId, '📢 *رسالة من الادارة*\n\n' + text, { parse_mode: 'Markdown' });
+      await ctx.telegram.sendMessage(state.chatId, text, { parse_mode: 'Markdown' });
       return ctx.reply('تم الارسال!', kbBuild([[kbBtn('◀️ رجوع', 'gp_view_' + state.chatId)]])).catch(() => {});
     } catch (e) { return ctx.reply('فشل: ' + e.message).catch(() => {}); }
   }
@@ -393,16 +393,16 @@ async function handleMedia(ctx, state) {
     else if (msg.document) { fileId = msg.document.file_id; mediaType = 'document'; }
     else if (msg.sticker)  { fileId = msg.sticker.file_id;  mediaType = 'sticker'; }
     else if (msg.voice)    { fileId = msg.voice.file_id;    mediaType = 'voice'; }
-    return _doBroadcast(ctx, state.spId, caption || 'اشعار من الادارة', fileId, mediaType);
+    return _doBroadcast(ctx, state.spId, caption || '', fileId, mediaType);
   }
 
   if (state.type === 'gp_msgone') {
     await require('../utils/stateManager').delState(ctx.uid);
     try {
       if (msg.photo)
-        await ctx.telegram.sendPhoto(state.chatId, msg.photo[msg.photo.length-1].file_id, { caption: caption || 'رسالة من الادارة', parse_mode: 'Markdown' });
+        await ctx.telegram.sendPhoto(state.chatId, msg.photo[msg.photo.length-1].file_id, { caption: caption || '', parse_mode: 'Markdown' });
       else if (msg.video)
-        await ctx.telegram.sendVideo(state.chatId, msg.video.file_id, { caption: caption || 'رسالة من الادارة', parse_mode: 'Markdown' });
+        await ctx.telegram.sendVideo(state.chatId, msg.video.file_id, { caption: caption || '', parse_mode: 'Markdown' });
       else if (msg.voice)
         await ctx.telegram.sendVoice(state.chatId, msg.voice.file_id);
       else if (msg.sticker)
@@ -429,7 +429,7 @@ async function _doBroadcast(ctx, spId, text, fileId, mediaType) {
 
   const prog = await ctx.reply('جاري الارسال... ' + groups.length + ' قروب', { parse_mode: 'Markdown' }).catch(() => null);
   let sent = 0, fail = 0;
-  const msgText = '📢 *رسالة من الادارة*\n\n' + text;
+  const msgText = text;
   const CHUNK = 5;
 
   for (let i = 0; i < groups.length; i += CHUNK) {
