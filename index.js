@@ -294,7 +294,7 @@ const gameAndBankMiddleware = async (ctx, next) => {
 
     // 🎵 البحث عن الأغاني
     if (/^🎵\s+.+/i.test(txt) || /^موسيقى\s+.+/i.test(txt) || /^اغنية\s+.+/i.test(txt) || /^أغنية\s+.+/i.test(txt)) {
-      return music.handleSearch(ctx).catch(() => next());
+      return music.handleSearch(ctx).catch(e => { console.error('[Music trigger]', e.message, e.stack); return ctx.reply('❌ خطأ: ' + e.message).catch(()=>{}); });
     }
 
         // 🏦 Taline Bank
