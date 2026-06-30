@@ -243,6 +243,12 @@ async function initSchema() {
   // migration: created_at في users
   try { if(pg) await pg.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'); } catch(err) { require('./logger').debug('[catch]', err.message); }
 
+  // group_notes
+  try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS group_notes (
+    chat_id BIGINT NOT NULL, name TEXT NOT NULL, content TEXT NOT NULL,
+    created_by BIGINT, created_at TIMESTAMP DEFAULT NOW(),
+    PRIMARY KEY(chat_id, name))`); } catch(e) {}
+
   // grp_approved و group_watching
   try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS grp_approved (
     chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL, approved_by BIGINT,
