@@ -99,9 +99,17 @@ async function migrateAdvanced() {
       name TEXT NOT NULL,
       content TEXT NOT NULL,
       created_by BIGINT,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      UNIQUE(chat_id, name)
-    )`),
+      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    )`).then(() => run(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'group_notes_chat_name_unique'
+        ) THEN
+          ALTER TABLE group_notes ADD CONSTRAINT group_notes_chat_name_unique UNIQUE(chat_id, name);
+        END IF;
+      END $$;
+    `).catch(() => {})),
     run('CREATE INDEX IF NOT EXISTS idx_group_notes ON group_notes(chat_id)'),
 
     // حظر عالمي

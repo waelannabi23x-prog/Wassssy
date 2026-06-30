@@ -312,7 +312,18 @@ async function initSchema() {
   try { await pg.query('ALTER TABLE notes ADD COLUMN IF NOT EXISTS file_id TEXT'); } catch(_) {}
   try { await pg.query('ALTER TABLE notes ADD COLUMN IF NOT EXISTS note_type TEXT DEFAULT \'text\''); } catch(_) {}
   try { await pg.query('ALTER TABLE notes ADD COLUMN IF NOT EXISTS created_by BIGINT'); } catch(_) {}
-  try { await pg.query('ALTER TABLE notes ADD CONSTRAINT IF NOT EXISTS notes_chat_name_unique UNIQUE(chat_id, name)'); } catch(_) {}
+  try {
+    await pg.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (
+          SELECT 1 FROM pg_constraint WHERE conname = 'notes_chat_name_unique'
+        ) THEN
+          ALTER TABLE notes ADD CONSTRAINT notes_chat_name_unique UNIQUE(chat_id, name);
+        END IF;
+      END $$;
+    `);
+  } catch(e) { require('./logger').debug('[notes constraint]', e.message); }
   try { await pg.query(`CREATE TABLE IF NOT EXISTS blacklist_words(
     id SERIAL PRIMARY KEY, chat_id BIGINT, word TEXT,
     action TEXT DEFAULT 'delete', added_by BIGINT,
