@@ -305,6 +305,14 @@ async function initSchema() {
     content TEXT, file_id TEXT, note_type TEXT DEFAULT 'text',
     created_by BIGINT, UNIQUE(chat_id, name)
   )`); } catch(_) {}
+  // migration: إصلاح جدول notes قديم بدون chat_id
+  try { await pg.query('ALTER TABLE notes ADD COLUMN IF NOT EXISTS chat_id BIGINT'); } catch(_) {}
+  try { await pg.query('ALTER TABLE notes ADD COLUMN IF NOT EXISTS name TEXT'); } catch(_) {}
+  try { await pg.query('ALTER TABLE notes ADD COLUMN IF NOT EXISTS content TEXT'); } catch(_) {}
+  try { await pg.query('ALTER TABLE notes ADD COLUMN IF NOT EXISTS file_id TEXT'); } catch(_) {}
+  try { await pg.query('ALTER TABLE notes ADD COLUMN IF NOT EXISTS note_type TEXT DEFAULT \'text\''); } catch(_) {}
+  try { await pg.query('ALTER TABLE notes ADD COLUMN IF NOT EXISTS created_by BIGINT'); } catch(_) {}
+  try { await pg.query('ALTER TABLE notes ADD CONSTRAINT IF NOT EXISTS notes_chat_name_unique UNIQUE(chat_id, name)'); } catch(_) {}
   try { await pg.query(`CREATE TABLE IF NOT EXISTS blacklist_words(
     id SERIAL PRIMARY KEY, chat_id BIGINT, word TEXT,
     action TEXT DEFAULT 'delete', added_by BIGINT,
