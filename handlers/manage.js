@@ -1408,6 +1408,7 @@ async function showAutoReplies(ctx, page) {
   if (navRow.length) rows.push(navRow);
 
   rows.push([btn('➕ إضافة رد', 'mg_add_ar'), btn('🔍 بحث', 'mg_ar_search')]);
+  rows.push([btn('😀 React تلقائي', 'mg_auto_reactions')]);
   rows.push(back('mg_menu'));
   return eos(ctx, text, { parse_mode: 'Markdown', ...build(rows) });
 }
