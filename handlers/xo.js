@@ -7,9 +7,9 @@
 
 const games = new Map();
 
-const EMPTY = '⬜';
-const X_SYM = '❌';
-const O_SYM = '⭕';
+const EMPTY = ' · ';
+const X_SYM = ' X ';
+const O_SYM = ' O ';
 
 const WIN_LINES = [
   [0,1,2],[3,4,5],[6,7,8],
@@ -65,14 +65,8 @@ exports.startGame = async (ctx) => {
   const userId = ctx.from.id;
   const name   = ctx.from.first_name || 'لاعب';
 
-  if (games.has(chatId)) {
-    const g = games.get(chatId);
-    if (!g.started) {
-      return ctx.reply(`⚠️ لعبة XO قائمة! اضغط الزر للانضمام.`,
-        { reply_to_message_id: ctx.message?.message_id }).catch(()=>{});
-    }
-    games.delete(chatId);
-  }
+  // دائماً احذف اللعبة القديمة وابدأ جديدة
+  games.delete(chatId);
 
   const gameId = `${chatId}_${Date.now()}`;
   const game = {
@@ -86,15 +80,15 @@ exports.startGame = async (ctx) => {
 
   // رسالة مناداة احترافية
   const inviteText =
-    `🎮 *تم بدء لعبة XO*\n` +
-    `• اللاعب الأول : ${name} (${X_SYM})\n` +
-    `• اللي بيلعب يضغط زر ابدء اللعبه\n` +
+    `*تم بدء لعبة XO*\n` +
+    `اللاعب الاول : ${name}\n` +
+    `اللي بيلعب يضغط زر ابدء اللعبه\n` +
     `-`;
 
   const msg = await ctx.reply(inviteText, {
     parse_mode: 'Markdown',
     reply_markup: { inline_keyboard: [
-      [{ text: '🟢 • ابدء اللعبه', callback_data: `xo_join_${gameId}` }],
+      [{ text: '• ابدء اللعبه', callback_data: `xo_join_${gameId}` }],
     ]},
   }).catch(()=>null);
 
@@ -165,7 +159,7 @@ exports.handleCallback = async (ctx) => {
       (game.turn === 1 ? `${X_SYM} دور: *${game.player1Name}*` : `${O_SYM} دور: *${name}*`);
 
     const boardKb = buildBoard(game.board, game.gameId);
-    boardKb.push([{ text: '🏳️ استسلام', callback_data: `xo_resign_${game.gameId}` }]);
+    
 
     return ctx.editMessageText(startText, {
       parse_mode: 'Markdown',
@@ -271,7 +265,7 @@ exports.handleCallback = async (ctx) => {
 
     const text    = buildMessage(game);
     const boardKb = buildBoard(game.board, game.gameId);
-    boardKb.push([{ text: '🏳️ استسلام', callback_data: `xo_resign_${game.gameId}` }]);
+    
 
     return ctx.editMessageText(text, {
       parse_mode: 'Markdown',
