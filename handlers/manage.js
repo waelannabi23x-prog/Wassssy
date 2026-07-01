@@ -1418,7 +1418,8 @@ async function showAutoReplies(ctx, page) {
 const REACTION_EMOJIS = ['👍','👎','❤','🔥','🥰','👏','😁','🤔','🤯','😱','🤬','😢','🎉','🤩','🤮','💩','🙏','👌','🕊','🤡','🥱','🥴','😍','🐳','❤‍🔥','🌚','🌭','💯','🤣','⚡','🍌','🏆','💔','🤨','😐','🍓','🍾','💋','🖕','😈','😴','😭','🤓','👻','👨‍💻','👀','🎃','🙈','😇','😨','🤝','✍','🤗','🫡','🎅','🎄','☃','💅','🤪','🗿','🆒','💘','🙉','🦄','😘','💊','🙊','😎','👾','🤷‍♂','🤷','🤷‍♀','😡'];
 
 async function showAutoReactions(ctx) {
-  const rows_db = await all('SELECT * FROM auto_reactions ORDER BY id DESC').catch(()=>[]);
+  const { all: _allR } = require('../database/db');
+  const rows_db = await _allR('SELECT * FROM auto_reactions ORDER BY id DESC').catch(()=>[]);
   let text = '😀 *React تلقائي*\n━━━━━━━━━━━━━━━━\n\n';
   text += 'المجموع: *' + rows_db.length + '* react\n\n';
   const rows = [];
