@@ -115,12 +115,17 @@ exports.handleCallback = async (ctx) => {
     const p2n   = decodeURIComponent(parts[5] || 'لاعب');
 
     const gameId = `${chatId}_${Date.now()}`;
+    // عشوائي من يبدأ + تبادل X/O
+    const startFirst = Math.random() < 0.5 ? 1 : 2;
     const game = {
       gameId, chatId,
-      player1: p1id, player1Name: p1n,
-      player2: p2id, player2Name: p2n,
+      // إذا بدأ 2 — قلب الأدوار: p2 يصير player1 (X)
+      player1: startFirst === 1 ? p1id : p2id,
+      player1Name: startFirst === 1 ? p1n : p2n,
+      player2: startFirst === 1 ? p2id : p1id,
+      player2Name: startFirst === 1 ? p2n : p1n,
       board: Array(9).fill(EMPTY),
-      turn: 1, // X دائماً يبدأ
+      turn: 1,
       started: true, msgId: null,
     };
     games.set(chatId, game);
