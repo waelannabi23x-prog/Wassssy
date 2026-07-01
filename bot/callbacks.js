@@ -1408,6 +1408,19 @@ module.exports.registerCallbacks = function(bot, deps) {
           || data.startsWith('games_')
           || data.startsWith('music_')
           || data.startsWith('xo_')
+          || data.startsWith('tnd_')
+          || data.startsWith('slot_')
+          || data.startsWith('shop_')
+          || data.startsWith('inf_')
+          || data.startsWith('gpq_')
+          || data.startsWith('ml_') || data.startsWith('ma_')
+          || data.startsWith('mlr_') || data.startsWith('mar_')
+          || data.startsWith('mq_')
+          || data.startsWith('gsf-')
+          || data === 'rules_ok'
+          || data === 'shop_close'
+          || data === 'bank_transfer_help'
+          || data === 'bank_top'
           || data.startsWith('bank_') || data.startsWith('bnk_')
           || data.startsWith('bankpro:')
           || data === 'bank_menu' || data === 'bank_wallet'
