@@ -229,9 +229,6 @@ exports.handleCallback = async (ctx) => {
 
     game.board[cell] = game.turn === 1 ? X_SYM : O_SYM;
 
-    // انتظر answerCbQuery أولاً لسرعة الاستجابة
-    ctx.answerCbQuery('✅').catch(()=>{});
-
     const result = checkWinner(game.board);
 
     if (result) {
@@ -240,37 +237,34 @@ exports.handleCallback = async (ctx) => {
       games.delete(chatId);
 
       const boardKb = buildBoard(game.board, game.chatId, result.line || []);
+      boardKb.push([{ text: '• اعادة اللعب', callback_data: `xo_rematch_${p1id}_${p2id}_${encodeURIComponent(p1n)}_${encodeURIComponent(p2n)}` }]);
 
       if (result.winner === 'draw') {
-        boardKb.push([{ text: '• اعادة اللعب', callback_data: `xo_rematch_${p1id}_${p2id}_${encodeURIComponent(p1n)}_${encodeURIComponent(p2n)}` }]);
-        const _drawTxt = `🎮 *لعبة XO*\n• اللاعب الاول : ${p1n} (X)\n• اللاعب الثاني : ${p2n} (O)\n\n• تعادل!`;
-        const _drawOpts = { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } };
-        const _de = await ctx.editMessageText(_drawTxt, _drawOpts).catch(()=>null);
-        if (!_de) await ctx.reply(_drawTxt, _drawOpts).catch(()=>{});
+        await ctx.answerCbQuery('🤝 تعادل!').catch(()=>{});
+        const _drawTxt = `🎮 *لعبة XO*\n• اللاعب الاول : ${p1n} (X)\n• اللاعب الثاني : ${p2n} (O)\n\n• 🤝 تعادل!`;
+        await ctx.editMessageText(_drawTxt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } }).catch(()=>{});
         return;
       }
 
       const winnerName = result.winner === X_SYM ? p1n : p2n;
-      const winSym = result.winner === X_SYM ? 'X' : 'O';
-      boardKb.push([{ text: '• اعادة اللعب', callback_data: `xo_rematch_${p1id}_${p2id}_${encodeURIComponent(p1n)}_${encodeURIComponent(p2n)}` }]);
-      const _winTxt = `🎮 *لعبة XO*\n• اللاعب الاول : ${p1n} (X)\n• اللاعب الثاني : ${p2n} (O)\n\n• الفائز : ${winnerName}`;
-      const _winOpts = { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } };
-      const _edited = await ctx.editMessageText(_winTxt, _winOpts).catch(()=>null);
-      if (!_edited) await ctx.reply(_winTxt, _winOpts).catch(()=>{});
+      await ctx.answerCbQuery(`🏆 فاز ${winnerName}!`).catch(()=>{});
+      const _winTxt =
+        `🎮 *لعبة XO*\n` +
+        `• اللاعب الاول : ${p1n} (X)\n` +
+        `• اللاعب الثاني : ${p2n} (O)\n\n` +
+        `• 🏆 الفائز : *${winnerName}* (${result.winner === X_SYM ? 'X' : 'O'})`;
+      await ctx.editMessageText(_winTxt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } }).catch(()=>{});
       return;
     }
 
+    await ctx.answerCbQuery('✅').catch(()=>{});
     game.turn = game.turn === 1 ? 2 : 1;
 
     const text    = buildMessage(game);
     const boardKb = buildBoard(game.board, game.chatId);
-    
-
-    const _mo = { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } };
-    const _me = await ctx.editMessageText(text, _mo).catch(()=>null);
-    if (!_me) await ctx.reply(text, _mo).catch(()=>{});
+    await ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } }).catch(()=>{});
     return;
-  }
+      }
 };
 
 // تنظيف الألعاب القديمة
