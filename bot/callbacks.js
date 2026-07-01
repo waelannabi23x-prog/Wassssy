@@ -1407,6 +1407,7 @@ module.exports.registerCallbacks = function(bot, deps) {
           || data.startsWith('grp_restrict_') || data.startsWith('grp_unrestrict_')
           || data.startsWith('games_')
           || data.startsWith('music_')
+          || data.startsWith('xo_')
           || data.startsWith('bank_') || data.startsWith('bnk_')
           || data.startsWith('bankpro:')
           || data === 'bank_menu' || data === 'bank_wallet'
@@ -1622,6 +1623,11 @@ module.exports.registerCallbacks = function(bot, deps) {
 
 
   // ══ 🎵 Music Search Callbacks ══
+  // ══ 🎮 XO Game ══
+  if (data.startsWith('xo_')) {
+    return require('../handlers/xo').handleCallback(ctx).catch(() => {});
+  }
+
   if (data === 'music_close' || data.startsWith('music_dl_') || data.startsWith('music_track_')) {
     return require('../handlers/music').handleCallback(ctx).catch(() => {});
   }
