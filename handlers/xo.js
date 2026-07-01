@@ -120,7 +120,7 @@ exports.handleCallback = async (ctx) => {
       player1: p1id, player1Name: p1n,
       player2: p2id, player2Name: p2n,
       board: Array(9).fill(EMPTY),
-      turn: Math.random() < 0.5 ? 1 : 2,
+      turn: 1, // X دائماً يبدأ
       started: true, msgId: null,
     };
     games.set(chatId, game);
@@ -148,7 +148,7 @@ exports.handleCallback = async (ctx) => {
     game.player2     = userId;
     game.player2Name = name;
     game.started     = true;
-    game.turn        = Math.random() < 0.5 ? 1 : 2;
+    game.turn        = 1; // X دائماً يبدأ
 
     await ctx.answerCbQuery(`✅ انضممت كـ ${O_SYM}`).catch(()=>{});
 
@@ -242,7 +242,9 @@ exports.handleCallback = async (ctx) => {
       if (result.winner === 'draw') {
         ctx.answerCbQuery('🤝 تعادل!').catch(()=>{});
         const _drawTxt = `🎮 *لعبة XO*\n• اللاعب الاول : ${p1n} (X)\n• اللاعب الثاني : ${p2n} (O)\n\n• 🤝 تعادل!`;
-        ctx.editMessageText(_drawTxt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } }).catch(()=>{});
+        const _dOpts = { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } };
+        const _de = await ctx.editMessageText(_drawTxt, _dOpts).catch(()=>null);
+        if (!_de) await ctx.reply(_drawTxt, _dOpts).catch(()=>{});
         return;
       }
 
@@ -253,7 +255,9 @@ exports.handleCallback = async (ctx) => {
         `• اللاعب الاول : ${p1n} (X)\n` +
         `• اللاعب الثاني : ${p2n} (O)\n\n` +
         `• 🏆 الفائز : *${winnerName}* (${result.winner === X_SYM ? 'X' : 'O'})`;
-      ctx.editMessageText(_winTxt, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } }).catch(()=>{});
+      const _opts = { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } };
+      const _edited = await ctx.editMessageText(_winTxt, _opts).catch(()=>null);
+      if (!_edited) await ctx.reply(_winTxt, _opts).catch(()=>{});
       return;
     }
 
