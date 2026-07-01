@@ -88,7 +88,7 @@ exports.startGame = async (ctx) => {
   const msg = await ctx.reply(inviteText, {
     parse_mode: 'Markdown',
     reply_markup: { inline_keyboard: [
-      [{ text: '• ابدء اللعبه', callback_data: `xo_join_${gameId}` }],
+      [{ text: '• ابدء اللعبه', callback_data: `xo_join_${chatId}` }],
     ]},
   }).catch(()=>null);
 
@@ -139,7 +139,7 @@ exports.handleCallback = async (ctx) => {
 
   // انضمام
   if (data.startsWith('xo_join_')) {
-    if (!game) return ctx.answerCbQuery('❌ انتهت اللعبة').catch(()=>{});
+    if (!game) return ctx.answerCbQuery('❌ لا توجد لعبة نشطة، اكتب XO لبدء لعبة جديدة').catch(()=>{});
     if (game.player1 === userId)
       return ctx.answerCbQuery('❌ لا يمكنك اللعب مع نفسك!').catch(()=>{});
     if (game.started)
