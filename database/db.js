@@ -403,6 +403,17 @@ async function initSchema() {
     }
   } catch(_) {}
 
+  // Migration: auto_reactions
+  try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS auto_reactions (
+    id SERIAL PRIMARY KEY,
+    trigger TEXT NOT NULL,
+    emoji TEXT NOT NULL,
+    match_type TEXT DEFAULT 'contains',
+    is_active SMALLINT DEFAULT 1,
+    created_by BIGINT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+  )`); } catch(_) {}
+
   // Migration: resp_type و file_id لجدول auto_replies
   try { if(pg) await pg.query("ALTER TABLE auto_replies ADD COLUMN IF NOT EXISTS resp_type TEXT DEFAULT 'text'"); } catch(_) {}
   try { if(pg) await pg.query("ALTER TABLE auto_replies ADD COLUMN IF NOT EXISTS file_id TEXT"); } catch(_) {}

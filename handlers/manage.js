@@ -763,6 +763,16 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
     return true;
   }
 
+  // ── React تلقائي wizard ──
+  if (state && state.type === 'mg_reaction_trigger') {
+    await setState(uid, { type:'mg_reaction_emoji', trigger: text });
+    const emojiRows = [];
+    const emojis = ['👍','👎','❤','🔥','🥰','👏','😁','🤔','🤯','😱','🎉','🤩','💩','🙏','👌','🕊','🤡','🥱','😍','💯','🤣','⚡','🏆','💔','😐','😈','😭','🤓','👻','👀','🎃','😇','😨','🤝','😎','😡'];
+    for(let i=0;i<emojis.length;i+=5) emojiRows.push(emojis.slice(i,i+5).map(e=>btn(e,'mg_pick_emoji_'+encodeURIComponent(e))));
+    emojiRows.push([btn('❌ إلغاء','mg_auto_reactions')]);
+    return ctx.reply('✅ الكلمة: *' + text + '*\n\n😀 اختر الـ React:', { parse_mode:'Markdown', reply_markup:{ inline_keyboard: emojiRows }}).catch(()=>{});
+  }
+
   // ── wizard إضافة سؤال مليون ──
   if (state && state.type === 'mq_wizard_q') {
     await setState(uid, { type:'mq_wizard_a', question: text });
@@ -838,7 +848,39 @@ async function handleCallback(ctx,data){
     try { return await showChannelsMenu(ctx); }
     catch(e) { console.error('[channels_menu]', e.message, e.stack); return ctx.reply('❌ ' + e.message).catch(()=>{}); }
   }
-  if(data==='mg_auto_replies') return showAutoReplies(ctx);
+  if(data.startsWith('mg_pick_emoji_')) {
+    const emoji = decodeURIComponent(data.replace('mg_pick_emoji_',''));
+    const s = await (require('../utils/stateManager').getStateAsync||require('../utils/stateManager').getState)(uid).catch(()=>null);
+    if(!s || !s.trigger) return ctx.answerCbQuery('❌ انتهت الجلسة').catch(()=>{});
+    await run('INSERT INTO auto_reactions(trigger,emoji,match_type,created_by) VALUES($1,$2,$3,$4)',
+      [s.trigger, emoji, 'contains', uid]).catch(()=>{});
+    cacheClear('auto_reactions_all');
+    await require('../utils/stateManager').delState(uid).catch(()=>{});
+    await ctx.answerCbQuery('✅ تم!').catch(()=>{});
+    return showAutoReactions(ctx);
+  }
+  if(data==='mg_auto_reactions') return showAutoReactions(ctx);
+  if(data==='mg_add_reaction') {
+    await setState(uid, { type:'mg_reaction_trigger' });
+    return eos(ctx,
+      '😀 *إضافة React تلقائي*\n\n📝 أرسل الكلمة أو النص الذي سيُفعّل الـ React:',
+      { parse_mode:'Markdown', ...build([[btn('❌ إلغاء','mg_auto_reactions')]]) }
+    );
+  }
+  if(data.startsWith('mg_del_reaction_')) {
+    const rid = parseInt(data.replace('mg_del_reaction_',''));
+    await run('DELETE FROM auto_reactions WHERE id=$1',[rid]).catch(()=>{});
+    cacheClear('auto_reactions_all');
+    return showAutoReactions(ctx);
+  }
+  if(data.startsWith('mg_toggle_reaction_')) {
+    const rid = parseInt(data.replace('mg_toggle_reaction_',''));
+    const r = await get('SELECT is_active FROM auto_reactions WHERE id=$1',[rid]).catch(()=>null);
+    if(r) await run('UPDATE auto_reactions SET is_active=$1 WHERE id=$2',[r.is_active?0:1,rid]).catch(()=>{});
+    cacheClear('auto_reactions_all');
+    return showAutoReactions(ctx);
+  }
+if(data==='mg_auto_replies') return showAutoReplies(ctx);
   if(data==='mg_games_settings') return showGamesSettings(ctx);
   if(data.startsWith('mg_gs_')) {
     const key = data.replace('mg_gs_','');
@@ -1368,6 +1410,25 @@ async function showAutoReplies(ctx, page) {
   rows.push([btn('➕ إضافة رد', 'mg_add_ar'), btn('🔍 بحث', 'mg_ar_search')]);
   rows.push(back('mg_menu'));
   return eos(ctx, text, { parse_mode: 'Markdown', ...build(rows) });
+}
+
+const REACTION_EMOJIS = ['👍','👎','❤','🔥','🥰','👏','😁','🤔','🤯','😱','🤬','😢','🎉','🤩','🤮','💩','🙏','👌','🕊','🤡','🥱','🥴','😍','🐳','❤‍🔥','🌚','🌭','💯','🤣','⚡','🍌','🏆','💔','🤨','😐','🍓','🍾','💋','🖕','😈','😴','😭','🤓','👻','👨‍💻','👀','🎃','🙈','😇','😨','🤝','✍','🤗','🫡','🎅','🎄','☃','💅','🤪','🗿','🆒','💘','🙉','🦄','😘','💊','🙊','😎','👾','🤷‍♂','🤷','🤷‍♀','😡'];
+
+async function showAutoReactions(ctx) {
+  const rows_db = await all('SELECT * FROM auto_reactions ORDER BY id DESC').catch(()=>[]);
+  let text = '😀 *React تلقائي*\n━━━━━━━━━━━━━━━━\n\n';
+  text += 'المجموع: *' + rows_db.length + '* react\n\n';
+  const rows = [];
+  for(const r of rows_db) {
+    text += (r.is_active?'✅':'❌') + ' `' + r.trigger + '` → ' + r.emoji + '\n';
+    rows.push([
+      btn((r.is_active?'✅':'❌') + ' ' + r.trigger.substring(0,15) + ' ' + r.emoji, 'mg_toggle_reaction_' + r.id),
+      btn('🗑','mg_del_reaction_' + r.id)
+    ]);
+  }
+  rows.push([btn('➕ إضافة React','mg_add_reaction')]);
+  rows.push([btn('◀️ رجوع','mg_auto_replies')]);
+  return eos(ctx, text, { parse_mode:'Markdown', ...build(rows) });
 }
 
 async function showAutoReplyDetail(ctx, id) {
