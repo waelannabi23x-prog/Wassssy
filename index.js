@@ -228,6 +228,26 @@ const groupProtectionMiddleware = async (ctx, next) => {
     }
   }
 
+  // 😀 Auto React
+  if (txt && ['group','supergroup'].includes(ctx.chat?.type)) {
+    try {
+      let _reactList = _cGet('auto_reactions_all');
+      if (!_reactList) {
+        _reactList = await _dbAll('SELECT trigger, emoji FROM auto_reactions WHERE is_active=1').catch(()=>[]);
+        _cSet('auto_reactions_all', _reactList, 60000);
+      }
+      for (const r of _reactList) {
+        if (txt.toLowerCase().includes(r.trigger.toLowerCase())) {
+          ctx.telegram.setMessageReaction(
+            ctx.chat.id, ctx.message.message_id,
+            [{ type: 'emoji', emoji: r.emoji }]
+          ).catch(()=>{});
+          break;
+        }
+      }
+    } catch(_) {}
+  }
+
   // 🌙 فحص AFK (لا يحظر التدفّق — fire & forget، يشمل الأدمنز أيضاً)
   try { require('./handlers/fun_commands').checkAfkOnMessage(ctx).catch(() => {}); } catch (_) {}
 
