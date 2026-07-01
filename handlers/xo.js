@@ -231,42 +231,45 @@ exports.handleCallback = async (ctx) => {
 
     const result = checkWinner(game.board);
 
+    // دالة مساعدة للـ edit بشكل صريح
+    const _msgId = ctx.callbackQuery?.message?.message_id;
+    const _grpId = ctx.callbackQuery?.message?.chat?.id || chatId;
+    const _edit  = (txt, kb) =>
+      ctx.telegram.editMessageText(_grpId, _msgId, undefined, txt, {
+        parse_mode: 'Markdown',
+        reply_markup: { inline_keyboard: kb },
+      }).catch(()=>{});
+
     if (result) {
       const p1id = game.player1, p2id = game.player2;
       const p1n  = game.player1Name, p2n = game.player2Name;
       games.delete(chatId);
 
-      const boardKb = buildBoard(game.board, game.chatId, result.line || []);
-      boardKb.push([{ text: '• اعادة اللعب', callback_data: `xo_rematch_${p1id}_${p2id}_${encodeURIComponent(p1n)}_${encodeURIComponent(p2n)}` }]);
+      const boardKb = buildBoard(game.board, _grpId, result.line || []);
+      const rematch = [{ text: '• اعادة اللعب', callback_data: `xo_rematch_${p1id}_${p2id}_${encodeURIComponent(p1n)}_${encodeURIComponent(p2n)}` }];
+      boardKb.push(rematch);
 
       if (result.winner === 'draw') {
-        ctx.answerCbQuery('🤝 تعادل!').catch(()=>{});
-        const _drawTxt = `🎮 *لعبة XO*\n• اللاعب الاول : ${p1n} (X)\n• اللاعب الثاني : ${p2n} (O)\n\n• 🤝 تعادل!`;
-        const _dOpts = { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } };
-        const _de = await ctx.editMessageText(_drawTxt, _dOpts).catch(()=>null);
-        if (!_de) await ctx.reply(_drawTxt, _dOpts).catch(()=>{});
+        await ctx.answerCbQuery('🤝 تعادل!').catch(()=>{});
+        await _edit(`🎮 *لعبة XO*\n• اللاعب الاول : ${p1n} (X)\n• اللاعب الثاني : ${p2n} (O)\n\n• 🤝 تعادل!`, boardKb);
         return;
       }
 
       const winnerName = result.winner === X_SYM ? p1n : p2n;
-      ctx.answerCbQuery(`🏆 فاز ${winnerName}!`).catch(()=>{});
-      const _winTxt =
-        `🎮 *لعبة XO*\n` +
-        `• اللاعب الاول : ${p1n} (X)\n` +
-        `• اللاعب الثاني : ${p2n} (O)\n\n` +
-        `• 🏆 الفائز : *${winnerName}* (${result.winner === X_SYM ? 'X' : 'O'})`;
-      const _opts = { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } };
-      const _edited = await ctx.editMessageText(_winTxt, _opts).catch(()=>null);
-      if (!_edited) await ctx.reply(_winTxt, _opts).catch(()=>{});
+      const winSym     = result.winner === X_SYM ? 'X' : 'O';
+      await ctx.answerCbQuery(`🏆 فاز ${winnerName}!`).catch(()=>{});
+      await _edit(
+        `🎮 *لعبة XO*\n• اللاعب الاول : ${p1n} (X)\n• اللاعب الثاني : ${p2n} (O)\n\n• 🏆 الفائز : *${winnerName}* (${winSym})`,
+        boardKb
+      );
       return;
     }
 
-    ctx.answerCbQuery('✅').catch(()=>{});
+    await ctx.answerCbQuery('✅').catch(()=>{});
     game.turn = game.turn === 1 ? 2 : 1;
-
     const text    = buildMessage(game);
-    const boardKb = buildBoard(game.board, game.chatId);
-    ctx.editMessageText(text, { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } }).catch(()=>{});
+    const boardKb = buildBoard(game.board, _grpId);
+    await _edit(text, boardKb);
     return;
       }
 };
