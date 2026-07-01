@@ -26,7 +26,7 @@ function checkWinner(board) {
   return null;
 }
 
-function buildBoard(board, gameId, highlight = []) {
+function buildBoard(board, chatId, highlight = []) {
   const rows = [];
   for (let r = 0; r < 3; r++) {
     const row = [];
@@ -39,7 +39,7 @@ function buildBoard(board, gameId, highlight = []) {
       if (isWin && cell === O_SYM) text = '🔵';
       row.push({
         text,
-        callback_data: cell === EMPTY ? `xo_move_${gameId}_${i}` : `xo_noop`,
+        callback_data: cell === EMPTY ? `xo_move_${chatId}_${i}` : `xo_noop`,
       });
     }
     rows.push(row);
@@ -127,7 +127,7 @@ exports.handleCallback = async (ctx) => {
 
     await ctx.answerCbQuery('🎮 إعادة اللعب!').catch(()=>{});
     const text   = buildMessage(game);
-    const boardKb = buildBoard(game.board, game.gameId);
+    const boardKb = buildBoard(game.board, game.chatId);
     boardKb.push([{ text: '🔄 إعادة اللعب', callback_data: `xo_rematch_${p1id}_${p2id}_${encodeURIComponent(p1n)}_${encodeURIComponent(p2n)}` }]);
     return ctx.editMessageText(text, {
       parse_mode: 'Markdown',
@@ -158,7 +158,7 @@ exports.handleCallback = async (ctx) => {
       `• اللاعب الثاني : ${name} (${O_SYM})\n\n` +
       (game.turn === 1 ? `${X_SYM} دور: *${game.player1Name}*` : `${O_SYM} دور: *${name}*`);
 
-    const boardKb = buildBoard(game.board, game.gameId);
+    const boardKb = buildBoard(game.board, game.chatId);
     
 
     return ctx.editMessageText(startText, {
@@ -215,6 +215,8 @@ exports.handleCallback = async (ctx) => {
 
     const parts = data.split('_');
     const cell  = parseInt(parts[parts.length - 1]);
+    if (isNaN(cell) || cell < 0 || cell > 8)
+      return ctx.answerCbQuery('❌ خطأ').catch(()=>{});
 
     const isMyTurn =
       (game.turn === 1 && game.player1 === userId) ||
@@ -237,7 +239,7 @@ exports.handleCallback = async (ctx) => {
       const p1n  = game.player1Name, p2n = game.player2Name;
       games.delete(chatId);
 
-      const boardKb = buildBoard(game.board, game.gameId, result.line || []);
+      const boardKb = buildBoard(game.board, game.chatId, result.line || []);
 
       if (result.winner === 'draw') {
         boardKb.push([{ text: '🔄 • اعادة اللعب', callback_data: `xo_rematch_${p1id}_${p2id}_${encodeURIComponent(p1n)}_${encodeURIComponent(p2n)}` }]);
@@ -264,7 +266,7 @@ exports.handleCallback = async (ctx) => {
     game.turn = game.turn === 1 ? 2 : 1;
 
     const text    = buildMessage(game);
-    const boardKb = buildBoard(game.board, game.gameId);
+    const boardKb = buildBoard(game.board, game.chatId);
     
 
     return ctx.editMessageText(text, {
