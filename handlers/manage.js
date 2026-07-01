@@ -767,7 +767,7 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
   if (state && state.type === 'mg_reaction_trigger') {
     await setState(uid, { type:'mg_reaction_emoji', trigger: text });
     const emojiRows = [];
-    const emojis = ['👍','👎','❤','🔥','🥰','👏','😁','🤔','🤯','😱','🎉','🤩','💩','🙏','👌','🕊','🤡','🥱','😍','💯','🤣','⚡','🏆','💔','😐','😈','😭','🤓','👻','👀','🎃','😇','😨','🤝','😎','😡'];
+    const emojis = ['👍','👎','❤','🔥','🥰','👏','😁','🤔','🤯','😱','🎉','🤩','💩','🙏','👌','🕊','🤡','🥱','😍','💯','🤣','⚡','🏆','💔','😐','😈','😭','🤓','👻','👀','🎃','😇','😨','🤝','😎','😡','💋','🫡','🤗','🥳','😂','😏'];
     for(let i=0;i<emojis.length;i+=5) emojiRows.push(emojis.slice(i,i+5).map(e=>btn(e,'mg_pick_emoji_'+encodeURIComponent(e))));
     emojiRows.push([btn('❌ إلغاء','mg_auto_reactions')]);
     return ctx.reply('✅ الكلمة: *' + text + '*\n\n😀 اختر الـ React:', { parse_mode:'Markdown', reply_markup:{ inline_keyboard: emojiRows }}).catch(()=>{});
@@ -850,12 +850,14 @@ async function handleCallback(ctx,data){
   }
   if(data.startsWith('mg_pick_emoji_')) {
     const emoji = decodeURIComponent(data.replace('mg_pick_emoji_',''));
-    const s = await (require('../utils/stateManager').getStateAsync||require('../utils/stateManager').getState)(uid).catch(()=>null);
+    const { run: _run, all: _all } = require('../database/db');
+    const { getStateAsync, getState, delState } = require('../utils/stateManager');
+    const s = await (getStateAsync||getState)(uid).catch(()=>null);
     if(!s || !s.trigger) return ctx.answerCbQuery('❌ انتهت الجلسة').catch(()=>{});
-    await run('INSERT INTO auto_reactions(trigger,emoji,match_type,created_by) VALUES($1,$2,$3,$4)',
+    await _run('INSERT INTO auto_reactions(trigger,emoji,match_type,created_by) VALUES($1,$2,$3,$4)',
       [s.trigger, emoji, 'contains', uid]).catch(()=>{});
     cacheClear('auto_reactions_all');
-    await require('../utils/stateManager').delState(uid).catch(()=>{});
+    await delState(uid).catch(()=>{});
     await ctx.answerCbQuery('✅ تم!').catch(()=>{});
     return showAutoReactions(ctx);
   }
