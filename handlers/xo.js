@@ -38,7 +38,7 @@ function buildBoard(board, chatId, highlight = []) {
       if (isWin && cell === X_SYM) text = 'X';
       if (isWin && cell === O_SYM) text = 'O';
       row.push({
-        text: cell === EMPTY ? '·' : (cell === 'X' ? 'X' : 'O'),
+        text: cell === EMPTY ? '·' : (isWin ? (cell === X_SYM ? '🏆X' : '🏆O') : cell),
         callback_data: cell === EMPTY ? `xo_move_${chatId}_${i}` : `xo_noop_${i}`,
       });
     }
