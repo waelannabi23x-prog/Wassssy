@@ -7,9 +7,9 @@
 
 const games = new Map();
 
-const EMPTY = ' · ';
-const X_SYM = ' X ';
-const O_SYM = ' O ';
+const EMPTY = '·';
+const X_SYM = 'X';
+const O_SYM = 'O';
 
 const WIN_LINES = [
   [0,1,2],[3,4,5],[6,7,8],
@@ -35,11 +35,11 @@ function buildBoard(board, chatId, highlight = []) {
       const cell = board[i];
       const isWin = highlight.includes(i);
       let text = cell;
-      if (isWin && cell === X_SYM) text = '🔴';
-      if (isWin && cell === O_SYM) text = '🔵';
+      if (isWin && cell === X_SYM) text = 'X';
+      if (isWin && cell === O_SYM) text = 'O';
       row.push({
-        text,
-        callback_data: cell === EMPTY ? `xo_move_${chatId}_${i}` : `xo_noop`,
+        text: cell === EMPTY ? '·' : (cell === 'X' ? 'X' : 'O'),
+        callback_data: cell === EMPTY ? `xo_move_${chatId}_${i}` : `xo_noop_${i}`,
       });
     }
     rows.push(row);
@@ -102,7 +102,7 @@ exports.handleCallback = async (ctx) => {
   const userId = ctx.from?.id;
   const name   = ctx.from?.first_name || 'لاعب';
 
-  if (data === 'xo_noop') {
+  if (data === 'xo_noop' || data.startsWith('xo_noop_')) {
     return ctx.answerCbQuery('❌ هذه الخانة مأخوذة!').catch(()=>{});
   }
 
@@ -128,7 +128,7 @@ exports.handleCallback = async (ctx) => {
     await ctx.answerCbQuery('🎮 إعادة اللعب!').catch(()=>{});
     const text   = buildMessage(game);
     const boardKb = buildBoard(game.board, game.chatId);
-    boardKb.push([{ text: '🔄 إعادة اللعب', callback_data: `xo_rematch_${p1id}_${p2id}_${encodeURIComponent(p1n)}_${encodeURIComponent(p2n)}` }]);
+    boardKb.push([{ text: '• اعادة اللعب', callback_data: `xo_rematch_${p1id}_${p2id}_${encodeURIComponent(p1n)}_${encodeURIComponent(p2n)}` }]);
     return ctx.editMessageText(text, {
       parse_mode: 'Markdown',
       reply_markup: { inline_keyboard: boardKb },
@@ -198,11 +198,11 @@ exports.handleCallback = async (ctx) => {
       `🎮 *لعبة XO*\n` +
       `• اللاعب الاول : ${p1n} (${X_SYM})\n` +
       `• اللاعب الثاني : ${p2n} (${O_SYM})\n\n` +
-      `• 🏆 الفائز : ${winnerName} (بالاستسلام)`,
+      `• الفائز : ${winnerName} (بالاستسلام)`,
       {
         parse_mode: 'Markdown',
         reply_markup: { inline_keyboard: [[
-          { text: '🔄 • اعادة اللعب', callback_data: `xo_rematch_${p1id}_${p2id}_${encodeURIComponent(p1n)}_${encodeURIComponent(p2n)}` }
+          { text: '• اعادة اللعب', callback_data: `xo_rematch_${p1id}_${p2id}_${encodeURIComponent(p1n)}_${encodeURIComponent(p2n)}` }
         ]]},
       }
     ).catch(()=>{});
@@ -242,23 +242,24 @@ exports.handleCallback = async (ctx) => {
       const boardKb = buildBoard(game.board, game.chatId, result.line || []);
 
       if (result.winner === 'draw') {
-        boardKb.push([{ text: '🔄 • اعادة اللعب', callback_data: `xo_rematch_${p1id}_${p2id}_${encodeURIComponent(p1n)}_${encodeURIComponent(p2n)}` }]);
+        boardKb.push([{ text: '• اعادة اللعب', callback_data: `xo_rematch_${p1id}_${p2id}_${encodeURIComponent(p1n)}_${encodeURIComponent(p2n)}` }]);
         return ctx.editMessageText(
           `🎮 *لعبة XO*\n` +
           `• اللاعب الاول : ${p1n} (${X_SYM})\n` +
           `• اللاعب الثاني : ${p2n} (${O_SYM})\n\n` +
-          `• 🤝 تعادل!`,
+          `• تعادل!`,
           { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } }
         ).catch(()=>{});
       }
 
       const winnerName = result.winner === X_SYM ? p1n : p2n;
-      boardKb.push([{ text: '🔄 • اعادة اللعب', callback_data: `xo_rematch_${p1id}_${p2id}_${encodeURIComponent(p1n)}_${encodeURIComponent(p2n)}` }]);
+      const winSym = result.winner === X_SYM ? 'X' : 'O';
+      boardKb.push([{ text: '• اعادة اللعب', callback_data: `xo_rematch_${p1id}_${p2id}_${encodeURIComponent(p1n)}_${encodeURIComponent(p2n)}` }]);
       return ctx.editMessageText(
         `🎮 *لعبة XO*\n` +
         `• اللاعب الاول : ${p1n} (${X_SYM})\n` +
         `• اللاعب الثاني : ${p2n} (${O_SYM})\n\n` +
-        `• 🏆 الفائز : ${winnerName} (${result.winner})`,
+        `• الفائز : ${winnerName} (${winSym})`,
         { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } }
       ).catch(()=>{});
     }
