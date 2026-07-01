@@ -870,15 +870,17 @@ async function handleCallback(ctx,data){
     );
   }
   if(data.startsWith('mg_del_reaction_')) {
+    const { run: _rr, get: _gr } = require('../database/db');
     const rid = parseInt(data.replace('mg_del_reaction_',''));
-    await run('DELETE FROM auto_reactions WHERE id=$1',[rid]).catch(()=>{});
+    await _rr('DELETE FROM auto_reactions WHERE id=$1',[rid]).catch(()=>{});
     cacheClear('auto_reactions_all');
     return showAutoReactions(ctx);
   }
   if(data.startsWith('mg_toggle_reaction_')) {
+    const { run: _rr2, get: _gr2 } = require('../database/db');
     const rid = parseInt(data.replace('mg_toggle_reaction_',''));
-    const r = await get('SELECT is_active FROM auto_reactions WHERE id=$1',[rid]).catch(()=>null);
-    if(r) await run('UPDATE auto_reactions SET is_active=$1 WHERE id=$2',[r.is_active?0:1,rid]).catch(()=>{});
+    const r = await _gr2('SELECT is_active FROM auto_reactions WHERE id=$1',[rid]).catch(()=>null);
+    if(r) await _rr2('UPDATE auto_reactions SET is_active=$1 WHERE id=$2',[r.is_active?0:1,rid]).catch(()=>{});
     cacheClear('auto_reactions_all');
     return showAutoReactions(ctx);
   }
