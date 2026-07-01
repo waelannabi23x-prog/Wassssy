@@ -234,11 +234,14 @@ exports.handleCallback = async (ctx) => {
     // دالة مساعدة للـ edit بشكل صريح
     const _msgId = ctx.callbackQuery?.message?.message_id;
     const _grpId = ctx.callbackQuery?.message?.chat?.id || chatId;
-    const _edit  = (txt, kb) =>
-      ctx.telegram.editMessageText(_grpId, _msgId, undefined, txt, {
-        parse_mode: 'Markdown',
-        reply_markup: { inline_keyboard: kb },
-      }).catch(()=>{});
+    const _edit  = async (txt, kb) => {
+      const opts = { parse_mode: 'Markdown', reply_markup: { inline_keyboard: kb } };
+      const r = await ctx.editMessageText(txt, opts).catch(e => {
+        require('../utils/logger').debug('[XO edit error]', e.message);
+        return null;
+      });
+      if (!r) await ctx.reply(txt, opts).catch(()=>{});
+    };
 
     if (result) {
       const p1id = game.player1, p2id = game.player2;
