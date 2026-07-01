@@ -243,25 +243,21 @@ exports.handleCallback = async (ctx) => {
 
       if (result.winner === 'draw') {
         boardKb.push([{ text: '• اعادة اللعب', callback_data: `xo_rematch_${p1id}_${p2id}_${encodeURIComponent(p1n)}_${encodeURIComponent(p2n)}` }]);
-        return ctx.editMessageText(
-          `🎮 *لعبة XO*\n` +
-          `• اللاعب الاول : ${p1n} (${X_SYM})\n` +
-          `• اللاعب الثاني : ${p2n} (${O_SYM})\n\n` +
-          `• تعادل!`,
-          { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } }
-        ).catch(()=>{});
+        const _drawTxt = `🎮 *لعبة XO*\n• اللاعب الاول : ${p1n} (X)\n• اللاعب الثاني : ${p2n} (O)\n\n• تعادل!`;
+        const _drawOpts = { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } };
+        const _de = await ctx.editMessageText(_drawTxt, _drawOpts).catch(()=>null);
+        if (!_de) await ctx.reply(_drawTxt, _drawOpts).catch(()=>{});
+        return;
       }
 
       const winnerName = result.winner === X_SYM ? p1n : p2n;
       const winSym = result.winner === X_SYM ? 'X' : 'O';
       boardKb.push([{ text: '• اعادة اللعب', callback_data: `xo_rematch_${p1id}_${p2id}_${encodeURIComponent(p1n)}_${encodeURIComponent(p2n)}` }]);
-      return ctx.editMessageText(
-        `🎮 *لعبة XO*\n` +
-        `• اللاعب الاول : ${p1n} (${X_SYM})\n` +
-        `• اللاعب الثاني : ${p2n} (${O_SYM})\n\n` +
-        `• الفائز : ${winnerName} (${winSym})`,
-        { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } }
-      ).catch(()=>{});
+      const _winTxt = `🎮 *لعبة XO*\n• اللاعب الاول : ${p1n} (X)\n• اللاعب الثاني : ${p2n} (O)\n\n• الفائز : ${winnerName}`;
+      const _winOpts = { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } };
+      const _edited = await ctx.editMessageText(_winTxt, _winOpts).catch(()=>null);
+      if (!_edited) await ctx.reply(_winTxt, _winOpts).catch(()=>{});
+      return;
     }
 
     game.turn = game.turn === 1 ? 2 : 1;
@@ -270,10 +266,10 @@ exports.handleCallback = async (ctx) => {
     const boardKb = buildBoard(game.board, game.chatId);
     
 
-    return ctx.editMessageText(text, {
-      parse_mode: 'Markdown',
-      reply_markup: { inline_keyboard: boardKb },
-    }).catch(()=>{});
+    const _mo = { parse_mode: 'Markdown', reply_markup: { inline_keyboard: boardKb } };
+    const _me = await ctx.editMessageText(text, _mo).catch(()=>null);
+    if (!_me) await ctx.reply(text, _mo).catch(()=>{});
+    return;
   }
 };
 
