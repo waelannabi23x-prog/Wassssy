@@ -125,9 +125,8 @@ exports.startGame = async (ctx) => {
   cooldowns.set(chatId, Date.now());
   const startTime = Date.now();
 
-  const hint = country.name.charAt(0) + '_'.repeat(country.name.length - 1);
   const msg = await ctx.reply(
-    `• دولة ← ${country.flag} (\n• تلميح: ${hint}`,
+    `• دولة ← ${country.flag} (`,
     { reply_to_message_id: ctx.message?.message_id }
   ).catch(() => null);
 
@@ -173,7 +172,7 @@ exports.handleAnswer = async (ctx) => {
     `• اجابة صحيحة ← ${name}\n` +
     `• الدولة ← ${game.country.name} ${game.country.flag}\n` +
     `• عدد الثواني ← ${elapsed}\n` +
-    `• فلوسك ← (${Math.floor(newBal).toLocaleString()} DA 🤑)\n` +
+    `• فلوسك ← (${Math.floor(newBal).toLocaleString()} ريال 🤑)\n` +
     `-`,
     { reply_to_message_id: ctx.message.message_id }
   ).catch(() => {});
