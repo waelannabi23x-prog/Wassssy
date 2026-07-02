@@ -152,11 +152,14 @@ exports.handleAnswer = async (ctx) => {
   const name = ctx.from.first_name || 'لاعب';
 
   const mention = `[${name}](tg://user?id=${uid})`;
-  // رد فوري بدون انتظار DB
+  // جيب الرصيد ثم رد
+  const curBal = await getBalance(uid);
+  const newBal = curBal + reward;
   ctx.reply(
     `• اجابة صحيحة ← ${mention}\n` +
     `• الدولة ← ${game.country.name} ${game.country.flag}\n` +
     `• عدد الثواني ← ${elapsed}\n` +
+    `• فلوسك ← (${Math.floor(newBal).toLocaleString()} DA 🤑)\n` +
     `-`,
     { reply_to_message_id: ctx.message.message_id, parse_mode: 'Markdown' }
   ).catch(() => {});
