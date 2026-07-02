@@ -126,7 +126,7 @@ exports.startGame = async (ctx) => {
   const startTime = Date.now();
 
   const msg = await ctx.reply(
-    `• دولة ← ${country.flag} (`,
+    `• دولة ← ${country.flag}`,
     { reply_to_message_id: ctx.message?.message_id }
   ).catch(() => null);
 
