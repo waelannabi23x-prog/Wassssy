@@ -151,18 +151,17 @@ exports.handleAnswer = async (ctx) => {
   const uid  = ctx.from.id;
   const name = ctx.from.first_name || 'لاعب';
 
-  addBalance(uid, reward).then(async () => {
-    const newBal = await getBalance(uid);
-    const mention = `[${name}](tg://user?id=${uid})`;
-    ctx.reply(
-      `• اجابة صحيحة ← ${mention}\n` +
+  const mention = `[${name}](tg://user?id=${uid})`;
+  // رد فوري بدون انتظار DB
+  ctx.reply(
+    `• اجابة صحيحة ← ${mention}\n` +
     `• الدولة ← ${game.country.name} ${game.country.flag}\n` +
     `• عدد الثواني ← ${elapsed}\n` +
-    `• فلوسك ← (${Math.floor(newBal).toLocaleString()} ريال 🤑)\n` +
     `-`,
-      { reply_to_message_id: ctx.message.message_id, parse_mode: 'Markdown' }
-    ).catch(() => {});
-  });
+    { reply_to_message_id: ctx.message.message_id, parse_mode: 'Markdown' }
+  ).catch(() => {});
+  // DB في الخلفية
+  addBalance(uid, reward).catch(() => {});
 
   return true;
 };
