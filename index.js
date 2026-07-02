@@ -191,6 +191,10 @@ const groupProtectionMiddleware = async (ctx, next) => {
       }
       if (_arDis === 1) return next();
 
+    // تجاهل الردود التلقائية لكلمات الألعاب
+    const _gameWords = ['دول','xo','مليون','خمن','لوب غارو','werewolf','Xo','XO'];
+    if (_gameWords.some(w => txt.toLowerCase() === w.toLowerCase())) return next();
+
     const arKey = 'auto_replies_all';
     let arList = _cGet(arKey);
     if (!arList) {
@@ -311,6 +315,11 @@ const gameAndBankMiddleware = async (ctx, next) => {
 
     // البنك
     // bank.js القديم محذوف — استخدم bank_pro.js
+
+    // 🌍 لعبة الدول
+    if (/^دول$/i.test(txt)) {
+      return require('./handlers/countries_game').startGame(ctx).catch(() => next());
+    }
 
     // 🎮 لعبة XO
     if (/^xo$/i.test(txt) || /^XO$/i.test(txt)) {
