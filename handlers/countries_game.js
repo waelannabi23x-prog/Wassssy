@@ -108,6 +108,8 @@ exports.startGame = async (ctx) => {
   const chatId = ctx.chat.id;
 
   // كول داون
+  // لا cooldown إذا ما في لعبة نشطة
+  if (!activeGames.has(chatId)) cooldowns.delete(chatId);
   const lastTime = cooldowns.get(chatId);
   if (lastTime && Date.now() - lastTime < COOLDOWN_MS) {
     const secs = Math.ceil((COOLDOWN_MS - (Date.now() - lastTime)) / 1000);
@@ -132,16 +134,16 @@ exports.startGame = async (ctx) => {
   activeGames.set(chatId, { country, msgId: msg?.message_id, startTime });
 
   // انتهاء الوقت تلقائياً
+  const _tg = ctx.telegram;
   setTimeout(() => {
     const game = activeGames.get(chatId);
     if (game && game.startTime === startTime) {
       activeGames.delete(chatId);
-      if (msg) {
-        ctx.telegram.sendMessage(chatId,
-          `• انتهى الوقت ⏰\n• الدولة كانت ← ${country.name} ${country.flag}\n-`,
-          { reply_to_message_id: msg.message_id }
-        ).catch(() => {});
-      }
+      cooldowns.delete(chatId); // السماح بلعبة جديدة فوراً
+      _tg.sendMessage(chatId,
+        `• انتهى الوقت ⏰\n• الدولة كانت ← ${country.name} ${country.flag}\n-`,
+        msg ? { reply_to_message_id: msg.message_id } : {}
+      ).catch(() => {});
     }
   }, TIMEOUT_MS);
 };
