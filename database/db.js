@@ -34,7 +34,7 @@ function getPg() {
       if (!pgPool) { clearInterval(_kpTimer); return; }
       pgPool.query('SELECT 1').catch(e => {
         // لا نحذف الـ pool — هو يعيد الاتصال تلقائياً
-        require('./logger').warn('[DB] keepalive failed (auto-recovering):', e.message);
+        require('../utils/logger').warn('[DB] keepalive failed (auto-recovering):', e.message);
       });
     }, 25000);
     _kpTimer.unref();
@@ -241,7 +241,7 @@ async function initSchema() {
   }
 
   // migration: created_at في users
-  try { if(pg) await pg.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'); } catch(err) { require('./logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
   // grp_approved و group_watching
   try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS grp_approved (
@@ -252,22 +252,22 @@ async function initSchema() {
     created_at TIMESTAMP DEFAULT NOW(), PRIMARY KEY(chat_id,user_id))`); } catch(e) {}
 
   // member_cards migrations
-  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS trigger_word TEXT'); } catch(err) { require('./logger').debug('[catch]', err.message); }
-  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS first_name TEXT'); } catch(err) { require('./logger').debug('[catch]', err.message); }
-  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS username TEXT'); } catch(err) { require('./logger').debug('[catch]', err.message); }
-  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS photo_file_id TEXT'); } catch(err) { require('./logger').debug('[catch]', err.message); }
-  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS bio TEXT'); } catch(err) { require('./logger').debug('[catch]', err.message); }
-  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()'); } catch(err) { require('./logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS trigger_word TEXT'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS first_name TEXT'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS username TEXT'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS photo_file_id TEXT'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS bio TEXT'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE member_cards ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT NOW()'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
   // member_cards tables
   try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS member_cards (
     chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL,
     trigger_word TEXT, photo_file_id TEXT, bio TEXT,
     username TEXT, first_name TEXT, updated_at TIMESTAMP DEFAULT NOW(),
-    PRIMARY KEY(chat_id, user_id))`); } catch(err) { require('./logger').debug('[catch]', err.message); }
+    PRIMARY KEY(chat_id, user_id))`); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS member_card_triggers (
     chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL, trigger_word TEXT NOT NULL,
-    PRIMARY KEY(chat_id, trigger_word))`); } catch(err) { require('./logger').debug('[catch]', err.message); }
+    PRIMARY KEY(chat_id, trigger_word))`); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
   // Migration: history unique constraint
   try { if(pg) await pg.query('ALTER TABLE history ADD COLUMN IF NOT EXISTS date DATE DEFAULT CURRENT_DATE'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
@@ -323,7 +323,7 @@ async function initSchema() {
         END IF;
       END $$;
     `);
-  } catch(e) { require('./logger').debug('[notes constraint]', e.message); }
+  } catch(e) { require('../utils/logger').debug('[notes constraint]', e.message); }
   try { await pg.query(`CREATE TABLE IF NOT EXISTS blacklist_words(
     id SERIAL PRIMARY KEY, chat_id BIGINT, word TEXT,
     action TEXT DEFAULT 'delete', added_by BIGINT,
