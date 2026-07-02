@@ -107,22 +107,14 @@ function randomCountry(exclude) {
 exports.startGame = async (ctx) => {
   const chatId = ctx.chat.id;
 
-  // كول داون
-  // لا cooldown إذا ما في لعبة نشطة
-  if (!activeGames.has(chatId)) cooldowns.delete(chatId);
-  const lastTime = cooldowns.get(chatId);
-  if (lastTime && Date.now() - lastTime < COOLDOWN_MS) {
-    const secs = Math.ceil((COOLDOWN_MS - (Date.now() - lastTime)) / 1000);
-    return ctx.reply(`⏳ انتظر ${secs} ثانية`, {
-      reply_to_message_id: ctx.message?.message_id,
-    }).catch(() => {});
-  }
+  // إذا في لعبة نشطة ابدأ واحدة جديدة مباشرة
+  activeGames.delete(chatId);
 
   // اختر دولة عشوائية
   const prev    = activeGames.get(chatId)?.country?.name;
   const country = randomCountry(prev);
 
-  cooldowns.set(chatId, Date.now());
+
   const startTime = Date.now();
 
   const msg = await ctx.reply(
@@ -137,7 +129,6 @@ exports.startGame = async (ctx) => {
     const game = activeGames.get(chatId);
     if (game && game.startTime === startTime) {
       activeGames.delete(chatId);
-      cooldowns.delete(chatId);
     }
   }, TIMEOUT_MS);
 };
@@ -160,17 +151,18 @@ exports.handleAnswer = async (ctx) => {
   const uid  = ctx.from.id;
   const name = ctx.from.first_name || 'لاعب';
 
-  await addBalance(uid, reward);
-  const newBal = await getBalance(uid);
-
-  await ctx.reply(
-    `• اجابة صحيحة ← ${name}\n` +
+  addBalance(uid, reward).then(async () => {
+    const newBal = await getBalance(uid);
+    const mention = `[${name}](tg://user?id=${uid})`;
+    ctx.reply(
+      `• اجابة صحيحة ← ${mention}\n` +
     `• الدولة ← ${game.country.name} ${game.country.flag}\n` +
     `• عدد الثواني ← ${elapsed}\n` +
     `• فلوسك ← (${Math.floor(newBal).toLocaleString()} ريال 🤑)\n` +
     `-`,
-    { reply_to_message_id: ctx.message.message_id }
-  ).catch(() => {});
+      { reply_to_message_id: ctx.message.message_id, parse_mode: 'Markdown' }
+    ).catch(() => {});
+  });
 
   return true;
 };
