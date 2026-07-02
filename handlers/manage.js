@@ -1583,4 +1583,4 @@ async function startMillionQDel(ctx) {
 
 }
 
-module.exports={showAutoReplyDetail,mainMenu,handleCallback,handleText,handleFileUpload,handleBulkUpload,showUserProfile,showUsers,handleBundleFileUpload};
+module.exports={showAutoReplyDetail,mainMenu,catStats,catUsers,catAdmin,catFun,catSystem,handleCallback,handleText,handleFileUpload,handleBulkUpload,showUserProfile,showUsers,handleBundleFileUpload};

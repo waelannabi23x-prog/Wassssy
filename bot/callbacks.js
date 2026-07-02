@@ -114,6 +114,11 @@ module.exports.registerCallbacks = function(bot, deps) {
       return manage.mainMenu(ctx);
     }],
     ['mg_menu',    ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); return manage.mainMenu(ctx); }],
+    ['mg_cat_stats',  ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫',{show_alert:true}).catch(()=>{}); return manage.catStats(ctx); }],
+    ['mg_cat_users',  ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫',{show_alert:true}).catch(()=>{}); return manage.catUsers(ctx); }],
+    ['mg_cat_admin',  ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫',{show_alert:true}).catch(()=>{}); return manage.catAdmin(ctx); }],
+    ['mg_cat_fun',    ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫',{show_alert:true}).catch(()=>{}); return manage.catFun(ctx); }],
+    ['mg_cat_system', ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫',{show_alert:true}).catch(()=>{}); return manage.catSystem(ctx); }],
     ['mg_content', ctx => { if (!ctx.isAdmin) return ctx.answerCbQuery('🚫', { show_alert: true }).catch(err => { require('../utils/logger').debug("[silent]", err.message); }); return manage.handleCallback(ctx, 'mg_content'); }],
     ['browse',          ctx => browse.showSpecs(ctx)],
     ['latest',          ctx => userH.showLatest(ctx)],
