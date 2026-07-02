@@ -1587,7 +1587,7 @@ async function catStats(ctx){
   return eos(ctx,'📊 *الإحصائيات والسجلات*',{parse_mode:'Markdown',...build([
     [btn('📈 الإحصائيات','mg_analytics'), btn('📜 السجلات','mg_logs')],
     [btn('🗑 المحذوفات','mg_trash'),       btn('🚩 البلاغات','mg_reports')],
-    [back('mg_menu')],
+    back('mg_menu'),
   ])});
 }
 
@@ -1595,7 +1595,7 @@ async function catUsers(ctx){
   return eos(ctx,'👥 *المستخدمون والقروبات*',{parse_mode:'Markdown',...build([
     [btn('👤 المستخدمون','mg_users'),  btn('👑 الإداريون','mg_admins')],
     [btn('👥 القروبات','grp_main')],
-    [back('mg_menu')],
+    back('mg_menu'),
   ])});
 }
 
@@ -1604,7 +1604,7 @@ async function catAdmin(ctx){
     [btn('📢 بث للكل','mg_broadcast'),    btn('🔔 إشعار','mg_notify')],
     [btn('🎓 إشعار تخصص','mg_notify_sp'),btn('📨 الرسائل','mg_msgs')],
     [btn('📣 القنوات','mg_channels_menu'),btn('🤖 الردود','mg_auto_replies')],
-    [back('mg_menu')],
+    back('mg_menu'),
   ];
   return eos(ctx,'📢 *الإدارة والبث*',{parse_mode:'Markdown',...build(rows)});
 }
@@ -1613,7 +1613,7 @@ async function catFun(ctx){
   return eos(ctx,'🎮 *الترفيه*',{parse_mode:'Markdown',...build([
     [btn('🎮 الألعاب','mb_panel'),        btn('🏦 Taline Bank','mg_pro_bank_panel')],
     [btn('🤖 الردود التلقائية','mg_auto_replies')],
-    [back('mg_menu')],
+    back('mg_menu'),
   ])});
 }
 
@@ -1623,7 +1623,7 @@ async function catSystem(ctx){
     [btn('💾 نسخ احتياطي','mg_backup'),   btn('♻️ استعادة','mg_restore')],
     [btn(global.maintenanceMode?'🟢 إيقاف الصيانة':'🔴 الصيانة','mg_maint'), btn('⚙️ الإعدادات','mg_bot_settings')],
     [btn('📱 Mini App','mg_open_app'),     btn(appVisible?'👁 ظاهر':'🔒 مخفي','mg_toggle_app')],
-    [back('mg_menu')],
+    back('mg_menu'),
   ])});
 }
 
