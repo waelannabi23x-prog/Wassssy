@@ -52,6 +52,13 @@ module.exports.registerMessages = function(bot, deps) {
         return;
       }
 
+      // 🌍 لعبة الدول — قبل أي شيء
+      const _cg = require('../handlers/countries_game');
+      if (ctx.message?.text) {
+        const _cgHandled = await _cg.handleAnswer(ctx).catch(() => false);
+        if (_cgHandled) return;
+      }
+
       // بطاقة المستخدم — قبل أي state
       if (['group','supergroup'].includes(ctx.chat?.type) && ctx.message?.text) {
         const _ctxt = ctx.message.text.trim().toLowerCase();
