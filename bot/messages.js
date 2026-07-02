@@ -52,9 +52,14 @@ module.exports.registerMessages = function(bot, deps) {
         return;
       }
 
-      // 🌍 لعبة الدول — قبل أي شيء
+      // 🌍 لعبة الدول
       const _cg = require('../handlers/countries_game');
       if (ctx.message?.text) {
+        const _cgTxt = ctx.message.text.trim();
+        if (/^دول$/i.test(_cgTxt)) {
+          await _cg.startGame(ctx).catch(() => {});
+          return;
+        }
         const _cgHandled = await _cg.handleAnswer(ctx).catch(() => false);
         if (_cgHandled) return;
       }
