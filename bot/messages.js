@@ -52,6 +52,11 @@ module.exports.registerMessages = function(bot, deps) {
         return;
       }
 
+      // 📊 تصويت — معالجة الإنشاء
+      const _poll = require('../handlers/poll_system');
+      const _pollHandled = await _poll.handleDraft(ctx).catch(() => false);
+      if (_pollHandled) return;
+
       // 🌍 لعبة الدول
       const _cg = require('../handlers/countries_game');
       if (ctx.message?.text) {

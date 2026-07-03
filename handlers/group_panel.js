@@ -208,6 +208,7 @@ async function showGroupDetail(ctx, chatId) {
     // ── إجراءات ──
     [kbBtn('📢 راسل هذا القروب', 'gp_msgone_'  + chatId),
      kbBtn('📊 إحصائيات',        'grp_stats_'  + chatId)],
+    [kbBtn('📋 إنشاء تصويت', 'gp_poll_' + chatId)],
     [kbBtn('👥 الأعضاء', 'grp_main_' + chatId)],
     [kbBtn('◀️ رجوع', 'gp_panel'), kbBtn('🗑 إغلاق', 'gp_close')],
     [kbBtn('🚪 خروج من القروب', 'gp_leave_' + chatId)],
@@ -249,6 +250,12 @@ async function handleCallback(ctx, data) {
     const spId = data.replace('gp_broadcast_', '');
     await require('../utils/stateManager').setState(uid, { type: 'gp_broadcast_msg', spId });
     return ctx.reply('📢 *ارسال رسالة للقروبات*\n\nارسل الرسالة:\n نص فقط\n صورة مع caption\n فيديو مع caption\n\n_(او /cancel)_', { parse_mode: 'Markdown' }).catch(() => {});
+  }
+
+  if (data.startsWith('gp_poll_')) {
+    const chatId = data.replace('gp_poll_', '');
+    await require('../handlers/poll_system').startCreate(ctx, chatId);
+    return true;
   }
 
   if (data.startsWith('gp_msgone_')) {

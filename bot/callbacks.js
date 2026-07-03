@@ -9,6 +9,7 @@ const millionGame = require('../handlers/millionaire');
 
 module.exports.registerCallbacks = function(bot, deps) {
   const { handleCallback: infoCb } = require('../handlers/group_info_panel');
+  const pollSystem = require('../handlers/poll_system');
   // استخراج uid و chatId من callback_data بشكل آمن مع chatId السالب
   function extractUidChat(str) {
     // format: uid_chatId حيث chatId قد يكون سالب مثل -1001234567
@@ -414,6 +415,7 @@ module.exports.registerCallbacks = function(bot, deps) {
         return ctx.deleteMessage().catch(() => {});
       }
     }},
+    { p: 'poll_',       fn: (ctx, d) => require('../handlers/poll_system').handleCallback(ctx, d) },
     { p: 'inf_',        fn: (ctx, d) => require('../handlers/group_info_panel').handleCallback(ctx, d) },
     { p: 'nat_',        fn: (ctx, d) => require('../handlers/nations').handleCallback(ctx, d) },
     { p: 'nation_',     fn: (ctx, d) => require('../handlers/nations').handleCallback(ctx, d) },
