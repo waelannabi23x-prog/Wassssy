@@ -88,6 +88,9 @@ async function startCreate(ctx, chatId) {
 // 💬 معالجة رسائل الإنشاء
 // ══════════════════════════════════════════
 async function handleDraft(ctx) {
+  // فقط في الخاص
+  if (ctx.chat?.type !== 'private') return false;
+
   const adminId = ctx.from.id;
   const draft = pollDrafts.get(adminId);
   if (!draft) return false;
@@ -198,12 +201,15 @@ async function sendPoll(ctx, adminId) {
   if (!draft) return ctx.answerCbQuery('❌ انتهت الجلسة').catch(() => {});
 
   // احفظ في DB
-  const poll = await get(
+  const { run: _run, get: _get } = require('../database/db');
+  const pollId = await _get(
     `INSERT INTO polls(chat_id, created_by, question, options, ends_at)
-     VALUES($1,$2,$3,$4,$5) RETURNING *`,
+     VALUES($1,$2,$3,$4,$5) RETURNING id`,
     [draft.chatId, adminId, draft.question, JSON.stringify(draft.options), draft.endsAt || null]
-  ).catch(() => null);
+  ).catch(e => { require('../utils/logger').error('[Poll insert]', e.message); return null; });
 
+  if (!pollId) return ctx.answerCbQuery('❌ خطأ في الحفظ', { show_alert: true }).catch(() => {});
+  const poll = await _get('SELECT * FROM polls WHERE id=$1', [pollId.id]).catch(() => null);
   if (!poll) return ctx.answerCbQuery('❌ خطأ في الحفظ', { show_alert: true }).catch(() => {});
 
   pollDrafts.delete(adminId);
