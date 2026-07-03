@@ -347,6 +347,12 @@ const gameAndBankMiddleware = async (ctx, next) => {
     if (/^(الاثرياء|أثرياء|اثرياء)$/i.test(txt)) return bankPro.richList(ctx).catch(() => next());
   }
 
+  // 📊 تصويت — في الخاص فقط
+  if (!isGroup && ctx.chat?.type === 'private') {
+    const _pollHandled = await require('./handlers/poll_system').handleDraft(ctx).catch(() => false);
+    if (_pollHandled) return;
+  }
+
   // PV لعبة خمن
   if (!isGroup && ctx.chat?.type === 'private') {
     const uid = String(ctx.from?.id || '');
