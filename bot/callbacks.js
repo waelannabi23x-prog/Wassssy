@@ -928,6 +928,11 @@ module.exports.registerCallbacks = function(bot, deps) {
           return;
         }
 
+        // ── التصويت (في القروبات) ──
+        if (data.startsWith('poll_')) {
+          return require('../handlers/poll_system').handleCallback(ctx, data);
+        }
+
         // ── ألعاب المليون (في القروبات والخاص) ──────────────────
         if (data.startsWith('ml_') || data.startsWith('ma_') ||
             data.startsWith('mlr_') || data.startsWith('mar_')) {
