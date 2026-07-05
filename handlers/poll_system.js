@@ -224,7 +224,7 @@ async function sendPoll(ctx, adminId) {
   }).catch(e => { logger.error('[Poll] send error:', e.message); return null; });
 
   if (msg) {
-    await run('UPDATE polls SET msg_id=$1 WHERE id=$2', [msg.message_id, poll.id]).catch(() => {});
+    await _run('UPDATE polls SET msg_id=$1 WHERE id=$2', [msg.message_id, poll.id]).catch(() => {});
   }
 
   // إذا فيه وقت — جدول إنهاء تلقائي
