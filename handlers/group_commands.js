@@ -402,7 +402,9 @@ function setupGroupCommands(bot) {
   // ══════════════════════════════════════════
   // 🎮 Million Battle
   // ══════════════════════════════════════════
-  bot.command('million', async ctx => {
+  // [إصلاح] كان اسمه 'million' فيتعارض مع أمر بدء اللعبة المسجَّل في bot/commands.js (الذي يفوز دائماً لأنه مسجَّل أولاً)
+  // ما يجعل لوحة إدارة الأسئلة هذه غير قابلة للوصول إطلاقاً. أعيدت تسميته لأمر منفصل حتى يعمل الاثنان معاً.
+  bot.command(['million_admin', 'اسئلة_المليون'], async ctx => {
     if (!isGroup(ctx)) return;
     if (!await isTgAdmin(ctx)) return ctx.reply('🚫 للمشرفين فقط').catch(() => {});
     return million.showQuestionsPanel(ctx);

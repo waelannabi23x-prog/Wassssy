@@ -27,8 +27,6 @@ const millionaire   = require('./handlers/millionaire');
 const guessGame     = require('./handlers/guess_game');
 const tools         = require('./handlers/owner_tools');
 const bank          = require('./handlers/bank');
-const bankPro       = require('./handlers/bank_pro');
-const music         = require('./handlers/music');
 const ownerH        = require('./handlers/owner');
 const contentDb     = require('./database/content');
 const usersDb       = require('./database/users');
@@ -40,7 +38,7 @@ const filesDb       = require('./database/files');
 const { handleAiChat, resetChat } = require('./handlers/ai_chat');
 const { handleOwnerAI }           = require('./handlers/ai_owner');
 const { smartSearch }             = require('./handlers/group');
-const { handleNewMember, handleMemberLeft, showAllMembers, tagAll, muteAll, unmuteAll, showGroupStats, warnMember, banMember, unbanMember, muteMember, unmuteMember } = require('./handlers/group_admin');
+const { handleNewMember, handleMemberLeft, showAllMembers, tagAll, muteAll, unmuteAll, showGroupStats, warnMember, banMember, unbanMember, muteMember, unmuteMember, checkAntiSpam } = require('./handlers/group_admin');
 const { setupGroupCommands, handleSettingsCallback } = require('./handlers/group_commands');
 const { migrateGroupTables } = require('./database/group_db');
 const groupBroadcast = require('./utils/groupBroadcast');
@@ -158,7 +156,14 @@ const botAdminCheck = async (ctx, next) => {
   } catch(_) { return next(); }
 };
 
-const { all: _dbAll } = require('./database/db');
+// ── Spam/Flood state ──
+const _spamProtect = new Map();
+setInterval(() => {
+  const cut = Date.now() - 10000;
+  for (const [k, v] of _spamProtect) if (v.last < cut) _spamProtect.delete(k);
+}, 10000).unref();
+
+const { all: _dbAll, get: _dbGet } = require('./database/db');
 const { cacheGet: _cGet, cacheSet: _cSet } = require('./utils/cache');
 
 // ══════════════════════════════════════════
@@ -180,21 +185,6 @@ const groupProtectionMiddleware = async (ctx, next) => {
   const _inArMode = _state4ar?.type?.startsWith('mg_ar') || _state4ar?.type?.startsWith('mg_awaiting');
 
   if (txt && txt.length > 0 && !_isGameMsg && !_inArMode) {
-      // فحص إذا الردود موقوفة في هذا القروب
-      const _arDisKey = 'auto_reply_disabled_' + cid;
-      let _arDis = _cGet(_arDisKey);
-      if (_arDis === null) {
-        const { get: _dbGet } = require('./database/db');
-        const _row = await _dbGet('SELECT value FROM settings WHERE key=$1', [_arDisKey]).catch(() => null);
-        _arDis = _row?.value === '1' ? 1 : 0;
-        _cSet(_arDisKey, _arDis, 86400000);
-      }
-      if (_arDis === 1) return next();
-
-    // تجاهل الردود التلقائية لكلمات الألعاب
-    const _gameWords = ['دول','xo','مليون','خمن','لوب غارو','werewolf','Xo','XO'];
-    if (_gameWords.some(w => txt.toLowerCase() === w.toLowerCase())) return next();
-
     const arKey = 'auto_replies_all';
     let arList = _cGet(arKey);
     if (!arList) {
@@ -232,58 +222,46 @@ const groupProtectionMiddleware = async (ctx, next) => {
     }
   }
 
-  // 😀 Auto React
-  if (txt && ['group','supergroup'].includes(ctx.chat?.type)) {
-    try {
-      let _reactList = _cGet('auto_reactions_all');
-      if (!_reactList) {
-        _reactList = await _dbAll('SELECT trigger, emoji FROM auto_reactions WHERE is_active=1').catch(()=>[]);
-        _cSet('auto_reactions_all', _reactList, 60000);
-      }
-      for (const r of _reactList) {
-        if (txt.toLowerCase().includes(r.trigger.toLowerCase())) {
-          ctx.telegram.setMessageReaction(
-            ctx.chat.id, ctx.message.message_id,
-            [{ type: 'emoji', emoji: r.emoji }]
-          ).catch(()=>{});
-          break;
-        }
-      }
-    } catch(_) {}
-  }
-
-  // 🌙 فحص AFK (لا يحظر التدفّق — fire & forget، يشمل الأدمنز أيضاً)
-  try { require('./handlers/fun_commands').checkAfkOnMessage(ctx).catch(() => {}); } catch (_) {}
-
-  // 📊 تسجيل نشاط الرسائل (للإحصائيات)
-  if (ctx.from?.id && ctx.chat?.id) {
-    // 👁 مراقبة الأعضاء (fire & forget)
-    require('./handlers/group_schedule').runWatchMiddleware(
-      bot, cid, uid, ctx.from.first_name,
-      ctx.message?.text || ctx.message?.caption || '',
-      ctx.message?.message_id
-    ).catch(() => {});
-    // 📊 تتبع عدد الرسائل
-    require('./handlers/group_pro_features').trackMsg(cid, uid, ctx.from.first_name).catch(() => {});
-  }
-
-  // حماية الأدمنز من فلاتر الحماية
+  // حماية الأدمنز من الفلتر
   if (ctx.isAdmin || ctx.isOwner) return next();
 
-  // 🛡️ نظام الحماية الاحترافي
-  try {
-    const approved = await require('./handlers/group_pro_features').isApproved(cid, uid).catch(() => false);
-    if (!approved) {
-      const handled = await require('./handlers/group_protection').runProtection(ctx);
-      if (handled) return;
-    }
-  } catch (e) { logger.error('[Protection] ' + e.message); }
+  // إعدادات القروب
+  const sk = 'grp_s_' + cid;
+  let gs = _cGet(sk);
+  if (!gs) {
+    gs = await _dbGet('SELECT anti_spam,anti_link,anti_flood FROM group_chats WHERE chat_id=$1', [cid]).catch(() => null) || {};
+    _cSet(sk, gs, 60000);
+  }
 
-  // 🎯 فلاتر ذكية (يعمل بعد الحماية فقط)
-  try {
-    const filtered = await require('./handlers/group_filters').checkFilters(ctx);
-    if (filtered) return;
-  } catch (e) { logger.error('[Filters] ' + e.message); }
+  // Anti-Flood
+  if (gs.anti_flood) {
+    const key = uid + '_' + cid;
+    const sp  = _spamProtect.get(key) || { c: 0, t: now };
+    if (now - sp.t < 3000) sp.c++; else { sp.c = 1; sp.t = now; }
+    _spamProtect.set(key, sp);
+    if (sp.c > 5) {
+      ctx.deleteMessage().catch(() => {});
+      if (sp.c === 6) require('./handlers/group_admin').warnMember(ctx, cid, uid, 'فلود').catch(() => {});
+      return;
+    }
+  }
+
+  // Anti-Link
+  if (gs.anti_link && txt && !txt.startsWith('/')) {
+    if (/https?:\/\/|t\.me\/|telegram\.me\//i.test(txt)) {
+      ctx.deleteMessage().catch(() => {});
+      const m = await ctx.reply('🔗 ' + (ctx.from.first_name || '') + ' الروابط ممنوعة!').catch(() => null);
+      if (m) setTimeout(() => ctx.telegram.deleteMessage(cid, m.message_id).catch(() => {}), 5000);
+      return;
+    }
+  }
+
+  // Anti-Spam
+  if (gs.anti_spam && txt && txt.length > 5 && !txt.startsWith('/')) {
+    const sk2 = 'sp_' + uid + '_' + cid;
+    if (_cGet(sk2) === txt) { ctx.deleteMessage().catch(() => {}); return; }
+    _cSet(sk2, txt, 10000);
+  }
 
   return next();
 };
@@ -295,6 +273,13 @@ const groupProtectionMiddleware = async (ctx, next) => {
 const gameAndBankMiddleware = async (ctx, next) => {
   const isGroup = ['group', 'supergroup'].includes(ctx.chat?.type);
   const txt     = (ctx.message?.text || '').trim();
+
+  // 🔒 [إصلاح] فحص حظر مباشر هنا: هذا الميدلوير مسجَّل قبل authMiddleware عمداً (الألعاب/البنك قبل auth)،
+  // لذلك فحص الحظر داخل authMiddleware لا يصل لهذه الرسائل أبداً. هذا السطر يسد الثغرة دون تغيير ترتيب التسجيل.
+  if (isGroup && ctx.message && ctx.from?.id) {
+    const _banChk = await dbGet('SELECT is_banned FROM users WHERE id=$1', [ctx.from.id]).catch(() => null);
+    if (_banChk && _banChk.is_banned === 1) return next();
+  }
 
   if (isGroup && ctx.message) {
     if (/^خمن$/i.test(txt))           return guessGame.startInvite(ctx).catch(() => next());
@@ -314,43 +299,10 @@ const gameAndBankMiddleware = async (ctx, next) => {
     }
 
     // البنك
-    // bank.js القديم محذوف — استخدم bank_pro.js
-
-    // 🌍 لعبة الدول
-    if (/^دول$/i.test(txt)) {
-      return require('./handlers/countries_game').startGame(ctx).catch(() => next());
-    }
-
-    // 🎮 لعبة XO
-    if (/^xo$/i.test(txt) || /^XO$/i.test(txt)) {
-      return require('./handlers/xo').startGame(ctx).catch(() => next());
-    }
-
-    // 🎵 البحث عن الأغاني
-    if (/^🎵\s+.+/i.test(txt) || /^موسيقى\s+.+/i.test(txt) || /^اغنية\s+.+/i.test(txt) || /^أغنية\s+.+/i.test(txt)) {
-      return music.handleSearch(ctx).catch(e => { console.error('[Music trigger]', e.message, e.stack); return ctx.reply('❌ خطأ: ' + e.message).catch(()=>{}); });
-    }
-
-        // 🏦 Taline Bank
-    if (/^حسابي$/i.test(txt))                     return bankPro.showWalletNoButtons(ctx).catch(() => next());
-    if (/^فلوسي$/i.test(txt))                     return bankPro.showBalance(ctx).catch(() => next());
-    if (/^بنك$/i.test(txt))                       return bankPro.openAccount(ctx).catch(() => next());
-    if (/^محفظتي$/i.test(txt))                    return bankPro.showWallet(ctx).catch(() => next());
-    if (/^بطاقتي$/i.test(txt))                    return bankPro.showCard(ctx).catch(() => next());
-    if (/^كشف$/i.test(txt))                       return bankPro.showStatement(ctx).catch(() => next());
-    if (/^تحويل\s+\d/i.test(txt))                return bankPro.transfer(ctx).catch(() => next());
-    if (/^قرض(\s+\d.*)?$/i.test(txt))            return bankPro.requestLoan(ctx).catch(() => next());
-    if (/^ديوني$/i.test(txt))                     return bankPro.showLoans(ctx).catch(() => next());
-    if (/^سداد$/i.test(txt))                      return bankPro.repayLoan(ctx).catch(() => next());
-    if (/^استثمار(\s+\d.*)?$/i.test(txt))        return bankPro.invest(ctx).catch(() => next());
-    if (/^سحب استثمار$/i.test(txt))               return bankPro.withdrawInvest(ctx).catch(() => next());
-    if (/^(الاثرياء|أثرياء|اثرياء)$/i.test(txt)) return bankPro.richList(ctx).catch(() => next());
-  }
-
-  // 📊 تصويت — في الخاص فقط
-  if (!isGroup && ctx.chat?.type === 'private') {
-    const _pollHandled = await require('./handlers/poll_system').handleDraft(ctx).catch(() => false);
-    if (_pollHandled) return;
+    if (/^انشاء حساب$/i.test(txt))    return bank.createAccount(ctx).catch(() => next());
+    if (/^فلوسي$/i.test(txt))          return bank.showBalance(ctx).catch(() => next());
+    if (/^فارسي/i.test(txt))           return bank.transfer(ctx).catch(() => next());
+    if (/^rip /i.test(txt))            return bank.loan(ctx).catch(() => next());
   }
 
   // PV لعبة خمن
@@ -369,103 +321,6 @@ const gameAndBankMiddleware = async (ctx, next) => {
 
 // ── تسجيل middleware بالترتيب الصحيح ──
 bot.use(rateLimit);
-
-// 🏗 إنشاء جداول member cards عند البدء
-setTimeout(async () => {
-  try {
-    await dbRun(`CREATE TABLE IF NOT EXISTS member_cards (
-      chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL,
-      trigger_word TEXT, photo_file_id TEXT, bio TEXT,
-      username TEXT, first_name TEXT, updated_at TIMESTAMP DEFAULT NOW(),
-      PRIMARY KEY(chat_id, user_id))`);
-    await dbRun(`CREATE TABLE IF NOT EXISTS member_card_triggers (
-      chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL, trigger_word TEXT NOT NULL,
-      PRIMARY KEY(chat_id, trigger_word))`);
-    logger.info('[MemberCards] ✅ Tables ready');
-    // جداول gpq_approve
-    await dbRun(`CREATE TABLE IF NOT EXISTS group_approved (
-      chat_id BIGINT NOT NULL,
-      user_id BIGINT NOT NULL,
-      approved_by BIGINT,
-      approved_at TIMESTAMP DEFAULT NOW(),
-      PRIMARY KEY(chat_id, user_id)
-    )`).catch(() => {});
-    await dbRun(`CREATE TABLE IF NOT EXISTS group_protection_stats (
-      chat_id BIGINT NOT NULL,
-      user_id BIGINT NOT NULL,
-      violations INT DEFAULT 0,
-      last_violation TIMESTAMP,
-      PRIMARY KEY(chat_id, user_id)
-    )`).catch(() => {});
-  } catch(e) { logger.error('[MemberCards]', e.message); }
-}, 3000);
-
-// 🧹 مسح كل الردود مؤقت
-bot.command('clear_cards', async ctx => {
-  if (String(ctx.from?.id) !== String(process.env.OWNER_ID)) return ctx.reply('🚫').catch(() => {});
-  await dbRun('DELETE FROM member_cards').catch(() => {});
-  await dbRun('DELETE FROM member_card_triggers').catch(() => {});
-  ctx.reply('✅ تم مسح كل الردود').catch(() => {});
-});
-
-// 🐺 لوب غارو trigger
-bot.hears(/^(لوب غارو|لوب_غارو|ذئب|werewolf)$/i, async (ctx) => {
-  if (!['group','supergroup'].includes(ctx.chat?.type)) return;
-  try { return require('./handlers/werewolf/engine').createLobby(ctx); } catch(e) {}
-});
-// 💳 عرض بطاقة عضو تلقائياً
-bot.hears(/^.{2,25}$/, async (ctx, next) => {
-  if (!["group","supergroup"].includes(ctx.chat?.type)) return next();
-  const txt = ctx.message?.text?.trim();
-  if (!txt || txt.startsWith("/") || txt.startsWith("@")) return next();
-  if (ctx.message?.reply_to_message) return next();
-  // تجاهل الكلمات المحجوزة
-  const _blocked = ["ضف رد","امحي ردي","اعمل","بنك","مواطن","دولتي","لوب غارو","werewolf","خمن","مليون","بطاقتي","فلوسي","حسابي"];
-  if (_blocked.some(b => txt.toLowerCase() === b.toLowerCase())) return next();
-  // تجاهل إذا المستخدم في state نشط
-  try {
-    const _st = require('./utils/stateManager').getState(ctx.from?.id);
-    if (_st?.type?.startsWith('member_card') || _st?.type?.startsWith('tod') || _st?.type?.startsWith('mg_') || _st?.type?.startsWith('gp_')) return next();
-  } catch(_) {}
-  try {
-    const { get: _get } = require("./database/db");
-    const trigger = await _get("SELECT user_id FROM member_card_triggers WHERE chat_id=$1 AND trigger_word=$2", [ctx.chat.id, txt.toLowerCase()]).catch(() => null);
-    if (!trigger) return next();
-    const card = await _get("SELECT * FROM member_cards WHERE chat_id=$1 AND user_id=$2", [ctx.chat.id, trigger.user_id]).catch(() => null);
-    if (!card) return next();
-    // جيب صورة البروفايل الحالية من تيليجرام مباشرة
-    let livePhoto = card.photo_file_id;
-    try {
-      const photos = await ctx.telegram.getUserProfilePhotos(card.user_id, { limit: 1 });
-      if (photos && photos.total_count > 0 && photos.photos[0]) {
-        const arr = photos.photos[0];
-        livePhoto = arr[arr.length - 1].file_id;
-      }
-    } catch(_) {}
-
-    // جيب bio الحالي
-    let liveBio = card.bio;
-    try {
-      const userChat = await ctx.telegram.getChat(card.user_id);
-      if (userChat.bio) liveBio = userChat.bio;
-    } catch(_) {}
-
-    const name = card.first_name || "عضو";
-    const uname = card.username ? "@" + card.username : "";
-    const text = "• Use ↤ [" + name + "](tg://user?id=" + card.user_id + ")" +
-      (liveBio ? "\n\n• Bio ↤ " + liveBio : "") +
-      (uname ? "\n• " + uname : "");
-    const kb = { inline_keyboard: [[{ text: name, url: "tg://user?id=" + card.user_id }]] };
-    if (livePhoto) {
-      await ctx.replyWithPhoto(livePhoto, { caption: text, parse_mode: "Markdown", reply_markup: kb, reply_to_message_id: ctx.message.message_id }).catch(() => {});
-    } else {
-      await ctx.reply(text, { parse_mode: "Markdown", reply_markup: kb, reply_to_message_id: ctx.message.message_id }).catch(() => {});
-    }
-  } catch(_) { return next(); }
-});
-
-// 🎮 أكسيو أو فيريتي — تسجيل مبكر (قبل أي middleware قد يبتلع الرسائل)
-require('./handlers/tod').register(bot);
 bot.use(gameAndBankMiddleware);   // الألعاب والبنك قبل auth
 bot.use(authMiddleware);
 bot.use(botAdminCheck);           // FIX: مستوى أعلى — لا nested
@@ -497,27 +352,12 @@ registerCallbacks(bot, {
 
 // ── Messages ──
 setupGroupCommands(bot);
-require('./handlers/group_commands_pro').setupProCommands(bot);
-require('./handlers/group_commands_ar').setupArabicModCommands(bot);
-require('./handlers/group_pro_features').setupProFeatures(bot);
-require('./handlers/group_schedule').setupSchedule(bot);
-require('./handlers/nations').setup(bot);
-require('./handlers/group_filters').setupFilters(bot);
-require('./handlers/group_extras').setupExtras(bot);
 
 const { registerMessages } = require('./bot/messages');
 registerMessages(bot, {
   ownerH, GrpBuf, GrpMsgs, handleAiChat, handleOwnerAI,
   manage, browse, userH, bundlesDb, filesDb, adminsDb,
   logger, OWNER_ID, safeInt,
-});
-
-// ✏️ مكافحة تعديل الرسائل لتصبح مخالفة (anti_edit)
-bot.on('edited_message', async ctx => {
-  try {
-    const msg = ctx.update?.edited_message;
-    if (msg) await require('./handlers/group_protection').checkEdited(ctx, msg);
-  } catch (e) { logger.error('[EditedMsg] ' + e.message); }
 });
 
 // ── deep link: /start file_{fileId} ──
@@ -558,7 +398,6 @@ async function launch() {
   try {
     await initSchema();
     await migrateGroupTables().catch(() => {});
-    await require('./database/group_pro_db').migrate().catch(() => {});
     require('./utils/cache').clearAllSubCache();
     await require('./handlers/group_panel').migrateGroupPanel().catch(() => {});
     await require('./database/db').initBankTables().catch(() => {});
@@ -583,28 +422,7 @@ async function launch() {
 
     startScheduler(bot, [OWNER_ID]);
     GrpBuf.start();
-    require('./handlers/group_verify').startVerifyWatcher(bot);
-    require('./handlers/group_schedule').startScheduleWatcher(bot);
-    const _me = await bot.telegram.getMe().catch(() => ({}));
-    const BOT_USERNAME = _me.username || process.env.BOT_USERNAME || '';
-    logger.info('✅ Services started — @' + BOT_USERNAME);
-    // تنظيف القروبات المطرود منها عند البدء
-    setTimeout(async () => {
-      try {
-        const groups = await dbAll('SELECT chat_id FROM group_chats WHERE is_active != 0').catch(() => []);
-        for (const g of groups) {
-          try {
-            await bot.telegram.getChat(g.chat_id);
-          } catch(e) {
-            if (e.message?.includes('kicked') || e.message?.includes('Forbidden') || e.message?.includes('not found')) {
-              await dbRun('UPDATE group_chats SET is_active=0, notify_new_files=0 WHERE chat_id=$1', [g.chat_id]).catch(()=>{});
-              logger.info('[Cleanup] مطرود من: ' + g.chat_id);
-            }
-          }
-        }
-        logger.info('[Cleanup] ✅ تم تنظيف القروبات');
-      } catch(e) { logger.error('[Cleanup]', e.message); }
-    }, 10000);
+    logger.info('✅ Services started');
 
     app.use(bot.webhookCallback('/webhook/' + TOKEN, { secretToken: WEBHOOK_SECRET || undefined }));
 
@@ -674,6 +492,10 @@ async function launch() {
                   const _kb = { inline_keyboard: [[
                     { text: '👑 أضفني كـ مشرف 🛡️', url: 'https://t.me/' + un + '?startgroup=true&admin=delete_messages+restrict_members+pin_messages+invite_users+manage_chat' },
                   ]]};
+                  await ctx.telegram.sendMessage(chatId,
+                    '👋 مرحباً! أنا *' + (un || 'البوت') + '*\n\n❌ تم إضافتي بدون صلاحيات ادمين.\n\n👇 اضغط لإعادة إضافتي كمشرف:',
+                    { parse_mode: 'Markdown', reply_markup: _kb }
+                  ).catch(() => {});
                   await ctx.telegram.sendMessage(addedBy.id,
                     '⚠️ أضفتني في *' + title + '* بدون صلاحيات ادمين!\n\n👇 اضغط لإعادة إضافتي كمشرف:',
                     { parse_mode: 'Markdown', reply_markup: _kb }
@@ -690,69 +512,18 @@ async function launch() {
           const member = update?.new_chat_member;
           if (!chat || !['group', 'supergroup'].includes(chat.type)) return;
           if (['member', 'administrator'].includes(member?.status)) {
-            // لو مش ادمين — اخرج فوراً
-            if (member?.status === 'member') {
-              logger.warn('[GroupReg] مش ادمين — خروج من: ' + (chat.title || chat.id));
-              bot.telegram.leaveChat(chat.id).catch(() => {});
-              return;
-            }
             await dbRun(
-              `INSERT INTO group_chats(chat_id, title, specialty_id, welcome_enabled, goodbye_enabled, notify_new_files, added_by)
-               VALUES($1,$2,0,1,0,1,$3)
-               ON CONFLICT(chat_id) DO UPDATE SET title=$2, added_by=COALESCE(group_chats.added_by,$3)`,
-              [chat.id, chat.title || '', update?.from?.id || null]
+              `INSERT INTO group_chats(chat_id, title, specialty_id, welcome_enabled, goodbye_enabled, notify_new_files)
+               VALUES($1,$2,0,1,0,1)
+               ON CONFLICT(chat_id) DO UPDATE SET title=$2`,
+              [chat.id, chat.title || '']
             ).catch(() => {});
             logger.info('[GroupReg] ✅ أُضيف البوت لـ: ' + (chat.title || chat.id));
           } else if (['left', 'kicked'].includes(member?.status)) {
-            await dbRun('UPDATE group_chats SET is_active=0 WHERE chat_id=$1', [chat.id]).catch(() => {});
+            await dbRun('UPDATE group_chats SET is_active=false WHERE chat_id=$1', [chat.id]).catch(() => {});
             logger.info('[GroupReg] 🚪 خرج البوت من: ' + (chat.title || chat.id));
           }
         } catch(e) { logger.error('[my_chat_member]', e.message); }
-      });
-
-      // ── Inline Query — @bot كلمة بحث ──────────────────────
-      bot.on('inline_query', async ctx => {
-        const query = ctx.inlineQuery?.query?.trim() || '';
-        if (query.length < 2) {
-          return ctx.answerInlineQuery([], {
-            switch_pm_text: '🔍 اكتب اسم الملف للبحث...',
-            switch_pm_parameter: 'search',
-            cache_time: 0,
-          }).catch(() => {});
-        }
-        try {
-          const results = await smartSearch(query, 15);
-          if (!results || !results.length) {
-            return ctx.answerInlineQuery([], {
-              switch_pm_text: '❌ لا نتائج لـ: ' + query,
-              switch_pm_parameter: 'search',
-              cache_time: 10,
-            }).catch(() => {});
-          }
-          const items = results.map(f => ({
-            type: 'article',
-            id: String(f.id),
-            title: '📄 ' + (f.title || 'ملف'),
-            description: (f.sub_name || '') + (f.cat_name ? ' · ' + f.cat_name : ''),
-            input_message_content: {
-              message_text: '📄 *' + (f.title || 'ملف') + '*\n\n' +
-                (f.sub_name ? '📚 ' + f.sub_name + '\n' : '') +
-                (f.cat_name ? '📁 ' + f.cat_name + '\n' : '') +
-                '\n_استخدم البوت للتحميل_',
-              parse_mode: 'Markdown',
-            },
-            reply_markup: {
-              inline_keyboard: [[
-                { text: '📥 فتح في البوت', url: 'https://t.me/' + (ctx.botInfo?.username || BOT_USERNAME) + '?start=file_' + f.id }
-              ]]
-            },
-            thumb_url: 'https://cdn-icons-png.flaticon.com/512/337/337946.png',
-          }));
-          return ctx.answerInlineQuery(items, { cache_time: 30 }).catch(() => {});
-        } catch(e) {
-          logger.error('[InlineQuery]', e.message);
-          return ctx.answerInlineQuery([], { cache_time: 5 }).catch(() => {});
-        }
       });
 
       // تسجيل رسائل القروب + تسجيل الأعضاء
@@ -783,7 +554,6 @@ async function launch() {
 
       // Games — register مرة واحدة
       guessGame.register(bot);
-      require('./handlers/werewolf').register(bot).catch(e => console.error('[WW]',e.message));
       millionaire.register(bot);
       logger.info('[Launch] ✅ Games registered');
 
@@ -796,7 +566,7 @@ async function launch() {
 
     if (WEBHOOK_URL) {
       await bot.telegram.setWebhook(WEBHOOK_URL + '/webhook/' + TOKEN, {
-        allowed_updates: ['message', 'edited_message', 'callback_query', 'my_chat_member', 'chat_member', 'inline_query'],
+        allowed_updates: ['message', 'callback_query', 'my_chat_member', 'chat_member', 'inline_query'],
         drop_pending_updates: true,
         max_connections: 40,
         ...(WEBHOOK_SECRET && { secret_token: WEBHOOK_SECRET }),

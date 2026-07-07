@@ -329,12 +329,13 @@ module.exports.registerCallbacks = function(bot, deps) {
       }
 
       if (action === 'approve') {
-        await _r('INSERT INTO group_approved(chat_id,user_id,approved_by) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [chatId, userId, ctx.from.id]).catch(() => {});
+        // [إصلاح] كانت تكتب في group_approved بينما isApproved() في group_pro_features.js تقرأ من grp_approved
+        await _r('INSERT INTO grp_approved(chat_id,user_id,approved_by) VALUES($1,$2,$3) ON CONFLICT DO NOTHING', [chatId, userId, ctx.from.id]).catch(() => {});
         return ctx.answerCbQuery('✅ تم الاستثناء من الحماية').catch(() => {});
       }
 
       if (action === 'unapprove') {
-        await _r('DELETE FROM group_approved WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => {});
+        await _r('DELETE FROM grp_approved WHERE chat_id=$1 AND user_id=$2', [chatId, userId]).catch(() => {});
         return ctx.answerCbQuery('✅ تم إلغاء الاستثناء').catch(() => {});
       }
 
@@ -1404,6 +1405,7 @@ module.exports.registerCallbacks = function(bot, deps) {
         }
       }
         const _grpOk = data.startsWith('grp_') || data.startsWith('del_channel_')
+          || data.startsWith('gf_') || data.startsWith('sch_') // [إصلاح] فلاتر القروب + الحظر المؤقت كانتا مفقودتين من القائمة
           || data.startsWith('gs_') || data.startsWith('grp_unban_')
           || data.startsWith('grp_unmute_') || data === 'check_subscription'
           || data === 'refresh_channels' || data.startsWith('mute_all_')

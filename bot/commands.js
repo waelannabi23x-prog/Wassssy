@@ -253,7 +253,7 @@ module.exports = function registerCommands(bot, { startHandler, manage, userH, m
   bot.command(['flip','عملة'],     ctx => require('../handlers/bank_games').handleFlip(ctx).catch(()=>{}));
   bot.command(['rob','سرقة'],      ctx => require('../handlers/bank_games').handleRob(ctx).catch(()=>{}));
   bot.command(['leaderboard','متصدرين','lb'], ctx => require('../handlers/bank_games').handleLeaderboard(ctx).catch(()=>{}));
-  bot.command(['bank','حسابي','بنكي'], ctx => require('../handlers/bank').showBalance(ctx).catch(()=>{}));
+  bot.command(['bank','حسابي','بنكي'], ctx => require('../handlers/bank_pro').showWalletNoButtons(ctx).catch(()=>{}));
 
   // ── لوحة الإدارة ──
   bot.command(['adminpanel','لوحة'], async ctx => {
