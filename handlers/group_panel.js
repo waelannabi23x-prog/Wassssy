@@ -209,6 +209,7 @@ async function showGroupDetail(ctx, chatId) {
     [kbBtn('📢 راسل هذا القروب', 'gp_msgone_'  + chatId),
      kbBtn('📊 إحصائيات',        'grp_stats_'  + chatId)],
     [kbBtn('📋 إنشاء تصويت', 'gp_poll_' + chatId)],
+    [kbBtn('⏹ إيقاف التصويت', 'gp_pollstop_' + chatId), kbBtn('👁 عرض النتائج', 'gp_pollresults_' + chatId)],
     [kbBtn('👥 الأعضاء', 'grp_main_' + chatId)],
     [kbBtn('◀️ رجوع', 'gp_panel'), kbBtn('🗑 إغلاق', 'gp_close')],
     [kbBtn('🚪 خروج من القروب', 'gp_leave_' + chatId)],
@@ -256,6 +257,22 @@ async function handleCallback(ctx, data) {
     const chatId = data.replace('gp_poll_', '');
     await require('../handlers/poll_system').startCreate(ctx, chatId);
     return true;
+  }
+
+  if (data.startsWith('gp_pollstop_')) {
+    const chatId = data.replace('gp_pollstop_', '');
+    const poll = await require('../database/db').get('SELECT * FROM polls WHERE chat_id=$1 ORDER BY created_at DESC LIMIT 1', [chatId]).catch(() => null);
+    if (!poll) return ctx.answerCbQuery('❌ ما فيه تصويت بهذا القروب', { show_alert: true }).catch(() => {});
+    if (!poll.is_active) return ctx.answerCbQuery('⚠️ التصويت متوقف مسبقاً', { show_alert: true }).catch(() => {});
+    await require('../handlers/poll_system').endPoll(ctx.telegram, poll.id);
+    return ctx.answerCbQuery('✅ تم إيقاف التصويت').catch(() => {});
+  }
+
+  if (data.startsWith('gp_pollresults_')) {
+    const chatId = data.replace('gp_pollresults_', '');
+    const poll = await require('../database/db').get('SELECT * FROM polls WHERE chat_id=$1 ORDER BY created_at DESC LIMIT 1', [chatId]).catch(() => null);
+    if (!poll) return ctx.answerCbQuery('❌ ما فيه تصويت بهذا القروب', { show_alert: true }).catch(() => {});
+    return require('../handlers/poll_system').showResults(ctx, poll.id);
   }
 
   if (data.startsWith('gp_msgone_')) {

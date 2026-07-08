@@ -49,22 +49,27 @@ async function buildPollKb(pollId, options) {
   const countMap = {};
   votes.forEach(v => { countMap[v.option_idx] = parseInt(v.cnt); });
 
-  const rows = options.map((opt, i) => {
+  // [تعديل] كل زر يعرض النسبة % فقط (بدون عدد الأصوات)
+  const buttons = options.map((opt, i) => {
     const cnt = countMap[i] || 0;
     const pct = total > 0 ? Math.round(cnt * 100 / total) : 0;
-    const bar = '█'.repeat(Math.floor(pct / 10)) + '░'.repeat(10 - Math.floor(pct / 10));
-    return [{ text: `${opt} — ${cnt} (${pct}%)`, callback_data: `poll_vote_${pollId}_${i}` }];
+    return { text: `${opt} (${pct}%)`, callback_data: `poll_vote_${pollId}_${i}` };
   });
-  rows.push([{ text: `📊 المجموع: ${total} صوت`, callback_data: `poll_results_${pollId}` }]);
+
+  // [تعديل] شبكة 2×2 بدل عمود واحد، وحذف سطر/زر "المجموع" نهائياً (النتائج التفصيلية صارت من لوحة الإدارة فقط)
+  const rows = [];
+  for (let i = 0; i < buttons.length; i += 2) {
+    rows.push(buttons.slice(i, i + 2));
+  }
   return rows;
 }
 
+// [تعديل] رسالة أبسط وأقصر
 function buildPollText(poll, ended = false) {
   const status = ended ? '🔴 منتهي' : '🟢 نشط';
-  let txt = `📊 *تصويت ${status}*\n━━━━━━━━━━━━━━━━\n\n`;
-  txt += `❓ *${poll.question}*\n\n`;
-  txt += `_اضغط على خيارك للتصويت_`;
-  if (poll.ends_at) {
+  let txt = `📊 *تصويت* ${status}\n\n`;
+  txt += `❓ *${poll.question}*`;
+  if (poll.ends_at && !ended) {
     const d = new Date(poll.ends_at);
     txt += `\n⏰ ينتهي: ${d.toLocaleString('ar-DZ')}`;
   }
@@ -379,4 +384,4 @@ async function handleCallback(ctx, data) {
   return false;
 }
 
-module.exports = { startCreate, handleDraft, handleCallback };
+module.exports = { startCreate, handleDraft, handleCallback, endPoll, showResults };

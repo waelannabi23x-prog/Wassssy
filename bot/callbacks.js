@@ -1404,6 +1404,7 @@ module.exports.registerCallbacks = function(bot, deps) {
         }
       }
         const _grpOk = data.startsWith('grp_') || data.startsWith('del_channel_')
+          || data.startsWith('poll_') // [تعديل] تفعيل أزرار التصويت (poll_system.js) داخل القروب
           || data.startsWith('gs_') || data.startsWith('grp_unban_')
           || data.startsWith('grp_unmute_') || data === 'check_subscription'
           || data === 'refresh_channels' || data.startsWith('mute_all_')
