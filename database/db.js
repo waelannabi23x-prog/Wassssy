@@ -275,12 +275,10 @@ async function initSchema() {
   // Migration: history unique constraint
   try { if(pg) await pg.query('ALTER TABLE history ADD COLUMN IF NOT EXISTS date DATE DEFAULT CURRENT_DATE'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query('DELETE FROM history h1 USING history h2 WHERE h1.id > h2.id AND h1.user_id = h2.user_id AND h1.file_id = h2.file_id'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
-  // [إصلاح] "ADD CONSTRAINT IF NOT EXISTS" غير مدعومة في PostgreSQL (فقط ADD COLUMN تدعمها) فكانت تفشل بصمت دائماً.
-  try { if(pg) await pg.query(`DO $$ BEGIN
-    ALTER TABLE history ADD CONSTRAINT hist_user_file_unique UNIQUE (user_id, file_id);
-  EXCEPTION WHEN duplicate_object THEN NULL; END $$;`); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
+  try { if(pg) await pg.query('ALTER TABLE history ADD CONSTRAINT IF NOT EXISTS hist_user_file_unique UNIQUE (user_id, file_id)'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
   // Migration: history unique constraint
+  try { if(pg) await pg.query('ALTER TABLE history ADD CONSTRAINT hist_user_file_unique UNIQUE (user_id, file_id)'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
 
   // Migration: auto_replies table
   try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS auto_replies (
@@ -432,10 +430,6 @@ async function initSchema() {
 
   // Migration: group_bans + anti_spam columns
   try { if(pg) await pg.query(`CREATE TABLE IF NOT EXISTS group_bans (id SERIAL PRIMARY KEY, chat_id BIGINT NOT NULL, user_id BIGINT NOT NULL, banned_by BIGINT, reason TEXT, banned_at TIMESTAMPTZ DEFAULT NOW(), UNIQUE(chat_id, user_id))`); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
-  // [إصلاح] group_db.js كان ينشئ نفس الجدول بأعمدة created_at/updated_at بدل banned_at، فيفشل الإدراج في group_protection.js و group_admin.js بصمت.
-  // إضافة العمودين هنا (بدون حذف banned_at) يجعل كل المسارات القديمة والجديدة تعمل معاً.
-  try { if(pg) await pg.query(`ALTER TABLE group_bans ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP`); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
-  try { if(pg) await pg.query(`ALTER TABLE group_bans ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP`); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query('ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS anti_spam INTEGER DEFAULT 0'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query('ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS anti_link INTEGER DEFAULT 0'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query('ALTER TABLE group_chats ADD COLUMN IF NOT EXISTS anti_flood INTEGER DEFAULT 0'); } catch(err) { require('../utils/logger').debug('[catch]', err.message); }
@@ -525,7 +519,6 @@ async function getP(name, values) {
 // Group Management Pro — schema
 // ══════════════════════════════════════════
 async function migrateGroupPro() {
-  const pg = getPg(); // [إصلاح] كانت pg غير معرّفة هنا فتسبب ReferenceError عند أي استدعاء لهذه الدالة
   if (!pg) return;
   const queries = [
     `CREATE TABLE IF NOT EXISTS grp_settings (

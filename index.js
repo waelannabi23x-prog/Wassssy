@@ -274,13 +274,6 @@ const gameAndBankMiddleware = async (ctx, next) => {
   const isGroup = ['group', 'supergroup'].includes(ctx.chat?.type);
   const txt     = (ctx.message?.text || '').trim();
 
-  // 🔒 [إصلاح] فحص حظر مباشر هنا: هذا الميدلوير مسجَّل قبل authMiddleware عمداً (الألعاب/البنك قبل auth)،
-  // لذلك فحص الحظر داخل authMiddleware لا يصل لهذه الرسائل أبداً. هذا السطر يسد الثغرة دون تغيير ترتيب التسجيل.
-  if (isGroup && ctx.message && ctx.from?.id) {
-    const _banChk = await dbGet('SELECT is_banned FROM users WHERE id=$1', [ctx.from.id]).catch(() => null);
-    if (_banChk && _banChk.is_banned === 1) return next();
-  }
-
   if (isGroup && ctx.message) {
     if (/^خمن$/i.test(txt))           return guessGame.startInvite(ctx).catch(() => next());
     if (/^(العاب|الالعاب)$/i.test(txt)) {
