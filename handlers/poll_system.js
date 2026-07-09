@@ -330,14 +330,19 @@ async function endPoll(telegram, pollId) {
     }
   });
 
-  let txt = `📊 *التصويت انتهى* 🔴\n━━━━━━━━━━━━━━━━\n\n❓ *${poll.question}*\n\n`;
-  opts.forEach((opt, i) => {
-    const cnt = countMap[i] || 0;
-    const pct = total > 0 ? Math.round(cnt * 100 / total) : 0;
-    txt += `${i + 1}. *${opt}* — ${cnt} (${pct}%)\n`;
+  // ترتيب الخيارات من الأكثر للأقل
+  const sortedOpts = opts.map((opt, i) => ({
+    opt, cnt: countMap[i] || 0,
+    pct: total > 0 ? Math.round((countMap[i] || 0) * 100 / total) : 0
+  })).sort((a, b) => b.cnt - a.cnt);
+
+  let txt = `*${poll.question}*\n\n`;
+  sortedOpts.forEach((o, i) => {
+    const bar = i === 0 && total > 0 ? ' ◀' : '';
+    txt += `${o.opt} — ${o.cnt} (${o.pct}%)${bar}\n`;
   });
-  txt += `\n👥 المجموع: *${total}* صوت`;
-  if (winner && total > 0) txt += `\n🏆 الفائز: *${winner}*`;
+  txt += `\n— ${total} صوت`;
+  if (winner && total > 0) txt += ` | الفائز: *${winner}*`;
 
   if (poll.msg_id) {
     await telegram.editMessageText(poll.chat_id, poll.msg_id, undefined, txt, {
