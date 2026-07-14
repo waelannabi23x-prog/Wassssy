@@ -900,6 +900,11 @@ module.exports.registerCallbacks = function(bot, deps) {
         return;
       }
 
+      // fwo_ — تنظيم الملفات، يشتغل في الخاص فقط لكن يجب فحصه هنا قبل شرط !== 'private'
+      if (data.startsWith('fwo_')) {
+        return require('../handlers/forward_organizer').handleCallback(ctx, data);
+      }
+
       if (ctx.chat?.type !== 'private') {
         if (data.startsWith('grp_main_')) {
           const chatId = data.replace('grp_main_', '');
@@ -926,11 +931,6 @@ module.exports.registerCallbacks = function(bot, deps) {
           require('../utils/cache').cacheClear('grp_members_' + regChatId);
           ctx.answerCbQuery('✅ تم تسجيلك!').catch(() => {});
           return;
-        }
-
-        // ── تنظيم الملفات المُعاد توجيهها ──
-        if (data.startsWith('fwo_')) {
-          return require('../handlers/forward_organizer').handleCallback(ctx, data);
         }
 
         // ── التصويت (في القروبات) ──
