@@ -187,12 +187,22 @@ module.exports.registerMessages = function(bot, deps) {
 
   // ── Documents ──
   bot.on('document', async ctx => {
-    if (!ctx.isAdmin && !ctx.isOwner) return;
+    if (!ctx.isAdmin && !ctx.isOwner) {
+      await require('../handlers/forward_organizer').handleForward(ctx).catch(() => {});
+      return;
+    }
     const s = require('../utils/stateManager').getState(ctx.uid);
 
     if (ctx.isOwner) {
-      const isFwd = !!(ctx.message.forward_from || ctx.message.forward_from_chat || ctx.message.forward_sender_name);
+      const isFwd = !!(ctx.message.forward_from || ctx.message.forward_from_chat || ctx.message.forward_sender_name || ctx.message.forward_date || ctx.message.forward_origin);
       const hasCap = !!(ctx.message.caption && /تخصص:|سنة:|spec:|year:|sem:|mat:|cat:/i.test(ctx.message.caption));
+      if (isFwd && hasCap && !s) {
+        // caption فيها تصنيف — استخدم المسار القديم مباشرة
+      } else if (isFwd && !s) {
+        // forward عادي بدون تصنيف — استخدم الميزة الجديدة حتى للـ owner
+        const handled = await require('../handlers/forward_organizer').handleForward(ctx).catch(() => false);
+        if (handled) return;
+      }
       if (isFwd && !hasCap && !s) {
         await require('../utils/stateManager').setState(ctx.uid, { type: 'pending_forward', doc: ctx.message.document, photo: null });
         await ctx.reply('📎 ملف محفوظ! أرسل المسار:\n`تخصص: X | سنة: X | فصل: X | مادة: X | قسم: X`', { parse_mode: 'Markdown' }).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
@@ -256,7 +266,19 @@ module.exports.registerMessages = function(bot, deps) {
     }
 
     if (ctx.chat?.type !== 'private') return;
-    if (!ctx.isAdmin && !ctx.isOwner) return;
+    if (!ctx.isAdmin && !ctx.isOwner) {
+      await require('../handlers/forward_organizer').handleForward(ctx).catch(() => {});
+      return;
+    }
+    // owner/admin — لو forward عادي بدون state، جرّب الميزة الجديدة
+    {
+      const _sChk = require('../utils/stateManager').getState(ctx.uid);
+      const _isFwdMedia = !!(ctx.message.forward_from || ctx.message.forward_from_chat || ctx.message.forward_sender_name || ctx.message.forward_date || ctx.message.forward_origin);
+      if (_isFwdMedia && !_sChk) {
+        const _h = await require('../handlers/forward_organizer').handleForward(ctx).catch(() => false);
+        if (_h) return;
+      }
+    }
     const s = require('../utils/stateManager').getState(ctx.uid);
     if (s?.type === 'mg_bulk_files')   return manage.handleBulkUpload(ctx);
     if (s?.type === 'mg_bundle_files') return manage.handleBundleFileUpload(ctx);
