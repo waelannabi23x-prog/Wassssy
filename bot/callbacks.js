@@ -928,6 +928,11 @@ module.exports.registerCallbacks = function(bot, deps) {
           return;
         }
 
+        // ── تنظيم الملفات المُعاد توجيهها ──
+        if (data.startsWith('fwo_')) {
+          return require('../handlers/forward_organizer').handleCallback(ctx, data);
+        }
+
         // ── التصويت (في القروبات) ──
         if (data.startsWith('poll_')) {
           return require('../handlers/poll_system').handleCallback(ctx, data);
