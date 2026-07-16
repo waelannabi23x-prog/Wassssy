@@ -900,10 +900,7 @@ module.exports.registerCallbacks = function(bot, deps) {
         return;
       }
 
-      // fwo_ — تنظيم الملفات، يشتغل في الخاص فقط لكن يجب فحصه هنا قبل شرط !== 'private'
-      if (data.startsWith('fwo_')) {
-        return require('../handlers/forward_organizer').handleCallback(ctx, data);
-      }
+
 
       if (ctx.chat?.type !== 'private') {
         if (data.startsWith('grp_main_')) {
