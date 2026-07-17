@@ -16,7 +16,16 @@ function extractFile(msg) {
   if (msg.document) return { type: 'document', file_id: msg.document.file_id, name: msg.document.file_name || 'ملف' };
   if (msg.photo)    return { type: 'photo',    file_id: msg.photo[msg.photo.length - 1].file_id, name: 'صورة' };
   if (msg.video)    return { type: 'video',    file_id: msg.video.file_id, name: msg.video.file_name || 'فيديو' };
+  if (msg.audio)    return { type: 'audio',    file_id: msg.audio.file_id, name: msg.audio.file_name || 'صوت' };
+  if (msg.voice)    return { type: 'voice',    file_id: msg.voice.file_id, name: 'رسالة صوتية' };
+  if (msg.sticker)  return { type: 'sticker',  file_id: msg.sticker.file_id, name: 'ستيكر' };
+  if (msg.animation) return { type: 'animation', file_id: msg.animation.file_id, name: 'GIF' };
+  if (msg.text)     return { type: 'text', text: msg.text };
   return null;
+}
+
+function isForwardedText(msg) {
+  return isForwarded(msg) && !!msg.text && !msg.text.startsWith('/');
 }
 
 function getForwardSourceName(msg) {
@@ -56,9 +65,27 @@ async function handleForward(ctx) {
     (file.name && file.name !== 'ملف' && file.name !== 'صورة' && file.name !== 'فيديو' ? `\n📎 الاسم: \`${file.name}\`` : '');
 
   try {
-    if      (file.type === 'document') await ctx.telegram.sendDocument(OWNER_ID, file.file_id, { caption, parse_mode: 'Markdown' });
-    else if (file.type === 'photo')    await ctx.telegram.sendPhoto(OWNER_ID, file.file_id, { caption, parse_mode: 'Markdown' });
-    else if (file.type === 'video')    await ctx.telegram.sendVideo(OWNER_ID, file.file_id, { caption, parse_mode: 'Markdown' });
+    if (file.type === 'text') {
+      await ctx.telegram.sendMessage(OWNER_ID, caption + `\n\n💬 *النص:*\n${file.text}`, { parse_mode: 'Markdown' });
+    } else {
+      const sendMap = {
+        document:  'sendDocument',
+        photo:     'sendPhoto',
+        video:     'sendVideo',
+        audio:     'sendAudio',
+        voice:     'sendVoice',
+        sticker:   'sendSticker',
+        animation: 'sendAnimation',
+      };
+      const method = sendMap[file.type];
+      if (!method) return false;
+      if (file.type === 'sticker') {
+        await ctx.telegram.sendSticker(OWNER_ID, file.file_id);
+        await ctx.telegram.sendMessage(OWNER_ID, caption, { parse_mode: 'Markdown' });
+      } else {
+        await ctx.telegram[method](OWNER_ID, file.file_id, { caption, parse_mode: 'Markdown' });
+      }
+    }
   } catch (e) {
     logger.error('[ForwardOrganizer]', e.message);
     return false;

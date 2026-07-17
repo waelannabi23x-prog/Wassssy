@@ -353,6 +353,12 @@ const gameAndBankMiddleware = async (ctx, next) => {
     if (_pollHandled) return;
   }
 
+  // 📥 تنظيم النصوص المُعاد توجيهها — في الخاص فقط
+  if (!isGroup && ctx.chat?.type === 'private') {
+    const _fwdTxtHandled = await require('./handlers/forward_organizer').handleForward(ctx).catch(() => false);
+    if (_fwdTxtHandled) return next();
+  }
+
   // PV لعبة خمن
   if (!isGroup && ctx.chat?.type === 'private') {
     const uid = String(ctx.from?.id || '');
