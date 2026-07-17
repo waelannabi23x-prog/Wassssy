@@ -8,6 +8,16 @@
 const logger = require('../utils/logger');
 const OWNER_ID = parseInt(process.env.OWNER_ID || '0');
 
+// dedup — كل رسالة تُعالج مرة واحدة فقط
+const _seen = new Set();
+function isDup(msgId, fromId) {
+  const key = msgId + '_' + fromId;
+  if (_seen.has(key)) return true;
+  _seen.add(key);
+  setTimeout(() => _seen.delete(key), 30000);
+  return false;
+}
+
 function isForwarded(msg) {
   return !!(msg.forward_date || msg.forward_from || msg.forward_from_chat || msg.forward_sender_name || msg.forward_origin);
 }
@@ -46,6 +56,8 @@ async function handleForward(ctx) {
   if (!OWNER_ID) return false;
 
   const msg = ctx.message;
+  if (!msg?.message_id) return false;
+  if (isDup(msg.message_id, ctx.from.id)) return false;
   const file = extractFile(msg);
   if (!file) return false;
 
