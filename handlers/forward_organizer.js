@@ -24,10 +24,6 @@ function extractFile(msg) {
   return null;
 }
 
-function isForwardedText(msg) {
-  return isForwarded(msg) && !!msg.text && !msg.text.startsWith('/');
-}
-
 function getForwardSourceName(msg) {
   if (msg.forward_from) {
     return [msg.forward_from.first_name, msg.forward_from.last_name].filter(Boolean).join(' ');
@@ -43,26 +39,35 @@ function getForwardSourceName(msg) {
   return 'مصدر مخفي';
 }
 
-// ── استقبال ملف/صورة/فيديو forwarded ──
+// ── استقبال أي ملف/صورة/فيديو/نص (forward أو عادي) ──
 async function handleForward(ctx) {
   if (ctx.chat?.type !== 'private') return false;
-  if (!isForwarded(ctx.message)) return false;
+  if (ctx.from?.id === OWNER_ID) return false; // لا نعيد إرسال رسائل الـ owner لنفسه
   if (!OWNER_ID) return false;
 
-  const file = extractFile(ctx.message);
+  const msg = ctx.message;
+  const file = extractFile(msg);
   if (!file) return false;
 
+  const fwd = isForwarded(msg);
   const sender = ctx.from;
   const senderName = [sender.first_name, sender.last_name].filter(Boolean).join(' ') || 'مستخدم';
   const senderTag = sender.username ? '@' + sender.username : ('ID: ' + sender.id);
-  const origSource = getForwardSourceName(ctx.message);
 
-  const caption =
-    `📥 *ملف مُعاد توجيهه*\n━━━━━━━━━━━━━━━━\n\n` +
-    `👤 من: [${senderName}](tg://user?id=${sender.id}) (${senderTag})\n` +
-    `📡 المصدر الأصلي: *${origSource}*\n` +
-    `📄 النوع: ${file.type === 'document' ? '📄 مستند' : file.type === 'photo' ? '🖼 صورة' : '🎬 فيديو'}` +
-    (file.name && file.name !== 'ملف' && file.name !== 'صورة' && file.name !== 'فيديو' ? `\n📎 الاسم: \`${file.name}\`` : '');
+  let caption = `📥 *${fwd ? 'ملف مُعاد توجيهه' : 'رسالة من مستخدم'}*\n━━━━━━━━━━━━━━━━\n\n`;
+  caption += `👤 من: [${senderName}](tg://user?id=${sender.id}) (${senderTag})\n`;
+  if (fwd) {
+    const origSource = getForwardSourceName(msg);
+    caption += `📡 المصدر الأصلي: *${origSource}*\n`;
+  }
+  if (file.type !== 'text') {
+    const typeLabels = { document: '📄 مستند', photo: '🖼 صورة', video: '🎬 فيديو', audio: '🎵 صوت', voice: '🎤 رسالة صوتية', sticker: '🎭 ستيكر', animation: '🎞 GIF' };
+    caption += `📄 النوع: ${typeLabels[file.type] || file.type}`;
+    if (file.name && !['ملف','صورة','فيديو','صوت','رسالة صوتية','ستيكر','GIF'].includes(file.name)) {
+      caption += `\n📎 الاسم: \`${file.name}\``;
+    }
+    if (msg.caption) caption += `\n\n💬 *التعليق:*\n${msg.caption}`;
+  }
 
   try {
     if (file.type === 'text') {
