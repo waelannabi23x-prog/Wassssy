@@ -491,7 +491,8 @@ function setupGroupCommands(bot) {
   bot.command('info', async ctx => {
     if (!isGroup(ctx)) return;
     delCmd(ctx);
-    if (!ctx.isAdmin && !ctx.isOwner) return;
+    const _isGrpAdmin = ctx.isAdmin || ctx.isOwner || await isTgAdmin(ctx);
+    if (!_isGrpAdmin) return;
     const target = ctx.message.reply_to_message?.from;
     if (!target) {
       return ctx.reply('↩️ رد على رسالة العضو لعرض معلوماته', {
