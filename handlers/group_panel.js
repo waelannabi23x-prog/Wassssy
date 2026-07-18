@@ -521,13 +521,13 @@ async function showMyGroups(ctx) {
   } else {
     // parallel — كل القروبات دفعة واحدة
     const checks = await Promise.allSettled(
-      allGroups.map(g => ctx.telegram.getChatMember(g.chat_id, uid).catch(() => null))
+      allGroups.map(g => ctx.telegram.getChatMember(g.chat_id, uid).catch(e => { console.log('[MyGroups] getChatMember fail:', g.chat_id, e.message); return null; }))
     );
     checks.forEach((res, i) => {
       const g = allGroups[i];
-      const member = res.value;
+      const member = res.status === 'fulfilled' ? res.value : null;
       const status = member?.status;
-      // admin في Telegram أو هو من أضاف البوت (added_by)
+      console.log('[MyGroups] chat:', g.chat_id, 'title:', g.title, 'status:', status, 'added_by:', g.added_by);
       if (['administrator','creator'].includes(status) || String(g.added_by) === String(uid)) {
         myGroups.push(g);
       }
