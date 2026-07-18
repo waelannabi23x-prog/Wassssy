@@ -521,17 +521,18 @@ async function showMyGroups(ctx) {
   } else {
     // parallel — كل القروبات دفعة واحدة
     const checks = await Promise.allSettled(
-      allGroups.map(g => ctx.telegram.getChatMember(g.chat_id, uid).catch(e => { console.log('[MyGroups] getChatMember fail:', g.chat_id, e.message); return null; }))
+      allGroups.map(g => ctx.telegram.getChatMember(g.chat_id, uid).catch(() => null))
     );
+    const staleIds = [];
     checks.forEach((res, i) => {
       const g = allGroups[i];
       const member = res.status === 'fulfilled' ? res.value : null;
       const status = member?.status;
-      console.log('[MyGroups] chat:', g.chat_id, 'title:', g.title, 'status:', status, 'added_by:', g.added_by);
       if (['administrator','creator'].includes(status) || String(g.added_by) === String(uid)) {
         myGroups.push(g);
       }
     });
+
   }
 
   if (!myGroups.length) {
@@ -595,7 +596,26 @@ async function handleGenInvite(ctx, chatId) {
   }
 }
 
+async function cleanDeadGroups(ctx) {
+  const groups = await all('SELECT chat_id, title FROM group_chats WHERE is_active!=0').catch(() => []);
+  let cleaned = 0;
+  for (const g of groups) {
+    try {
+      const me = await ctx.telegram.getChatMember(g.chat_id, ctx.botInfo.id);
+      if (['left', 'kicked'].includes(me.status)) {
+        await require('../database/db').run('UPDATE group_chats SET is_active=0 WHERE chat_id=$1', [g.chat_id]);
+        cleaned++;
+      }
+    } catch (e) {
+      // البوت مش موجود أصلاً بالقروب (خطأ 403 مثلاً) = ميت
+      await require('../database/db').run('UPDATE group_chats SET is_active=0 WHERE chat_id=$1', [g.chat_id]).catch(() => {});
+      cleaned++;
+    }
+  }
+  return ctx.reply(`✅ تم تنظيف *${cleaned}* قروب ميت من أصل *${groups.length}*`, { parse_mode: 'Markdown' }).catch(() => {});
+}
+
 module.exports = {
-  showMyGroups, showMainMenu, showGroupPanel, showGroupsLeaderboard,
+  showMyGroups, showMainMenu, showGroupPanel, showGroupsLeaderboard, cleanDeadGroups,
   handleCallback, handleText, handleMedia, migrateGroupPanel,
   handleInviteMeList, handleGenInvite };

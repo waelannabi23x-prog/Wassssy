@@ -353,8 +353,8 @@ const gameAndBankMiddleware = async (ctx, next) => {
     if (_pollHandled) return;
   }
 
-  // 📥 تنظيم النصوص المُعاد توجيهها — في الخاص فقط
-  if (!isGroup && ctx.chat?.type === 'private') {
+  // 📥 تنظيم النصوص المُعاد توجيهها — في الخاص فقط، وليس لصاحب البوت أو الأدمن
+  if (!isGroup && ctx.chat?.type === 'private' && !ctx.isAdmin && !ctx.isOwner) {
     const _fwdTxtHandled = await require('./handlers/forward_organizer').handleForward(ctx).catch(() => false);
     if (_fwdTxtHandled) return next();
   }
