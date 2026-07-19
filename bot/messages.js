@@ -230,7 +230,8 @@ module.exports.registerMessages = function(bot, deps) {
         });
         const backup = JSON.parse(raw);
         if (!backup.tables) throw new Error('ملف غير صالح');
-        const SAFE = new Set(['users','admins','specialties','years','semesters','subjects','categories','files','favorites','history','ratings','user_specialties','settings','bundles','bundle_files','message_templates','scheduled_messages','comments','reports','group_chats','group_members']);
+        const { ALL_TABLES } = require('../utils/backup_full');
+        const SAFE = new Set(ALL_TABLES);
         let restored = 0, errors = 0;
         for (const [table, rows] of Object.entries(backup.tables)) {
           if (!rows.length || !SAFE.has(table)) { errors++; continue; }
@@ -242,7 +243,14 @@ module.exports.registerMessages = function(bot, deps) {
           catch(e) { errors++; logger.error('[Restore]', table, e.message); }
         }
         if (msg) ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(() => {});
-        ctx.reply('✅ تمت الاستعادة\n\n' + restored + ' سجل | ' + errors + ' خطأ').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+        const totalTables = Object.keys(backup.tables).length;
+        ctx.reply(
+          '✅ *تمت الاستعادة الشاملة!*\n\n' +
+          '📊 الجداول: *' + totalTables + '*\n' +
+          '📄 السجلات المستعادة: *' + restored + '*\n' +
+          (errors ? '⚠️ أخطاء: *' + errors + '* (جداول فارغة أو غير موجودة)' : '✅ بدون أخطاء'),
+          { parse_mode: 'Markdown' }
+        ).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
       } catch(e) {
         if (msg) ctx.telegram.deleteMessage(ctx.chat.id, msg.message_id).catch(() => {});
         ctx.reply('❌ فشلت الاستعادة: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
