@@ -87,6 +87,29 @@ async function mainMenu(ctx){
   return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
 }
 
+async function showMaintPanel(ctx){
+  const db = require('../database/db');
+  const [msg, endTime, exempt] = await Promise.all([
+    db.getSetting('maintenance_msg').catch(()=>null),
+    db.getSetting('maintenance_end').catch(()=>null),
+    db.getSetting('maintenance_groups_exempt').catch(()=>null),
+  ]);
+  const isExempt = exempt === 'true';
+  const text =
+    '🔧 *وضع الصيانة*\n━━━━━━━━━━━━━━━━━━━━\n\n' +
+    'الحالة: '+(global.maintenanceMode?'🔴 *مفعّلة*':'🟢 *متوقفة*')+'\n\n' +
+    '📝 الرسالة الحالية:\n_'+(msg?escMd(msg):'الافتراضية')+'_\n\n' +
+    '⏱ وقت العودة: '+(endTime?escMd(endTime):'_غير محدد_')+'\n' +
+    '👥 استثناء القروبات: '+(isExempt?'✅ مفعّل (القروبات تعمل بشكل طبيعي)':'❌ معطّل (الكل متأثر)');
+  const rows = [
+    [btn(global.maintenanceMode?'🟢 إيقاف الصيانة':'🔴 تفعيل الصيانة','mg_maint_toggle')],
+    [btn('📝 تعديل الرسالة','mg_set_maint_msg'), btn('⏱ وقت العودة','mg_set_maint_end')],
+    [btn(isExempt?'❌ إلغاء استثناء القروبات':'✅ استثناء القروبات','mg_maint_toggle_exempt')],
+    [btn('🔄 تحديث','mg_maint_refresh'), btn('◀️ رجوع','mg_menu')],
+  ];
+  return eos(ctx,text,{parse_mode:'Markdown',...build(rows)});
+}
+
 async function showContent(ctx){
   const adminSp=ctx.isOwner?0:await adminsDb.getAdminSpecialty(ctx.uid);
   let specs=await content.getSpecs();
@@ -463,7 +486,25 @@ case '/cancel':clearState(uid);return ctx.reply('تم الإلغاء.',build([ba
         break;}
       case 'mg_notify_msg':{clearState(uid);const nIds=await interactions.getActiveUsers(7);await safeAdd(broadcastQueue,'broadcast-all',{userIds:nIds,message:'🔔 *إشعار*\n\n'+text,parseMode:'Markdown',fromUid:uid});ctx.reply('📤 جاري الإرسال لـ *'+nIds.length+'* مستخدم — ستصلك النتيجة لما ينتهي',{parse_mode:'Markdown',...build([back('mg_menu')])});break;}
       case 'mg_add_admin_id':{const tid=parseInt(text);if(isNaN(tid)){clearState(uid);return ctx.reply('❌ ID غير صحيح.');}await adminsDb.add(tid,uid);await interactions.addLog(uid,'add_admin','ID: '+tid);if(global.invalidateAdmin) global.invalidateAdmin(tid);const specs=await content.getSpecs();const spRows=specs.map(s=>[btn('🎓 '+s.name,'mg_admin_sp_'+tid+'_'+s.id)]);spRows.push([btn('كل التخصصات','mg_admin_sp_'+tid+'_0')]);clearState(uid);ctx.reply('اختر تخصص المشرف:',{...build(spRows)});try{ctx.telegram.sendMessage(tid,'🎉 تمت إضافتك مشرفاً',{parse_mode:'Markdown'});}catch(_){}break;}
-      case 'mg_maint_msg':global.maintenanceModeMsg=text;clearState(uid);ctx.reply('✅ تم تحديث رسالة الصيانة',build([back('mg_menu')]));break;
+      case 'mg_maint_msg':{
+        await require('../database/db').setSetting('maintenance_msg', text);
+        global._maintMsgCache = null; // إبطال الكاش فوراً
+        clearState(uid);
+        ctx.reply('✅ تم تحديث رسالة الصيانة',build([back('mg_menu')]));
+        break;
+      }
+      case 'mg_maint_end':{
+        const cleaned = text.trim();
+        if (cleaned.toLowerCase() === 'حذف' || cleaned === '-') {
+          await require('../database/db').run("DELETE FROM settings WHERE key='maintenance_end'").catch(()=>{});
+        } else {
+          await require('../database/db').setSetting('maintenance_end', cleaned);
+        }
+        global._maintMsgCache = null;
+        clearState(uid);
+        ctx.reply('✅ تم تحديث وقت العودة المتوقع',build([back('mg_menu')]));
+        break;
+      }
       case 'mg_gs_edit': {
         const { run: dbRun2 } = require('../database/db');
         await dbRun2(
@@ -1189,8 +1230,23 @@ if(data==='mg_auto_replies') return showAutoReplies(ctx);
   if(data==='mg_reports'){const rpts=await all(`SELECT r.*,f.title as ft,u.first_name as fn FROM reports r LEFT JOIN files f ON r.file_id=f.id LEFT JOIN users u ON r.user_id=u.id WHERE r.status='pending' ORDER BY r.created_at DESC LIMIT 20`);let txt='🚩 *البلاغات ('+rpts.length+')*\n\n';if(!rpts.length) txt+='لا توجد بلاغات.';else rpts.forEach((r,i)=>{txt+=(i+1)+'. '+escMd(r.ft||'?')+' | '+escMd(r.reason||'?')+' | '+(r.fn||r.user_id)+'\n';});const rrows=rpts.map(r=>[btn('✅ حل','mg_resolve_report_'+r.id),btn('🗑 حذف','mg_cdl_fl_0_0_0_0_'+r.file_id),btn('❌ تجاهل','mg_dismiss_report_'+r.id)]);rrows.push(back('mg_menu'));return eos(ctx,txt,{parse_mode:'Markdown',...build(rrows)});}
   if(data.startsWith('mg_dismiss_report_')){const rid=data.replace('mg_dismiss_report_','');dbRun("UPDATE reports SET status='dismissed' WHERE id=$1",[rid]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });return handleCallback(ctx,'mg_reports');}
 if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_report_','');dbRun("UPDATE reports SET status='resolved' WHERE id=$1",[rid]).catch(err => { require('../utils/logger').debug("[silent]", err.message); });ctx.answerCbQuery('✅ تم حل البلاغ').catch(err => { require('../utils/logger').debug("[silent]", err.message); });return handleCallback(ctx,'mg_reports');}
-  if(data==='mg_maint'){global.maintenanceMode=!global.maintenanceMode;await setSetting('maintenance',global.maintenanceMode?'true':'false');await interactions.addLog(uid,'maintenance',global.maintenanceMode?'ON':'OFF');return eos(ctx,'🔧 *الصيانة: '+(global.maintenanceMode?'🔴 مفعّلة':'🟢 متوقفة')+'*',{parse_mode:'Markdown',...build([[btn(global.maintenanceMode?'🟢 إيقاف':'🔴 تفعيل','mg_maint')],[btn('📝 تعديل الرسالة','mg_set_maint_msg'),btn('◀️ رجوع','mg_menu')]])});}
-  if(data==='mg_set_maint_msg'){setState(uid,{type:'mg_maint_msg'});return ctx.reply('📝 رسالة الصيانة:');}
+  if(data==='mg_maint_toggle'){
+    global.maintenanceMode=!global.maintenanceMode;
+    global._maintMsgCache=null;
+    await setSetting('maintenance',global.maintenanceMode?'true':'false');
+    await interactions.addLog(uid,'maintenance',global.maintenanceMode?'ON':'OFF');
+    return showMaintPanel(ctx);
+  }
+  if(data==='mg_maint'||data==='mg_maint_refresh') return showMaintPanel(ctx);
+  if(data==='mg_set_maint_msg'){setState(uid,{type:'mg_maint_msg'});return ctx.reply('📝 *رسالة الصيانة:*\n_(أو /cancel)_',{parse_mode:'Markdown'});}
+  if(data==='mg_set_maint_end'){setState(uid,{type:'mg_maint_end'});return ctx.reply('⏱ *وقت العودة المتوقع* (نص حر، مثال: "بعد ساعتين" أو "22:00"):\nاكتب *حذف* لإزالته\n_(أو /cancel)_',{parse_mode:'Markdown'});}
+  if(data==='mg_maint_toggle_exempt'){
+    const cur=await require('../database/db').getSetting('maintenance_groups_exempt').catch(()=>null);
+    const next=cur==='true'?'false':'true';
+    await require('../database/db').setSetting('maintenance_groups_exempt',next);
+    global._maintMsgCache=null;
+    return showMaintPanel(ctx);
+  }
   if(data==='mg_backup'){
     const msg = await ctx.reply('⏳ جاري تصدير كل البيانات (قد يستغرق دقيقة)...').catch(()=>{});
     try {

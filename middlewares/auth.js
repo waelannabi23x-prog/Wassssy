@@ -111,11 +111,19 @@ async function authMiddleware(ctx, next) {
     // ✅ كاش 60 ثانية لتجنب DB query على كل طلب
     if (!global._maintMsgCache || Date.now() - global._maintMsgCache.ts > 60000) {
       const { getSetting } = require('../database/db');
-      const endTime = await getSetting('maintenance_end').catch(() => null);
-      let msg = global.maintenanceMsg || '🔧 البوت تحت الصيانة حالياً لتحسين الخدمة.';
+      const [customMsg, endTime, groupsExempt] = await Promise.all([
+        getSetting('maintenance_msg').catch(() => null),
+        getSetting('maintenance_end').catch(() => null),
+        getSetting('maintenance_groups_exempt').catch(() => null),
+      ]);
+      let msg = customMsg || '🔧 البوت تحت الصيانة حالياً لتحسين الخدمة.';
       if (endTime) msg += `\n\n⏱ الوقت المتوقع للعودة: ${endTime}`;
       msg += '\n\nنعتذر عن الإزعاج 🙏';
-      global._maintMsgCache = { msg, ts: Date.now() };
+      global._maintMsgCache = { msg, ts: Date.now(), groupsExempt: groupsExempt === 'true' };
+    }
+    // استثناء القروبات إن كان مفعّلاً (صيانة الخاص فقط)
+    if (global._maintMsgCache.groupsExempt && ctx.chat?.type !== 'private') {
+      return next();
     }
     return ctx.reply(global._maintMsgCache.msg).catch(() => {});
   }
