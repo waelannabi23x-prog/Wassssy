@@ -267,6 +267,12 @@ async function initSchema() {
   )`); } catch(err) { require('./logger').debug('[catch]', err.message); }
   try { if(pg) await pg.query('CREATE INDEX IF NOT EXISTS idx_group_messages_chat ON group_messages(chat_id)'); } catch(err) { require('./logger').debug('[catch]', err.message); }
 
+  // إصلاح sequence جدول years (كان مكسور بسبب duplicate key)
+  try { if(pg) await pg.query(`SELECT setval('years_id_seq', COALESCE((SELECT MAX(id) FROM years), 1), true)`); } catch(e) { require('./logger').debug('[years_seq]', e.message); }
+  try { if(pg) await pg.query(`SELECT setval('specialties_id_seq', COALESCE((SELECT MAX(id) FROM specialties), 1), true)`); } catch(e) { require('./logger').debug('[specialties_seq]', e.message); }
+  try { if(pg) await pg.query(`SELECT setval('semesters_id_seq', COALESCE((SELECT MAX(id) FROM semesters), 1), true)`); } catch(e) { require('./logger').debug('[semesters_seq]', e.message); }
+  try { if(pg) await pg.query(`SELECT setval('subjects_id_seq', COALESCE((SELECT MAX(id) FROM subjects), 1), true)`); } catch(e) { require('./logger').debug('[subjects_seq]', e.message); }
+
   // migration: specialty_id في users
   try { if(pg) await pg.query('ALTER TABLE users ADD COLUMN IF NOT EXISTS specialty_id INTEGER'); } catch(err) { require('./logger').debug('[catch]', err.message); }
 
