@@ -207,7 +207,7 @@ async function showPreview(ctx, fid, spId, yrId, smId, sbId, catId) {
   var fav=personalCached.fav, userRating=personalCached.userRating;
   var avg=ratingData?ratingData.avg:0, cnt=ratingData?ratingData.cnt:0;
   var text = '📄 *'+escMd(f.title)+'*\n'+(f.description?'📝 _'+escMd(f.description)+'_\n':'')+'\n📁 '+escMd(f.cat_name||'')+'  |  📖 '+escMd(f.sub_name||'')+'\n⬇️ *'+f.downloads+'* تحميل  |  💬 *'+commentCount+'* تعليق\n'+(avg>0?'⭐ '+parseFloat(avg).toFixed(1)+' ('+cnt+')':'');
-  var backCb = catId!==0?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
+  var backCb = (catId && catId != '0' && catId != 0) ? 'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId : 'main_menu';
   var ratingBtns = [1,2,3,4,5].map(function(i){ return btn(i<=userRating?'⭐':'☆','rate_'+fid+'_'+i+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId); });
   var rows = [
     [btn('⬇️ تحميل الملف','fl_'+fid+'_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId)],
