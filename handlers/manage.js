@@ -1192,21 +1192,30 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
   if(data==='mg_maint'){global.maintenanceMode=!global.maintenanceMode;await setSetting('maintenance',global.maintenanceMode?'true':'false');await interactions.addLog(uid,'maintenance',global.maintenanceMode?'ON':'OFF');return eos(ctx,'🔧 *الصيانة: '+(global.maintenanceMode?'🔴 مفعّلة':'🟢 متوقفة')+'*',{parse_mode:'Markdown',...build([[btn(global.maintenanceMode?'🟢 إيقاف':'🔴 تفعيل','mg_maint')],[btn('📝 تعديل الرسالة','mg_set_maint_msg'),btn('◀️ رجوع','mg_menu')]])});}
   if(data==='mg_set_maint_msg'){setState(uid,{type:'mg_maint_msg'});return ctx.reply('📝 رسالة الصيانة:');}
   if(data==='mg_backup'){
-    const msg = await ctx.reply('⏳ جاري تصدير البيانات...').catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+    const msg = await ctx.reply('⏳ جاري تصدير كل البيانات (قد يستغرق دقيقة)...').catch(()=>{});
     try {
-      const tables = ['specialties','years','semesters','subjects','categories','files','bundles','bundle_files','admins','settings','message_templates','scheduled_messages'];
-      const backup = { exported_at: new Date().toISOString(), tables: {} };
-      for (const t of tables) {
-        try { backup.tables[t] = await all('SELECT * FROM ' + t); } catch(_) { backup.tables[t] = []; }
-      }
-      const json = JSON.stringify(backup, null, 2);
+      const { exportAll } = require('../utils/backup_full');
+      const backup = await exportAll();
+      const json = JSON.stringify(backup);
       const buf  = Buffer.from(json, 'utf8');
-      const fname = 'backup_' + new Date().toISOString().substring(0,10) + '.json';
-      await ctx.replyWithDocument({ source: buf, filename: fname }, { caption: '💾 Backup ' + new Date().toISOString().substring(0,10) });
-      if (msg) ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+      const sizeMB = (buf.length / 1024 / 1024).toFixed(2);
+      const fname = 'taline_backup_' + new Date().toISOString().substring(0,10) + '.json';
+
+      const tableCount = Object.keys(backup.tables).length;
+      const rowCount = Object.values(backup.tables).reduce((s,r)=>s+r.length,0);
+      const errCount = backup.errors.length;
+
+      let caption = '💾 *نسخة احتياطية شاملة*\n' +
+        '📊 الجداول: *' + tableCount + '*\n' +
+        '📄 الصفوف: *' + rowCount + '*\n' +
+        '📦 الحجم: *' + sizeMB + ' MB*';
+      if (errCount) caption += '\n⚠️ جداول فشلت: *' + errCount + '*';
+
+      await ctx.replyWithDocument({ source: buf, filename: fname }, { caption, parse_mode: 'Markdown' });
+      if (msg) ctx.deleteMessage(msg.message_id).catch(()=>{});
     } catch(e) {
-      if (msg) ctx.deleteMessage(msg.message_id).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
-      ctx.reply('❌ فشل التصدير: ' + e.message).catch(err => { require('../utils/logger').debug("[silent]", err.message); });
+      if (msg) ctx.deleteMessage(msg.message_id).catch(()=>{});
+      ctx.reply('❌ فشل التصدير: ' + e.message).catch(()=>{});
     }
     return;
   }
@@ -1239,7 +1248,7 @@ if(data.startsWith('mg_resolve_report_')){const rid=data.replace('mg_resolve_rep
 
   if(data==='mg_del_welcome'){await require('../database/db').run("DELETE FROM settings WHERE key IN ('start_welcome_text','start_welcome_media_id','start_welcome_media_type')").catch(()=>{});ctx.answerCbQuery('✅ تم الحذف').catch(()=>{});return handleCallback(ctx,'mg_bot_settings');}
 
-  if(data==='mg_restore'){setState(uid,{type:'mg_awaiting_restore'});return eos(ctx,'♻️ *استعادة قاعدة البيانات*\n\n⚠️ سيتم استبدال البيانات!\n\nأرسل ملف `.db`:',{parse_mode:'Markdown',...build([back('mg_menu')])});}
+  if(data==='mg_restore'){setState(uid,{type:'mg_awaiting_restore'});return eos(ctx,'♻️ *استعادة كاملة*\n\n⚠️ سيُستبدل كل شيء: مستخدمين، ملفات، بنك، ألعاب، حماية، ردود تلقائية!\n\nأرسل ملف `.json` من "نسخ احتياطي":',{parse_mode:'Markdown',...build([back('mg_menu')])});}
   if(data==='mg_broadcast'){setState(uid,{type:'mg_broadcast'});return ctx.reply('📢 رسالة البث:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
   if(data==='mg_add_admin'){setState(uid,{type:'mg_add_admin_id'});return ctx.reply('👤 ID المستخدم:\n_(أو /cancel)_',{parse_mode:'Markdown'});}
   if(data.startsWith('mg_admin_sp_')){const p=data.replace('mg_admin_sp_','').split('_');await adminsDb.setSpecialty(p[0],p[1]);return eos(ctx,'✅ تم تحديد التخصص',{...build([back('mg_admins')])});}
