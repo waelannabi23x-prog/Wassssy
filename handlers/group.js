@@ -19,7 +19,7 @@ async function _goSearch(q,limit){
 }
 async function smartSearch(rawQ,limit){
   limit=limit||15;
-  const{terms,raw}=parseQuery(rawQ);
+  const{terms,raw,groups}=parseQuery(rawQ);
   if(!terms.length)return[];
   const cacheKey=raw.slice(0,60);
   const cached=_getCached(cacheKey);
@@ -31,7 +31,7 @@ async function smartSearch(rawQ,limit){
   const pgResults=await Promise.all(pgTerms.map(t=>filesDb.search(t,limit).catch(()=>[])));
   for(const arr of pgResults)arr.forEach(f=>{if(!allResults.has(f.id))allResults.set(f.id,f);});
   const final=[...allResults.values()]
-    .map(f=>({f,s:scoreFile(f,terms)}))
+    .map(f=>({f,s:scoreFile(f,terms,groups)}))
     .filter(x=>x.s>0)
     .sort((a,b)=>b.s-a.s)
     .slice(0,limit)

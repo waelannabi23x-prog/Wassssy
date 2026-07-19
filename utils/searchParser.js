@@ -55,7 +55,7 @@ const _RX_SPLIT = /[\s,_\-.]+/;
 const _RX_NUMTK = /^([a-zA-Z\u0600-\u06ff]+)(\d+)$/;
 function normalize(s){return(s||'').toLowerCase().normalize('NFD').replace(_RX_DIAC,'').replace(_RX_PUNCT,' ').replace(_RX_SPACE,' ').trim();}
 function parseQuery(rawQ){
-  if(!rawQ)return{terms:[],raw:''};
+  if(!rawQ)return{terms:[],raw:'',groups:[]};
   const q=rawQ.replace(_RX_SANIT,'').trim().slice(0,100);
   const tokens=[];
   for(const tok of q.split(_RX_SPLIT).filter(t=>t.length>=1)){
@@ -64,18 +64,33 @@ function parseQuery(rawQ){
     else tokens.push(tok.toLowerCase());
   }
   const termSet=new Set();
+  // groups: كل عنصر يمثّل كلمة أصلية واحدة ومرادفاتها — يُستخدم لفرض تطابق كل كلمة أصلية
+  const groups=[];
   for(const tok of tokens){
     const norm=normalize(tok);
-    termSet.add(norm);
+    const groupSet=new Set([norm]);
     const expns=ALIASES[tok]||ALIASES[norm];
-    if(expns)expns.slice(0,3).forEach(a=>termSet.add(normalize(a)));
+    if(expns)expns.slice(0,3).forEach(a=>groupSet.add(normalize(a)));
+    groupSet.forEach(t=>termSet.add(t));
+    groups.push([...groupSet].filter(Boolean));
   }
   const terms=[...termSet].filter(t=>t.length>=1);
-  return{terms,raw:tokens.join(' ')};
+  return{terms,raw:tokens.join(' '),groups};
 }
-function scoreFile(file,terms){
+function scoreFile(file,terms,groups){
   const title=normalize(file.title),sub=normalize(file.sub_name||''),cat=normalize(file.cat_name||'');
   const full=title+' '+sub+' '+cat;
+  // إذا توفرت groups (كل عنصر = كلمة أصلية واحدة + مرادفاتها)،
+  // اشترط أن كل كلمة أصلية على الأقل واحدة من مرادفاتها تظهر في full،
+  // وإلا استبعد الملف تماماً. هذا يمنع "serie algo" من مطابقة ملف
+  // "exercices analyse" لمجرد اشتراكه في مرادف "exercices" مع serie
+  // بينما لا علاقة له بـ algo.
+  if(groups&&groups.length>1){
+    for(const group of groups){
+      const groupMatches=group.some(t=>t&&full.includes(t));
+      if(!groupMatches)return 0;
+    }
+  }
   // precompute normalized terms once
   const nterms=terms.map(t=>normalize(t)).filter(Boolean);
   let score=0;
