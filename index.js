@@ -210,11 +210,13 @@ const groupProtectionMiddleware = async (ctx, next) => {
         } else if (ar.match_type === 'exact') {
           isMatch = txt.toLowerCase() === ar.trigger.toLowerCase();
         } else {
-          isMatch = txt.toLowerCase().includes(ar.trigger.toLowerCase());
+          // مطابقة كلمة كاملة (word boundary) بدل substring — يمنع "لا" من مطابقة "بوسسيلا"
+          const escaped = ar.trigger.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+          isMatch = new RegExp('(^|\\s)' + escaped + '($|\\s|[.,!?؟،])', 'i').test(txt);
         }
         if (isMatch) matched.push(ar);
       } catch(_) {
-        if (txt.toLowerCase().includes(ar.trigger.toLowerCase())) matched.push(ar);
+        if (txt.toLowerCase() === ar.trigger.toLowerCase()) matched.push(ar);
       }
     }
     if (matched.length > 0) {
