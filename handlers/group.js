@@ -30,6 +30,21 @@ async function smartSearch(rawQ,limit){
   const pgTerms=[...new Set([raw,...terms])].slice(0,4);
   const pgResults=await Promise.all(pgTerms.map(t=>filesDb.search(t,limit).catch(()=>[])));
   for(const arr of pgResults)arr.forEach(f=>{if(!allResults.has(f.id))allResults.set(f.id,f);});
+
+  // تحقق من كل النتائج ضد قاعدة البيانات الحية (Go service قد يرجع نتائج قديمة/محذوفة)
+  const idsToVerify = [...allResults.keys()];
+  if (idsToVerify.length) {
+    const { all: _dbAll } = require('../database/db');
+    const liveIds = await _dbAll(
+      `SELECT id FROM files WHERE id = ANY($1::int[]) AND is_deleted=0`,
+      [idsToVerify]
+    ).catch(() => null);
+    if (liveIds) {
+      const liveSet = new Set(liveIds.map(r => r.id));
+      for (const id of idsToVerify) if (!liveSet.has(id)) allResults.delete(id);
+    }
+  }
+
   const final=[...allResults.values()]
     .map(f=>({f,s:scoreFile(f,terms,groups)}))
     .filter(x=>x.s>0)
