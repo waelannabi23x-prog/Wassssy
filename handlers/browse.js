@@ -258,7 +258,25 @@ async function showComments(ctx, fid, spId, yrId, smId, sbId, catId, page) {
 async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
   fid = safeInt(fid);
   var uid = ctx.uid;
-  var backCb = catId!==0?'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId:'main_menu';
+
+  // بناء زر رجوع صحيح:
+  // - إذا وصلت السلسلة كاملة (تصفح عادي): استخدمها مباشرة
+  // - إذا كان catId حقيقياً لكن الباقي أصفار (من جديد/مفضلاتي/سجلي):
+  //   استرجع المسار الحقيقي من category_id عبر استعلام واحد مخزَّن مؤقتاً
+  // - إذا لم يوجد catId إطلاقاً: ارجع للقائمة الرئيسية
+  var backCb = 'main_menu';
+  var hasCat = catId && catId != '0' && catId != 0;
+  if (hasCat) {
+    var hasFullPath = spId && spId != '0' && spId != 0;
+    if (hasFullPath) {
+      backCb = 'ct_'+spId+'_'+yrId+'_'+smId+'_'+sbId+'_'+catId;
+    } else {
+      var realPath = await content.getPathFromCategory(catId).catch(function(){ return null; });
+      if (realPath && realPath.spId) {
+        backCb = 'ct_'+realPath.spId+'_'+realPath.yrId+'_'+realPath.smId+'_'+realPath.sbId+'_'+catId;
+      }
+    }
+  }
 
   // ⚡ 1. رد فوري — يشيل الـ spinner قبل أي شيء
   ctx.answerCbQuery('📥 جاري التحميل...').catch(function(){});
