@@ -382,7 +382,7 @@ async function handleFileUpload(ctx){
       }
     }
     ctx.reply('✅ *'+escMd(state.title)+'* رُفع بنجاح!',{parse_mode:'Markdown',...build([[btn('➕ رفع آخر','mg_upl_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId+'_'+state.catId)],[btn('📁 عرض الملفات','mg_fls_'+state.spId+'_'+state.yrId+'_'+state.smId+'_'+state.sbId+'_'+state.catId)]])});
-  }catch(e){clearState(uid);ctx.reply(e.message==='exists'?'❌ يوجد ملف بهذا الاسم!':'❌ فشل: '+e.message);}
+  }catch(e){console.error('[handleFileUpload]', e.message, e.stack); clearState(uid);ctx.reply(e.message==='exists'?'❌ يوجد ملف بهذا الاسم!':'❌ فشل: '+e.message);}
 }
 async function handleText(ctx,state){
   const uid=ctx.uid;
