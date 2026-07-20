@@ -233,8 +233,19 @@ module.exports.registerMessages = function(bot, deps) {
         const { ALL_TABLES } = require('../utils/backup_full');
         const SAFE = new Set(ALL_TABLES);
         let restored = 0, errors = 0;
+        const { getPg } = require('../database/db');
+        const _pg = getPg();
+        // ✅ استبدال كامل: امسح كل جدول مستهدف قبل إدراج بيانات النسخة القديمة
+        // بدلاً من الدمج (INSERT فقط)، لضمان أن الاستعادة تُرجع الحالة القديمة
+        // تماماً وتحذف أي بيانات أُضيفت بعد تاريخ النسخة الاحتياطية.
         for (const [table, rows] of Object.entries(backup.tables)) {
-          if (!rows.length || !SAFE.has(table)) { errors++; continue; }
+          if (!SAFE.has(table)) { errors++; continue; }
+          if (_pg) {
+            await _pg.query('TRUNCATE TABLE "' + table + '" CASCADE').catch(async () => {
+              await _pg.query('DELETE FROM "' + table + '"').catch(() => {});
+            });
+          }
+          if (!rows.length) { restored += 0; continue; } // جدول فُرِّغ بنجاح لكن لا بيانات لاستعادتها فيه
           const cols = Object.keys(rows[0]).filter(c => /^[a-zA-Z_][a-zA-Z0-9_]{0,59}$/.test(c));
           if (!cols.length) { errors++; continue; }
           const ph   = rows.map((_, ri) => '(' + cols.map((_, ci) => '$' + (ri * cols.length + ci + 1)).join(',') + ')').join(',');
