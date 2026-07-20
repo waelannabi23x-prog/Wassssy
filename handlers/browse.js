@@ -274,6 +274,9 @@ async function sendFile(ctx, fid, spId, yrId, smId, sbId, catId) {
       var realPath = await content.getPathFromCategory(catId).catch(function(){ return null; });
       if (realPath && realPath.spId) {
         backCb = 'ct_'+realPath.spId+'_'+realPath.yrId+'_'+realPath.smId+'_'+realPath.sbId+'_'+catId;
+        // أبطل أي كاش قديم لهذا المسار (قد يكون بُني سابقاً بمعرّفات أصفار خاطئة)
+        cacheClear('showfiles_'+catId);
+        cacheClear('path_'+realPath.spId+'_'+realPath.yrId+'_'+realPath.smId+'_'+realPath.sbId+'_'+catId);
       }
     }
   }

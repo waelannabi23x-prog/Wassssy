@@ -128,14 +128,18 @@ async function getPathFromCategory(catId) {
   const cached = _cg(k);
   if (cached) return cached;
   const row = await _get(
-    `SELECT y.specialty_id as sp_id, s.year_id as yr_id, sub.semester_id as sm_id, c.subject_id as sb_id
-     FROM categories c
-     JOIN subjects sub ON c.subject_id = sub.id
-     JOIN semesters s ON sub.semester_id = s.id
-     JOIN years y ON s.year_id = y.id
-     WHERE c.id = $1`,
+    `SELECT
+        yr.specialty_id  AS sp_id,
+        sem.year_id      AS yr_id,
+        sub.semester_id  AS sm_id,
+        cat.subject_id   AS sb_id
+     FROM categories cat
+     JOIN subjects   sub ON cat.subject_id  = sub.id
+     JOIN semesters  sem ON sub.semester_id = sem.id
+     JOIN years      yr  ON sem.year_id     = yr.id
+     WHERE cat.id = $1`,
     [catId]
-  ).catch(() => null);
+  ).catch((e) => { require('../utils/logger').error('[getPathFromCategory]', e.message); return null; });
   if (!row) return null;
   const path = { spId: row.sp_id, yrId: row.yr_id, smId: row.sm_id, sbId: row.sb_id, catId };
   _cs(k, path, 600000);
