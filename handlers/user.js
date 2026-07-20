@@ -15,7 +15,7 @@ async function showLatest(ctx) {
   var k = 'latest_15', list = cacheGet(k);
   if (!list) { list = await filesDb.recentFiles(15); cacheSet(k, list, 120000); }
   if (!list.length) return eos(ctx, '🆕 لا توجد ملفات بعد.', build([back('main_menu')]));
-  var rows = list.map(f => [btn('📄 ' + f.title + ' · ' + f.sub_name, 'fl_' + f.id + '_0_0_0_0_0')]);
+  var rows = list.map(f => [btn('📄 ' + f.title + ' · ' + f.sub_name, 'fl_' + f.id + '_0_0_0_0_' + (f.category_id||0))]);
   rows.push(back('main_menu'));
   return eos(ctx, '🆕 *آخر الملفات (' + list.length + ')*', { parse_mode: 'Markdown', ...build(rows) });
 }
@@ -60,7 +60,7 @@ async function showFavorites(ctx) {
     rows.push([btn('📖 ' + sub, 'noop')]);
     grouped[sub].forEach(f => {
       var icon = f.file_type==='link'?'🔗':f.file_type==='photo'?'🖼️':'📄';
-      rows.push([btn(icon+' '+f.title, 'fl_'+f.id+'_0_0_0_0_0'), btn('🗑','unfav_'+f.id)]);
+      rows.push([btn(icon+' '+f.title, 'fl_'+f.id+'_0_0_0_0_'+(f.category_id||0)), btn('🗑','unfav_'+f.id)]);
     });
   });
   rows.push(back('main_menu'));
@@ -90,7 +90,7 @@ async function toggleFav(ctx, fid, remove) {
 async function showHistory(ctx) {
   var uid = ctx.uid, hist = await interactions.getHistory(uid);
   if (!hist.length) return eos(ctx, '📂 *السجل*\n\nلم تشاهد أي ملفات بعد.', { parse_mode: 'Markdown', ...build([back('main_menu')]) });
-  var rows = hist.map(f => [btn('📄 ' + f.title, 'fl_' + f.id + '_0_0_0_0_0')]);
+  var rows = hist.map(f => [btn('📄 ' + f.title, 'fl_' + f.id + '_0_0_0_0_' + (f.category_id||0))]);
   rows.push(back('main_menu'));
   rows.push([btn('🗑 مسح سجلي','clear_my_history')]);
   return eos(ctx, '📂 *السجل (' + hist.length + ')*', { parse_mode: 'Markdown', ...build(rows) });

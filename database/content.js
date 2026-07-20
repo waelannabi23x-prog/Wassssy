@@ -77,16 +77,76 @@ const deleteSemester = async id => { await run('UPDATE semesters SET is_deleted=
 
 const addSubject    = async (smId,name) => { const r=await get('SELECT id FROM subjects WHERE semester_id=$1 AND name=$2',[smId,name]); if(r) throw new Error('exists'); await run('INSERT INTO subjects(semester_id,name) VALUES($1,$2)',[smId,name]); cacheClear('subs_raw_'+smId); };
 const renameSubject = async (id,name) => { await run('UPDATE subjects SET name=$1 WHERE id=$2',[name,id]); cacheClear('sub_'+id); cacheClearPrefix('subs_raw_'); cacheClearPrefix('path_'); };
-const deleteSubject = async id => { await run('UPDATE subjects SET is_deleted=1 WHERE id=$1',[id]); cacheClear('sub_'+id); cacheClearPrefix('subs_raw_'); cacheClearPrefix('path_'); };
+const deleteSubject = async id => {
+  // ✅ حذف كامل نهائي — المادة + كل التصنيفات والملفات المرتبطة بها
+  const {run:_run, all:_all} = require('./db');
+  try {
+    const files = await _all(
+      'SELECT f.id, f.category_id FROM files f JOIN categories c ON f.category_id=c.id WHERE c.subject_id=$1',
+      [id]
+    ).catch(()=>[]);
+    await _run('DELETE FROM files WHERE id IN (SELECT f.id FROM files f JOIN categories c ON f.category_id=c.id WHERE c.subject_id=$1)',[id]).catch(()=>{});
+    await _run('DELETE FROM categories WHERE subject_id=$1',[id]).catch(()=>{});
+    await _run('DELETE FROM subjects WHERE id=$1',[id]).catch(()=>{});
+    files.forEach(f => { cacheClear('file_'+f.id); cacheClear('prev_static_'+f.id); cacheClearPrefix('showfiles_'+f.category_id); });
+    cacheClear('sub_'+id); cacheClearPrefix('subs_raw_'); cacheClearPrefix('path_'); cacheClearPrefix('cats_raw_');
+    cacheClearPrefix('search_'); cacheClearPrefix('gsrc_');
+    if (global._clearSearchCache) global._clearSearchCache();
+  } catch(e) {
+    require('../utils/logger').error('[deleteSubject]', e.message);
+    throw e;
+  }
+};
 
 const addCategory    = async (sbId,name) => { const r=await get('SELECT id FROM categories WHERE subject_id=$1 AND name=$2',[sbId,name]); if(r) throw new Error('exists'); await run('INSERT INTO categories(subject_id,name) VALUES($1,$2)',[sbId,name]); cacheClear('cats_raw_'+sbId); };
 const renameCategory = async (id,name) => { await run('UPDATE categories SET name=$1 WHERE id=$2',[name,id]); cacheClear('cat_'+id); cacheClearPrefix('cats_raw_'); cacheClearPrefix('path_'); cacheClearPrefix('showfiles_'); };
-const deleteCategory = async id => { await run('UPDATE categories SET is_deleted=1 WHERE id=$1',[id]); cacheClear('cat_'+id); cacheClearPrefix('cats_raw_'); cacheClearPrefix('showfiles_'); cacheClearPrefix('path_'); };
+const deleteCategory = async id => {
+  // ✅ حذف كامل نهائي — التصنيف + كل الملفات بداخله
+  const {run:_run, all:_all} = require('./db');
+  try {
+    const files = await _all('SELECT id FROM files WHERE category_id=$1',[id]).catch(()=>[]);
+    await _run('DELETE FROM files WHERE category_id=$1',[id]).catch(()=>{});
+    await _run('DELETE FROM categories WHERE id=$1',[id]).catch(()=>{});
+    files.forEach(f => { cacheClear('file_'+f.id); cacheClear('prev_static_'+f.id); });
+    cacheClear('cat_'+id); cacheClearPrefix('cats_raw_'); cacheClearPrefix('showfiles_'); cacheClearPrefix('path_');
+    cacheClearPrefix('search_'); cacheClearPrefix('gsrc_');
+    if (global._clearSearchCache) global._clearSearchCache();
+  } catch(e) {
+    require('../utils/logger').error('[deleteCategory]', e.message);
+    throw e;
+  }
+};
+
+// يجلب المسار الكامل (spId,yrId,smId,sbId) انطلاقاً من category_id فقط.
+// استعلام واحد خفيف — يُستخدم لبناء زر رجوع صحيح عند فتح ملف من
+// "جديد/مفضلاتي/سجلي" حيث لا تتوفر السلسلة الكاملة مسبقاً.
+const { get: _get } = require('./db');
+const { cacheGet: _cg, cacheSet: _cs } = require('../utils/cache');
+async function getPathFromCategory(catId) {
+  if (!catId || catId == 0) return null;
+  const k = 'catpath_' + catId;
+  const cached = _cg(k);
+  if (cached) return cached;
+  const row = await _get(
+    `SELECT y.specialty_id as sp_id, s.year_id as yr_id, sub.semester_id as sm_id, c.subject_id as sb_id
+     FROM categories c
+     JOIN subjects sub ON c.subject_id = sub.id
+     JOIN semesters s ON sub.semester_id = s.id
+     JOIN years y ON s.year_id = y.id
+     WHERE c.id = $1`,
+    [catId]
+  ).catch(() => null);
+  if (!row) return null;
+  const path = { spId: row.sp_id, yrId: row.yr_id, smId: row.sm_id, sbId: row.sb_id, catId };
+  _cs(k, path, 600000);
+  return path;
+}
 
 module.exports = {
   getSpecs,getSpec,getYears,getYear,getSemesters,getSemester,getSubjects,getSubject,getCategories,getCategory,
   addSpec,renameSpec,deleteSpec,addYear,renameYear,deleteYear,
   addSemester,renameSemester,deleteSemester,addSubject,renameSubject,deleteSubject,
   addCategory,renameCategory,deleteCategory,
-  invalidateSpec,invalidateYear,invalidateSem,invalidateSub,invalidateCat
+  invalidateSpec,invalidateYear,invalidateSem,invalidateSub,invalidateCat,
+  getPathFromCategory
 };
