@@ -161,7 +161,13 @@ async function showFiles(ctx, spId, yrId, smId, sbId, catId, page) {
   var pd=staticData.pathData, allFiles=staticData.allFiles, bundles=staticData.bundles;
   var sp=pd.sp, yr=pd.yr, sm=pd.sm, sb=pd.sb, cat=pd.cat;
   var total=allFiles.length, list=allFiles.slice(page*PS,(page+1)*PS);
-  var text = (cat?'*'+escMd(cat.name)+'*\n':'')+'\n'+(total?'📄 *'+total+' ملف*':'لا توجد ملفات');
+  // 🔍 DEBUG مؤقت — يظهر القيم الفعلية عند فشل العثور على cat
+  if (!cat) {
+    require('../utils/logger').error('[showFiles DEBUG]',
+      'spId='+spId, 'yrId='+yrId, 'smId='+smId, 'sbId='+sbId, 'catId='+catId,
+      'pd.sp='+JSON.stringify(sp), 'pd.cat='+JSON.stringify(cat));
+  }
+  var text = (cat?'*'+escMd(cat.name)+'*\n':'⚠️ *DEBUG*: sp='+spId+' yr='+yrId+' sm='+smId+' sb='+sbId+' cat='+catId+' | cat موجود: '+(!!cat)+'\n')+'\n'+(total?'📄 *'+total+' ملف*':'لا توجد ملفات');
   var fileIds = list.map(function(f){ return f.id; });
   var favKey = 'favbatch_'+uid+'_'+catId+'_'+page;
   var favMap = cacheGet(favKey);
